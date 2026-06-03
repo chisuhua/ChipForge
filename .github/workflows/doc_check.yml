@@ -1,0 +1,94 @@
+name: Documentation Health Check
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - 'ip/**'
+      - 'tools/doc_checker.py'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'ip/**'
+      - 'tools/doc_checker.py'
+
+jobs:
+  doc-check:
+    runs-on: ubuntu-latest
+    name: Check Documentation Health
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout CppTLM (for framework path validation)
+        uses: actions/checkout@v4
+        with:
+          repository: chisuhua/CppTLM  # 根据实际仓库调整
+          path: CppTLM
+
+      - name: Checkout CppHDL (for framework path validation)
+        uses: actions/checkout@v4
+        with:
+          repository: chisuhua/CppHDL  # 根据实际仓库调整
+          path: CppHDL
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run documentation checks
+        id: doc_check
+        run: |
+          python tools/doc_checker.py --format text --verbose
+        continue-on-error: true
+
+      - name: Generate JSON report
+        if: always()
+        run: |
+          python tools/doc_checker.py --format json > doc_check_report.json
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-check-report
+          path: doc_check_report.json
+
+      - name: Comment on PR (if failure)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('doc_check_report.json', 'utf8'));
+
+            let body = '## 📋 文档检查报告\n\n';
+            body += `**总体状态**: ${report.passed ? '✅ 通过' : '❌ 失败'}\n\n`;
+
+            for (const [check, result] of Object.entries(report.checks || {})) {
+              const icon = result.passed ? '✅' : '❌';
+              body += `${icon} **${check}**: ${result.summary || ''}\n`;
+              if (!result.passed && result.errors) {
+                for (const err of result.errors.slice(0, 10)) {
+                  body += `  - ${err}\n`;
+                }
+                if (result.errors.length > 10) {
+                  body += `  - ... 还有 ${result.errors.length - 10} 个问题\n`;
+                }
+              }
+              body += '\n';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if checks did not pass
+        if: steps.doc_check.outcome == 'failure'
+        run: exit 1

@@ -76,5 +76,5 @@ Memory IP 提供主存储器建模，包括 SRAM（片上）和 DRAM（片外）
 | bank_conflict_count | counter | Bank 冲突次数 |
 
 ## 7. 相关文档
-- [项目架构总览](../docs/architecture/overview.md)
-- [接口设计详解](../docs/architecture/interface-design.md)
+- [项目架构总览](../../docs/architecture/overview.md)
+- [接口设计详解](../../docs/architecture/interface-design.md)

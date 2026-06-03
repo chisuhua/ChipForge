@@ -80,5 +80,5 @@ Interconnect IP 负责 SoC 内各组件（CPU、Cache、Memory、Peripheral）�
 | bandwidth_per_port | rate | 各端口带宽利用率 |
 
 ## 8. 相关文档
-- [项目架构总览](../docs/architecture/overview.md)
-- [接口设计详解](../docs/architecture/interface-design.md)
+- [项目架构总览](../../docs/architecture/overview.md)
+- [接口设计详解](../../docs/architecture/interface-design.md)

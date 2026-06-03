@@ -86,5 +86,5 @@ Peripheral IP 包含 SoC 的基础外设模块，提供中断控制、定时器�
 - Linux 设备驱动兼容性
 
 ## 6. 相关文档
-- [项目架构总览](../docs/architecture/overview.md)
-- [接口设计详解](../docs/architecture/interface-design.md)
+- [项目架构总览](../../docs/architecture/overview.md)
+- [接口设计详解](../../docs/architecture/interface-design.md)
