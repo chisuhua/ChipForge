@@ -18,6 +18,8 @@
 |  按产品形态装配组件，ImplMode 决定 TLM/RTL 混插比例               |
 +---------+------------------------------------------+-------------+
           | ch_stream<T>                              | Port<T>
+          | （模块内部设计接口）                      | （RTL 组件端口）
+          | StreamAdapter 自动映射为 Port              |
 +---------v----------------------------------+    +---v-------------------------------+
 |     CppTLM 组件层           |    |      CppHDL 组件层             |
 |  高速功能建模               |    |  周期精确 RTL 建模             |
@@ -37,6 +39,16 @@
 |            ImplMode      TxnTracker   MemoryMap                   |
 +------------------------------------------------------------------+
 ```
+
+> **架构层级说明：**
+> - **模块设计层**（IP 开发者视角）：使用 `ch_stream<Bundle>` 定义数据流
+> - **框架组装层**（SoC 集成者视角）：使用 Port 连接 + JSON 配置
+> - **StreamAdapter**：自动桥接两层，IP 开发者和 SoC 集成者各自独立工作
+>
+> ```
+> IP 开发者 ──→ ch_stream<T> ──→ [StreamAdapter] ──→ Port ──→ SoC 集成者
+>            （模块内部）      （自动转换，透明）   （JSON配置引用）
+> ```
 
 ### 组件模式切换
 
@@ -58,7 +70,12 @@ ImplMode::SHADOW     - RTL 跟踪 TLM，用于 RTL 调试
 所有硬件 IP（cpu / cache / memory / interconnect / peripheral）统一放在 `ip/` 目录下，每个 IP 是**完全独立的可验证单元**：
 
 - 每个 IP 包含 `tlm/`、`rtl/`、`test/`、`configs/` 四个子目录
-- 每个 IP 拥有独立的 CppTLM 验证环境（TrafficGen 驱动 + JSON 最小测试拓扑）
+- 每个 IP 拥有独立的验证环境，由以下组件构成：
+  - **驱动模块**（如 TrafficGen）：在 `ip/{module}/test/` 中实现，负责生成激励
+  - **JSON 最小测试拓扑**：在 `ip/{module}/configs/` 中定义，仅包含待测 IP + 驱动 + 监控
+  - **参考模型对比**：与 Spike 等 ISS 结果进行比对
+
+> 注：TrafficGen 等验证工具由 ChipForge 项目实现，CppTLM 仅提供框架支持。
 - TLM 实现用于高速验证和设计空间探索，RTL 实现用于周期精确验证
 - 新芯片形态（如 GPU）直接复用已有 IP 库
 
@@ -96,10 +113,10 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 
 ### Bundle 是核心纽带
 
-`bundles/` 目录的数据结构定义**同时被 CppTLM 和 CppHDL 引用**：
+`ChipForge/bundles/` 目录定义所有业务 Bundle（如 MemReqBundle、CacheReqBundle），这些 Bundle 基于 CppHDL 的类型系统（`ch_uint<N>`、`ch_bool`、`bundle_base<Self>`）构建，但不依赖任何一个框架的仿真引擎。CppTLM 通过序列化/反序列化将 Bundle 转换为内部 Packet 进行传输；CppHDL 直接操作 Bundle 信号。
 
-- CppTLM 中：`ch_stream<MemReqBundle>` 传递事务
-- CppHDL 中：`Port<MemReqBundle>` 定义 RTL 端口
+- CppTLM 中：模块设计时通过 `ch_stream<MemReqBundle>` 定义数据流接口。框架通过 StreamAdapter 自动将其映射为 Port，SoC 级 JSON 配置通过 Port 名称完成连接。模块开发者只需关注 ch_stream 层面的数据流设计。
+- CppHDL 中：`__input(Bundle)` / `__output(Bundle)` 定义 RTL 端口（直接操作 Bundle 信号）
 - 无需手工桥接层，接口天然一致
 
 ### SoC 层是 IP 组合器
@@ -110,6 +127,18 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 - 根据 `ImplMode` 参数决定各 IP 用 TLM 还是 RTL 实现
 - 不同产品形态只需新建一个 SoC JSON 配置文件
 - 通过 CppTLM 的 `ModuleFactory` + JSON 配置实现零代码装配
+
+ModuleFactory 是 CppTLM 提供的基础设施（`include/core/module_factory.hh`），支持：
+- JSON 配置解析（modules / connections）
+- 模块类型注册
+- 自动实例化和连接
+
+ChipForge 项目需要在各 IP 的 `tlm/` 目录中实现具体模块，并通过 `REGISTER_MODULE(type, class)` 宏注册到 ModuleFactory。例如：
+```cpp
+// ip/cpu/tlm/register.cpp
+#include "RiscvIssTlm.h"
+REGISTER_MODULE("RiscvIssTlm", RiscvIssTlm);
+```
 
 ```json
 {
