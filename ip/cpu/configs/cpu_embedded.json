@@ -1,0 +1,21 @@
+{
+  "name": "RiscvCpu_embedded",
+  "type": "cpu",
+  "params": {
+    "isa": "rv32imac",
+    "pipeline_stages": 3,
+    "clock_freq_mhz": 50,
+    "enable_pmp": true,
+    "enable_mmu": false,
+    "branch_predictor": "static",
+    "btb_entries": 16,
+    "icache_latency_cycles": 1,
+    "dcache_latency_cycles": 1
+  },
+  "ports": {
+    "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "dbus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "irq": {"type": "signal", "width": 8}
+  },
+  "stats": ["ipc", "cycles"]
+}

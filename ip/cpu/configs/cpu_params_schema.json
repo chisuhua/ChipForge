@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RISC-V CPU IP Configuration Schema",
+  "type": "object",
+  "properties": {
+    "name": {"type": "string", "description": "实例名称"},
+    "type": {"type": "string", "const": "cpu"},
+    "impl_mode": {
+      "type": "string",
+      "enum": ["TLM_ONLY", "RTL_ONLY", "COMPARE", "SHADOW"],
+      "default": "TLM_ONLY",
+      "description": "实现模式"
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "isa": {
+          "type": "string",
+          "enum": ["rv32i", "rv32im", "rv32imac", "rv64i", "rv64gc"],
+          "default": "rv64gc",
+          "description": "指令集架构"
+        },
+        "pipeline_stages": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12,
+          "default": 5,
+          "description": "流水线级数"
+        },
+        "clock_freq_mhz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000,
+          "default": 100,
+          "description": "时钟频率 (MHz)"
+        },
+        "enable_pmp": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用物理内存保护"
+        },
+        "enable_mmu": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用 MMU"
+        },
+        "mmu_mode": {
+          "type": "string",
+          "enum": ["sv32", "sv39", "sv48"],
+          "default": "sv39",
+          "description": "虚拟内存模式"
+        },
+        "branch_predictor": {
+          "type": "string",
+          "enum": ["static", "bimodal", "gshare", "tournament"],
+          "default": "gshare",
+          "description": "分支预测器类型"
+        },
+        "btb_entries": {
+          "type": "integer",
+          "enum": [16, 32, 64, 128, 256],
+          "default": 64,
+          "description": "BTB 条目数"
+        }
+      },
+      "required": ["isa"]
+    }
+  },
+  "required": ["name", "type", "params"]
+}

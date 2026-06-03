@@ -1,0 +1,22 @@
+{
+  "name": "RiscvCpu_default",
+  "type": "cpu",
+  "params": {
+    "isa": "rv64gc",
+    "pipeline_stages": 5,
+    "clock_freq_mhz": 100,
+    "enable_pmp": true,
+    "enable_mmu": true,
+    "mmu_mode": "sv39",
+    "branch_predictor": "gshare",
+    "btb_entries": 64,
+    "icache_latency_cycles": 1,
+    "dcache_latency_cycles": 1
+  },
+  "ports": {
+    "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "dbus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "irq": {"type": "signal", "width": 16}
+  },
+  "stats": ["ipc", "branch_miss_rate", "cache_hit_rate", "cycles"]
+}
