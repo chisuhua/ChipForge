@@ -1,0 +1,6 @@
+# 外部依赖（符号链接，不纳入版本控制）
+/CppTLM
+/CppHDL
+
+# 临时产物
+/patch.patch
