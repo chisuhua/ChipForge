@@ -77,85 +77,116 @@ enum class ImplMode {
 ## TLM 组件接口（CppTLM）
 
 ```cpp
-// cpu/tlm/RiscvIssTlm.h
-class RiscvIssTlm : public sc_module {
+// ═══════════════════════════════════════════════════════════════
+// TLM 组件设计视角（以 CPU ISS 为例）
+// ═══════════════════════════════════════════════════════════════
+
+// 模块继承 ChStreamModuleBase，不是 sc_module
+class RiscvIssTlm : public ChStreamModuleBase {
 public:
-    // 指令总线（ch_stream 接口）
-    ch_stream<MemReqBundle>*  ibus_req;
-    ch_stream<MemRespBundle>* ibus_resp;
-    // 数据总线
-    ch_stream<MemReqBundle>*  dbus_req;
-    ch_stream<MemRespBundle>* dbus_resp;
-    // 中断输入
-    sc_in<bool>     irq_timer;
-    sc_in<bool>     irq_software;
-    sc_in<uint32_t> irq_external;
+    RiscvIssTlm(const std::string& name, EventQueue* eq)
+        : ChStreamModuleBase(name, eq) {}
 
-    void execute_cycle();  // 驱动 ISS 执行一条指令
-
+    // ── ch_stream 是模块内部接口（设计视角）──
+    // 模块设计者从 ch_stream 角度思考数据流
+    // StreamAdapter 自动将其映射到 Port（框架视角）
 private:
-    std::unique_ptr<spike_t> spike_;  // Spike ISS 实例
+    // 内部 ch_stream 通道
+    ch_stream<MemReqBundle>  ibus_req_;    // 指令请求
+    ch_stream<MemRespBundle> ibus_resp_;   // 指令响应
+    ch_stream<MemReqBundle>  dbus_req_;    // 数据请求
+    ch_stream<MemRespBundle> dbus_resp_;   // 数据响应
 
-    uint32_t fetch(uint64_t pc) {
-        MemReqBundle req;
-        req.transaction_id = next_txn_id_++;
-        req.address  = pc;
-        req.is_write = false;
-        req.size     = 4;
-        ibus_req->push(req);
-        auto resp = ibus_resp->pop();
-        return static_cast<uint32_t>(resp.data);
+public:
+    void on_config_loaded() override {
+        // JSON 配置加载后回调
+        auto isa = get_param<std::string>("isa");   // "rv64gc"
+        auto stages = get_param<int>("pipeline_stages"); // 5
+    }
+
+    void tick() override {
+        // 每周期执行：取指 → 译码 → 执行 → 访存 → 写回
+        fetch_stage();
+        decode_stage();
+        execute_stage();
+        memory_stage();
+        writeback_stage();
     }
 };
+
+// ── 框架组装视角（用户无需关心）──
+// ModuleFactory 自动完成以下操作：
+// 1. 解析 JSON 配置，实例化 RiscvIssTlm
+// 2. 为每个 ch_stream 创建 StreamAdapter
+// 3. StreamAdapter 将 ch_stream 暴露为 MasterPort/SlavePort
+// 4. 通过 JSON 连接描述完成端口互连
+//
+// JSON 配置示例（soc 级别）：
+// {
+//   "modules": [
+//     {"name": "cpu_0", "type": "RiscvIssTlm", "params": {"isa": "rv64gc"}}
+//   ],
+//   "connections": [
+//     {"from": "cpu_0.ibus_req", "to": "icache_0.req_in"}
+//   ]
+// }
 ```
 
 ## RTL 组件接口（CppHDL）
 
 ```cpp
-// cache/rtl/L1CacheRtl.h
+// ═══════════════════════════════════════════════════════════════
+// RTL 组件设计视角（以 L1 Cache 为例）
+// ═══════════════════════════════════════════════════════════════
+
+// CppHDL 组件继承 Component
 class L1CacheRtl : public Component {
 public:
-    // 使用 __io 宏定义端口（与 TLM 完全相同的 Bundle 类型）
-    __io(
-        ch_in<CacheReqBundle>   cpu_req;
-        ch_out<CacheRespBundle> cpu_resp;
-        ch_out<MemReqBundle>    mem_req;
-        ch_in<MemRespBundle>    mem_resp;
-    )
+    // 端口声明（Bundle 类型）
+    __input(CacheReqBundle)   cpu_req;     // CPU 侧请求
+    __output(CacheRespBundle) cpu_resp;    // CPU 侧响应
+    __output(MemReqBundle)    mem_req;     // 下级存储请求
+    __input(MemRespBundle)    mem_resp;    // 下级存储响应
+
+    // 内部状态
+    ch_reg<ch_uint<32>> cache_tag[256];
+    ch_reg<ch_uint<64>> cache_data[256];
+    ch_reg<ch_bool>     valid_bits[256];
 
     void describe() override {
-        // 时序逻辑：通过 ch_reg 定义状态（寄存器）
-        ch_mem<ch_uint<64>, 256> cache_data("cache_data");
-        ch_mem<ch_uint<32>, 256> cache_tag("cache_tag");
-        ch_reg<ch_bool> valid_bits[256];
+        // 组合逻辑：缓存查询
+        auto req = io(cpu_req);
+        auto index = slice<7, 0>(req.address);
+        auto tag = slice<31, 8>(req.address);
 
-        // 组合逻辑：直接表达（当前周期内完成）
-        auto req = io().cpu_req;
-        auto index = bits<7, 0>(req.address);
-        auto tag   = bits<31, 8>(req.address);
-        auto tag_hit = (cache_tag.aread(index) == tag)
-                     & valid_bits[index];
+        auto tag_match = (cache_tag[index] == tag);
+        auto is_hit = tag_match & valid_bits[index];
 
-        // 输出驱动
+        // 驱动响应
         CacheRespBundle resp;
-        resp.transaction_id = req.transaction_id;
-        resp.data    = cache_data.aread(index);
-        resp.is_hit  = tag_hit;
-        resp.error_code = 0_d;
-        io().cpu_resp <<= resp;
+        resp.data = ch_sel(is_hit, cache_data[index], 0);
+        resp.hit = is_hit;
+        io(cpu_resp) <<= resp;
 
-        // 时序更新：写使能时更新缓存行
-        auto write_en = req.is_write & tag_hit;
-        cache_data.write(index, req.data, write_en);
-        cache_tag.write(index, tag, write_en);
+        // 时序逻辑：写命中时更新
+        auto write_en = req.is_write & is_hit;
+        cache_data[index] <<= ch_sel(write_en, req.data, cache_data[index]);
+        cache_tag[index] <<= ch_sel(write_en & !valid_bits[index], tag, cache_tag[index]);
+        valid_bits[index] <<= valid_bits[index] | write_en;
     }
 };
 ```
 
 ## SoC 组合层
 
+> **重要说明：** SoC 组装不直接操作 `ch_stream`。
+> 模块内部使用 `ch_stream` 定义数据流，StreamAdapter 自动将其映射为 Port。
+> SoC 层通过 JSON 配置 + ModuleFactory 引用端口名称完成连接。
+
 ```cpp
 // soc/RiscvVirtSoC.h
+// 推荐使用 JSON 配置驱动组装（见下方）
+// 以下手工 C++ 组装仅供理解参考
 class RiscvVirtSoC {
 public:
     explicit RiscvVirtSoC(ImplMode mode = ImplMode::TLM_ONLY);
@@ -180,7 +211,8 @@ private:
     std::unique_ptr<PlicTlm>       plic_;
     std::unique_ptr<UartTlm>       uart_;
 
-    void connect_all();  // Bundle 接口一致，自动连接
+    // 连接通过 Port 接口完成（由 StreamAdapter 从 ch_stream 自动映射而来）
+    void connect_all();
 };
 ```
 
