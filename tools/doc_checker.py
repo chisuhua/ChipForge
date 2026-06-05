@@ -160,7 +160,7 @@ class DocChecker:
         valid_links = 0
 
         # Markdown 链接正则：[text](path)
-        link_pattern = re.compile(r'\[([^\]]*)\]\(([^)]+)\)')
+        link_pattern = re.compile(r'\[((?:[^\[\]]|\\\[|\\\])*)\]\(((?:[^\(\)]|\([^\(\)]*\))+?)\)')
 
         # 收集所有 .md 文件（排除 attic/ 和符号链接目录）
         md_files = self._find_md_files()
