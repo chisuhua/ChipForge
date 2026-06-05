@@ -7,16 +7,16 @@
 ### 三级测试分层
 
 ```
-Level 3: 系统级
+Level C: 系统级
     Linux Boot -> Shell 交互 -> 应用程序运行
     Zephyr / FreeRTOS -> RTOS 系统调用
 
-Level 2: 功能级
+Level B: 功能级
     riscv-tests ISA 单元测试
     riscv-arch-test 合规测试
     CSR / PMP / 虚拟内存专项
 
-Level 1: 组件级
+Level A: 组件级
     各组件独立单元测试（Google Test / Catch2）
     L1CacheTlm vs L1CacheRtl 对比
 ```

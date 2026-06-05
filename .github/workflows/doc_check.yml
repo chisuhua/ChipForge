@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     name: Check Documentation Health
 
+    env:
+      CPPTLM_REPO: ${{ vars.CPPTLM_REPO || 'chisuhua/CppTLM' }}
+      CPPHDL_REPO: ${{ vars.CPPHDL_REPO || 'chisuhua/CppHDL' }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,13 +29,13 @@ jobs:
       - name: Checkout CppTLM (for framework path validation)
         uses: actions/checkout@v4
         with:
-          repository: chisuhua/CppTLM  # 根据实际仓库调整
+          repository: ${{ env.CPPTLM_REPO }}
           path: CppTLM
 
       - name: Checkout CppHDL (for framework path validation)
         uses: actions/checkout@v4
         with:
-          repository: chisuhua/CppHDL  # 根据实际仓库调整
+          repository: ${{ env.CPPHDL_REPO }}
           path: CppHDL
 
       - name: Setup Python

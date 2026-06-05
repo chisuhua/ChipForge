@@ -8,8 +8,9 @@
 
 核心设计原则：
 - **水平功能切片**：每个 Plugin 横跨多个流水线阶段
-- **Stageable 跨阶段数据通路**：Plugin 间通过 Stageable 共享数据
-- **服务发现模式**：Plugin 在 setup 阶段声明/发现能力
+- **PipeLink 跨阶段声明**：Plugin 间通过 PipeLink 共享数据
+- **PipeBuilder DSL 编译式调度**：Plugin 在 setup 阶段声明/发现能力
+- **权威设计**: 详见 [multi_isa_architecture.md](docs/multi_isa_architecture.md) v2.0
 
 > 📖 [VexRiscvArch.md](docs/riscv/VexRiscvArch.md) 为早期设计参考文档，仅供理解设计演进使用。
 
