@@ -45,10 +45,15 @@
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | isa | string | "rv64gc" | 指令集架构 |
-| pipeline_stages | int | 5 | 流水线级数 |
+| pipeline_stages | int (1-12) | 5 | 流水线级数 |
+| clock_freq_mhz | int (1-2000) | 100 | 时钟频率 (MHz) |
 | enable_pmp | bool | true | 物理内存保护 |
-| enable_mmu | bool | true | 虚拟内存（Sv39） |
-| branch_predictor | string | "gshare" | 分支预测器类型 |
+| enable_mmu | bool | true | 虚拟内存开关 |
+| mmu_mode | enum | "sv39" | sv32/sv39/sv48 |
+| branch_predictor | enum | "gshare" | static/bimodal/gshare/tournament |
+| btb_entries | enum | 64 | 16/32/64/128/256 |
+| icache_latency_cycles | int (0-32) | 1 | ICache 命中延迟 |
+| dcache_latency_cycles | int (0-32) | 1 | DCache 命中延迟 |
 
 ## 快速开始
 
