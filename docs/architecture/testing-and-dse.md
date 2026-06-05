@@ -183,7 +183,7 @@ public:
 
 参考 gem5 的 Stats 系统，每个 TLM 组件内置层次化统计收集：
 
-本项目采用 `tlm_stats` 命名空间实现统计收集框架，详见 [Performance Guide - §7 CPPLTLM Stats Framework](../performance-guide.md#7-cpptlm-统计收集框架)。
+本项目采用 `tlm_stats` 命名空间实现统计收集框架，详见 [Performance Guide - §7 CPPLTLM Stats Framework](performance-guide.md#7-cpptlm-统计收集框架)。
 
 #### 组件统计注
 
