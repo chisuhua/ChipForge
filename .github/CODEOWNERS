@@ -1,0 +1,19 @@
+# CODEOWNERS — auto-assign reviewers for each path
+# See https://docs.github.com/en/repositories/creating-and-managing-bundles/configuring-code-owners
+
+# Default: @maintainers for any unmatched path
+*                       @chipforge/maintainers
+
+# Architecture docs
+/docs/architecture/     @chipforge/arch-team
+/docs/roadmap/          @chipforge/arch-team
+
+# IP library
+/ip/                    @chipforge/ip-team
+
+# Tools and CI
+/tools/                 @chipforge/tools-team
+/.github/workflows/     @chipforge/tools-team
+
+# Schema and configs (critical — always review)
+/**/*.json              @chipforge/tools-team
