@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     name: Check Documentation Health
 
+    env:
+      CPPTLM_REPO: ${{ vars.CPPTLM_REPO || 'chisuhua/CppTLM' }}
+      CPPHDL_REPO: ${{ vars.CPPHDL_REPO || 'chisuhua/CppHDL' }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,28 +29,37 @@ jobs:
       - name: Checkout CppTLM (for framework path validation)
         uses: actions/checkout@v4
         with:
-          repository: chisuhua/CppTLM  # 根据实际仓库调整
+          repository: ${{ env.CPPTLM_REPO }}
           path: CppTLM
 
       - name: Checkout CppHDL (for framework path validation)
         uses: actions/checkout@v4
         with:
-          repository: chisuhua/CppHDL  # 根据实际仓库调整
+          repository: ${{ env.CPPHDL_REPO }}
           path: CppHDL
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest jsonschema
+
+      - name: Smoke-test the tool itself
+        run: |
+          python -m py_compile tools/doc_checker.py
+          python -m unittest tools.test_doc_checker -v
 
       - name: Run documentation checks
         id: doc_check
         run: |
           python tools/doc_checker.py --format text --verbose
-        continue-on-error: true
 
       - name: Generate JSON report
-        if: always()
+        if: success() || failure()
         run: |
           python tools/doc_checker.py --format json > doc_check_report.json
 
@@ -69,9 +82,15 @@ jobs:
             body += `**总体状态**: ${report.passed ? '✅ 通过' : '❌ 失败'}\n\n`;
 
             for (const [check, result] of Object.entries(report.checks || {})) {
-              const icon = result.passed ? '✅' : '❌';
-              body += `${icon} **${check}**: ${result.summary || ''}\n`;
-              if (!result.passed && result.errors) {
+              const icon = result.ok ? '✅' : '❌';
+              let summary = '';
+              if (result.passed !== undefined && result.total !== undefined) {
+                summary = `${result.passed}/${result.total}`;
+              } else if (result.count !== undefined) {
+                summary = `${result.count} issues`;
+              }
+              body += `${icon} **${check}**: ${summary}\n`;
+              if (!result.ok && result.errors) {
                 for (const err of result.errors.slice(0, 10)) {
                   body += `  - ${err}\n`;
                 }
@@ -89,6 +108,4 @@ jobs:
               body: body
             });
 
-      - name: Fail if checks did not pass
-        if: steps.doc_check.outcome == 'failure'
-        run: exit 1
+

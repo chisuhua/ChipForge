@@ -7,16 +7,16 @@
 ### 三级测试分层
 
 ```
-Level 3: 系统级
+Level C: 系统级
     Linux Boot -> Shell 交互 -> 应用程序运行
     Zephyr / FreeRTOS -> RTOS 系统调用
 
-Level 2: 功能级
+Level B: 功能级
     riscv-tests ISA 单元测试
     riscv-arch-test 合规测试
     CSR / PMP / 虚拟内存专项
 
-Level 1: 组件级
+Level A: 组件级
     各组件独立单元测试（Google Test / Catch2）
     L1CacheTlm vs L1CacheRtl 对比
 ```
@@ -183,60 +183,17 @@ public:
 
 参考 gem5 的 Stats 系统，每个 TLM 组件内置层次化统计收集：
 
-```cpp
-// metrics/statistics.h
-namespace stats {
-
-class Scalar {
-public:
-    void operator++();
-    void operator+=(uint64_t v);
-    uint64_t value() const;
-};
-
-class Distribution {
-public:
-    Distribution(uint64_t bucket_width, uint64_t num_buckets);
-    void sample(uint64_t value);       // 记录一次采样
-    double mean() const;
-    double percentile(double p) const; // p50, p95, p99
-};
-
-class Vector {
-public:
-    Vector(size_t size);               // 每核/每线程独立计数
-    Scalar& operator[](size_t idx);
-};
-
-class Formula {
-public:
-    Formula(std::function<double()> calc);  // 衍生指标
-    double value() const;
-};
-
-class StatGroup {
-public:
-    void add(const std::string& name, Scalar& stat);
-    void add(const std::string& name, Distribution& stat);
-    void add(const std::string& name, Formula& stat);
-
-    void export_json(const std::string& path) const;
-    void export_csv(const std::string& path) const;
-    void reset_all();
-};
-
-}  // namespace stats
-```
+本项目采用 `tlm_stats` 命名空间实现统计收集框架，详见 [Performance Guide - §7 CPPLTLM Stats Framework](performance-guide.md#7-cpptlm-统计收集框架)。
 
 #### 组件统计注
 
 ```cpp
 class L1CacheTlm : public ChStreamModuleBase {
-    stats::Scalar hits_, misses_, evictions_, writebacks_;
-    stats::Distribution miss_latency_;
-    stats::Formula hit_ratio_;
+    tlm_stats::Scalar hits_, misses_, evictions_, writebacks_;
+    tlm_stats::Distribution miss_latency_;
+    tlm_stats::Formula hit_ratio_;
 
-    void register_stats(stats::StatGroup& group) {
+    void register_stats(tlm_stats::StatGroup& group) {
         group.add("hits", hits_);
         group.add("misses", misses_);
         group.add("evictions", evictions_);

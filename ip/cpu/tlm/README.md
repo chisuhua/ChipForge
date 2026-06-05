@@ -1,5 +1,7 @@
 # CPU TLM 实现
 
+> ⚠️ **Status: Phase 5 Planning** — RTL not yet implemented.
+
 ## 概述
 基于 CppTLM 框架的 RISC-V ISS（指令集模拟器），采用 Plugin + Stageable 架构。
 

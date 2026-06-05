@@ -297,6 +297,8 @@ class RRIPPolicy   : public ReplacementPolicy { /* Re-reference Interval Predict
 
 ## 工程目录结构
 
+### 已建目录
+
 ```
 chipforge/
 +-- CMakeLists.txt
@@ -404,18 +406,18 @@ chipforge/
 |   +-- MultiCoreSoC.h/cpp          # SMP 多核形态
 |   +-- GpuSoC.h/cpp               # GPU 形态（Phase 5+）
 |
-+-- metrics/                        # * 统计收集框架
++-- metrics/                        # * 统计收集框架 (规划中, Phase 2 创建)
 |   +-- statistics.h                # Scalar/Distribution/Vector/Formula
 |   +-- stat_group.h                # 层次化统计组
 |   +-- stat_manager.h              # 全局统计管理器
 |   +-- stat_exporter.h             # JSON/CSV/gem5 格式导出
 |
-+-- verification/                   # 验证基础设施（跨 IP 共用）
++-- verification/                   # 验证基础设施（跨 IP 共用）(规划中, Phase 3 创建)
 |   +-- ScoreBoard.h/cpp            # TLM vs RTL 执行迹对比
 |   +-- SpikeBridge.h/cpp           # Spike co-simulation 接口
 |   +-- CoverageCollector.h/cpp     # 功能覆盖率收集
 |
-+-- sw/                             # 软件镜像（git submodules）
++-- sw/                             # 软件镜像（git submodules）(规划中, Phase 2 创建)
 |   +-- baremetal/
 |   |   +-- riscv-tests/            # 官方 ISA 测试
 |   |   +-- riscv-arch-test/        # 合规测试
@@ -430,14 +432,14 @@ chipforge/
 |       +-- buildroot/              # 根文件系统
 |
 +-- tools/                          # * DSE 工具链
-|   +-- dse/
+|   +-- dse/                        (规划中, Phase 2 创建)
 |   |   +-- sweep_driver.py         # 参数扫描驱动（并行执行）
 |   |   +-- pareto_analyzer.py      # Pareto 前沿计算
 |   |   +-- sensitivity_plot.py     # 敏感性分析可视化
-|   +-- config_gen/
+|   +-- config_gen/                 (规划中, Phase 2 创建)
 |       +-- topology_generator.py   # 拓扑配置生成工具
 |
-+-- scripts/
++-- scripts/                        (规划中, Phase 2 创建)
     +-- run_tests.py                # 测试驱动脚本
     +-- run_dse.py                  # 设计空间探索入口脚本
     +-- analyze_results.py          # DSE 结果分析

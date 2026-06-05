@@ -12,9 +12,10 @@
 | **MasterPort / SlavePort** | - | CppTLM 框架级组装接口，由 StreamAdapter 从 ch_stream 自动映射 | interface-design.md |
 | **Port** | - | 模块对外组装接口（框架视角），SoC JSON 配置通过 Port 名称连接模块 | interface-design.md |
 | **SimObject** | Simulation Object | CppTLM 的基础仿真对象，所有组件的基类 | overview.md |
-| **Stageable** | - | VexRiscv 风格的跨流水线阶段数据通路声明机制 | VexRiscvOnCppTLM.md |
 | **StreamAdapter** | Stream Adapter | ch_stream 到 Port 的双向适配层，由 ModuleFactory 自动创建，用户无需手动编码 | overview.md |
-| **Plugin** | - | 功能模块化单元，横跨多个流水线阶段实现特定功能 | VexRiscvOnCppTLM.md |
+| **PipeNode** | - | 声明式管线节点，承载 Plugin 行为 | multi_isa_architecture.md |
+| **PipeLink** | - | PipeNode 间的数据通道声明 | multi_isa_architecture.md |
+| **PipeBuilder** | - | 编译期调度生成器，将声明转为 TLM/RTL | multi_isa_architecture.md |
 
 ## 接口与数据结构
 

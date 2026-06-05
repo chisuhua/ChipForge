@@ -61,10 +61,43 @@
           "enum": [16, 32, 64, 128, 256],
           "default": 64,
           "description": "BTB 条目数"
+        },
+        "icache_latency_cycles": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32,
+          "default": 1,
+          "description": "ICache 命中延迟"
+        },
+        "dcache_latency_cycles": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32,
+          "default": 1,
+          "description": "DCache 命中延迟"
         }
       },
-      "required": ["isa"]
+      "required": ["isa"],
+      "allOf": [
+        {"if": {"properties": {"enable_mmu": {"const": true}}}, "then": {"required": ["mmu_mode"]}},
+        {"if": {"properties": {"isa": {"enum": ["rv32i", "rv32im", "rv32imac"]}}}, "then": {"properties": {"mmu_mode": {"const": "sv32"}}}}
+      ]
+    },
+    "ports": {
+      "type": "object",
+      "description": "外部端口定义",
+      "properties": {
+        "ibus": {"type": "object"},
+        "dbus": {"type": "object"},
+        "irq": {"type": "object"}
+      }
+    },
+    "stats": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "统计指标列表"
     }
   },
-  "required": ["name", "type", "params"]
+  "required": ["name", "type", "params"],
+  "additionalProperties": false
 }

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 """ChipForge 文档健康度自动检查工具
 
@@ -159,7 +160,7 @@ class DocChecker:
         valid_links = 0
 
         # Markdown 链接正则：[text](path)
-        link_pattern = re.compile(r'\[([^\]]*)\]\(([^)]+)\)')
+        link_pattern = re.compile(r'\[((?:[^\[\]]|\\\[|\\\])*)\]\(((?:[^\(\)]|\([^\(\)]*\))+?)\)')
 
         # 收集所有 .md 文件（排除 attic/ 和符号链接目录）
         md_files = self._find_md_files()
@@ -624,7 +625,7 @@ class DocChecker:
     def _find_md_files(self) -> List[Path]:
         """查找项目中所有 .md 文件（排除 attic/、.git/、符号链接目录中的文件）"""
         md_files: List[Path] = []
-        exclude_dirs = {"attic", ".git", "node_modules", "__pycache__"}
+        exclude_dirs = {"attic", ".git", ".omo", "node_modules", "__pycache__"}
 
         for root, dirs, files in os.walk(self.root, followlinks=False):
             root_path = Path(root)
@@ -644,7 +645,7 @@ class DocChecker:
     def _find_project_files(self) -> List[Path]:
         """查找项目中所有文件（排除 attic/、.git/、符号链接目录）"""
         project_files: List[Path] = []
-        exclude_dirs = {"attic", ".git", "node_modules", "__pycache__"}
+        exclude_dirs = {"attic", ".git", ".omo", "node_modules", "__pycache__"}
 
         for root, dirs, files in os.walk(self.root, followlinks=False):
             root_path = Path(root)

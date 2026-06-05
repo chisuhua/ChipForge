@@ -4,3 +4,35 @@
 
 # 临时产物
 /patch.patch
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+build/
+dist/
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.dylib
+
+# OS
+.DS_Store

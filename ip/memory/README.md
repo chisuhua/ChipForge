@@ -1,5 +1,7 @@
 # Memory IP 设计文档
 
+> ⚠️ **Status: Planning** — Code not yet implemented. See [Phase 1 roadmap](../../docs/roadmap/phases/phase-1-foundation.md) for planned structure.
+
 ## 1. 功能概述
 
 ### 1.1 模块定位
