@@ -57,7 +57,6 @@
 |---------|----------------|---------|------|
 | ch_stream 模块基类 | `CppTLM/include/core/chstream_module.hh` | `ChStreamModuleBase` | 支持 ch_stream 通信的模块基类 |
 | ch_stream 端口 | `CppTLM/include/core/chstream_port.hh` | `ChStreamInitiatorPort` / `ChStreamTargetPort` | ch_stream 握手端口 |
-| ch_stream 适配器工厂 | `CppTLM/include/core/chstream_adapter_factory.hh` | `ChStreamAdapterFactory` | 自动创建 StreamAdapter |
 | ch_stream 注册 | `CppTLM/include/chstream_register.hh` | - | ch_stream 模块注册宏 |
 | 适配层基类 | `CppTLM/include/framework/stream_adapter.hh` | `StreamAdapterBase` | ch_stream ↔ Port 转换 |
 | 输入适配器 | `CppTLM/include/framework/stream_adapter.hh` | `InputStreamAdapter<T>` | SlavePort → ch_stream |
