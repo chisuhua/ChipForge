@@ -42,6 +42,17 @@ target_compile_options(cf_plugin INTERFACE
   $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
 )
 
+# 可选: 覆盖率测量 (gcov)
+option(CF_PLUGIN_COVERAGE "Enable gcov coverage for cf_plugin tests" OFF)
+if(CF_PLUGIN_COVERAGE)
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(WARNING "CF_PLUGIN_COVERAGE works best with Debug build")
+  endif()
+  target_compile_options(cf_plugin INTERFACE --coverage -O0 -g)
+  target_link_libraries(cf_plugin INTERFACE --coverage)
+  message(STATUS "  cf_plugin:        coverage enabled (gcov)")
+endif()
+
 # ----------------------------------------------------------------------------
 # 单元测试 (使用纯 main() + assert, 暂不引入 Catch2)
 # ----------------------------------------------------------------------------
@@ -87,6 +98,26 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_hello_plugin.cpp)
   add_executable(test_hello_plugin tests/test_hello_plugin.cpp)
   target_link_libraries(test_hello_plugin PRIVATE cf_plugin)
   add_test(NAME test_hello_plugin COMMAND test_hello_plugin)
+endif()
+
+# Phase 0 §2.3 集成标准: 与 CppTLM ChStreamModuleBase + CppHDL ch::Component 共存
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_coexistence.cpp)
+  add_executable(test_coexistence tests/test_coexistence.cpp)
+  target_link_libraries(test_coexistence
+    PRIVATE
+      cf_plugin
+      cpptlm_core
+      cpphdl
+  )
+  target_include_directories(test_coexistence
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}/CppTLM/include
+      ${CMAKE_SOURCE_DIR}/CppTLM/external/json
+      ${CMAKE_SOURCE_DIR}/CppHDL/include
+  )
+  # CppHDL uses C++20 (std::source_location); CppTLM is C++17 compatible
+  set_target_properties(test_coexistence PROPERTIES CXX_STANDARD 20)
+  add_test(NAME test_coexistence COMMAND test_coexistence)
 endif()
 
 # ----------------------------------------------------------------------------

@@ -1,10 +1,11 @@
 # Phase 0：Plugin 最小脚手架
 
-> **Status**: In Progress (5/5 P0 组件已完成, 51/51 单元测试 PASS)
+> **Status**: ✅ Completed (2026-06-08, 5/5 P0 组件 + 全部退出标准 v2 达成)
 > **Milestone**: M0 - Plugin 脚手架可运行
 > **Depends on**: None
 > **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md`
 > **目标版本**: ChipForge 0.0.x（脚手架基线）
+> **退出日期**: 2026-06-08
 
 **目标**：建立 Plugin-style 设计的基础脚手架（scaffolding），为 Phase1 业务逻辑（L1CachePlugin 等）提供可执行的运行时支撑。
 

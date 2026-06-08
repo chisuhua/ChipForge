@@ -66,17 +66,13 @@ set(BUILD_RTL         OFF CACHE BOOL "CppTLM RTL bridge"   FORCE)
 set(USE_SYSTEMC_STUB  ON  CACHE BOOL "CppTLM SystemC stub" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/CppTLM cpptlm_build)
 
-# ─── CppHDL v1.0.0: HDL 框架 ⏸️ 暂时禁用 ───
-# 阻塞原因: CppHDL/tests/CMakeLists.txt:38 引用 `../../examples/...` 路径错误
-#   (在 CppHDL 作为子目录时,../../ 出 CppHDL 范围;实际路径应在 ../examples/...)
-# 状态: 上游 bug,见 CppHDL AGENTS.md 备注 "riscv-mini: API updates needed"
-# 影响: CppHDL 整个 add_subdirectory 失败,阻塞 HDL 框架集成
-# 决策: Phase 0 暂不需 CppHDL (Plugin 脚手架是纯 C++17 框架)
-#       Phase 1+ 再评估 (可能采用独立构建 + find_package)
-#
-# 恢复方法 (CppHDL 修复后):
-#   set(CH_JIT_ENABLE OFF CACHE BOOL "CppHDL JIT" FORCE)
-#   add_subdirectory(${CMAKE_SOURCE_DIR}/CppHDL cpphdl_build)
+# ─── CppHDL v1.0.0: HDL 框架 ✅ 已集成 ───
+# 阻塞已解除: CppHDL/tests/CMakeLists.txt 改用 ${PROJECT_SOURCE_DIR}/examples/...
+#   (commit 7fe4a5d "fix path", 2026-06-08 之前修复)
+# 关闭 JIT 避免 LLVM 依赖; Phase 0 Plugin 脚手架是纯 C++17, 不直接用 ch::Component
+#   但集成以便 Phase 5 (RTL 协同) 时零修改切换
+set(CH_JIT_ENABLE     OFF CACHE BOOL "CppHDL JIT (requires LLVM)" FORCE)
+add_subdirectory(${CMAKE_SOURCE_DIR}/CppHDL cpphdl_build)
 
 # ════════════════════════════════════════════════════════════════════
 # ChipForge 自身目标 (按 Phase 顺序逐步添加)
@@ -95,6 +91,15 @@ add_subdirectory(src/cf_plugin)   # Phase 0  ✅ 已就位 (空占位)
 # (子目录 src/cf_plugin/CMakeLists.txt 自身有 enable_testing(), 此处冗余声明为安全)
 enable_testing()
 
+# ----------------------------------------------------------------------------
+# 静态检查 (D4 决策强制): 无 test pass, exit code 反映合规
+# ----------------------------------------------------------------------------
+add_test(
+  NAME verify_plugin_decision
+  COMMAND ${CMAKE_SOURCE_DIR}/tools/verify_plugin_decision.sh
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # ════════════════════════════════════════════════════════════════════
 # 输出目录
 # ════════════════════════════════════════════════════════════════════
@@ -109,7 +114,7 @@ message(STATUS "")
 message(STATUS "ChipForge ${PROJECT_VERSION} Configuration")
 message(STATUS "  C++ Standard:    C++${CMAKE_CXX_STANDARD}")
 message(STATUS "  CppTLM:          v2.1.0  (tests/examples/docs/rtl-bridge off)")
-message(STATUS "  CppHDL:          DISABLED (upstream tests/CMakeLists.txt bug)")
+message(STATUS "  CppHDL:          v1.0.0  (JIT off; examples/tests off by default)")
 message(STATUS "  ccache:          ${CCACHE_PROGRAM}")
 message(STATUS "  ASan:            ${ENABLE_ASAN}")
 message(STATUS "  Build type:      ${CMAKE_BUILD_TYPE}")

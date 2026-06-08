@@ -95,8 +95,8 @@
 | PA-2 | 文档 | M5: `declarative-hybrid-framework.md` §12.0.3 责任归属表 | TBD | ✅ 已完成 (2026-06-08, v2.0.3) | P1 |
 | PA-3 | 文档 | 处置 `phase-1-foundation.md`(旧 vs 新 phase-1-tlm-foundation.md) | TBD | ✅ 已完成 (2026-06-08, 添加废弃标记) | P2 |
 | PA-4a | 构建 | CppTLM 集成 + 根 CMakeLists.txt 升级 | TBD | ✅ 已完成 (2026-06-08) | P1 |
-| PA-4b | 构建 | CppHDL 集成(阻塞: CppHDL 上游 tests 路径 bug) | TBD | ⏸️ 等待 CppHDL 修复 | P2 |
-| PA-5 | 验证 | V1: `tools/verify_plugin_decision.sh`(可选) | TBD | 🔄 待办 | P3 |
+| PA-4b | 构建 | CppHDL 集成(阻塞: CppHDL 上游 tests 路径 bug) | TBD | ✅ 已完成 (2026-06-08, 上游修复后集成) | P2 |
+| PA-5 | 验证 | V1: `tools/verify_plugin_decision.sh`(可选) | TBD | ✅ 已完成 (2026-06-08, 3/3 PASS) | P3 |
 
 ---
 
@@ -157,6 +157,7 @@
 
 | 日期 | 事件 |
 |------|------|
+| 2026-06-08 | **本次会话续三**: CppHDL 集成已恢复(上游 commit 7fe4a5d 修复);test_coexistence 5/5 PASS(CppTLM+CppHDL 共存);PA-5 verify_plugin_decision.sh 3/3 PASS;coverage 测量设施就位;`docs/api/cf_plugin.md` API 文档(Doxygen 替代);Phase 0 退出标准 v2 全部达成(Status: ✅ Completed);7/7 ctest 100% PASS |
 | 2026-06-08 | **本次会话续二**: Phase 0 P0 #1-5 全部实施完成 (51/51 单元测试 PASS);PluginBase + Payload<T> + PipeNode + PipeBuilder + CtrlLink;ctest 聚合 5/5 PASS in 0.61s |
 | 2026-06-08 | **本次会话终**: 创建 `src/cf_plugin/` 工作区 (CMakeLists.txt + README.md);`cf_plugin` INTERFACE 库已注册;cmake configure 0 错误 (1.3s + 2.9s);Phase 0 实施基础设施就绪 |
 | 2026-06-08 | **本次会话续**: 根 `CMakeLists.txt` STUB → 真实集成 (v0.0.1);CppTLM 子模块已集成 (configure 0 错误, cpptlm_core 目标可达, 5+ .o 编译成功);CppHDL 因上游 tests 路径 bug 暂缓 (PA-4b 跟踪);`compile_commands.json` 已生成 |
