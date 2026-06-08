@@ -2,11 +2,13 @@
 
 | 字段 | 值 |
 |------|-----|
-| 版本号 | 2.0.2 |
+| 版本号 | 2.0.3 |
 | 日期 | 2026-06-08 |
 | 状态 | **Active (混合：已实现 + Phase 0/6 提案)** |
 | 适用范围 | ChipForge 全局（任意 IP 通用） |
 | 修订依据 | 战略决策 DECISION-2026-06-08-01（Plugin 范式 + Phase 0 脚手架）|
+
+> **v2.0.3 变更**: §12.0.3 责任归属表新增 "Phase 归属" 列;所有 Owner 标记为 "TBD" 待用户指派。
 
 > ⚠️ **重要：本文档混合了"已实现框架"与"Phase 1 设计提案"**
 >
@@ -1258,19 +1260,27 @@ CppTLM AGENTS.md 明确：
 
 #### 12.0.3 责任归属（明确缺失）
 
-| 设计草案 | 当前 Owner | 状态 |
-|----------|-----------|------|
-| §4 Plugin 模型 | **未指定** | 阻塞 Phase 1 启动 |
-| §5.5 BundleMapper | **未指定** | 可独立实施 |
-| §5.7 Symbolic<T> 运行时抽象 | **未指定** | 可与 §5.5 并行 |
-| §6 ImplMode | **未指定** | 阻塞 Phase 1c |
-| §7 PipeNode/PipeBuilder | **未指定** | 阻塞 Phase 1 启动 |
-| §9 验证策略 | **未指定** | 可与 §6 并行 |
-| §10 L1 Cache 双模式 | **未指定** | Phase 1c 依赖 |
-| **Phase 0 脚手架** | **未指定** | 阻塞 Phase 1 启动（D1 决策）|
-| **Phase 1 L1CachePlugin** | **未指定** | 依赖 Phase 0 完成（D2 决策）|
+> **v2.0.3 更新**: 新增 "Phase 归属" 列映射到路线图新阶段;所有 Owner 标记为 TBD 待用户指派。
+
+| 设计草案 | Phase 归属 | 当前 Owner | 状态 |
+|----------|----------|-----------|------|
+| §4 Plugin 模型 | Phase 0 (P0 #1-5) | TBD | 阻塞 Phase 1 启动 |
+| §5.5 BundleMapper | Phase 6 (完整) / Phase 0 (uint_t<N> 替代) | TBD | Phase 0 用 uint_t<N> 编译期切换 |
+| §5.7 Symbolic<T> 运行时抽象 | Phase 6 | TBD | 可与 §5.5 并行 |
+| §6 ImplMode | Phase 6 | TBD | 阻塞 Phase 1c |
+| §7 PipeNode/PipeBuilder | Phase 0 (P0 #3 #4) | TBD | 阻塞 Phase 1 启动 |
+| §9 验证策略 | Phase 6 (完整) / Phase 1+ (随业务展开) | TBD | 可与 §6 并行 |
+| §10 L1 Cache 双模式 | Phase 1 (L1CachePlugin) + Phase 5 (RTL) | TBD | Phase 1 依赖 Phase 0 |
+| **Phase 0 脚手架** | Phase 0 | TBD | 阻塞 Phase 1 启动（D1 决策）|
+| **Phase 1 L1CachePlugin** | Phase 1 | TBD | 依赖 Phase 0 完成（D2 决策）|
+| **Phase 6 完整 PipeBuilder** | Phase 6 | TBD | 依赖 2-3 个 Plugin 稳定（D5 决策）|
 
 **v2.0.1 行动项**：在 Phase 1 启动前，§12.0.3 必须为每个 🚧 章节指定 Owner；否则 Phase 1 启动会议应**冻结**所有相关章节的设计。
+
+**v2.0.3 行动项**: 用户指派 Owner 后,需同步:
+1. 更新本表"当前 Owner"列
+2. 在 `.omo/plans/` 下创建对应 Phase 实施计划(由 Owner 起草)
+3. 在 `docs/roadmap/roadmap-status.md` §3 "当前未决项" 中关闭对应 PA-2 项
 
 ### 12.1 已实现项 ✅（可直接使用）
 
@@ -1377,4 +1387,4 @@ Phase 0 完成后，以下 5 个接口在 Phase 1-5 期间**保持稳定**（仅
 
 ---
 
-*文档结束。本版本（v2.0.2）已应用战略决策（2026-06-08）的 Plugin 范式 + Phase 0/6 拆分（详见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`）；v2.0.1 审查修复与 v2.0 → v2.0.1 增量保留为历史基线。*
+*文档结束。本版本（v2.0.3, 2026-06-08）已应用战略决策（2026-06-08）的 Plugin 范式 + Phase 0/6 拆分 + §12.0.3 责任归属映射（详见 `.omo/drafts/decision-plugin-framework-2026-06-08.md` 与 `.omo/plans/plugin-framework-revision-plan.md`）；v2.0.1 审查修复与 v2.0 → v2.0.1 → v2.0.2 增量保留为历史基线。*

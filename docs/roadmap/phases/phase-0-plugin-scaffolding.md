@@ -1,6 +1,6 @@
 # Phase 0：Plugin 最小脚手架
 
-> **Status**: Not Started
+> **Status**: In Progress (5/5 P0 组件已完成, 51/51 单元测试 PASS)
 > **Milestone**: M0 - Plugin 脚手架可运行
 > **Depends on**: None
 > **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md`

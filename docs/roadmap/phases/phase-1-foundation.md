@@ -1,5 +1,24 @@
 # Phase 1：基础框架搭建
 
+> **⚠️ 已废弃 (DEPRECATED) — 2026-06-08**
+>
+> 本文档已被 [phase-1-tlm-foundation.md](phase-1-tlm-foundation.md) 取代。
+>
+> **废弃原因**:
+> - 原 Phase 1 任务基于"先做 CppTLM/CppHDL 框架集成,再做 L1Cache"线性推进
+> - 新 Phase 1 任务基于 D4 决策,采用 **Plugin-style 设计**(无 `tick()`、无状态机、Bundle 用 `uint_t<N>`)
+> - 新增 Phase 0(Plugin 最小脚手架)作为前置依赖
+>
+> **替代文档**: [phase-1-tlm-foundation.md](phase-1-tlm-foundation.md) — 第一个 Plugin-style IP = L1CachePlugin
+>
+> **保留本文件的原因**: 历史参考。如需了解原始 Phase 1 任务设计,可阅读本文档;但实施请遵循新文档。
+>
+> **决策依据**: [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md) (D1-D11)
+
+---
+
+# Phase 1：基础框架搭建
+
 > **Status**: Not Started
 > **Milestone**: M1 - Hello World
 > **Depends on**: None
