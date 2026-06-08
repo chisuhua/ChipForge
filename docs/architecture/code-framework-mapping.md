@@ -15,30 +15,48 @@
 >
 > 已知限制:本文档列举的为常用 API 路径,非穷尽列表。具体实现以代码为准。
 
+> 📊 **实现状态图例**
+>
+> 本文档涉及的概念混合了**已实现代码**与**架构设计目标**。为避免误导读者，特标注以下状态：
+>
+> - ✅ **[已实现]**：CppTLM/CppHDL 框架层代码中已存在，可在 C++ 中直接引用
+> - 🔧 **[框架层已实现]**：框架层接口完整，但 ChipForge 应用层尚未调用或封装
+> - 🚧 **[设计阶段]**：仅存在于架构设计文档（`overview.md` / `interface-design.md` / `ip/cpu/docs/multi_isa_architecture.md`），代码尚未实现
+> - ❌ **[文档与代码背离]**：架构文档声称已实现，但实际代码不存在（详见第 7 节"实现状态与设计目标对比"）
+>
+> 默认未标注条目均为 ✅ **[已实现]**。
+
 ## 1. 总体架构层次
 
 ```
-┌─────────────────────────────────────────────────┐
-│ ChipForge 应用层                                │
-│ ├── ip/*/tlm/   → TLM 模块实现                  │
-│ ├── ip/*/rtl/   → RTL 模块实现                  │
-│ ├── bundles/    → 共享 Bundle 定义              │
-│ └── soc/        → JSON 配置 + 组装              │
-├─────────────────────────────────────────────────┤
-│ CppTLM 框架层                                   │
-│ ├── SimObject / EventQueue   → 仿真引擎         │
-│ ├── ChStreamModuleBase       → ch_stream 模块   │
-│ ├── StreamAdapter            → 自动适配层       │
-│ ├── ModuleFactory            → JSON 配置驱动    │
-│ └── Metrics                  → 统计收集         │
-├─────────────────────────────────────────────────┤
-│ CppHDL 框架层                                   │
-│ ├── Component                → RTL 组件基类     │
-│ ├── ch_module<T>             → 子模块实例化     │
-│ ├── bundle_base<Self>        → Bundle 类型系统  │
-│ └── Simulator                → RTL 仿真引擎     │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ ChipForge 应用层                                            │
+│ ├── ip/*/tlm/   → TLM 模块实现 (空目录，参见 §7)            │
+│ ├── ip/*/rtl/   → RTL 模块实现 (空目录，参见 §7)            │
+│ ├── bundles/    → 共享 Bundle 定义 (目录为空，参见 §7)       │
+│ └── soc/        → JSON 配置 + 组装                          │
+├─────────────────────────────────────────────────────────────┤
+│ CppTLM 框架层                                               │
+│ ├── SimObject / EventQueue   → 仿真引擎                     │
+│ ├── ChStreamModuleBase       → ch_stream 模块               │
+│ ├── StreamAdapter            → 自动适配层（已实现 ~800 行） │
+│ ├── ChStreamAdapterFactory   → JSON 类型注册中心            │
+│ ├── CoherenceDomain / VC     → NoC / 一致性原语（§2.7）     │
+│ ├── ModuleFactory            → JSON 配置驱动                │
+│ └── Metrics                  → 统计收集                     │
+├─────────────────────────────────────────────────────────────┤
+│ CppHDL 框架层                                               │
+│ ├── Component                → RTL 组件基类                 │
+│ ├── ch_module<T>             → 子模块实例化                 │
+│ ├── bundle_base<Self>        → Bundle 类型系统              │
+│ ├── chlib/*                  → 25 个 HDL 高级组件（§3.5）   │
+│ ├── axi4/*                   → AXI4 参考实现（§3.6）        │
+│ ├── codegen_verilog.h        → Verilog 代码生成             │
+│ └── Simulator                → RTL 仿真引擎                 │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+> **实现边界说明**：上述架构图中，**框架层（CppTLM/CppHDL）**部分全部已实现。ChipForge 应用层仅 `soc/riscv_virt.json` 与 IP 目录骨架（`README.md` / `.gitkeep`）存在，具体 IP 实现 / Bundle 定义 / SoC 装配类尚未构建，详见第 7 节"实现状态与设计目标对比"。
 
 ## 2. CppTLM 框架映射
 
@@ -53,16 +71,19 @@
 
 ### 2.2 ch_stream 通信体系
 
+> **路径变更说明（2026-06-02）**：`StreamAdapterBase` 基类已从 `framework/stream_adapter.hh` 迁出至 `core/stream_adapter_base.hh`，以打破 core↔framework 循环依赖。具体适配器类（`InputStreamAdapter` / `OutputStreamAdapter` / `StreamAdapter`）仍保留在 `framework/stream_adapter.hh`。
+
 | 文档概念 | CppTLM 代码位置 | 类/接口 | 说明 |
 |---------|----------------|---------|------|
 | ch_stream 模块基类 | `CppTLM/include/core/chstream_module.hh` | `ChStreamModuleBase` | 支持 ch_stream 通信的模块基类 |
 | ch_stream 端口 | `CppTLM/include/core/chstream_port.hh` | `ChStreamInitiatorPort` / `ChStreamTargetPort` | ch_stream 握手端口 |
 | ch_stream 注册 | `CppTLM/include/chstream_register.hh` | - | ch_stream 模块注册宏 |
-| 适配层基类 | `CppTLM/include/framework/stream_adapter.hh` | `StreamAdapterBase` | ch_stream ↔ Port 转换 |
+| 适配层基类 | `CppTLM/include/core/stream_adapter_base.hh` | `cpptlm::StreamAdapterBase` | ch_stream ↔ Port 转换（**已迁出 framework/**） |
 | 输入适配器 | `CppTLM/include/framework/stream_adapter.hh` | `InputStreamAdapter<T>` | SlavePort → ch_stream |
 | 双向适配器 | `CppTLM/include/framework/bidirectional_port_adapter.hh` | `BidirectionalPortAdapter` | 请求/响应双向适配 |
 | 双端口适配器 | `CppTLM/include/framework/dual_port_stream_adapter.hh` | `DualPortStreamAdapter` | 双端口流适配 |
 | 多端口适配器 | `CppTLM/include/framework/multi_port_stream_adapter.hh` | `MultiPortStreamAdapter` | 多端口聚合 |
+| 适配器工厂 | `CppTLM/include/framework/chstream_adapter_factory.hh` | `ChStreamAdapterFactory` | JSON 驱动的类型注册中心（单例），支持 `registerFactory` / `registerAdapter` / `create` / `knows` |
 | 调试追踪器 | `CppTLM/include/framework/debug_tracker.hh` | `DebugTracker` | 调试信息追踪 |
 
 ### 2.3 端口与连接
@@ -114,6 +135,15 @@
 | CppHDL 类型 | `CppTLM/include/bundles/cpphdl_types.hh` | CppHDL 类型支持 |
 | Bundle 序列化 | `CppTLM/include/bundles/bundle_serialization.hh` | Bundle ↔ Packet 转换 |
 
+### 2.7 NoC 与缓存一致性原语
+
+> **实现状态**：框架层已实现，应用于 ChipForge NoC 仿真（Phase 4.x）。这两个原语是 CppTLM 高层抽象，开发者一般通过 `ModuleFactory` 间接使用。
+
+| 文档概念 | CppTLM 代码位置 | 类/接口 | 说明 |
+|---------|----------------|---------|------|
+| 一致性域 | `CppTLM/include/core/coherence_domain.hh` | `CoherenceDomain` / `DomainRegistry` / `enum class Protocol { MESI, MOESI }` | Phase 4.2/4.3 缓存一致性模块：snoop fanout、bridge map、home-node 查找 |
+| 虚拟通道 | `CppTLM/include/core/virtual_channel.hh` | `InputVC` / `OutputVC`（含嵌套 `Stats`） | VC 缓冲区，提供 `enqueue` / `front` / `pop` / `trySend` 接口、容量、优先级、per-VC 统计 |
+
 ## 3. CppHDL 框架映射
 
 ### 3.1 组件模型
@@ -137,7 +167,18 @@
 | 存储器 | `CppHDL/include/core/mem.h` | `ch_mem` | 存储器原语 |
 | IO 端口 | `CppHDL/include/core/io.h` | `ch_logic_in` / `ch_logic_out` | 输入/输出端口 |
 | 字面量 | `CppHDL/include/core/literal.h` | `ch_literal` | 硬件字面值 |
-| 运算符 | `CppHDL/include/core/operators.h` | - | 硬件运算符重载 |
+| 运算符 | `CppHDL/include/core/operators.h` | - | 硬件运算符重载（编译期） |
+| 模拟数据类型 | `CppHDL/include/core/types.h` | `sdata_type` / `ch::core::constants::*` | 框架内部仿真数据原语与常量 |
+| 全局仿真上下文 | `CppHDL/include/core/context.h` | `ch::core::Context` | `thread_local` 仿真状态：管理 lnode 集合、求值阶段 |
+| 方向标签 | `CppHDL/include/core/direction.h` | `input_direction` / `output_direction` / `internal_direction` | 端口方向空类型标签 + `is_input_v` / `is_output_v` 特性 |
+| 节点构建器 | `CppHDL/include/core/node_builder.h` | `ch::core::node_builder` | 单例工厂类，是构造 lnode 的首选接口（**避免直接操作 lnode**，参见 AGENTS.md 反模式） |
+| lnode 前向声明 | `CppHDL/include/core/lnode.h` | - | lnode 类型前向声明 |
+| lnode 运行时多态 | `CppHDL/include/core/lnodeimpl.h` | - | lnode 运行时多态支持 |
+| 逻辑缓冲 | `CppHDL/include/core/logic_buffer.h` | `LogicBuffer` | 信号传播 + 时序封装 |
+| 运行时运算符 | `CppHDL/include/core/operators_runtime.h` | - | 运行时运算符（必须与 `operators.h` 同步维护，参见 AGENTS.md） |
+| 求值后端接口 | `CppHDL/include/core/eval_backend.h` | - | 求值后端抽象接口 |
+| 解释器后端 | `CppHDL/include/core/interpreter_backend.h` | - | 解释器风格求值后端 |
+| Verilator 后端 | `CppHDL/include/core/verilator_backend.h` | - | Verilator 协同仿真后端 |
 
 ### 3.3 Bundle 系统
 
@@ -172,15 +213,77 @@
 
 | 文档概念 | CppHDL 代码位置 | 说明 |
 |---------|----------------|------|
-| 逻辑节点 | `CppHDL/include/lnode/` | 电路图表示（bool.tpp, uint.tpp, reg.tpp 等） |
-| AST | `CppHDL/include/ast/` | 抽象语法树（ast_nodes.h, instr_*.h） |
-| 位向量 | `CppHDL/include/bv/` | 位级操作支持（bitvector.h, bv.h） |
+| 逻辑节点 | `CppHDL/include/lnode/` | **位于顶层**（非 `include/core/lnode/`），包含模板实现 `*.tpp`（bool.tpp / uint.tpp / reg.tpp / context.tpp / logic_buffer.tpp / node_builder.tpp）和扩展头 `*.h`（literal_ext.h / node_builder_ext.h / operators_ext.h） |
+| AST | `CppHDL/include/ast/` | 抽象语法树：`ast_nodes.h` + 12 个 `instr_*.h` 指令节点（base/clock/io/mem/mux/op/proxy/reg）+ 内部实现 `clockimpl.h` / `memimpl.h` / `resetimpl.h` / `mem_port_impl.h` |
+| 位向量 | `CppHDL/include/bv/` | 位级操作支持（`bitvector.h`, `bv.h`, `utils.h`） |
 | AXI4 组件 | `CppHDL/include/axi4/` | AXI4 参考实现（互联、协议转换等） |
 | 代码生成 | `CppHDL/include/codegen_verilog.h` | Verilog 代码生成 |
 | DAG 代码生成 | `CppHDL/include/codegen_dag.h` | DAG 格式代码生成 |
-| JIT 编译 | `CppHDL/include/jit/` | JIT 仿真加速 |
+| JIT 编译 | `CppHDL/include/jit/` | JIT 仿真加速（`jit_compiler.h` / `jit_ir.h`） |
+| 工具库 | `CppHDL/include/utils/` | 通用工具：`logger.h` / `exceptions.h` / `format_utils.h` / `source_info.h` / `destruction_manager.h` / `converter.h` |
 
-### 3.5 AXI4 参考实现
+### 3.5 HDL 组件库（chlib）
+
+> **重要补充**：`chlib/` 目录是 CppHDL 的高级组件库，包含 **25 个 .h 文件（5881 行）**的预构建 HDL 原语（FIFO、流水线、仲裁器、FSM、断言等）。此前映射文档完全遗漏此章节，是最大缺口。
+>
+> 入口头：`CppHDL/include/chlib.h`（58 行 umbrella header，已默认包含大部分组件；`axi4lite.h` / `converter.h` / `fragment` 类被显式注释掉，需按需手动 include）
+
+#### 3.5.1 算术与位操作
+
+| 组件 | CppHDL 代码位置 | 说明 |
+|------|----------------|------|
+| 基础算术 | `CppHDL/include/chlib/arithmetic.h` | `add<N>`、基本算术函数（`ch_uint<N>` 输入） |
+| 超前进位加法器 | `CppHDL/include/chlib/arithmetic_advance.h` | `carry_lookahead_adder<N>`，返回 `CLAResult<N>`（sum + carry_out） |
+| 位级操作 | `CppHDL/include/chlib/bitwise.h` | `leading_zero_detector<N>` 等位级原语 |
+| 组合逻辑 | `CppHDL/include/chlib/combinational.h` | `priority_encoder<N>` 等组合逻辑原语 |
+| 逻辑门 | `CppHDL/include/chlib/logic.h` | `and_gate<N>` 等基本门 |
+| 编码转换 | `CppHDL/include/chlib/converter.h` | `binary_to_onehot<N>` 二进制 ↔ one-hot（**未包含在 `chlib.h`**，需手动 include） |
+| One-Hot 解码 | `CppHDL/include/chlib/onehot.h` | `onehot_dec<N>` one-hot 解码器 |
+
+#### 3.5.2 存储与寄存器
+
+| 组件 | CppHDL 代码位置 | 说明 |
+|------|----------------|------|
+| FIFO | `CppHDL/include/chlib/fifo.h` | 完整 FIFO 实现，含 `count_empty` 辅助（chlib 中最大单文件，466 行） |
+| 单口 RAM | `CppHDL/include/chlib/memory.h` | `single_port_ram<DATA, ADDR>` RAM 原语 |
+| 寄存器 | `CppHDL/include/chlib/sequential.h` | `register_<N>` 使能寄存器（基于 `ch_reg`） |
+| 流水线寄存器 | `CppHDL/include/chlib/pipeline.h` | 单级流水线寄存器组件，含数据 + ready/valid 变体 |
+| 流流水线 | `CppHDL/include/chlib/stream_pipeline.h` | `stream_m2s_pipe` 增加 1 周期 valid + payload 延迟 |
+
+#### 3.5.3 状态机与控制流
+
+| 组件 | CppHDL 代码位置 | 说明 |
+|------|----------------|------|
+| 状态机 DSL | `CppHDL/include/chlib/state_machine.h` | `ch_state_machine<S, N>` SpinalHDL 风格 DSL，`.state()` / `.on_active()` / `.transition_to()` |
+| 表达式条件 | `CppHDL/include/chlib/if.h` | 表达式风格 `multi_if<T>`（branch_info 列表） |
+| 语句块条件 | `CppHDL/include/chlib/if_stmt.h` | 语句块风格 `conditional_block`（上下文管理） |
+| 路由/选择 | `CppHDL/include/chlib/switch.h` | switch/routing 逻辑 + `std::common_type` 对 `ch_uint` 的特化 |
+
+#### 3.5.4 仲裁器
+
+| 组件 | CppHDL 代码位置 | 说明 |
+|------|----------------|------|
+| 优先级选择器 | `CppHDL/include/chlib/selector_arbiter.h` | `PrioritySelectorResult<N>` 优先级选择器 |
+| 流仲裁器 | `CppHDL/include/chlib/stream_arbiter.h` | `StreamArbiterLockResult<T, N>` 锁定仲裁器（事务完成前保持锁定） |
+
+#### 3.5.5 流（Stream）操作
+
+| 组件 | CppHDL 代码位置 | 说明 |
+|------|----------------|------|
+| 流核心 | `CppHDL/include/chlib/stream.h` | chlib 最大文件（562 行），`ch_stream<T>` 核心流操作 |
+| 流构建器 | `CppHDL/include/chlib/stream_builder.h` | 流畅 API：`StreamBuilder<T>::queue<depth>()` / `.haltWhen()` / `.map()` / `.throwWhen()` / `.takeWhen()` / `.continueWhen()` |
+| 流运算符 | `CppHDL/include/chlib/stream_operators.h` | `operator<<=` 直接连接（SpinalHDL 风格 `sink <<= source`） |
+| 流位宽转换 | `CppHDL/include/chlib/stream_width_adapter.h` | `stream_narrow_to_wide<W, N>` / `stream_wide_to_narrow<N, W>` |
+
+#### 3.5.6 总线协议与调试
+
+| 组件 | CppHDL 代码位置 | 说明 |
+|------|----------------|------|
+| AXI4-Lite 通道 | `CppHDL/include/chlib/axi4lite.h` | `Axi4LiteWriteAddr<N>` 等 AXI4-Lite 通道信号结构（**未包含在 `chlib.h`**，需手动 include） |
+| 断言检查 | `CppHDL/include/chlib/assert.h` | `AssertChecker` 仿真时断言组件 |
+| UART 追踪 | `CppHDL/include/chlib/simulator_trace.h` | `UartCapture` UART TX 输出捕获 |
+
+### 3.6 AXI4 参考实现
 
 | 组件 | CppHDL 代码位置 | 说明 |
 |------|----------------|------|
@@ -190,7 +293,7 @@
 | AXI4-Lite 从设备 | `CppHDL/include/axi4/axi4_lite_slave.h` | Lite 从设备基类 |
 | AXI 互联 4×4 | `CppHDL/include/axi4/axi_interconnect_4x4.h` | 4×4 AXI 互联 |
 | AXI→AXI-Lite 桥 | `CppHDL/include/axi4/axi_to_axilite.h` | 协议转换桥 |
-| 外设库 | `CppHDL/include/axi4/peripherals/` | AXI4 外设参考实现 |
+| 外设库 | `CppHDL/include/axi4/peripherals/` | AXI4 外设参考实现（axi_dma / axi_gpio / axi_i2c / axi_pwm / axi_spi / axi_timer / axi_uart） |
 
 ## 4. ChipForge 项目层映射
 
@@ -259,3 +362,59 @@
 - [接口设计详解](interface-design.md)
 - [术语表](../GLOSSARY.md)
 - [技术选型](tech-selection.md)
+
+## 7. 实现状态与设计目标对比
+
+> **重要**：本节旨在明确区分**已实现的框架代码**与**架构文档中的设计目标**。`overview.md` 和 `interface-design.md` 中的部分描述属于**设计意图**而非已完成代码，读者应以此节为准。
+
+### 7.1 已实现（框架层 + 工具完备）
+
+| 概念 | 状态 | 证据 |
+|------|------|------|
+| CppTLM SimObject / EventQueue / ChStreamModuleBase | ✅ 已实现 | `include/core/sim_object.hh` 等 86 条路径全部验证存在 |
+| CppTLM StreamAdapter（适配层） | ✅ 已实现 | 5 个适配器头文件共 ~800 行，无 TODO / unimplemented |
+| CppTLM ChStreamAdapterFactory | ✅ 已实现 | `framework/chstream_adapter_factory.hh` 单例工厂 |
+| CppTLM CoherenceDomain / VirtualChannel | ✅ 已实现 | `core/coherence_domain.hh` / `core/virtual_channel.hh` |
+| CppTLM PluginLoader（运行时 SO 加载） | ✅ 已实现 | `core/plugin_loader.hh` + `src/utils/dynamic_loader.cc` |
+| CppHDL Component / Simulator / Bundle 系统 | ✅ 已实现 | `component.h` / `simulator.h` / `core/bundle/*` 全部存在 |
+| CppHDL chlib 组件库 | ✅ 已实现 | 25 个组件文件、5881 行，预构建 FIFO / 流水线 / 仲裁器 / FSM / AXI4-Lite 等 |
+| CppHDL lnode / AST / bv / codegen | ✅ 已实现 | 模板实现 + 13 个 AST 节点 + Verilog/DAG 代码生成 |
+
+### 7.2 框架层已实现，但应用层尚未构建（🔧）
+
+| 概念 | 框架层状态 | 应用层状态 |
+|------|----------|----------|
+| CppTLM `tlm/*.hh` 标准 IP 库 | ✅ 已实现（12 个文件：arbiter / cache / cpu / crossbar / link / memory / nic / noc_statistics / router / stress_patterns / tlm_stub / traffic_gen） | ❌ ChipForge 未注册或使用 |
+| CppHDL `cpu/*` CPU 子系统（RV32I / 流水线 / 缓存 / 分支预测 / 冒险） | ✅ 已实现（独立框架） | ❌ ChipForge 未集成 |
+| CppHDL JIT 编译器 | ✅ 已实现（`jit/jit_compiler.h`） | ❌ ChipForge 未启用 |
+
+### 7.3 设计阶段（仅文档存在，🚧）
+
+| 概念 | 文档来源 | 缺失原因 |
+|------|---------|---------|
+| **PipeNode / PipeLink / PipeBuilder** | `GLOSSARY.md` L16-18, `ip/cpu/README.md` L11-13, `ip/cpu/docs/multi_isa_architecture.md`（1100+ 行设计稿） | 0 行代码，0 头文件，纯设计提案 |
+| **声明式 Plugin 模型**（`Plugin` 基类 + `setup()` / `build()` / `at_stage()`） | `ip/cpu/docs/multi_isa_architecture.md` L1055 | 仅有 `PluginLoader`（dlopen SO 加载器），与声明式 Plugin 是无关概念 |
+| **IP 级别的 TLM 实现**（`RiscvIssTlm` / `L1CacheTlm` / `BusMatrixTlm` / `DramTlm` / `UartTlm` 等） | `soc/riscv_virt.json` 引用 | `ip/*/tlm/` 目录全部为空（仅 `README.md`） |
+
+### 7.4 文档与代码背离（❌ 必须修正）
+
+| 文档声称 | 实际代码状态 | 修正方向 |
+|---------|------------|---------|
+| `interface-design.md` L8-22: `bundles/mem_bundles.h` 定义 `MemReqBundle` | `bundles/` 目录为空；`MemReqBundle` 在 CppTLM/CppHDL 中 0 匹配 | 要么实现 Bundle 定义，要么从文档中删除 |
+| `interface-design.md` L39-65: `bundles/cache_bundles.h` 定义 `CacheReqBundle` | 不存在 | 同上 |
+| `interface-design.md` L68-75: `bundles/impl_mode.h` 定义 `enum class ImplMode {TLM_ONLY, RTL_ONLY, COMPARE, SHADOW}` | `impl_mode.h` 不存在；`ImplMode` 在 CppTLM/CppHDL/ChipForge 全部 0 匹配 | 同上 |
+| `interface-design.md` L186-217: `soc/RiscvVirtSoC.h/cpp` 已存在 | 不存在；`soc/` 仅有 `riscv_virt.json` | 要么构建 SoC 装配类，要么删除示例代码 |
+| `overview.md` L131-141: 各 IP 使用 `REGISTER_MODULE` 宏 | `REGISTER_MODULE` 在 ChipForge 中 0 匹配 | 同上 |
+| `soc/riscv_virt.json` L4: `"impl_mode": "TLM_ONLY"` | 无代码解析此字段 | 删除该字段或实现 `ImplMode` 支持 |
+
+### 7.5 建议的修正优先级
+
+1. **紧急**：明确 `interface-design.md` 与 `overview.md` 的文档性质（设计提案 vs 已完成体系结构）
+2. **紧急**：删除或补全 `bundles/` 目录的引用
+3. **高**：要么实现 `RiscvVirtSoC.cpp` 入口，要么删除 `soc/riscv_virt.json`（避免悬挂引用）
+4. **中**：实现 `bundles/impl_mode.h` 与 `ImplMode` 框架支持（如确实需要 TLM↔RTL 切换）
+5. **低**：将 PipeNode / 声明式 Plugin 的设计从 `multi_isa_architecture.md` 拆分到独立 RFC 文档，避免读者误以为已规划
+
+---
+
+> **维护建议**：每次升级 CppTLM/CppHDL 后，应运行 `verify_framework_mapping.sh`（参见仓库根目录）核对所有路径一致性，并人工核查本节"已实现"列表是否仍然成立。
