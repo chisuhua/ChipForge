@@ -40,6 +40,7 @@
   - [H. 流水线抽象（Phase 1）](#h-流水线抽象phase-1-4-条)
   - [I. 验证框架（Phase 1）](#i-验证框架phase-1-3-条)
   - [J. 目录与组织](#j-目录与组织-2-条)
+  - [K. 范式决策](#k-范式决策-1-条)
 - [4. 漂移检测规则](#4-漂移检测规则)
 - [5. 验证脚本说明](#5-验证脚本说明)
 - [6. 变更日志](#6-变更日志)
@@ -124,7 +125,7 @@
 | ADR-035 | CompareDriver TLM↔RTL 驱动 | 验证 | 🚧 |
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
 | ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部） |
-| ADR-037 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
+| ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
 
 ### 2.4 统计
 
@@ -758,7 +759,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #1 |
 | 来源 | `declarative-hybrid-framework.md` §4.1 + ADR-1 |
 | 决策 | `Plugin` 基类只有 `setup(PipeBuilder&)` 与 `build(PipeBuilder&)`，**没有** `tick()` |
 | 理由 | 调度由框架确定性决定，Plugin 不持有时序状态 |
@@ -782,7 +783,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #4 |
 | 来源 | `declarative-hybrid-framework.md` §4.3 + ADR-2 |
 | 决策 | `PipeBuilder::at_stage(stage, phase, lambda)` 将 Plugin 绑定到逻辑阶段名（`"lookup"` 等）|
 | 理由 | Plugin 实现与物理流水线深度解耦，配置变更无需修改 Plugin 代码 |
@@ -802,7 +803,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #4 |
 | 来源 | `declarative-hybrid-framework.md` §4.3 + ADR-3 |
 | 决策 | `enum class Phase { EARLY, NORMAL, LATE }` 控制同逻辑阶段内多 Plugin 的执行顺序 |
 | 理由 | 依赖检测（EARLY）→ 主体逻辑（NORMAL）→ 写回准备（LATE），三档足够典型需求 |
@@ -821,7 +822,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #4 (最小) + Phase 6 (完整) |
 | 来源 | `declarative-hybrid-framework.md` §4.4 |
 | 决策 | `PipeBuilder::declare_substage(parent, sub, depth)` 在流水线中追加子 Node |
 | 理由 | 允许 Plugin 在 `setup()` 阶段动态扩展物理流水线深度 |
@@ -840,7 +841,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 6 |
 | 来源 | `declarative-hybrid-framework.md` §6 + ADR-7 |
 | 决策 | 每个 IP 实例可在 JSON 中独立指定 `impl_mode_override`，框架按模块创建对应实现并自动桥接 |
 | 理由 | 焦点调试 / 渐进 RTL 化 / 回归矩阵的工程需求 |
@@ -868,7 +869,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #3 |
 | 来源 | `declarative-hybrid-framework.md` §7.1 |
 | 决策 | `PipeNode` 提供 `is_firing()` / `is_moving()` / `is_blocked()` / `is_canceling()` 状态查询 |
 | 理由 | 三态握手（valid/ready/cancel）支持流水线正常、阻塞、取消三种场景 |
@@ -888,7 +889,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #5 |
 | 来源 | `declarative-hybrid-framework.md` §7.2 |
 | 决策 | `StageLink`（标准流水级）/ `CtrlLink`（带控制 API）/ `DirectLink`（组合直连）|
 | 理由 | 不同流水线场景需要不同的 Link 抽象 |
@@ -907,7 +908,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|------|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 0 P0 #4 |
 | 来源 | `declarative-hybrid-framework.md` §7.3 |
 | 决策 | `PipeBuilder` 统一编译入口：create_node / at_stage / declare_substage / build / tick |
 | 理由 | 单一入口，简化用户心智 |
@@ -926,7 +927,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（部分重叠：chlib 已有同名自由函数） |
+| 状态 | 🚧 Phase 0 P0 #5 |
 | 来源 | `declarative-hybrid-framework.md` §4.5 |
 | 决策 | `CtrlLink::halt_when` / `flush_when` / `throw_when` / `bypass` 四种对象方法 |
 | 理由 | 多 Plugin 独立声明同一条件，框架做 OR 合并 |
@@ -961,7 +962,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 6 |
 | 来源 | `declarative-hybrid-framework.md` §9.5 |
 | 决策 | `TransactionScoreBoard` / `CycleScoreBoard` / `TimingScoreBoard` |
 | 理由 | 事务级、周期级、时序级三种对比粒度 |
@@ -980,7 +981,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（未实现） |
+| 状态 | 🚧 Phase 6 |
 | 来源 | `declarative-hybrid-framework.md` §6.6, §9.4 |
 | 决策 | `CompareDriver` 同步 TLM 与 RTL 实例，注入相同输入，比较输出 |
 | 理由 | COMPARE 模式基础设施 |
@@ -999,7 +1000,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（部分对应已存在） |
+| 状态 | 🚧 Phase 1+ (随业务展开) |
 | 来源 | `declarative-hybrid-framework.md` §9.1 |
 | 决策 | Level A（Plugin 单元）/ Level B（IP 集成）/ Level C（COMPARE 协同）|
 | 理由 | 自底向上的验证策略 |
@@ -1017,29 +1018,50 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 ---
 
-### J. 目录与组织（2 条）
+### K. 范式决策（1 条）
 
 ---
 
-#### ADR-037：统一目录结构（取消 tlm/rtl 分离）
+#### ADR-037：Plugin 作为设计范式（不是工具）
 
-| 字段 | 值 |
-|------|-----|
-| 状态 | 🚧 Phase 1 提案（**未执行**：当前仍 tlm/rtl 分离）|
-| 来源 | `declarative-hybrid-framework.md` ADR-6 |
-| 决策 | 取消 `ip/<x>/tlm/` 与 `ip/<x>/rtl/` 分离，按职责组织（`bundles/` / `plugins/` / `tlm/` / `rtl/` / `configs/` / `tests/`）|
-| 理由 | 双模式由编译期 / 运行期开关切换，不应反映在顶层目录上 |
-| 后果 | 🚧 **未执行**：当前 ChipForge 仍是 `ip/cache/{tlm,rtl,configs,test}/` 分离 |
+**状态**: Accepted (2026-06-08)
+**决策者**: User + Prometheus
+**背景**: 见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`
+**关联**: 重塑路线图（Phase 0/1/6 重新定位）
 
-**验证命令**（当前预期失败）：
-```bash
-# 当前 tlm/rtl 仍分离（说明 ADR-6 未执行）
-[[ -d /workspace/project/ChipForge/ip/cache/tlm ]] && \
-[[ -d /workspace/project/ChipForge/ip/cache/rtl ]] && \
-echo "DRIFT: 目录仍分离 — ADR-037 仍为 🚧 状态"
-```
+**决策内容**:
+- **D1**: 路线图前插入 Phase 0 = Plugin 最小**脚手架**（2-3 周）
+- **D2**: Phase 1 Hello World = L1CachePlugin（真实 Plugin，不是占位）
+- **D4**: 业务逻辑强制采用 **Plugin-style** 设计（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）
+- **D5**: Phase 6 = 完整 PipeBuilder 框架 + RTL 生成（12-20 周）
+- **D6-D9**: 4 项命名冲突解决方案
 
-**代码锚点（当前）**：`ip/cache/{tlm,rtl,configs,test}/`, `ip/cpu/{tlm,rtl,configs,test}/`, `ip/interconnect/...`, `ip/memory/...`, `ip/peripheral/...`
+**影响**:
+- 重塑 Phase 1-5 实施路径（业务逻辑必须 Plugin-style）
+- 推迟 v2.0.1 §12.2 的 Phase 1a/1b/1c 到 Phase 6
+- 路线图新增 Phase 0（在 Phase 1 前）和 Phase 6（在 Phase 5 后）
+
+**影响 ADR**:
+- ADR-025~036 状态从 "🚧 未实施" → "Phase 0/6 范围"
+- ADR-026 (`at_stage()` 逻辑阶段名) → Phase 0 P0 #4
+- ADR-027 (`Phase {EARLY,NORMAL,LATE}`) → Phase 0 P0 #4
+- ADR-028 (`declare_substage()`) → Phase 0 P0 #4 (最小实现) + Phase 6 (完整)
+- ADR-029 (模块级 `ImplMode`) → Phase 6
+- ADR-030 (`PipeNode` 三态握手) → Phase 0 P0 #3
+- ADR-031 (`StageLink/CtrlLink/DirectLink`) → Phase 0 P0 #5
+- ADR-032 (`PipeBuilder` 统一编译器) → Phase 0 P0 #4
+- ADR-033 (`CtrlLink` 四种控制 API) → Phase 0 P0 #5
+- ADR-034 (`ScoreBoard`) → Phase 6
+- ADR-035 (`CompareDriver`) → Phase 6
+- ADR-036 (三级测试金字塔) → Phase 1+ (随业务展开)
+
+**不可逆性**: D4（Plugin-style 强制）不可逆 —— 一旦 Phase 1 业务逻辑用 Plugin-style，事后改回 tick() 几乎全重写
+
+**重新审视指引**: 见决策记录 §8（每季度或在 Phase 0/1/6 关键节点）
+
+---
+
+### J. 目录与组织（2 条）
 
 ---
 
@@ -1060,6 +1082,28 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 ```
 
 **代码锚点**：`CppTLM/include/chstream_register.hh`
+
+---
+
+#### ADR-039：统一目录结构（取消 tlm/rtl 分离）
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | 🚧 Phase 1 提案（**未执行**：当前仍 tlm/rtl 分离）|
+| 来源 | `declarative-hybrid-framework.md` ADR-6 |
+| 决策 | 取消 `ip/<x>/tlm/` 与 `ip/<x>/rtl/` 分离，按职责组织（`bundles/` / `plugins/` / `tlm/` / `rtl/` / `configs/` / `tests/`）|
+| 理由 | 双模式由编译期 / 运行期开关切换，不应反映在顶层目录上 |
+| 后果 | 🚧 **未执行**：当前 ChipForge 仍是 `ip/cache/{tlm,rtl,configs,test}/` 分离 |
+
+**验证命令**（当前预期失败）：
+```bash
+# 当前 tlm/rtl 仍分离（说明 ADR-6 未执行）
+[[ -d /workspace/project/ChipForge/ip/cache/tlm ]] && \
+[[ -d /workspace/project/ChipForge/ip/cache/rtl ]] && \
+  echo "DRIFT: 目录仍分离 — ADR-039 仍为 🚧 状态"
+```
+
+**代码锚点（当前）**：`ip/cache/{tlm,rtl,configs,test}/`, `ip/cpu/{tlm,rtl,configs,test}/`, `ip/interconnect/...`, `ip/memory/...`, `ip/peripheral/...`
 
 ---
 
@@ -1198,6 +1242,7 @@ Summary:
 | 2026-06-07 | 1.0 | 初始版本：38 条 ADR，24 已实现 + 14 Phase 1 提案 |
 | | | 配套 `tools/verify_adr.sh` 同步发布 |
 | | | 与 `code-framework-mapping.md` v2.0 / `declarative-hybrid-framework.md` v2.0 对齐 |
+| 2026-06-08 | 1.1 | 新增 ADR-037（Plugin 作为设计范式）；ADR-025~036 状态映射到 Phase 0/1+/6；原 ADR-037 编号顺延为 ADR-039 |
 
 ---
 

@@ -2,11 +2,11 @@
 
 | 字段 | 值 |
 |------|-----|
-| 版本号 | 2.0.1 |
+| 版本号 | 2.0.2 |
 | 日期 | 2026-06-08 |
-| 状态 | **Active (混合：已实现 + Phase 1 提案)** |
+| 状态 | **Active (混合：已实现 + Phase 0/6 提案)** |
 | 适用范围 | ChipForge 全局（任意 IP 通用） |
-| 修订依据 | 架构审查（2026-06-08）的 P0–P1 修复建议 |
+| 修订依据 | 战略决策 DECISION-2026-06-08-01（Plugin 范式 + Phase 0 脚手架）|
 
 > ⚠️ **重要：本文档混合了"已实现框架"与"Phase 1 设计提案"**
 >
@@ -532,6 +532,20 @@ public:
 > 2. 一个 `ChStreamModuleBase` 子类是否可挂载多个 Plugin？反之，一个 Plugin 是否可挂载到多个模块？
 > 3. Plugin 如何访问模块私有状态——通过 `PipeBuilder` 注入访问器，还是模块主动暴露？
 
+> **v2.0.2 补充：脚手架 vs 框架的区分**
+>
+> Phase 0（Plugin 最小脚手架）与 Phase 6（完整 PipeBuilder 框架）的关系：
+>
+> | 维度 | Phase 0 脚手架 | Phase 6 完整框架 |
+> |------|----------------|------------------|
+> | Plugin 生命周期 | setup + build | + 延迟构建 + 重做 |
+> | 调度 | 顺序 / 简单并行 | 依赖分析 / 最优调度 |
+> | JSON 配置 | 无 | pipeline_stages 解析 |
+> | 验证 | 无 ScoreBoard | CompareDriver + ScoreBoard |
+> | RTL 生成 | 无 | VerilogCodeGen 集成 |
+>
+> 关键承诺：Phase 0 的 5 个接口（`PluginBase` / `Payload<T>` / `PipeNode` / `PipeBuilder` / `CtrlLink`）在 Phase 1-5 期间**保持稳定**，Phase 6 仅扩展，不破坏现有业务代码。
+
 ---
 
 ## 5. Bundle 分层与协议策略 ✅ (部分)
@@ -836,6 +850,17 @@ private:
 
 - 全仓搜索 `TLMRTLBridge` / `TlmRtlBridge` / `HybridBridge`（应 0 命中，仅 `HybridCacheWrapper` 与 `hybrid_cache_component.*` 命中）
 - 全仓搜索 `CompareDriver` / `ScoreBoard`（应 0 命中）
+
+#### 6.8.5 Phase 0/1 中的 L1CachePlugin 验证用例
+
+`L1CachePlugin`（Phase 1 Hello World）是**第一个验证 Phase 0 脚手架**的真实 Plugin：
+
+- **位置**: 详见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../roadmap/phases/phase-1-tlm-foundation.md) §1.2
+- **目的**: 验证 Plugin-style 业务逻辑在 Phase 0 脚手架下能端到端跑通
+- **设计约束**: 业务代码无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`（D4 强制）
+- **不修改**: Phase 0 接口承诺的稳定性（§6.8 关联承诺）
+
+L1CachePlugin 不依赖 §6.8 描述的通用 TLM↔RTL 桥接（它仅做 TLM），它是**脚手架验证**用例，不是**框架功能**验证。
 
 ---
 
@@ -1242,6 +1267,8 @@ CppTLM AGENTS.md 明确：
 | §7 PipeNode/PipeBuilder | **未指定** | 阻塞 Phase 1 启动 |
 | §9 验证策略 | **未指定** | 可与 §6 并行 |
 | §10 L1 Cache 双模式 | **未指定** | Phase 1c 依赖 |
+| **Phase 0 脚手架** | **未指定** | 阻塞 Phase 1 启动（D1 决策）|
+| **Phase 1 L1CachePlugin** | **未指定** | 依赖 Phase 0 完成（D2 决策）|
 
 **v2.0.1 行动项**：在 Phase 1 启动前，§12.0.3 必须为每个 🚧 章节指定 Owner；否则 Phase 1 启动会议应**冻结**所有相关章节的设计。
 
@@ -1260,67 +1287,63 @@ CppTLM AGENTS.md 明确：
 | lnode DAG 与 NodeBuilder | `CppHDL/include/core/lnode.h` + `core/lnodeimpl.h` + `lnode/*.tpp` + `core/node_builder.h` | ✅ |
 | PluginLoader（dlopen SO 加载） | `CppTLM/include/core/plugin_loader.hh` | ✅ |
 
-### 12.2 Phase 1 拆分方案（v2.0.1 重构）
+### 12.2 Phase 0：Plugin 最小脚手架（v2.0.2 重写）
 
-> **v2.0.1 重大重构**：v2.0 中将所有 10 项 Phase 1 任务集中在 4–8 周窗口内，**严重低估工作量**。本节将 Phase 1 拆分为三个独立可交付的子阶段（1a/1b/1c），每个子阶段均有明确的可交付物与退出标准。
+> **v2.0.2 重大重构**：v2.0.1 中"Phase 1 拆分方案（Phase 1a/1b/1c）"重新定位为两个独立阶段：
+> - **Phase 0**：Plugin 最小**脚手架**（5 个 P0 组件，~2-3 周）—— 让 Plugin-style 业务逻辑能跑起来
+> - **Phase 6**：完整 **PipeBuilder 框架** + RTL 生成（~12-20 周）—— 完整调度算法、JSON 解析、验证基础设施、RTL 集成
+>
+> 详细任务清单：见 [`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../roadmap/phases/phase-0-plugin-scaffolding.md)
+> 详细 Phase 6 任务：见 [`docs/roadmap/phases/phase-6-declarative.md`](../../roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，预留）
+> 决策依据：见 [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
 
-#### 12.2.1 Phase 1a — Plugin/Pipe 核心机制（4–6 周）
+#### 12.2.1 Phase 0 范围（5 个 P0 交付物）
 
-> **目标**：完成 Plugin/PipeBuilder 内部 API，**不**与现有 `ChStreamModuleBase` 集成。
+| 任务 | 工时 | 退出标准 |
+|------|------|----------|
+| `PluginBase`（仅 setup+build，无 tick） | 2 天 | 编译期禁止 tick + 单元测试 |
+| `Payload<T>` 类型安全 Key | 2 天 | 编译期类型检查 + 单元测试 |
+| `PipeNode`（PayloadMap + valid/ready 状态机） | 3 天 | 状态机正确性 + 单元测试 |
+| `PipeBuilder`（register_plugin + at_stage + 调度） | 4 天 | 调度确定性 + 单元测试 |
+| `CtrlLink`（halt_when/throw_when/flush_when/bypass） | 3 天 | 多条件 OR 合并 + 单元测试 |
+| **总计** | **~14 工作日（2.5-3 周）** | |
 
-| 任务 | 依赖 | 风险 | 退出标准 |
-|------|------|------|----------|
-| **实现 `Plugin` 基类**（`setup` + `build`，无 tick） | 框架层稳定 | 中：需要明确 Plugin 生命周期 | 单元测试覆盖 `Plugin` 的 setup/build 时序 |
-| **实现 `Phase` 枚举** | Plugin 基础 | 低 | 编译通过 |
-| **实现 `Payload<T>` 类型安全 Key** | Plugin 基础 | 低 | 编译通过 |
-| **实现 `PipeBuilder` 核心 API**（`create_node` / `at_stage` / `declare_substage`） | Plugin + Phase | 中：调度算法设计 | 最小 PipeBuilder 单测 + 调度确定性测试 |
-| **实现 `PipeNode` / `PipeLink` 三种类型**（`StageLink` / `CtrlLink` / `DirectLink`） | PipeBuilder | 中 | PipeNode 状态机单测 |
-| **实现 `CtrlLink` 四种控制 API**（`halt_when` / `flush_when` / `throw_when` / `bypass`） | PipeNode | 中：与 `halt_when` / `throw_when` 等交互复杂 | CtrlLink 状态机 + 反压场景测试 |
+#### 12.2.2 Phase 0 显式不做（推迟到 Phase 6）
 
-**Phase 1a 退出标准**（必须全部满足才能进入 1b）：
-- [ ] 所有单元测试通过（覆盖率 ≥ 80%）
-- [ ] `Plugin` + `PipeBuilder` 的 API 文档（Doxygen）完整
-- [ ] 调度确定性证明（在 `docs/architecture/plugin-scheduling-correctness.md` 中给出）
-- [ ] 零 TODO 残留（与 CppTLM 零债务原则一致）
+- `enum class ImplMode` 枚举
+- `BundleMapper` 模板（Phase 0 用 `uint_t<N>` 编译期切换足够）
+- `CompareDriver` / `ScoreBoard`
+- JSON `pipeline_stages` 解析
+- RTL AST 生成（VerilogCodeGen 集成）
+- 模块级 `impl_mode_override`
+- 完整 `CtrlLink::bypass` 语义
+- 调度算法（依赖分析、最优调度）
 
-#### 12.2.2 Phase 1b — JSON 装配 + 验证基础设施（4–6 周）
+#### 12.2.3 Phase 0 接口稳定性承诺
 
-> **目标**：扩展 ModuleFactory 接受 Plugin/Pipeline 配置；建立 COMPARE/SHADOW 验证基础设施。
+Phase 0 完成后，以下 5 个接口在 Phase 1-5 期间**保持稳定**（仅 Phase 6 才扩展）：
 
-| 任务 | 依赖 | 风险 | 退出标准 |
-|------|------|------|----------|
-| **实现 `BundleMapper` 模板** | Bundle 系统已实现 | 低 | POD↔ch_uint 双向转换单测 |
-| **实现模块级 `impl_mode_override` JSON 解析** | ModuleFactory | 中：需修改拓扑解析器 | JSON 含 `impl_mode_override` 字段的解析测试 |
-| **实现 `CompareDriver` 与 `ScoreBoard` 基类** | 框架层稳定 | 中 | ScoreBoard 差异检测单测 |
+- `cf::plugin::PluginBase::setup(PipeBuilder&)` / `build(PipeBuilder&)`
+- `cf::plugin::Payload<T>` 模板与 `operator()` 访问
+- `cf::plugin::PipeNode` 状态机 API
+- `cf::plugin::PipeBuilder` 的 `at_stage` / `register_plugin` / `build` / `run` / `node_of_logic_stage`
+- `cf::plugin::CtrlLink` 的 `halt_when` / `throw_when` / `flush_when` / `bypass`
 
-**Phase 1b 退出标准**：
-- [ ] ModuleFactory 可解析含 `pipeline_stages` 字段的 JSON
-- [ ] ScoreBoard 可对比两个 Packet 流的差异
-- [ ] JSON Schema 校验脚本通过
+**这意味着 Phase 1 业务逻辑（L1CachePlugin）使用上述接口后，不需要重写即可在 Phase 6 升级到完整框架。**
 
-#### 12.2.3 Phase 1c — 端到端 Plugin 化 IP（4–8 周）
+#### 12.2.4 Phase 6 范围（v2.0.1 §12.2 的 1a/1b/1c 重新映射）
 
-> **目标**：将现有 `CacheTLM` 改造为 Plugin 化 IP，验证 1a+1b 集成效果。
+| 子阶段 | 内容 | 工时 |
+|--------|------|------|
+| Phase 6a | 调度算法（依赖分析、最优调度）+ JSON `pipeline_stages` 解析 | 4-6 周 |
+| Phase 6b | 验证基础设施（CompareDriver + ScoreBoard）+ 模块级 `impl_mode_override` | 4-6 周 |
+| Phase 6c | 完整 RTL 生成（VerilogCodeGen 集成）+ 通用 TLM↔RTL 桥接 | 4-8 周 |
+| **总计** | | **12-20 周** |
 
-| 任务 | 依赖 | 风险 | 退出标准 |
-|------|------|------|----------|
-| **实现第一个 Plugin 化 IP**（建议：基于现有 `CacheTLM`） | Phase 1a + 1b | 高：端到端验证 | CacheTLM 跑通 Plugin 化 SoC demo；与原 CacheTLM 行为一致 |
-
-**Phase 1c 退出标准**：
-- [ ] 端到端 SoC demo 跑通（Catch2 集成测试）
-- [ ] 与 v2.0 行为对比测试通过（同一测试套件下输出相同统计）
-- [ ] L1 Cache 双模式参考实现（如未在本期完成，进 Phase 2）
-
-#### 12.2.4 Phase 1 总时间窗口
-
-| 子阶段 | 时间窗口 | 累计 | 关键风险 |
-|--------|----------|------|----------|
-| Phase 1a | 4–6 周 | 4–6 周 | 调度算法设计 |
-| Phase 1b | 4–6 周 | 8–12 周 | ModuleFactory 修改需向后兼容 |
-| Phase 1c | 4–8 周 | 12–20 周 | 端到端集成 |
-| **总计** | **12–20 周** | | **（vs v2.0 估计的 4–8 周）** |
-
-**重要警告**：v2.0 中"Phase 1（4–8 周）"是不切实际的。Phase 1a 单独就需要 4–6 周。**应将版本目标从 ChipForge 0.2 调整为 0.2.0（1a 完成）/ 0.2.1（1c 完成）**。
+**触发条件**：满足以下任一时启动 Phase 6：
+- Phase 1 L1CachePlugin + 至少 2 个其他 Plugin-style IP 稳定运行
+- 出现"第三个需要 TLM↔RTL 协同的 IP"
+- 用户主动决定启动
 
 ### 12.3 Phase 2 目标（8–16 周，目标版本 ChipForge 0.3）
 
@@ -1350,7 +1373,8 @@ CppTLM AGENTS.md 明确：
 2. Phase 1 完成后，本文档 v2.x 需升级为 v3.0，将 ✅ 与 🚧 标记按实现状态调整
 3. 文档审查 checklist 应包含「所有代码示例可编译」项
 4. 评审过程产出的 P0–P3 修订建议已在 v2.0 应用，原始评审过程产物参见 Git 仓库历史与 `docs/architecture/` 目录
+5. **Plugin 范式决策可追溯**（D4 强制）：业务逻辑必须采用 Plugin-style（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）。任何违反此约束的代码须在评审中拒绝，决策依据见 [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
 
 ---
 
-*文档结束。本版本（v2.0.1）已应用架构审查（2026-06-08）的全部 P0–P1 修复；v2.0 中的 P0–P3 修订建议保留为历史基线（v2.0 → v2.0.1 增量修改详见各章节"v2.0.1"标注）。*
+*文档结束。本版本（v2.0.2）已应用战略决策（2026-06-08）的 Plugin 范式 + Phase 0/6 拆分（详见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`）；v2.0.1 审查修复与 v2.0 → v2.0.1 增量保留为历史基线。*

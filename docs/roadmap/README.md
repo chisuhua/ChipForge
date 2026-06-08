@@ -19,13 +19,15 @@
 
 ### 实施阶段
 
-| Phase | 文档 | 状态 |
-|-------|------|------|
-| Phase 1 | [基础框架搭建](phases/phase-1-foundation.md) | Not Started |
-| Phase 2 | [Bare-metal 测试套件](phases/phase-2-baremetal.md) | Not Started |
-| Phase 3 | [RTOS 测试套件](phases/phase-3-rtos.md) | Not Started |
-| Phase 4 | [Linux 启动支持](phases/phase-4-linux.md) | Not Started |
-| Phase 5 | [RTL 协同验证 + Verilog 生成](phases/phase-5-rtl.md) | Not Started |
+| Phase | 文档 | 状态 | 关键目标 |
+|-------|------|------|---------|
+| **Phase 0** | [Plugin 最小脚手架](phases/phase-0-plugin-scaffolding.md) | Not Started | PluginBase / Payload<T> / PipeNode / PipeBuilder / CtrlLink |
+| Phase 1 | [基础 TLM 平台（Hello World = L1CachePlugin）](phases/phase-1-tlm-foundation.md) | Not Started | 第一个 Plugin-style IP 验证 Plugin 风格可行性 |
+| Phase 2 | [Bare-metal 测试套件](phases/phase-2-baremetal.md) | Not Started | riscv-tests RV64GC |
+| Phase 3 | [RTOS 测试套件](phases/phase-3-rtos.md) | Not Started | FreeRTOS + Zephyr |
+| Phase 4 | [Linux 启动支持](phases/phase-4-linux.md) | Not Started | OpenSBI + Linux Kernel |
+| Phase 5 | [RTL 协同验证 + Verilog 生成](phases/phase-5-rtl.md) | Not Started | CppHDL RTL 与 TLM 对比 |
+| **Phase 6** | [完整 PipeBuilder 框架 + RTL 生成](phases/phase-6-declarative.md) | Not Started | 完整调度算法 + RTL 生成（推迟的 Phase 1a/1b/1c）|
 
 ### 其他
 
@@ -49,4 +51,21 @@
 | **M8** | 多芯片扩展 | 复用组件库装配 GpuSoC；验证跨芯片形态可复用性（可选） | Phase 5 |
 | **M9** | DSE 框架可用 | 参数扫描工作流端到端运行；缓存策略 DSE 产出 Pareto 分析报告 | Phase 2-3 |
 | **M10** | 多 ISA 支持 | 新增 CPU IP 暴露统一 ch_stream 接口；同一 SoC JSON 配置可切换不同 ISA 核心 | Phase 5 |
+
+### 关键概念：Plugin 风格范式（决策 D4）
+
+> **Plugin 是设计范式，不是工具**。所有 IP 业务逻辑从 Phase 1 开始必须采用 Plugin-style（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）。Phase 5/6 升级 RTL 时业务代码不重写。
+>
+> 详细决策依据：[`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
+
+### Phase 6 说明（v2.0 拆分）
+
+原路线图 v2.0 中"Phase 1（Plugin 模型）"被拆分为两个阶段：
+- **Phase 0**：Plugin 最小**脚手架**（5 个 P0 组件，2-3 周）—— 让 Plugin-style 业务逻辑能跑起来
+- **Phase 6**：完整 **PipeBuilder 框架** + RTL 生成（12-20 周）—— 完整调度算法、JSON 解析、CompareDriver、ScoreBoard、RTL 集成
+
+这种拆分确保：
+- Phase 0 完成后，Phase 1-5 业务逻辑（L1CachePlugin 等）已采用 Plugin-style
+- Phase 6 启动时，业务代码不需要重写
+- 完整框架的投入有 Phase 1-5 的反馈
 
