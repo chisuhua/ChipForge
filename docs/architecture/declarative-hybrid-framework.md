@@ -2,10 +2,11 @@
 
 | 字段 | 值 |
 |------|-----|
-| 版本号 | 2.0 |
-| 日期 | 2026-06-07 |
+| 版本号 | 2.0.1 |
+| 日期 | 2026-06-08 |
 | 状态 | **Active (混合：已实现 + Phase 1 提案)** |
 | 适用范围 | ChipForge 全局（任意 IP 通用） |
+| 修订依据 | 架构审查（2026-06-08）的 P0–P1 修复建议 |
 
 > ⚠️ **重要：本文档混合了"已实现框架"与"Phase 1 设计提案"**
 >
@@ -26,15 +27,19 @@
 - [2. CppTLM 事件驱动引擎](#2-cpptlm-事件驱动引擎) ✅
 - [3. CppHDL 硬件描述引擎](#3-cpphdl-硬件描述引擎) ✅
 - [4. 声明式 Plugin 模型](#4-声明式-plugin-模型) 🚧
-  - [4.1–4.6 全部为设计提案](#4-声明式-plugin-模型)
+  - [4.1–4.7 全部为设计提案](#4-声明式-plugin-模型)
+  - [4.8 与 ChStreamModuleBase 体系的关系](#48-与-chstreammodulebase-体系的关系v2201-新增)
 - [5. Bundle 分层与协议策略](#5-bundle-分层与协议策略) ✅ (部分)
 - [6. 混合仿真：模块级 TLM/RTL 细粒度配置](#6-混合仿真模块级-tlmrtl-细粒度配置) 🚧
+  - [6.8 通用 TLM↔RTL 边界桥接：限制声明](#68-通用-tlmrtl-边界桥接限制声明v2201-新增)
 - [7. PipeNode / PipeLink / PipeBuilder 通用骨架](#7-pipenodepipelinkpipebuilder-通用骨架) 🚧
 - [8. SoC 级混合组装](#8-soc-级混合组装) ✅
 - [9. 验证策略](#9-验证策略) 🚧
 - [10. 完整示例：L1 Cache IP 双模式实现](#10-完整示例l1-cache-ip-双模式实现) 🚧
 - [11. 附录](#11-附录)
 - [12. 实现路线图（Phase 映射）](#12-实现路线图phase-映射) ✅ 新增
+  - [12.0 与零债务原则的协调](#120-与-cpptlmcpphdl-零债务原则的协调v2201-新增)
+  - [12.2 Phase 1 拆分方案](#122-phase-1-拆分方案v2201-重构)（1a/1b/1c）
 
 ---
 
@@ -51,7 +56,7 @@ ChipForge 旨在提供一套**统一的 TLM/RTL 混合仿真与生成框架**，
 | 框架层：Bundle 接口契约 + ch_stream 通信 | ✅ 已实现 |
 | 应用层：声明式 Plugin 模型（同一份描述生成 TLM 调度表与 RTL AST） | 🚧 Phase 1 提案 |
 | 应用层：模块级 ImplMode 选择（同一 SoC 中混合 TLM/RTL） | 🚧 Phase 1 提案 |
-| 应用层：JSON 驱动的 IP 装配与拓扑 | ✅ 已实现（`ModuleFactory`） |
+| 应用层：JSON 驱动的 IP 装配与拓扑 | ✅ 框架层已实现；⚠️ 唯一示例 `soc/riscv_virt.json` 不可运行（见 §6.2） |
 | 应用层：完整的 L1 Cache IP 双模式参考实现 | 🚧 Phase 1 提案 |
 
 ### 1.2 三层框架分工
@@ -376,7 +381,7 @@ private:
 
 ### 3.4 LogicNode DAG → 后端
 
-`describe()` 中的每条赋值被记录为 `LogicNode`（实现位于 `core/lnode.h` + `core/lnodeimpl.h` + `core/node_builder.h`），构成有向无环图（DAG）。后端遍历 DAG 产生：
+`describe()` 中的每条赋值被记录为 `LogicNode`（前向声明 `core/lnode.h`，模板实现位于顶层 `lnode/` 目录的 `*.tpp` 文件，构建入口 `core/node_builder.h`），构成有向无环图（DAG）。后端遍历 DAG 产生：
 
 - **Verilog 生成**：`VerilogCodeGen` 输出可综合 `.v` 文件
 - **JIT 仿真**：`Simulator` 直接对 DAG 求值，用于 RTL_ONLY / COMPARE 模式
@@ -393,7 +398,7 @@ private:
 | 存储器 | `ch_mem<T,D>` | `CppHDL/include/core/mem.h` |
 | Bundle 基类 | `bundle_base<Self>` | `CppHDL/include/core/bundle/bundle_base.h` |
 | 端口宏 | `__io` / `__in` / `__out` | `CppHDL/include/core/io.h:318,337-338` |
-| 逻辑节点 | `lnode` / `lnodeimpl` | `CppHDL/include/core/lnode.h` + `core/lnodeimpl.h` ⚠️ 非 logic_node.h |
+| 逻辑节点 | `lnode` / `lnodeimpl` | `CppHDL/include/core/lnode.h`（前向声明） + `CppHDL/include/lnode/`（模板实现：`.tpp`/`.h`） |
 | 节点构建器 | `node_builder` | `CppHDL/include/core/node_builder.h` |
 | Verilog 生成 | `VerilogCodeGen` | `CppHDL/include/codegen_verilog.h` |
 | 仿真器 | `Simulator` | `CppHDL/include/simulator.h` |
@@ -496,11 +501,42 @@ public:
 
 详见 [第 12 节 实现路线图](#12-实现路线图phase-映射)。简述：Plugin 模型是 ChipForge Phase 1（4–8 周）的核心目标，目前仅有 `ip/cpu/docs/multi_isa_architecture.md` 的设计草案。
 
+### 4.8 与 `ChStreamModuleBase` 体系的关系（v2.0.1 新增）
+
+> **本节澄清 §4 提出的 Plugin 模型与 §2 描述的 `ChStreamModuleBase` 现有体系之间的关系。**
+
+`ChStreamModuleBase`（§2.3）与 `Plugin`（§4.2）是两种**正交**的抽象层级，目前的草案关系如下：
+
+| 维度 | `ChStreamModuleBase`（已实现） | `Plugin`（Phase 1 提案） |
+|------|--------------------------------|--------------------------|
+| 基类实例 | TLM 模块实例（`CacheTLM`、`MemoryTLM` 等） | 横切关注点单元（`CacheTagLookupPlugin`、`DMABurstPlugin` 等） |
+| 调度单元 | `tick()` 由 `EventQueue` 调用 | **无 `tick()`**；通过 `at_stage(phase, fn)` 注册回调 |
+| 通信机制 | `StreamAdapter` 注入 + `ch_stream<Bundle>` 内部传递 | `Payload<T>` 类型安全 Key + `PipeNode::operator()` 跨阶段共享 |
+| 时间模型 | 离散事件 / 周期 | 逻辑阶段 + Phase 顺序（EARLY → NORMAL → LATE） |
+| 组合方式 | ModuleFactory JSON 注册 + REGISTER_CHSTREAM | `PipeBuilder::register_plugin(unique_ptr<Plugin>)` |
+
+**关系约束（草案，Phase 1a 设计阶段）**：
+
+1. **Plugin 不替代 SimObject/TlmModule/ChStreamModuleBase**：Plugin 是**横切关注点**（cross-cutting concern），必须挂载到具体 `ChStreamModuleBase` 子类上才能生效
+2. **Plugin 实例的生命周期短于模块**：单次 `build()` 内创建并固化，模块持续运行
+3. **Plugin 间的通信通过 `PipeBuilder` 共享的 `PipeNode`**：不直接调用彼此方法
+4. **第一阶段（Phase 1a）Plugin 仅在 TLM 模式生效**：RTL 模式继续使用现有 `Component::describe()` DAG
+
+**与 §8.5 职责分离的关系**：§8.5 描述的是"TLM 模块开发者"与"Plugin 开发者"的分工——这暗示两者是不同的角色：
+- **TLM 模块开发者**：实现 `ChStreamModuleBase` 子类（已有模式）
+- **Plugin 开发者**：实现 `Plugin` 子类（在 `setup()` 中声明能力，在 `build()` 中按阶段执行）
+- **SoC 集成者**：在 JSON 中配置 `modules` 数组，同时配置 `plugins` 数组（Phase 1c 引入）
+
+> **开放问题（待 Phase 1a 设计阶段回答）**：
+> 1. Plugin 如何与 `ChStreamModuleBase` 子类的 `tick()` 协作？Plugin 是在 `tick()` 之前/之后/之间触发？
+> 2. 一个 `ChStreamModuleBase` 子类是否可挂载多个 Plugin？反之，一个 Plugin 是否可挂载到多个模块？
+> 3. Plugin 如何访问模块私有状态——通过 `PipeBuilder` 注入访问器，还是模块主动暴露？
+
 ---
 
 ## 5. Bundle 分层与协议策略 ✅ (部分)
 
-> **本章节大部分内容是已实现代码的描述**。仅 5.5（Mapper）的运行时方案和 5.4 中 `ch_flow` / `Fragment` 类型为未实现。
+> **本章节大部分内容是已实现代码的描述**。仅 5.5（Mapper 模板）和 5.7（运行时 `Symbolic<T>` 抽象）为未实现。5.4 中的 `ch::ch_flow<T>` 与 `ch::ch_fragment<T>` 已实现（v2.0.1 修正）。
 
 ### 5.1 Bundle 三层架构（已实现）
 
@@ -560,10 +596,13 @@ using CacheRespStream = ch_stream<CacheRespBundle>;
 |------|------|------|------|
 | `ch_stream<T>` | CppHDL `bundle/stream_bundle.h:19` | ✅ 已实现 | 握手数据流（valid/ready/cancel），流水线间首选 |
 | `ch_logic_in<T>` / `ch_logic_out<T>` | CppHDL `core/io.h` | ✅ 已实现 | 单元级 IO 端口 |
-| `ch_flow<T>` | （原文档声明） | ⚠️ **未实现** | 原文档提及的「单向流控」协议类型**不存在** |
-| `Fragment<T>` | （原文档声明） | ⚠️ **未实现** | 原文档提及的「多拍突发」协议类型**不存在** |
+| `ch::ch_flow<T>` | CppHDL `bundle/flow_bundle.h:21`（命名空间 `ch::`） | ✅ 已实现 | 单向流控（payload + valid，无 ready）；无反压场景 |
+| `ch::ch_fragment<T>` | CppHDL `bundle/fragment.h:16`（命名空间 `ch::`） | ✅ 已实现 | 多拍突发（data_beat + last + first）；分片传输 |
 
-> **删除声明**：原文档 Section 5.4 中 `ch_flow<T>` 与 `Fragment<T>` **未在 CppHDL 中实现**。如需这些类型，需扩展 Bundle 系统或创建独立头文件。
+> **v2.0.1 修正**：v2.0 中将 `ch_flow<T>` / `Fragment<T>` 标为"未实现"是错误的（v2.0 修订时未先验证代码）。两份头文件实际已完整实现，使用时需注意：
+> - 完整路径为 `ch::ch_flow<T>` / `ch::ch_fragment<T>`（位于 `ch` 命名空间）
+> - 必须包含 `bundle/flow_bundle.h` / `bundle/fragment.h` 或 umbrella `bundle.h`
+> - 原文档中称"无 Fragment<T> 类型"的叙述源于类型名前缀缺失（实际为 `ch_fragment<T>`）
 
 ### 5.5 BundleMapper（设计草稿）
 
@@ -630,7 +669,27 @@ enum class ImplMode {
 
 ### 6.2 模块级 impl_mode_override（设计提案）
 
-> ⚠️ 该 JSON 字段**当前不被 CppTLM `ModuleFactory` 解析**。`soc/riscv_virt.json` 中的 `"impl_mode": "TLM_ONLY"` 字段是悬挂引用。
+> ⚠️ **整文件不可用（v2.0.1 重大修正）**：
+>
+> `soc/riscv_virt.json`（仓库唯一示例 SoC 配置）的 **7 个模块类型引用 + 1 个 `impl_mode` 字段（共 8 项）都是悬挂引用**，无法运行。当前不可用的清单如下：
+>
+> | JSON 引用类型 | 实际状态 | 备注 |
+> |--------------|---------|------|
+> | `RiscvIssTlm` | ❌ 类不存在 | CppTLM 框架内无 ISS 模型 |
+> | `L1CacheTlm` | ❌ 名称错误 | 应为 `CacheTLM`（通用缓存模板，非 L1 特化） |
+> | `BusMatrixTlm` | ❌ 名称错误 | 应为 `CrossbarTLM`（4 端口，非通用总线矩阵） |
+> | `DramTlm` | ❌ 名称错误 | 应为 `MemoryTLM`（通用内存模型，非 DRAM 控制器） |
+> | `UartTlm` | ❌ 类不存在 | 需在 `ip/peripheral/` 自行实现 |
+> | `ClintTlm` | ❌ 类不存在 | 需自行实现 |
+> | `PlicTlm` | ❌ 类不存在 | 需自行实现 |
+> | `"impl_mode": "TLM_ONLY"` | ❌ 字段未被 ModuleFactory 解析 | 整 ImplMode 机制未实现 |
+>
+> **修复路径**（三选一）：
+> 1. **删除 `riscv_virt.json`**：避免悬挂引用误导读者
+> 2. **重写 JSON**：使用 §8.2 示例中的正确类名（`CPUTLM` / `CacheTLM` / `MemoryTLM` / `CrossbarTLM`），并删除 `impl_mode` 字段
+> 3. **实现缺失的 IP**：在 `ip/cpu/`、`ip/cache/`、`ip/peripheral/` 中补齐 RiscvIssTlm / UartTlm / ClintTlm / PlicTlm，并加入 `REGISTER_CHSTREAM` 注册表
+>
+> 当前推荐路径 (2)：保留最小可用示例，详见 §8.2。
 
 ```json
 {
@@ -723,7 +782,7 @@ private:
 
 ### 6.5 跨 TLM↔RTL 桥接（已实现 + 局部）
 
-> **当前现状**：仅 `cpptlm::rtl::HybridCacheWrapper` 提供 CacheTLM + L1CacheRtl 的协同仿真（详见 `CppTLM/include/rtl/hybrid_cache_wrapper.hh`）。**通用 TLM↔RTL 边界桥接**仍是 Phase 1 提案。
+> **当前现状**：仅 `cpptlm::rtl::HybridCacheWrapper` 提供 CacheTLM + L1CacheRtl 的协同仿真（详见 `CppTLM/include/rtl/hybrid_cache_wrapper.hh`）。**通用 TLM↔RTL 边界桥接**详见 [§6.8 限制声明](#68-通用-tlmrtl-边界桥接限制声明v2201-新增)。
 
 ### 6.6 COMPARE / SHADOW 模式（设计提案）
 
@@ -732,6 +791,51 @@ private:
 ### 6.7 性能影响（待基准测试验证）
 
 > 所有性能数字为设计参考值，未经任何基准测试验证。Phase 1 实施时应通过标准 benchmark（如 Dhrystone、RISC-V 指令流）实测后填入。
+
+### 6.8 通用 TLM↔RTL 边界桥接：限制声明（v2.0.1 新增）
+
+> **本节显式声明**：在 Phase 1 完成前，**通用 TLM↔RTL 边界桥接没有可用的通用方案**。
+
+#### 6.8.1 现状
+
+| 范围 | 当前能力 | 状态 |
+|------|----------|------|
+| 单 IP 协同（CacheTLM + L1CacheRtl） | `cpptlm::rtl::HybridCacheWrapper`（`CppTLM/include/rtl/hybrid_cache_wrapper.hh`） | ✅ 已实现，**特例** |
+| 任意 TLM IP + 任意 RTL IP 跨边界 | 无通用桥接器 | ❌ 未实现 |
+| 同一 IP 内同时存在 TLM 与 RTL 视图 | 仅 `HybridCacheWrapper` | ⚠️ 特例 |
+| 跨 IP 边界（TLM 端 ↔ RTL 端）的通用同步协议 | 无 | ❌ 未实现 |
+| 跨 TLM↔RTL 的时序对齐（如 RTL 单周期延迟 vs TLM 多事务） | 无 | ❌ 未实现 |
+
+#### 6.8.2 为什么"通用桥接"不是 Phase 1 的可交付物
+
+跨 TLM↔RTL 边界的**根本难点**：
+
+1. **时序模型差异**：TLM 模式按事务（transaction）推进；RTL 模式按周期（cycle）推进。两者在边界处的转换需精确的"事务→周期"映射
+2. **数据表示差异**：TLM Bundle 是 `uint64_t`/`bool` POD；RTL Bundle 是 `ch_uint<N>`/`ch_bool` 综合期类型。需要在边界执行 `BundleMapper`（§5.5，**未实现**）
+3. **握手协议差异**：TLM 用 valid/ready/cancel 三态；RTL 用 valid/ready 两态 + 时序延迟
+4. **取消语义差异**：TLM 支持事务级 cancel；RTL 需通过 `throwWhen()` 注入 cancel
+
+**Phase 1a 范围限制声明**：
+
+- ✅ Phase 1a/b：仅完成 Plugin/PipeBuilder 核心机制（与 `HybridCacheWrapper` 协同工作时可用）
+- ❌ Phase 1c 之前的任意 TLM↔RTL 通用桥接：**不在范围内**
+- 🚧 Phase 2：通用 `TLMRTLBridge<ReqBundle, RespBundle>` 模板提案（在 12.x 路线图中）
+
+#### 6.8.3 用户如何在此期间处理 TLM↔RTL 协同需求
+
+| 用户场景 | 推荐方案 |
+|----------|---------|
+| Cache 一致性对比（最常见） | 使用 `HybridCacheWrapper` 模式，参考 `CppTLM/include/rtl/hybrid_cache_wrapper.hh` 与 `hybrid_cache_component.hh` 复制模式 |
+| 非 Cache 场景（如 DMA、Interconnect） | Phase 1 内**无法**实现，需自行编写桥接 wrapper；或将整个 IP 全部采用 TLM 或全部 RTL |
+| SoC 级混合（TLM CPU + RTL 外设） | 当前无通用方案；建议：CPU 用 TLM，外设全部用 TLM（保留仿真速度优势），Phase 2 后再混合 |
+| 模型一致性检查（COMPARE/SHADOW） | **不可用**（§6.6 全部未实现） |
+
+#### 6.8.4 验证此声明
+
+本节约束可通过以下方式验证：
+
+- 全仓搜索 `TLMRTLBridge` / `TlmRtlBridge` / `HybridBridge`（应 0 命中，仅 `HybridCacheWrapper` 与 `hybrid_cache_component.*` 命中）
+- 全仓搜索 `CompareDriver` / `ScoreBoard`（应 0 命中）
 
 ---
 
@@ -1052,7 +1156,7 @@ private:
 | RTL 端口（旧） | `ch_logic_in` / `ch_logic_out` | `CppHDL/include/core/io.h` | ✅ |
 | RTL Bundle 基类 | `bundle_base<Self>` | `CppHDL/include/core/bundle/bundle_base.h` | ✅ |
 | RTL 流 | `ch_stream<T>` | `CppHDL/include/bundle/stream_bundle.h:19` | ✅ |
-| RTL 节点 | `lnode` / `lnodeimpl` | `CppHDL/include/core/lnode.h` / `core/lnodeimpl.h` | ✅ ⚠️ 非 logic_node.h |
+| RTL 节点 | `lnode` / `lnodeimpl` | `CppHDL/include/core/lnode.h` + `core/lnodeimpl.h`（前向声明）；`CppHDL/include/lnode/*.tpp`（模板实现） | ✅ ⚠️ 非 logic_node.h |
 | RTL 节点构建器 | `node_builder` | `CppHDL/include/core/node_builder.h` | ✅ |
 | RTL Verilog 生成 | `VerilogCodeGen` | `CppHDL/include/codegen_verilog.h` | ✅ |
 | RTL 仿真 | `Simulator` | `CppHDL/include/simulator.h` | ✅ |
@@ -1089,6 +1193,58 @@ private:
 
 > **本章由评审过程新增**（P3 修订要求），明确每个设计项的落地阶段与负责人。
 
+### 12.0 与 CppTLM/CppHDL "零债务原则"的协调（v2.0.1 新增）
+
+> **本节显式声明**：v2.0 文档中约 65% 章节标为 🚧 设计提案，**这本身是一种技术债**。本节给出与 CppTLM AGENTS.md "零债务原则"的调和策略。
+
+#### 12.0.1 冲突识别
+
+CppTLM AGENTS.md 明确：
+> **零债务原则**：每个 Phase 完成即编译通过、测试覆盖、文档同步。**禁止遗留 TODO、跳过测试、未归档的技术债**
+
+但 v2.0 文档中：
+
+| 章节 | 状态 | 隐含的技术债 |
+|------|------|--------------|
+| §4 Plugin 模型（4.1–4.7） | 🚧 设计 | 调度算法、生命周期、与 ChStreamModuleBase 关系均未实现 |
+| §5.5 BundleMapper | 🚧 设计 | POD↔ch_uint 转换模板缺失 |
+| §5.7 Symbolic<T> 运行时抽象 | 🚧 设计 | 跨模块类型擦除缺失 |
+| §6 混合仿真 4 种 ImplMode | 🚧 设计 | 整 ImplMode 机制缺失 |
+| §7 PipeNode/PipeBuilder | 🚧 设计 | 0 行代码、0 头文件 |
+| §9 验证策略（9.2–9.7） | 🚧 设计 | ScoreBoard / CompareDriver / DSE 集成缺失 |
+| §10 L1 Cache 双模式实现 | 🚧 设计 | 引用文件全部不存在（`ip/cache/{bundles,tlm,rtl,plugins}/` 目录全空） |
+
+这些章节合计约 1100 行设计草案，构成**未实现的规格说明**——本身就是技术债。
+
+#### 12.0.2 调和策略
+
+**短期（v2.0.x 维护期）**：
+1. 任何新的 🚧 设计章节必须有显式 ADR + Owner + Phase 归属
+2. 任何从仓库移除的"已实现"标签必须经过路径 + 编译验证（参见 v2.0 错误地将 `ch_flow` 标为"未实现"）
+3. 每个 Phase 完成时，文档必须升级主版本号（v2.0 → v3.0）
+
+**中期（v2.1/v2.2 演进期）**：
+1. §4 Plugin 模型分阶段实施（详见 §12.2 拆分方案）
+2. §10 L1 Cache 双模式作为"参考实现"分阶段落地（不阻塞主线）
+
+**长期（v3.0 重组期）**：
+1. 当 Phase 1c 完成（首个端到端 Plugin化 IP）时，§4 / §7 / §9 / §10 应转为 ✅ 状态
+2. 若 Phase 1c 在 6 个月后仍未启动，应将相关章节归档至 `docs-archived/`（参见 CppTLM AGENTS.md 的归档约定）
+
+#### 12.0.3 责任归属（明确缺失）
+
+| 设计草案 | 当前 Owner | 状态 |
+|----------|-----------|------|
+| §4 Plugin 模型 | **未指定** | 阻塞 Phase 1 启动 |
+| §5.5 BundleMapper | **未指定** | 可独立实施 |
+| §5.7 Symbolic<T> 运行时抽象 | **未指定** | 可与 §5.5 并行 |
+| §6 ImplMode | **未指定** | 阻塞 Phase 1c |
+| §7 PipeNode/PipeBuilder | **未指定** | 阻塞 Phase 1 启动 |
+| §9 验证策略 | **未指定** | 可与 §6 并行 |
+| §10 L1 Cache 双模式 | **未指定** | Phase 1c 依赖 |
+
+**v2.0.1 行动项**：在 Phase 1 启动前，§12.0.3 必须为每个 🚧 章节指定 Owner；否则 Phase 1 启动会议应**冻结**所有相关章节的设计。
+
 ### 12.1 已实现项 ✅（可直接使用）
 
 | 模块 | 路径 | 状态 |
@@ -1101,34 +1257,81 @@ private:
 | TLM 标准 IP 库（Cache / Memory / Crossbar / CPU / Router / NIC / Link） | `CppTLM/include/tlm/` | ✅ |
 | HybridCacheWrapper TLM↔RTL 桥接 | `CppTLM/include/rtl/hybrid_cache_wrapper.hh` | ✅ |
 | VerilogCodeGen 与 Simulator | `CppHDL/include/codegen_verilog.h` / `simulator.h` | ✅ |
-| lnode DAG 与 NodeBuilder | `CppHDL/include/core/lnode*.h` | ✅ |
+| lnode DAG 与 NodeBuilder | `CppHDL/include/core/lnode.h` + `core/lnodeimpl.h` + `lnode/*.tpp` + `core/node_builder.h` | ✅ |
 | PluginLoader（dlopen SO 加载） | `CppTLM/include/core/plugin_loader.hh` | ✅ |
 
-### 12.2 Phase 1 目标（4–8 周，目标版本 ChipForge 0.2）🚧
+### 12.2 Phase 1 拆分方案（v2.0.1 重构）
 
-| 任务 | 依赖 | 风险 |
-|------|------|------|
-| **实现 `Plugin` 基类**（`setup` + `build`，无 tick） | 框架层稳定 | 中：需要明确 Plugin 生命周期 |
-| **实现 `Phase` 枚举** | Plugin 基础 | 低 |
-| **实现 `Payload<T>` 类型安全 Key** | Plugin 基础 | 低 |
-| **实现 `PipeBuilder` 核心 API**（`create_node` / `at_stage` / `declare_substage`） | Plugin + Phase | 中：调度算法设计 |
-| **实现 `PipeNode` / `PipeLink` 三种类型** | PipeBuilder | 中 |
-| **实现 `CtrlLink` 四种控制 API** | PipeNode | 中：与 `halt_when` / `throw_when` 等交互复杂 |
-| **实现 `BundleMapper` 模板** | Bundle 系统已实现 | 低 |
-| **实现模块级 `impl_mode_override` JSON 解析** | ModuleFactory | 中：需修改拓扑解析器 |
-| **实现 `CompareDriver` 与 `ScoreBoard` 基类** | 框架层稳定 | 中 |
-| **实现第一个 Plugin 化 IP**（建议：基于现有 `CacheTLM`） | 上述全部 | 高：端到端验证 |
+> **v2.0.1 重大重构**：v2.0 中将所有 10 项 Phase 1 任务集中在 4–8 周窗口内，**严重低估工作量**。本节将 Phase 1 拆分为三个独立可交付的子阶段（1a/1b/1c），每个子阶段均有明确的可交付物与退出标准。
+
+#### 12.2.1 Phase 1a — Plugin/Pipe 核心机制（4–6 周）
+
+> **目标**：完成 Plugin/PipeBuilder 内部 API，**不**与现有 `ChStreamModuleBase` 集成。
+
+| 任务 | 依赖 | 风险 | 退出标准 |
+|------|------|------|----------|
+| **实现 `Plugin` 基类**（`setup` + `build`，无 tick） | 框架层稳定 | 中：需要明确 Plugin 生命周期 | 单元测试覆盖 `Plugin` 的 setup/build 时序 |
+| **实现 `Phase` 枚举** | Plugin 基础 | 低 | 编译通过 |
+| **实现 `Payload<T>` 类型安全 Key** | Plugin 基础 | 低 | 编译通过 |
+| **实现 `PipeBuilder` 核心 API**（`create_node` / `at_stage` / `declare_substage`） | Plugin + Phase | 中：调度算法设计 | 最小 PipeBuilder 单测 + 调度确定性测试 |
+| **实现 `PipeNode` / `PipeLink` 三种类型**（`StageLink` / `CtrlLink` / `DirectLink`） | PipeBuilder | 中 | PipeNode 状态机单测 |
+| **实现 `CtrlLink` 四种控制 API**（`halt_when` / `flush_when` / `throw_when` / `bypass`） | PipeNode | 中：与 `halt_when` / `throw_when` 等交互复杂 | CtrlLink 状态机 + 反压场景测试 |
+
+**Phase 1a 退出标准**（必须全部满足才能进入 1b）：
+- [ ] 所有单元测试通过（覆盖率 ≥ 80%）
+- [ ] `Plugin` + `PipeBuilder` 的 API 文档（Doxygen）完整
+- [ ] 调度确定性证明（在 `docs/architecture/plugin-scheduling-correctness.md` 中给出）
+- [ ] 零 TODO 残留（与 CppTLM 零债务原则一致）
+
+#### 12.2.2 Phase 1b — JSON 装配 + 验证基础设施（4–6 周）
+
+> **目标**：扩展 ModuleFactory 接受 Plugin/Pipeline 配置；建立 COMPARE/SHADOW 验证基础设施。
+
+| 任务 | 依赖 | 风险 | 退出标准 |
+|------|------|------|----------|
+| **实现 `BundleMapper` 模板** | Bundle 系统已实现 | 低 | POD↔ch_uint 双向转换单测 |
+| **实现模块级 `impl_mode_override` JSON 解析** | ModuleFactory | 中：需修改拓扑解析器 | JSON 含 `impl_mode_override` 字段的解析测试 |
+| **实现 `CompareDriver` 与 `ScoreBoard` 基类** | 框架层稳定 | 中 | ScoreBoard 差异检测单测 |
+
+**Phase 1b 退出标准**：
+- [ ] ModuleFactory 可解析含 `pipeline_stages` 字段的 JSON
+- [ ] ScoreBoard 可对比两个 Packet 流的差异
+- [ ] JSON Schema 校验脚本通过
+
+#### 12.2.3 Phase 1c — 端到端 Plugin 化 IP（4–8 周）
+
+> **目标**：将现有 `CacheTLM` 改造为 Plugin 化 IP，验证 1a+1b 集成效果。
+
+| 任务 | 依赖 | 风险 | 退出标准 |
+|------|------|------|----------|
+| **实现第一个 Plugin 化 IP**（建议：基于现有 `CacheTLM`） | Phase 1a + 1b | 高：端到端验证 | CacheTLM 跑通 Plugin 化 SoC demo；与原 CacheTLM 行为一致 |
+
+**Phase 1c 退出标准**：
+- [ ] 端到端 SoC demo 跑通（Catch2 集成测试）
+- [ ] 与 v2.0 行为对比测试通过（同一测试套件下输出相同统计）
+- [ ] L1 Cache 双模式参考实现（如未在本期完成，进 Phase 2）
+
+#### 12.2.4 Phase 1 总时间窗口
+
+| 子阶段 | 时间窗口 | 累计 | 关键风险 |
+|--------|----------|------|----------|
+| Phase 1a | 4–6 周 | 4–6 周 | 调度算法设计 |
+| Phase 1b | 4–6 周 | 8–12 周 | ModuleFactory 修改需向后兼容 |
+| Phase 1c | 4–8 周 | 12–20 周 | 端到端集成 |
+| **总计** | **12–20 周** | | **（vs v2.0 估计的 4–8 周）** |
+
+**重要警告**：v2.0 中"Phase 1（4–8 周）"是不切实际的。Phase 1a 单独就需要 4–6 周。**应将版本目标从 ChipForge 0.2 调整为 0.2.0（1a 完成）/ 0.2.1（1c 完成）**。
 
 ### 12.3 Phase 2 目标（8–16 周，目标版本 ChipForge 0.3）
 
 | 任务 | 依赖 |
 |------|------|
-| 完整 L1 Cache IP 双模式参考实现 | Phase 1 完成 |
-| `ip/cache/` 目录填充（tlm/rtl/plugins/tests/configs） | Phase 1 |
-| 通用 TLM↔RTL 桥接（扩展 `HybridCacheWrapper` 模式） | Phase 1 |
-| 性能基准测试套件（Dhrystone / RISC-V 指令流） | Phase 1 |
-| DSE 集成（参数扫描 + Pareto 分析） | Phase 1 |
-| 单元/集成/COMPARE 测试金字塔落地 | Phase 1 |
+| 完整 L1 Cache IP 双模式参考实现 | Phase 1c 完成 |
+| `ip/cache/` 目录填充（tlm/rtl/plugins/tests/configs） | Phase 1c |
+| 通用 TLM↔RTL 桥接（扩展 `HybridCacheWrapper` 模式） | Phase 1c |
+| 性能基准测试套件（Dhrystone / RISC-V 指令流） | Phase 1c |
+| DSE 集成（参数扫描 + Pareto 分析） | Phase 1c |
+| 单元/集成/COMPARE 测试金字塔落地 | Phase 1c |
 | `ch_int<N>` 类型扩展（如需要） | 用户反馈 |
 | 修复文档 ADR-6 目录分离问题 | 全栈 |
 
@@ -1136,17 +1339,18 @@ private:
 
 | 设计项 | 备注 |
 |--------|------|
-| `ch_flow<T>` / `Fragment<T>` 协议类型 | 需评估是否真有必要（当前 `ch_stream<T>` 已足够） |
 | SpinalHDL 风格 API | CppHDL 已独立设计，未承诺兼容 |
 | 运行时 Symbolic<T> 抽象 | 当前编译期切换足够；运行时支持需明确驱动场景 |
+
+> **v2.0.1 移除**：`ch_flow<T>` / `Fragment<T>`（即 `ch::ch_flow<T>` / `ch::ch_fragment<T>`）已实现并归入 5.4 节，不再列为路线图项。
 
 ### 12.5 文档维护规则
 
 1. 每次升级 CppTLM/CppHDL 后，**必须重新核对**本文档的 11.2 路径表与所有代码示例
 2. Phase 1 完成后，本文档 v2.x 需升级为 v3.0，将 ✅ 与 🚧 标记按实现状态调整
 3. 文档审查 checklist 应包含「所有代码示例可编译」项
-4. 评审报告（参见会话历史）作为 v2.0 的修订依据
+4. 评审过程产出的 P0–P3 修订建议已在 v2.0 应用，原始评审过程产物参见 Git 仓库历史与 `docs/architecture/` 目录
 
 ---
 
-*文档结束。本版本（v2.0）已按 [评审报告](declarative-hybrid-framework-rfc-status.md) 全部 P0–P3 修订建议应用。*
+*文档结束。本版本（v2.0.1）已应用架构审查（2026-06-08）的全部 P0–P1 修复；v2.0 中的 P0–P3 修订建议保留为历史基线（v2.0 → v2.0.1 增量修改详见各章节"v2.0.1"标注）。*
