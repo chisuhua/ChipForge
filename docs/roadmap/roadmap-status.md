@@ -11,7 +11,7 @@
 
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
-| Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% | 无 | Phase 1 启动 |
+| Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
 | Phase 1 | M1 - L1CachePlugin Hello World | Not Started | 0% | 依赖 Phase 0(已解除) | Bundle 定义 |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
@@ -91,12 +91,12 @@
 
 | ID | 类型 | 项目 | 责任 | 状态 | 优先级 |
 |----|------|------|------|------|-------|
-| PA-1 | 文档 | M4: `adr.md` 新增 ADR-037 + 更新 ADR-025~036 | TBD | ✅ 已完成 (2026-06-08, v1.1) | P1 |
-| PA-2 | 文档 | M5: `declarative-hybrid-framework.md` §12.0.3 责任归属表 | TBD | ✅ 已完成 (2026-06-08, v2.0.3) | P1 |
-| PA-3 | 文档 | 处置 `phase-1-foundation.md`(旧 vs 新 phase-1-tlm-foundation.md) | TBD | ✅ 已完成 (2026-06-09, 文件已 git rm) | P2 |
-| PA-4a | 构建 | CppTLM 集成 + 根 CMakeLists.txt 升级 | TBD | ✅ 已完成 (2026-06-08) | P1 |
-| PA-4b | 构建 | CppHDL 集成(阻塞: CppHDL 上游 tests 路径 bug) | TBD | ✅ 已完成 (2026-06-08, 上游修复后集成) | P2 |
-| PA-5 | 验证 | V1: `tools/verify_plugin_decision.sh`(可选) | TBD | ✅ 已完成 (2026-06-08, 3/3 PASS) | P3 |
+| PA-1 | 文档 | M4: `adr.md` 新增 ADR-037 + 更新 ADR-025~036 | Prometheus+Sisyphus | ✅ 已完成 (2026-06-08, v1.1) | P1 |
+| PA-2 | 文档 | M5: `declarative-hybrid-framework.md` §12.0.3 责任归属表 | Prometheus+Sisyphus | ✅ 已完成 (2026-06-08, v2.0.3) | P1 |
+| PA-3 | 文档 | 处置 `phase-1-foundation.md`(旧 vs 新 phase-1-tlm-foundation.md) | Prometheus+Sisyphus | ✅ 已完成 (2026-06-09, 文件已 git rm) | P2 |
+| PA-4a | 构建 | CppTLM 集成 + 根 CMakeLists.txt 升级 | Prometheus+Sisyphus | ✅ 已完成 (2026-06-08) | P1 |
+| PA-4b | 构建 | CppHDL 集成(阻塞: CppHDL 上游 tests 路径 bug) | Prometheus+Sisyphus | ✅ 已完成 (2026-06-08, 上游修复后集成) | P2 |
+| PA-5 | 验证 | V1: `tools/verify_plugin_decision.sh`(可选) | Prometheus+Sisyphus | ✅ 已完成 (2026-06-08, 3/3 PASS) | P3 |
 
 ---
 
@@ -114,34 +114,35 @@
 
 ## 5. 下一步建议(Top 3)
 
-### 建议 2:启动 Phase 0 P0 #1 — PluginBase(2 天) — 🔄 剩余
+### 建议 1:启动 Phase 1 — L1CachePlugin (1.5 周) — 🔄 剩余
 
-**前置条件已就绪**:
-- ✅ `src/cf_plugin/` 目录 + CMakeLists.txt + README.md(本轮完成)
-- ✅ `cf_plugin` INTERFACE 库已注册(供 P0 组件消费)
-- ✅ 根 `CMakeLists.txt` 集成 CppTLM(供单元测试链接)
-- ✅ `compile_commands.json` 已生成(LSP 友好)
-- ⚠️ 需要至少 1 个 Owner 指派(§12.0.3 责任表)
+**前置条件已就绪** (2026-06-09 Quick 准备已解锁):
+- ✅ ADR-033 (CtrlLink 4-control-API) 已 ✅ Accepted,D6 共存方案绑定 (halt_when / throw_when / flush_when / bypass)
+- ✅ Phase 0 脚手架 5/5 P0 组件完成 (51/51 单元测试 PASS, 7/7 ctest PASS)
+- ✅ CppTLM + CppHDL 集成完成 (`cpptlm_core` + `cpphdl` 目标可达)
+- ✅ `bundles/mem_bundles.h` 计划在 Phase 1.1 落地 (1 天)
+- ⚠️ 风险: 应用层代码空 (`bundles/`、`ip/*/tlm/`、`soc/riscv_virt.json` 6/8 引用悬挂) — Phase 1 启动时一并建设
 
-**任务**(详见 `phase-0-plugin-scaffolding.md` §1.1):
-- 定义 `cf::plugin::PluginBase` 抽象基类
-  - 暴露 `setup(PipeBuilder&)`(默认空) + `build(PipeBuilder&)`(纯虚)
-- 编译期断言禁止 `tick()`(static_assert + final 类 + 删除的 tick())
-- 单元测试 `test_plugin_lifecycle.cpp`
-- 验证 cmake 链接 + 运行测试
+**任务** (详见 `phase-1-tlm-foundation.md`):
+- 1.1 Bundle 定义 (`MemReq` / `MemResp` 用 `uint_t<N>`,D4 合规) — 1 天
+- 1.2 L1CachePlugin 实现 (lookup + refill 两阶段,无 `tick()`) — 3-4 天
+- 1.3 最小 SoC JSON (`l1_cache_minimal.json` 用 CPUTLM/CacheTLM/MemoryTLM/CrossbarTLM) — 1 天
+- 1.4 对比基线 (与 `cpptlm::CacheTLM` 执行迹对比) — 1-2 天
 
-**价值**: Phase 0 第一个 P0 组件开始落地,验证"Plugin-style"设计在 C++17 静态类型系统下可行
+**价值**: 验证 D4 Plugin-style 端到端可行性,是 Phase 0 投入变现的关键节点
 
-### 建议 3:按 1.1 → 1.5 顺序完成 Phase 0 全部 5 个 P0(共 2-3 周) — 🔄 剩余
+### 建议 2:解决 ADR-033 衍生命名冲突 (CtrlLink::halt_when vs CppHDL chlib stream_halt_when) — 🟡 待确认
 
-按顺序实施剩余 4 个组件:
-- 1.2 `Payload<T>` (2 天)
-- 1.3 `PipeNode` (3 天)
-- 1.4 `PipeBuilder` (4 天)
-- 1.5 `CtrlLink` (3 天)
-- 端到端验证(最小 HelloPlugin) + Phase 0 退出标准 (2-3 天)
+**背景**: 2026-06-09 ADR-033 锁定 D6 共存方案 (4 conflicts),但 chlib 自由函数与 `cf::plugin::CtrlLink` 对象方法在 Phase 1 编码期可能产生实际调用点冲突
 
-**前置条件**: 建议 1 + 建议 2 完成 + Owner 持续投入
+**选项**:
+- A. 维持共存 (D6 原方案) — chlib 自由函数保持向后兼容,新 Plugin 业务代码统一 `CtrlLink::*`
+- B. chlib 自由函数加 namespace prefix (`chlib::stream_halt_when`) — 显式区分
+- C. CtrlLink 改名 (`CtrlLinkHalt` 等) — 规避冲突但破坏已落地 API
+
+**价值**: 在 Phase 1 编码前关闭最后的不确定性,避免 `CtrlLink::halt_when` 调用点大规模重命名
+
+**建议**: 维持 D6 (选项 A),如果 Phase 1.2 实施时实测发现调用点混淆再升级到选项 B
 
 ---
 
