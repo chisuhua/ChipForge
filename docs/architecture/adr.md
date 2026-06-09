@@ -74,7 +74,7 @@
 
 > **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 23 条
+### 2.1 已实现决策（✅）— 30 条
 
 | ID | 标题 | 类别 | 验证路径 |
 |----|------|------|----------|
@@ -100,6 +100,13 @@
 | ADR-021 | bundle_base<Self> CRTP | Bundle | `core/bundle/bundle_base.h` |
 | ADR-022 | CH_BUNDLE_FIELDS_T 宏族 | Bundle | `core/bundle/bundle_meta.h:23-32` |
 | ADR-023 | ch_stream<T> 协议 | Bundle | `bundle/stream_bundle.h:19` |
+| ADR-025 | Plugin 基类无 tick | Plugin | `include/cf/plugin/plugin_base.h` |
+| ADR-026 | at_stage() 逻辑阶段名 | Plugin | `include/cf/plugin/pipe_builder.h:68` |
+| ADR-027 | Phase 子阶段 EARLY/NORMAL/LATE | Plugin | `include/cf/plugin/pipe_builder.h:38` |
+| ADR-028 | declare_substage() | Plugin | `include/cf/plugin/pipe_builder.h:77` |
+| ADR-030 | PipeNode 三态握手 | Plugin | `include/cf/plugin/pipe_node.h` |
+| ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
+| ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
@@ -108,19 +115,12 @@
 |----|------|------|------------|----------|
 | ADR-024 | Bundle 三层分层 | Bundle | Bundle + Protocol | Mapper 模板未实现 |
 
-### 2.3 Phase 1 提案决策（🚧）— 15 条
+### 2.3 Phase 1 提案决策（🚧）— 7 条
 
 | ID | 标题 | 类别 | 状态 | 备注 |
 |----|------|------|------|------|
-| ADR-025 | Plugin 基类无 tick | Plugin | 🚧 |
-| ADR-026 | at_stage() 逻辑阶段名 | Plugin | 🚧 |
-| ADR-027 | Phase 子阶段顺序 | Plugin | 🚧 |
-| ADR-028 | declare_substage() | Plugin | 🚧 |
-| ADR-029 | 模块级 ImplMode | Plugin | 🚧 |
-| ADR-030 | PipeNode 三态握手 | Pipe | 🚧 |
-| ADR-031 | StageLink / CtrlLink / DirectLink | Pipe | 🚧 |
-| ADR-032 | PipeBuilder 统一编译器 | Pipe | 🚧 |
-| ADR-033 | CtrlLink 四种控制 API | Pipe | ✅ Accepted | D6 共存方案已绑定 (4 conflicts) |
+| ADR-029 | 模块级 ImplMode | Plugin | 🚧（推迟到 Phase 6） |
+| ADR-031 | StageLink / CtrlLink / DirectLink | Pipe | 🚧（Phase 0 仅 CtrlLink 已完成） |
 | ADR-034 | ScoreBoard 三种变体 | 验证 | 🚧 |
 | ADR-035 | CompareDriver TLM↔RTL 驱动 | 验证 | 🚧 |
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
@@ -137,13 +137,13 @@
 | 注册与发现 (D) | 3 | 0 | 0 | 3 |
 | 端口与信号 (E) | 3 | 0 | 0 | 3 |
 | Bundle 与协议 (F) | 3 | 1 | 0 | 4 |
-| 声明式 Plugin (G) | 0 | 0 | 5 | 5 |
-| 流水线抽象 (H) | 0 | 0 | 4 | 4 |
+| 声明式 Plugin (G) | 4 | 0 | 1 | 5 |
+| 流水线抽象 (H) | 3 | 0 | 1 | 4 |
 | 验证框架 (I) | 0 | 0 | 3 | 3 |
 | 目录与组织 (J) | 1 | 0 | 1 | 2 |
-| **合计** | **23** | **1** | **14** | **38** |
+| **合计** | **30** | **1** | **7** | **38** |
 
-**实现率**：24/38 = **63%**（含部分实现）
+**实现率**：30/38 = **79%**（含部分实现）
 
 ---
 
@@ -759,23 +759,23 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #1 |
+| 状态 | ✅ Phase 0 P0 #1 |
 | 来源 | `declarative-hybrid-framework.md` §4.1 + ADR-1 |
 | 决策 | `Plugin` 基类只有 `setup(PipeBuilder&)` 与 `build(PipeBuilder&)`，**没有** `tick()` |
 | 理由 | 调度由框架确定性决定，Plugin 不持有时序状态 |
-| 后果 | 🚧 未实现；当前 `PluginLoader`（ADR-017）是无关的 dlopen 加载器 |
+| 后果 | ✅ 已实现；`include/cf/plugin/plugin_base.h:48` 定义 `PluginBase`，仅提供 `name() / setup() / build()`，无 `tick()`。`PluginLoader`（ADR-017）是无关的 dlopen 加载器 |
 
-**验证命令**（预期失败 = 符合预期）：
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.1
+
+**验证命令**（必须通过）：
 ```bash
-# Plugin 基类应不存在
-[[ ! -e /workspace/project/ChipForge/core/plugin.h ]] && \
-[[ ! -e /workspace/project/CppTLM/include/core/plugin.h ]] && \
-[[ ! -e /workspace/project/CppHDL/include/core/plugin.h ]]
-# 任何位置都不应有 class Plugin
-! grep -rqE "^class Plugin\s" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | grep -v "PluginLoader" | head -1
+# PluginBase 应在 include/cf/plugin/plugin_base.h 中定义
+grep -nE "^class PluginBase\b" /workspace/project/ChipForge/include/cf/plugin/plugin_base.h
+# 任何 Plugin/PluginBase 都不应暴露 tick() 方法
+! grep -rE "(\bPluginBase\b|\bclass Plugin\b).*\btick\s*\(" /workspace/project/ChipForge/include/cf/plugin 2>/dev/null | head -1
 ```
 
-**代码锚点（预期缺失）**：`core/plugin.h`（在 ChipForge / CppTLM / CppHDL 中均不应存在）
+**代码锚点**：`include/cf/plugin/plugin_base.h:48`（`class PluginBase`）
 
 ---
 
@@ -783,19 +783,21 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #4 |
+| 状态 | ✅ Phase 0 P0 #4 |
 | 来源 | `declarative-hybrid-framework.md` §4.3 + ADR-2 |
 | 决策 | `PipeBuilder::at_stage(stage, phase, lambda)` 将 Plugin 绑定到逻辑阶段名（`"lookup"` 等）|
 | 理由 | Plugin 实现与物理流水线深度解耦，配置变更无需修改 Plugin 代码 |
-| 后果 | 🚧 未实现；当前无法做"逻辑名 → 物理 Node"映射 |
+| 后果 | ✅ 已实现；`PipeBuilder::at_stage(stage_name, phase, cb)` 在 `include/cf/plugin/pipe_builder.h:68`，并自动创建 `PipeNode`（line 72-74） |
 
-**验证命令**（预期失败）：
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+
+**验证命令**（必须通过）：
 ```bash
-# at_stage 方法应不存在
-! grep -rqE "at_stage\s*\(" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
+# at_stage 方法应已实现
+grep -nE "void\s+at_stage\s*\(" /workspace/project/ChipForge/include/cf/plugin/pipe_builder.h
 ```
 
-**代码锚点（预期缺失）**：`PipeBuilder::at_stage`
+**代码锚点**：`include/cf/plugin/pipe_builder.h:68`（`PipeBuilder::at_stage`）
 
 ---
 
@@ -803,18 +805,21 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #4 |
+| 状态 | ✅ Phase 0 P0 #4 |
 | 来源 | `declarative-hybrid-framework.md` §4.3 + ADR-3 |
 | 决策 | `enum class Phase { EARLY, NORMAL, LATE }` 控制同逻辑阶段内多 Plugin 的执行顺序 |
 | 理由 | 依赖检测（EARLY）→ 主体逻辑（NORMAL）→ 写回准备（LATE），三档足够典型需求 |
-| 后果 | 🚧 未实现；当前同阶段 Plugin 调度顺序未定义 |
+| 后果 | ✅ 已实现；`enum class Phase` 在 `include/cf/plugin/pipe_builder.h:38` 定义，配合 `phase_name()`（line 44）输出可读名称 |
 
-**验证命令**（预期失败）：
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+
+**验证命令**（必须通过）：
 ```bash
-! grep -rqE "enum class Phase\s*\{[^}]*EARLY" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
+# Phase 枚举应已定义
+grep -nE "enum\s+class\s+Phase\s*\{[^}]*EARLY" /workspace/project/ChipForge/include/cf/plugin/pipe_builder.h
 ```
 
-**代码锚点（预期缺失）**：`enum class Phase`
+**代码锚点**：`include/cf/plugin/pipe_builder.h:38`（`enum class Phase`）
 
 ---
 
@@ -822,18 +827,21 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #4 (最小) + Phase 6 (完整) |
+| 状态 | ✅ Phase 0 P0 #4 (最小) + Phase 6 (完整) |
 | 来源 | `declarative-hybrid-framework.md` §4.4 |
 | 决策 | `PipeBuilder::declare_substage(parent, sub, depth)` 在流水线中追加子 Node |
 | 理由 | 允许 Plugin 在 `setup()` 阶段动态扩展物理流水线深度 |
-| 后果 | 🚧 未实现；当前流水线深度完全由 JSON 静态决定 |
+| 后果 | ✅ 最小实现已落地（`include/cf/plugin/pipe_builder.h:77`，`depth` 参数占位），父子关系记录在 `substage_parent_`；完整拓扑/调度集成推迟到 Phase 6 |
 
-**验证命令**（预期失败）：
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.3
+
+**验证命令**（必须通过 — 最小签名）：
 ```bash
-! grep -rqE "declare_substage\s*\(" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
+# declare_substage 方法应已实现
+grep -nE "void\s+declare_substage\s*\(" /workspace/project/ChipForge/include/cf/plugin/pipe_builder.h
 ```
 
-**代码锚点（预期缺失）**：`PipeBuilder::declare_substage`
+**代码锚点**：`include/cf/plugin/pipe_builder.h:77`（`PipeBuilder::declare_substage`）
 
 ---
 
@@ -869,19 +877,22 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #3 |
+| 状态 | ✅ Phase 0 P0 #3 |
 | 来源 | `declarative-hybrid-framework.md` §7.1 |
 | 决策 | `PipeNode` 提供 `is_firing()` / `is_moving()` / `is_blocked()` / `is_canceling()` 状态查询 |
 | 理由 | 三态握手（valid/ready/cancel）支持流水线正常、阻塞、取消三种场景 |
-| 后果 | 🚧 未实现；当前 `ch_stream` 已支持三态握手，但无显式 `PipeNode` 包装 |
+| 后果 | ✅ 已实现；`class PipeNode` 在 `include/cf/plugin/pipe_node.h:29`，状态查询 API 完整，桥接到底层 `ch_stream` 握手语义 |
 
-**验证命令**（预期失败）：
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.4
+
+**验证命令**（必须通过）：
 ```bash
-! grep -rqE "class PipeNode" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
-! grep -rqE "is_firing\(\)|is_canceling\(\)" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
+# PipeNode 类与三态查询 API 应已实现
+grep -nE "^class PipeNode\b" /workspace/project/ChipForge/include/cf/plugin/pipe_node.h
+grep -nE "is_firing\s*\(\)|is_canceling\s*\(\)" /workspace/project/ChipForge/include/cf/plugin/pipe_node.h
 ```
 
-**代码锚点（预期缺失）**：`class PipeNode`
+**代码锚点**：`include/cf/plugin/pipe_node.h:29`（`class PipeNode`）
 
 ---
 
@@ -889,18 +900,23 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #5 |
+| 状态 | 🚧 Phase 0 仅 CtrlLink 已完成；StageLink / DirectLink / PipeLink 基类推迟到 Phase 6 |
 | 来源 | `declarative-hybrid-framework.md` §7.2 |
 | 决策 | `StageLink`（标准流水级）/ `CtrlLink`（带控制 API）/ `DirectLink`（组合直连）|
 | 理由 | 不同流水线场景需要不同的 Link 抽象 |
-| 后果 | 🚧 未实现；当前无 `PipeLink` 抽象 |
+| 后果 | 🚧 部分实现；Phase 0 仅 `CtrlLink` 已落地（见 `include/cf/plugin/ctrl_link.h`），`StageLink` / `DirectLink` / 统一 `PipeLink` 基类推迟到 Phase 6 |
 
-**验证命令**（预期失败）：
+**验证命令**（CtrlLink 必须通过，StageLink/DirectLink 预期失败）：
 ```bash
-! grep -rqE "class (StageLink|CtrlLink|DirectLink)" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
+# CtrlLink 必须存在
+grep -nE "^class\s+CtrlLink\b" /workspace/project/ChipForge/include/cf/plugin/ctrl_link.h
+# StageLink / DirectLink / PipeLink 基类应不存在
+! grep -rqE "class\s+(StageLink|DirectLink|PipeLink)\b" /workspace/project/ChipForge/include/cf/plugin 2>/dev/null | head -1
 ```
 
-**代码锚点（预期缺失）**：`class StageLink / CtrlLink / DirectLink`
+**代码锚点**：
+- `include/cf/plugin/ctrl_link.h:24`（`class CtrlLink` — 已实现）
+- `class StageLink` / `class DirectLink`（预期缺失，推迟到 Phase 6）
 
 ---
 
@@ -908,18 +924,21 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|------|
-| 状态 | 🚧 Phase 0 P0 #4 |
+| 状态 | ✅ Phase 0 P0 #4 |
 | 来源 | `declarative-hybrid-framework.md` §7.3 |
 | 决策 | `PipeBuilder` 统一编译入口：create_node / at_stage / declare_substage / build / tick |
 | 理由 | 单一入口，简化用户心智 |
-| 后果 | 🚧 未实现；当前无 `PipeBuilder` 类 |
+| 后果 | ✅ 脚手架已实现；`class PipeBuilder` 在 `include/cf/plugin/pipe_builder.h:53`，聚合 `register_plugin / at_stage / declare_substage / node_of_logic_stage`；`build()`/`tick()` 调度闭环待 Phase 6 完善 |
 
-**验证命令**（预期失败）：
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+
+**验证命令**（必须通过）：
 ```bash
-! grep -rqE "class PipeBuilder" /workspace/project/CppTLM/include /workspace/project/CppHDL/include /workspace/project/ChipForge 2>/dev/null | head -1
+# PipeBuilder 类应已实现
+grep -nE "^class PipeBuilder\b" /workspace/project/ChipForge/include/cf/plugin/pipe_builder.h
 ```
 
-**代码锚点（预期缺失）**：`class PipeBuilder`
+**代码锚点**：`include/cf/plugin/pipe_builder.h:53`（`class PipeBuilder`）
 
 ---
 
@@ -927,11 +946,13 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 0 P0 #5 |
+| 状态 | ✅ Phase 0 P0 #5 |
 | 来源 | `declarative-hybrid-framework.md` §4.5 |
 | 决策 | `CtrlLink::halt_when` / `flush_when` / `throw_when` / `bypass` 四种对象方法 |
 | 理由 | 多 Plugin 独立声明同一条件，框架做 OR 合并 |
-| 后果 | 🚧 CtrlLink 对象方法未实现；⚠️ CppHDL chlib 已有 `stream_halt_when` / `stream_throw_when` 自由函数（位于 `chlib/stream.h:58,92`），命名与 Plugin 提案有冲突风险 |
+| 后果 | ✅ CtrlLink 四种控制 API 已实现（见 `include/cf/plugin/ctrl_link.h:34/40/46/52`）；D6 共存方案保留 CppHDL chlib 现有 `stream_halt_when` / `stream_throw_when` 自由函数（位于 `chlib/stream.h:58,92`），新 Plugin 业务代码统一使用 `CtrlLink::*` 对象方法 |
+
+**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.5
 
 **决策依据** (D6 共存方案):
 
@@ -949,19 +970,22 @@ D6 决策保留 CppHDL chlib 现有 28 个测试零破坏，新 Plugin 业务代
 - 选项 B：CtrlLink 改名为 `link_halt_when` 以避免命名冲突
 - 选项 C：将 chlib 自由函数迁移到 chstream 流（保留 chlib 现有 API）
 
-**验证命令**（预期失败 — CtrlLink 方法不存在）：
+**验证命令**（必须通过 — CtrlLink 方法存在）：
 ```bash
-# CtrlLink 对象方法（.halt_when / ->halt_when / ::halt_when）不存在
-! grep -rqE "(\.|->|::)\s*(halt_when|flush_when|throw_when)\s*\(" \
-  /workspace/project/CppTLM/include /workspace/project/ChipForge \
-  --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1
+# CtrlLink 四种控制 API（halt_when / throw_when / flush_when / bypass）应已实现
+grep -nE "CtrlLink&\s+(halt_when|throw_when|flush_when|bypass)\s*\(" \
+  /workspace/project/ChipForge/include/cf/plugin/ctrl_link.h
 # 注：故意排除 chlib 自由函数 stream_*_when
 ```
 
-**代码锚点（现有相关实现）**：
-- `CppHDL/include/chlib/stream.h:58` — `stream_throw_when(input_stream, condition)`
-- `CppHDL/include/chlib/stream.h:92` — `stream_halt_when(input_stream, halt)`
-- `CppHDL/include/chlib/stream_builder.h:70,113` — 流畅 API 调用 `stream_halt_when` / `stream_throw_when`
+**代码锚点**：
+- `include/cf/plugin/ctrl_link.h:34` — `CtrlLink::halt_when(Condition)`
+- `include/cf/plugin/ctrl_link.h:40` — `CtrlLink::throw_when(Condition)`
+- `include/cf/plugin/ctrl_link.h:46` — `CtrlLink::flush_when(Condition)`
+- `include/cf/plugin/ctrl_link.h:52` — `CtrlLink::bypass(const Payload<T>&, Condition)`
+- D6 共存 — `CppHDL/include/chlib/stream.h:58` — `stream_throw_when`（自由函数）
+- D6 共存 — `CppHDL/include/chlib/stream.h:92` — `stream_halt_when`（自由函数）
+- D6 共存 — `CppHDL/include/chlib/stream_builder.h:70,113` — 流畅 API 调用 `stream_halt_when` / `stream_throw_when`
 
 ---
 

@@ -2,13 +2,15 @@
 
 | 字段 | 值 |
 |------|-----|
-| 版本号 | 2.0.3 |
-| 日期 | 2026-06-08 |
+| 版本号 | 2.1.0 |
+| 日期 | 2026-06-09 |
 | 状态 | **Active (混合：已实现 + Phase 0/6 提案)** |
 | 适用范围 | ChipForge 全局（任意 IP 通用） |
 | 修订依据 | 战略决策 DECISION-2026-06-08-01（Plugin 范式 + Phase 0 脚手架）|
 
 > **v2.0.3 变更**: §12.0.3 责任归属表新增 "Phase 归属" 列;所有 Owner 标记为 "TBD" 待用户指派。
+>
+> **v2.1.0 变更**: §4（声明式 Plugin 模型 §4.1–§4.7）与 §7（PipeNode / PipeLink / PipeBuilder 通用骨架）已抽离至独立文档 [`plugin-framework.md`](./plugin-framework.md),本文件仅保留 §4.8（Plugin 与 ChStreamModuleBase 跨抽象层关系）。版本号升至 v2.1.0,日期更新至 2026-06-09。
 
 > ⚠️ **重要：本文档混合了"已实现框架"与"Phase 1 设计提案"**
 >
@@ -28,13 +30,12 @@
 - [1. 概述与设计哲学](#1-概述与设计哲学)
 - [2. CppTLM 事件驱动引擎](#2-cpptlm-事件驱动引擎) ✅
 - [3. CppHDL 硬件描述引擎](#3-cpphdl-硬件描述引擎) ✅
-- [4. 声明式 Plugin 模型](#4-声明式-plugin-模型) 🚧
-  - [4.1–4.7 全部为设计提案](#4-声明式-plugin-模型)
+- [4. 声明式 Plugin 模型](#4-声明式-plugin-模型-已抽离-) 🚧 [已抽离]
   - [4.8 与 ChStreamModuleBase 体系的关系](#48-与-chstreammodulebase-体系的关系v2201-新增)
 - [5. Bundle 分层与协议策略](#5-bundle-分层与协议策略) ✅ (部分)
 - [6. 混合仿真：模块级 TLM/RTL 细粒度配置](#6-混合仿真模块级-tlmrtl-细粒度配置) 🚧
   - [6.8 通用 TLM↔RTL 边界桥接：限制声明](#68-通用-tlmrtl-边界桥接限制声明v2201-新增)
-- [7. PipeNode / PipeLink / PipeBuilder 通用骨架](#7-pipenodepipelinkpipebuilder-通用骨架) 🚧
+- [7. PipeNode / PipeLink / PipeBuilder 通用骨架](#7-pipenodepipelinkpipebuilder-通用骨架-已抽离-) 🚧 [已抽离]
 - [8. SoC 级混合组装](#8-soc-级混合组装) ✅
 - [9. 验证策略](#9-验证策略) 🚧
 - [10. 完整示例：L1 Cache IP 双模式实现](#10-完整示例l1-cache-ip-双模式实现) 🚧
@@ -407,104 +408,14 @@ private:
 
 ---
 
-## 4. 声明式 Plugin 模型 🚧
+## 4. 声明式 Plugin 模型 [已抽离] 🚧
 
-> **本章为 Phase 1 设计提案**。所有描述的 `Plugin` / `Phase` / `at_stage` / `declare_substage` / `CtrlLink` 等 API **目前 100% 不存在于代码中**。本节是 ChipForge 项目的下一步实现目标。
->
-> **唯一相关的代码**：`CppTLM/include/core/plugin_loader.hh`（运行时 `.so` 加载器，**与声明式 Plugin 模型无关**）。
-
-### 4.1 设计动机
-
-传统 SystemC / Gem5 模型中，每组件实现 `tick()` 自行驱动状态。Plugin 数量增加后调度顺序难以推理。声明式 Plugin 模型希望：
-
-- 同一份 Plugin 描述既能生成 TLM 调度表，也能生成 RTL 硬件 AST
-- 调度由框架确定性决定，Plugin 仅声明「在哪个阶段做什么」
-- 流水线深度变更通过 JSON 配置，无需重写 Plugin
-
-### 4.2 Plugin 基类（设计草稿）
-
-> ⚠️ 以下代码**不可编译**。这是设计意图，不反映当前代码。
-
-```cpp
-// 设计草稿 — Phase 1 提案
-enum class Phase { EARLY = 0, NORMAL = 1, LATE = 2 };
-
-class Plugin {
-public:
-    explicit Plugin(const std::string& name);
-    virtual ~Plugin() = default;
-    virtual void setup(PipeBuilder& b) {}
-    virtual void build(PipeBuilder& b) = 0;
-    const std::string& name() const;
-    // 注：基类没有 tick()。这是约束，不是疏忽。
-};
-```
-
-### 4.3 at_stage() API（设计草稿）
-
-> ⚠️ 设计意图：`PipeBuilder` / `at_stage` / `Phase` 枚举**均未实现**。
-
-```cpp
-// 设计草稿
-void Plugin::build(PipeBuilder& b) {
-    b.at_stage("lookup", Phase::NORMAL, [&b]() {
-        auto* n = b.node_of_logic_stage("lookup");
-        if (!n->is_firing()) return;
-        // ... 业务逻辑
-    });
-}
-```
-
-### 4.4 declare_substage()（设计草稿）
-
-> ⚠️ 设计意图。
-
-```cpp
-// 设计草稿
-class DmaBurstPlugin : public Plugin {
-    void setup(PipeBuilder& b) override {
-        b.declare_substage("process", "burst_s1", 1);
-        b.declare_substage("burst_s1", "burst_s2", 1);
-    }
-};
-```
-
-### 4.5 CtrlLink 声明式控制（设计草稿）
-
-> ⚠️ 设计意图。
-
-| API（设计） | 作用 |
-|------------|------|
-| `halt_when(cond)` | 阻塞下游 ready |
-| `flush_when(cond)` | 清空寄存器 |
-| `throw_when(cond)` | 注入 cancel |
-| `bypass(key, src)` | 旁路转发 |
-
-### 4.6 通用 IP Plugin 示例（设计草稿，全部不可编译）
-
-> ⚠️ 以下示例是设计草稿，用于说明概念。**实际代码中 `PipeBuilder` / `Payload<T>` / `pl::CACHE_REQ` 等符号均不存在**。
-
-```cpp
-// 设计草稿 — Phase 1 提案
-class CacheTagLookupPlugin : public Plugin {
-public:
-    void build(PipeBuilder& b) override {
-        b.at_stage("lookup", Phase::NORMAL, [&b]() {
-            auto* n = b.node_of_logic_stage("lookup");
-            if (!n->is_firing()) return;
-            const auto& req = (*n)(pl::CACHE_REQ);
-            (*n)(pl::TAG_HIT) = tag_array_lookup(req.addr);
-        });
-    }
-};
-```
-
-### 4.7 实现状态与路线图
-
-详见 [第 12 节 实现路线图](#12-实现路线图phase-映射)。简述：Plugin 模型是 ChipForge Phase 1（4–8 周）的核心目标，目前仅有 `ip/cpu/docs/multi_isa_architecture.md` 的设计草案。
+> **Plugin 架构已抽离**: §4 描述的 Plugin 模型、§7 描述的 PipeNode/PipeLink/PipeBuilder 通用骨架，已在 [plugin-framework.md](plugin-framework.md) 中独立维护。Phase 0（Plugin 最小脚手架）于 2026-06-08 完成，5/5 P0 组件（PluginBase / Payload<T> / PipeNode / PipeBuilder / CtrlLink）已落地，51/51 单元测试 PASS。
 
 ### 4.8 与 `ChStreamModuleBase` 体系的关系（v2.0.1 新增）
 
+> **本节保留在主文档**：描述的是 Plugin 与 `ChStreamModuleBase` 的**跨抽象层关系**，不属于插件架构内部。插件架构内部设计请见 [plugin-framework.md](plugin-framework.md)。
+>
 > **本节澄清 §4 提出的 Plugin 模型与 §2 描述的 `ChStreamModuleBase` 现有体系之间的关系。**
 
 `ChStreamModuleBase`（§2.3）与 `Plugin`（§4.2）是两种**正交**的抽象层级，目前的草案关系如下：
@@ -866,69 +777,9 @@ L1CachePlugin 不依赖 §6.8 描述的通用 TLM↔RTL 桥接（它仅做 TLM�
 
 ---
 
-## 7. PipeNode / PipeLink / PipeBuilder 通用骨架 🚧
+## 7. PipeNode / PipeLink / PipeBuilder 通用骨架 [已抽离] 🚧
 
-> **本章为 Phase 1 设计提案**。`PipeNode` / `PipeLink` / `PipeArbitration` / `PipeBuilder` 类**100% 不存在于代码中**。本节是设计意图。
->
-> **唯一相关的设计文档**：`ip/cpu/docs/multi_isa_architecture.md`（1100+ 行设计稿）和 `docs/GLOSSARY.md` L16-18。
-
-### 7.1 PipeNode（设计草稿）
-
-```cpp
-// 设计草稿 — Phase 1 提案
-class PipeNode {
-public:
-    explicit PipeNode(const std::string& name);
-
-    template<typename T> T& operator()(const Payload<T>& key);
-    template<typename T> const T& operator()(const Payload<T>& key) const;
-
-    PipeArbitration& arb();
-    bool is_firing()    const;   // valid && ready && !cancel
-    bool is_moving()    const;   // valid && ready
-    bool is_blocked()   const;   // valid && !ready
-    bool is_canceling() const;   // cancel && valid
-};
-```
-
-### 7.2 PipeLink 三种类型（设计草稿）
-
-| Link 类型 | 行为 | 典型用途 |
-|-----------|------|---------|
-| `StageLink` | 流水线寄存器 | 标准流水级 |
-| `CtrlLink` | 寄存器 + 控制 API | 反压、刷新 |
-| `DirectLink` | 组合直连 | 同拍组合扩展 |
-
-### 7.3 PipeBuilder（设计草稿）
-
-```cpp
-// 设计草稿 — Phase 1 提案
-class PipeBuilder {
-public:
-    explicit PipeBuilder(ImplMode mode);
-    PipeNode*   create_node(const std::string& name);
-    StageLink*  create_stage_link (PipeNode* up, PipeNode* down);
-    CtrlLink*   create_ctrl_link  (PipeNode* up, PipeNode* down);
-    DirectLink* create_direct_link(PipeNode* up, PipeNode* down);
-    void register_plugin(std::unique_ptr<Plugin> p);
-    void at_stage(const std::string& logic_stage, Phase phase,
-                  std::function<void()> logic);
-    void declare_substage(const std::string& parent,
-                          const std::string& sub, int depth);
-    PipeNode* node_of_logic_stage(const std::string& name);
-    CtrlLink* ctrl_link_of(const std::string& up, const std::string& down);
-    void build();
-    void tick();
-};
-```
-
-### 7.4–7.5 逻辑阶段映射 / 流水线配置（设计草稿）
-
-> ⚠️ JSON `pipeline_stages` 字段**当前不被 CppTLM 解析**。整个流水线拓扑是设计意图。
-
-### 7.6 实现状态
-
-详见 [第 12 节](#12-实现路线图phase-映射)。PipeNode/PipeLink/PipeBuilder 是 Phase 1 核心目标。
+> **Plugin 架构已抽离**: §4 描述的 Plugin 模型、§7 描述的 PipeNode/PipeLink/PipeBuilder 通用骨架，已在 [plugin-framework.md](plugin-framework.md) 中独立维护。Phase 0（Plugin 最小脚手架）于 2026-06-08 完成，5/5 P0 组件（PluginBase / Payload<T> / PipeNode / PipeBuilder / CtrlLink）已落地，51/51 单元测试 PASS。
 
 ---
 

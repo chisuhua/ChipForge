@@ -388,12 +388,11 @@
 | CppHDL `cpu/*` CPU 子系统（RV32I / 流水线 / 缓存 / 分支预测 / 冒险） | ✅ 已实现（独立框架） | ❌ ChipForge 未集成 |
 | CppHDL JIT 编译器 | ✅ 已实现（`jit/jit_compiler.h`） | ❌ ChipForge 未启用 |
 
-### 7.3 设计阶段（仅文档存在，🚧）
+### 7.3 设计阶段 → 实现状态
 
-| 概念 | 文档来源 | 缺失原因 |
+| 概念 | 文档/代码来源 | 状态 |
 |------|---------|---------|
-| **PipeNode / PipeLink / PipeBuilder** | `GLOSSARY.md` L16-18, `ip/cpu/README.md` L11-13, `ip/cpu/docs/multi_isa_architecture.md`（1100+ 行设计稿） | 0 行代码，0 头文件，纯设计提案 |
-| **声明式 Plugin 模型**（`Plugin` 基类 + `setup()` / `build()` / `at_stage()`） | `ip/cpu/docs/multi_isa_architecture.md` L1055 | 仅有 `PluginLoader`（dlopen SO 加载器），与声明式 Plugin 是无关概念 |
+| **cf::plugin 5 个 P0 组件**（`PluginBase` / `Payload<T>` / `PipeNode` / `PipeBuilder` / `CtrlLink` + `uint_t<N>`） | `include/cf/plugin/`（6 头文件，约 667 行）+ `src/cf_plugin/tests/`（7 测试，51/51 PASS） | ✅ **Phase 0 已完成** (2026-06-08) — 详见 [`plugin-framework.md`](plugin-framework.md) |
 | **IP 级别的 TLM 实现**（`RiscvIssTlm` / `L1CacheTlm` / `BusMatrixTlm` / `DramTlm` / `UartTlm` 等） | `soc/riscv_virt.json` 引用 | `ip/*/tlm/` 目录全部为空（仅 `README.md`） |
 
 ### 7.4 文档与代码背离（❌ 必须修正）
@@ -406,6 +405,7 @@
 | `interface-design.md` L186-217: `soc/RiscvVirtSoC.h/cpp` 已存在 | 不存在；`soc/` 仅有 `riscv_virt.json` | 要么构建 SoC 装配类，要么删除示例代码 |
 | `overview.md` L131-141: 各 IP 使用 `REGISTER_MODULE` 宏 | `REGISTER_MODULE` 在 ChipForge 中 0 匹配 | 同上 |
 | `soc/riscv_virt.json` L4: `"impl_mode": "TLM_ONLY"` | 无代码解析此字段 | 删除该字段或实现 `ImplMode` 支持 |
+| 2026-06-09 | `declarative-hybrid-framework.md` §4/§7 标 "100% not in code" | Phase 0 5/5 已完成 | 已抽离至 [`plugin-framework.md`](plugin-framework.md)，文档升级至 v2.1.0 |
 
 ### 7.5 建议的修正优先级
 
@@ -413,7 +413,7 @@
 2. **紧急**：删除或补全 `bundles/` 目录的引用
 3. **高**：要么实现 `RiscvVirtSoC.cpp` 入口，要么删除 `soc/riscv_virt.json`（避免悬挂引用）
 4. **中**：实现 `bundles/impl_mode.h` 与 `ImplMode` 框架支持（如确实需要 TLM↔RTL 切换）
-5. **低**：将 PipeNode / 声明式 Plugin 的设计从 `multi_isa_architecture.md` 拆分到独立 RFC 文档，避免读者误以为已规划
+5. ✅ **已执行 (2026-06-09)**：将 PipeNode / 声明式 Plugin 的设计从 `multi_isa_architecture.md` 拆分到独立 RFC 文档 [`plugin-framework.md`](plugin-framework.md)
 
 ---
 
