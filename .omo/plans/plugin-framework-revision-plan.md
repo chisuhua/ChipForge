@@ -429,3 +429,21 @@
 ---
 
 *本计划依赖决策文档 `decision-plugin-framework-2026-06-08.md` 的最终确认。在用户确认前，不会执行实际的文档修改。*
+
+---
+
+## 11. 相关计划
+
+本计划（v1.0 Draft，2026-06-08）的范围聚焦于"路线图修订 + 决策文档创建"。**插件架构文档的抽离**（将 `declarative-hybrid-framework.md` §4/§7 抽离到独立文档 `plugin-framework.md`）已在另一个独立计划中处理：
+
+- **计划**：[`.omo/plans/plugin-docs-extraction.md`](plugin-docs-extraction.md) v1.0（2026-06-09）
+- **范围**：新建 `docs/architecture/plugin-framework.md`（~580 行插件架构权威）+ 修正 5 条 STALE ADR（ADR-025~033）+ 修复 `tools/verify_adr.sh` 3 处脚本缺陷 + 移除 `declarative-hybrid-framework.md` §4/§7（1390 → 1241 行）
+- **状态**：执行中（12 实施任务 + 4 验证任务）
+- **预计工作量**：6-9 工作日（纯文档，零代码改动）
+- **目标**：ADR 实现率从 63% → 79%，消除 §4/§7 与代码的"100% not in code" 描述背离
+
+两个计划的关系：
+- 本计划（v1.0）：路线图层（roadmap README + ADR-037 范式决策 + plugin-framework-revision-plan.md）
+- 抽离计划（v1.0）：架构层（plugin-framework.md 文档 + ADR 状态修正 + 验证脚本修复）
+
+抽离计划完成后，§4.8 跨抽象层关系（Plugin 与 ChStreamModuleBase 正交性）仍在主文档 `declarative-hybrid-framework.md` 中；插件架构内部设计（§4.1-§4.7 + §7 全部）已迁出至 `plugin-framework.md`。

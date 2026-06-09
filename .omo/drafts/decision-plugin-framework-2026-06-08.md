@@ -383,7 +383,7 @@
 | 日期 | 状态 | 变更 |
 |------|------|------|
 | 2026-06-08 | Proposed | 初始创建（基于 4 轮对话 + 2 个后台研究） |
-| 待定 | Accepted | 用户最终确认后变更 |
+| 2026-06-09 | Accepted | 事实上的 Accepted 确认: plugin-docs-extraction 计划 12/12 任务完成,ADR 实现率 63% → 79%,Phase 0 5/5 P0 组件 + 51/51 单元测试 PASS,见 `state/final-report-plugin-docs-extraction.md` |
 | 待定 | Superseded | 出现新的更优决策时变更 |
 
 ---
