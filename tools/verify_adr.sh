@@ -567,8 +567,9 @@ verify_adr_026() {
 
 verify_adr_027() {
   should_run ADR-027 || return
+  # 限定 cf::plugin 命名空间 (include/cf/plugin/)，不匹配其他命名空间
   if ! grep -rqE "enum class Phase\s*\{[^}]*EARLY" \
-    "$INCLUDE_CPPTLM" "$INCLUDE_CPPHDL" "$CHIPFORGE_ROOT" \
+    "$CHIPFORGE_ROOT/include/cf/plugin" \
     --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1; then
     log_expected_missing "ADR-027" "Phase 子阶段 EARLY/NORMAL/LATE" "枚举不存在"
   else
@@ -618,12 +619,27 @@ verify_adr_030() {
 
 verify_adr_031() {
   should_run ADR-031 || return
-  if ! grep -rqE "class (StageLink|CtrlLink|DirectLink)\b" \
+  # 拆分为三个独立子报告：每个 Link 类型单独判定
+  if grep -rqE "class CtrlLink\b" \
     "$INCLUDE_CPPTLM" "$INCLUDE_CPPHDL" "$CHIPFORGE_ROOT" \
-    --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1; then
-    log_expected_missing "ADR-031" "StageLink / CtrlLink / DirectLink" "三个类均不存在"
+    --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null; then
+    log_pass "ADR-031" "CtrlLink"
   else
-    log_stale "ADR-031" "PipeLink 三类型" "已实现但 ADR 仍 🚧"
+    log_expected_missing "ADR-031" "CtrlLink" "class CtrlLink 不存在"
+  fi
+  if grep -rqE "class StageLink\b" \
+    "$INCLUDE_CPPTLM" "$INCLUDE_CPPHDL" "$CHIPFORGE_ROOT" \
+    --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null; then
+    log_pass "ADR-031" "StageLink"
+  else
+    log_expected_missing "ADR-031" "StageLink" "class StageLink 不存在"
+  fi
+  if grep -rqE "class DirectLink\b" \
+    "$INCLUDE_CPPTLM" "$INCLUDE_CPPHDL" "$CHIPFORGE_ROOT" \
+    --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null; then
+    log_pass "ADR-031" "DirectLink"
+  else
+    log_expected_missing "ADR-031" "DirectLink" "class DirectLink 不存在"
   fi
 }
 
@@ -640,8 +656,9 @@ verify_adr_032() {
 
 verify_adr_033() {
   should_run ADR-033 || return
-  if ! grep -rqE "(\.|->|::)\s*(halt_when|flush_when|throw_when)\s*\(" \
-    "$INCLUDE_CPPTLM" "$CHIPFORGE_ROOT" \
+  # 匹配调用形式 (link.halt_when) 与定义形式 (CtrlLink& halt_when)
+  if ! grep -rqE "((\.|->|::)\s*|CtrlLink&\s+)(halt_when|flush_when|throw_when|bypass)\s*\(" \
+    "$INCLUDE_CPPTLM" "$CHIPFORGE_ROOT/include/cf/plugin" \
     --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1; then
     log_expected_missing "ADR-033" "CtrlLink 四种控制 API" \
       "CtrlLink 方法不存在（注意：CppHDL chlib 已有 stream_halt_when / stream_throw_when 自由函数，但非 CtrlLink 对象方法）"
