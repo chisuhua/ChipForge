@@ -5,7 +5,7 @@
 > **生成方式**: 手动维护 (Doxygen 暂未集成; 等待环境安装)
 > **上次更新**: 2026-06-08
 
-> **架构权威**:详见 [docs/architecture/plugin-framework.md](../../architecture/plugin-framework.md) (设计意图、生命周期、ADR摘要)。本文档仅描述 API签名。
+> **架构权威**:详见 [docs/architecture/plugin-framework.md](../architecture/plugin-framework.md) (设计意图、生命周期、ADR摘要)。本文档仅描述 API签名。
 
 `cf::plugin` 命名空间的所有公共 API 索引。
 
