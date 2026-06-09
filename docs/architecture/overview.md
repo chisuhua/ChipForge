@@ -1,5 +1,14 @@
 # 总体架构设计
 
+> **📌 实现状态快照 (2026-06-09)**
+>
+> - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 5 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink）+ 51/51 单元测试 PASS + 7/7 ctest PASS
+> - ✅ **框架层已就位**：CppTLM (TLM 建模) + CppHDL (RTL/lnode DAG) 集成完成，`cpptlm_core` / `cpphdl` 目标可达
+> - ⚠️ **应用层待建设**：`bundles/` 目录为空；`ip/{cpu,cache,memory,interconnect,peripheral}/{tlm,rtl,configs,tests}/` 为骨架 README；`soc/riscv_virt.json` 6/8 模块类型引用悬挂（详见 `code-framework-mapping.md` §7.4）
+> - 🚧 **下一里程碑 (Phase 1)**：实现 `bundles/mem_bundles.h` + `L1CachePlugin` 验证 D4 Plugin-style 端到端可行性
+>
+> **本文档描述目标架构**；具体实现进度以 [`roadmap/roadmap-status.md`](../roadmap/roadmap-status.md) 为准。
+
 ## 架构总览
 
 ```

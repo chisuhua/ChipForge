@@ -1,6 +1,6 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-08
+> **最后更新**: 2026-06-09
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
@@ -11,9 +11,9 @@
 
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
-| Phase 0 | M0 - 脚手架可运行 | Not Started | 0% | 待启动 | PluginBase 接口 |
-| Phase 1 | M1 - L1CachePlugin Hello World | Not Started | 0% | 依赖 Phase 0 | Bundle 定义 |
-| Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 处置 phase-1-foundation.md |
+| Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% | 无 | Phase 1 启动 |
+| Phase 1 | M1 - L1CachePlugin Hello World | Not Started | 0% | 依赖 Phase 0(已解除) | Bundle 定义 |
+| Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | ClintTlm/PlicTlm 完善 |
 | Phase 4 | M5 - Linux 启动 | Not Started | 0% | 依赖 Phase 3 | Sv39 + VirtIO Block |
@@ -28,7 +28,7 @@
 
 ### Phase 0 - Plugin 最小脚手架
 
-- **状态**: In Progress (5/5 P0 组件已完成, 单元测试 51/51 PASS, 待退出标准验收)
+- **状态**: ✅ Completed (5/5 P0 组件已交付, 51/51 单元测试 PASS, 7/7 ctest PASS, 退出标准 v2 全部达成)
 - **预估工时**: 14-16 工作日(2.5-3 周)
 - **已用**: 1 个 session 集中实施(2026-06-08)
 - **依赖**: 无
@@ -93,7 +93,7 @@
 |----|------|------|------|------|-------|
 | PA-1 | 文档 | M4: `adr.md` 新增 ADR-037 + 更新 ADR-025~036 | TBD | ✅ 已完成 (2026-06-08, v1.1) | P1 |
 | PA-2 | 文档 | M5: `declarative-hybrid-framework.md` §12.0.3 责任归属表 | TBD | ✅ 已完成 (2026-06-08, v2.0.3) | P1 |
-| PA-3 | 文档 | 处置 `phase-1-foundation.md`(旧 vs 新 phase-1-tlm-foundation.md) | TBD | ✅ 已完成 (2026-06-08, 添加废弃标记) | P2 |
+| PA-3 | 文档 | 处置 `phase-1-foundation.md`(旧 vs 新 phase-1-tlm-foundation.md) | TBD | ✅ 已完成 (2026-06-09, 文件已 git rm) | P2 |
 | PA-4a | 构建 | CppTLM 集成 + 根 CMakeLists.txt 升级 | TBD | ✅ 已完成 (2026-06-08) | P1 |
 | PA-4b | 构建 | CppHDL 集成(阻塞: CppHDL 上游 tests 路径 bug) | TBD | ✅ 已完成 (2026-06-08, 上游修复后集成) | P2 |
 | PA-5 | 验证 | V1: `tools/verify_plugin_decision.sh`(可选) | TBD | ✅ 已完成 (2026-06-08, 3/3 PASS) | P3 |
@@ -113,14 +113,6 @@
 ---
 
 ## 5. 下一步建议(Top 3)
-
-### 建议 1:处置 `phase-1-foundation.md`(0.1 天,极低风险) — 🔄 剩余
-
-- 旧文档已被 `phase-1-tlm-foundation.md` 取代
-- 选项 A:在旧文档顶部加废弃标记 + 指向新文档
-- 选项 B:直接删除旧文档(需要用户确认,旧文档任务列表与新文档差异较大)
-
-**价值**: 消除双 Phase 1 文档的混淆,避免后续工程师误读
 
 ### 建议 2:启动 Phase 0 P0 #1 — PluginBase(2 天) — 🔄 剩余
 
@@ -157,6 +149,8 @@
 
 | 日期 | 事件 |
 |------|------|
+| 2026-06-09 | **本次会话五** (Quick 准备): ADR-033 (CtrlLink 4-control-API) 🚧 → ✅ Accepted, D6 共存方案绑定 (halt_when / throw_when / flush_when / bypass);git rm `docs/roadmap/phases/phase-1-foundation.md`;修正 4 处 ip/{cache,memory,interconnect,peripheral}/README.md 链接指向 `phase-1-tlm-foundation.md`;roadmap-status.md 同步 (PA-3 状态推进 + 建议 1 删除 + Phase 1* 行 + 活动日志);1 个原子 commit 提交。Phase 1 (L1CachePlugin) Large plan 启动前的前置解锁。 |
+| 2026-06-09 | **本次会话四**: 路线图文档同步——`docs/roadmap/README.md` Phase 0 状态修正为 ✅ Completed(2026-06-08);`roadmap-status.md` §1 状态总览 + §2 Phase 0 详情同步;`docs/architecture/overview.md` 顶部新增"实现状态快照"banner,标明应用层(`bundles/`/`ip/*/`/`soc/riscv_virt.json`)待建设;消除文档-状态背离 |
 | 2026-06-08 | **本次会话续三**: CppHDL 集成已恢复(上游 commit 7fe4a5d 修复);test_coexistence 5/5 PASS(CppTLM+CppHDL 共存);PA-5 verify_plugin_decision.sh 3/3 PASS;coverage 测量设施就位;`docs/api/cf_plugin.md` API 文档(Doxygen 替代);Phase 0 退出标准 v2 全部达成(Status: ✅ Completed);7/7 ctest 100% PASS |
 | 2026-06-08 | **本次会话续二**: Phase 0 P0 #1-5 全部实施完成 (51/51 单元测试 PASS);PluginBase + Payload<T> + PipeNode + PipeBuilder + CtrlLink;ctest 聚合 5/5 PASS in 0.61s |
 | 2026-06-08 | **本次会话终**: 创建 `src/cf_plugin/` 工作区 (CMakeLists.txt + README.md);`cf_plugin` INTERFACE 库已注册;cmake configure 0 错误 (1.3s + 2.9s);Phase 0 实施基础设施就绪 |

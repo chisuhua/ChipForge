@@ -110,8 +110,8 @@
 
 ### 2.3 Phase 1 提案决策（🚧）— 15 条
 
-| ID | 标题 | 类别 | 状态 |
-|----|------|------|------|
+| ID | 标题 | 类别 | 状态 | 备注 |
+|----|------|------|------|------|
 | ADR-025 | Plugin 基类无 tick | Plugin | 🚧 |
 | ADR-026 | at_stage() 逻辑阶段名 | Plugin | 🚧 |
 | ADR-027 | Phase 子阶段顺序 | Plugin | 🚧 |
@@ -120,7 +120,7 @@
 | ADR-030 | PipeNode 三态握手 | Pipe | 🚧 |
 | ADR-031 | StageLink / CtrlLink / DirectLink | Pipe | 🚧 |
 | ADR-032 | PipeBuilder 统一编译器 | Pipe | 🚧 |
-| ADR-033 | CtrlLink 四种控制 API | Pipe | 🚧 |
+| ADR-033 | CtrlLink 四种控制 API | Pipe | ✅ Accepted | D6 共存方案已绑定 (4 conflicts) |
 | ADR-034 | ScoreBoard 三种变体 | 验证 | 🚧 |
 | ADR-035 | CompareDriver TLM↔RTL 驱动 | 验证 | 🚧 |
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
@@ -932,6 +932,17 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 | 决策 | `CtrlLink::halt_when` / `flush_when` / `throw_when` / `bypass` 四种对象方法 |
 | 理由 | 多 Plugin 独立声明同一条件，框架做 OR 合并 |
 | 后果 | 🚧 CtrlLink 对象方法未实现；⚠️ CppHDL chlib 已有 `stream_halt_when` / `stream_throw_when` 自由函数（位于 `chlib/stream.h:58,92`），命名与 Plugin 提案有冲突风险 |
+
+**决策依据** (D6 共存方案):
+
+引用 `.omo/drafts/decision-plugin-framework-2026-06-08.md` §3.5 (CtrlLink 控制 API 命名) + §4.2 D6：
+
+- `halt_when` (`CtrlLink` 对象方法) ↔ `stream_halt_when` (`chlib` 自由函数，位于 `chlib/stream.h:92`)：方案 C — 两者共存，明确层级差异
+- `throw_when` (`CtrlLink` 对象方法) ↔ `stream_throw_when` (`chlib` 自由函数，位于 `chlib/stream.h:58`)：方案 C — 两者共存
+- `flush_when` (`CtrlLink` 对象方法)：方案 C — 两者共存
+- `bypass` (`CtrlLink` 对象方法)：方案 C — 两者共存
+
+D6 决策保留 CppHDL chlib 现有 28 个测试零破坏，新 Plugin 业务代码统一使用 `CtrlLink::*` 对象方法，`chlib` 自由函数保持向后兼容。
 
 **重要发现**（2026-06-07 验证）：CppHDL chlib 提供的 `stream_halt_when` / `stream_throw_when` 是**自由函数**（非对象方法），位于 `chlib/stream.h`。这与 Plugin 模型的 `CtrlLink::halt_when` 对象方法设计**功能重叠但形式不同**。Phase 1 实施时需明确两者关系：
 - 选项 A：CtrlLink 复用 chlib 自由函数
