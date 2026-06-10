@@ -151,6 +151,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_plugin_unit.cpp)
   add_test(NAME test_l1_cache_plugin_unit COMMAND test_l1_cache_plugin_unit)
 endif()
 
+# Phase 1.3: TLM 存储抽象 + commit 钩子测试 (ADR-040)
+# 验证 array_store<T, N> 与 PipeBuilder::register_commit_hook 的集成
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_storage.cpp)
+  add_executable(test_storage tests/test_storage.cpp)
+  target_link_libraries(test_storage PRIVATE cf_plugin)
+  add_test(NAME test_storage COMMAND test_storage)
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------

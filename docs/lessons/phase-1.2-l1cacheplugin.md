@@ -95,6 +95,148 @@ uint_t<512> line_data{0xCAFEBABEDEADBEEFULL};
 
 仅限于 Phase 0/1 的 64-bit 单次访问测试，line_data 高位被丢弃。Phase 6 将升级为 `__int128` 或 `boost::multiprecision::uint512_t`。
 
+### 2.3 `if (cond) return;` 在 at_stage 回调中不可移植
+
+**现象**（`L1CachePlugin.cpp:131-136`）：
+```cpp
+pb.at_stage("refill", cf::plugin::Phase::LATE, [this]() {
+  auto n = refill_node_;
+  if (!n) return;
+
+  cf::plugin::bool_t hit = n->operator()(g_hit);
+  if (hit) return;  // 命中无需 refill
+  // ... refill 逻辑 ...
+});
+```
+
+**问题**：
+- **B 类不匹配**（时序语义）：TLM 模式单缓冲，`return;` 等价于"不做写"；RTL 模式双缓冲（`array_store::commit()` 切换后），早返会跳过 commit 边界
+- **C 类不匹配**（抽象层级）：RTL 中无"早返"概念，需用 `when(cond) { ... }` 表达条件；`return` 在硬件描述中无对应
+- Phase 1 单元测试可能 PASS（`if (hit) return;` 看似正确），但 Phase 5/6 升级后行为偏差
+
+```cpp
+// ❌ 错误: 早返依赖"return 后什么也不做"的隐式语义
+pb.at_stage("refill", Phase::LATE, [this]() {
+  if (hit) return;  // RTL 无 return 概念
+  write_set(idx, tag, mem_data);
+});
+```
+
+```cpp
+// ✅ 推荐: 显式 if/else 或 when(cond) 条件块
+pb.at_stage("refill", Phase::LATE, [this]() {
+  if (hit) {
+    // 命中: 保持 storage 不变 (no-op, 显式注释)
+  } else {
+    // miss: 执行 refill
+    write_set(idx, tag, mem_data);
+  }
+});
+// Phase 6 形态: when(!hit) { write_set(...); }
+```
+
+**配套检查**：`tools/check_plugin_portability.sh` Check 1 — 在 `ip/*/tlm/**/*.cpp` 中扫描 `at_stage` 回调内的 `if (cond) return;` 模式。
+
+**配套决策**：[ADR-040](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) §2.1 Tier-1 #4
+
+### 2.4 数组直接索引 `tags_[idx] = ...` 在 RTL 升级时需要 adapter
+
+**现象**（`L1CachePlugin.cpp:205-207`）：
+```cpp
+void L1CachePlugin::write_set(
+    std::size_t set,
+    cf::plugin::uint_t<kTagBits> tag,
+    cf::plugin::uint_t<kLineDataBits> line_data) {
+  if (set >= kNumSets) return;
+  tags_[set] = tag;        // 直接 std::array 索引赋值
+  data_[set] = line_data;  // Phase 6 切换 ch_mem 后需改为 mem_.write(addr, data)
+  valid_[set] = true;
+}
+```
+
+**问题**：
+- **A 类不匹配**（API 形态）：TLM 模式 `std::array::operator[]` 单参数；RTL 模式 `ch_mem::write(addr, data)` 双参数
+- Phase 6 升级时所有 `tags_[idx] = ...` 调用点都需修改
+
+```cpp
+// ❌ 错误: 直接持有 std::array, Phase 6 切换 ch_mem 时所有调用点都要改
+std::array<cf::plugin::uint_t<kTagBits>, kNumSets> tags_{};
+// ...
+tags_[idx] = tag;  // ch_mem 改为 ch_mem.write(idx, tag) 后所有赋值语句都要改
+```
+
+```cpp
+// ✅ 推荐: 用 array_store 包装, 对外 API 与 std::array 一致
+cf::plugin::storage::array_store<cf::plugin::uint_t<kTagBits>, kNumSets> tags_{};
+// ...
+tags_[idx] = tag;  // Phase 1 模式: 直接转发到 std::array
+                     // Phase 6 模式: 写入 shadow buffer, pb.run() 末尾 commit()
+// 业务调用方无需修改！
+```
+
+**额外收益**：
+- `array_store::commit()` 是 `PipeBuilder::run()` 末尾自动调用的钩子（`pipe_builder.h:101`）
+- Phase 6 切换后 `commit()` 提交 shadow → current，实现双缓冲
+- 单元测试无需修改（`operator[]` 语义不变）
+
+**配套检查**：`tools/check_plugin_portability.sh` Check 4（[WARN]）— 鼓励业务代码声明 `array_store` 而非 `std::array`。
+
+**配套决策**：[ADR-040](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) §2.1 Tier-2 #1 + §2.2 `array_store` 抽象
+
+### 2.5 位提取 `>>` + `&` 模式需要 helper 包装
+
+**现象**（`L1CachePlugin.cpp:108-113`）：
+```cpp
+cf::plugin::uint_t<L1CachePlugin::kIdxBits> idx =
+    static_cast<cf::plugin::uint_t<L1CachePlugin::kIdxBits>>(
+        (static_cast<uint64_t>(addr) >> kIdxShift) & kIdxMask);
+cf::plugin::uint_t<L1CachePlugin::kTagBits> tag =
+    static_cast<cf::plugin::uint_t<L1CachePlugin::kTagBits>>(
+        (static_cast<uint64_t>(addr) >> kTagShift) & kTagMask);
+```
+
+**问题**：
+- **A 类不匹配**（表达式）：TLM 模式 shift + mask；RTL 模式位选 `addr[HI:LO]`
+- 位宽常量分散在调用点（`kIdxShift` / `kIdxMask` / `kTagShift` / `kTagMask`），修改地址位宽时易遗漏
+- `static_cast<uint64_t>(addr)` 中间转换暴露 `uint_t<64>` 的 POD 内部表示，破坏封装
+
+```cpp
+// ❌ 错误: 位提取逻辑散布在 at_stage 闭包内
+constexpr uint64_t kIdxMask = (1ULL << kIdxBits) - 1;
+constexpr unsigned kIdxShift = kOffsetBits;
+auto idx = (static_cast<uint64_t>(addr) >> kIdxShift) & kIdxMask;
+auto tag = (static_cast<uint64_t>(addr) >> kTagShift) & kTagMask;
+```
+
+```cpp
+// ✅ 推荐: 集中到 helper, Phase 1 shift+mask, Phase 6 addr[HI:LO] 位选
+// (在 L1CachePlugin.h 类内)
+static constexpr cf::plugin::uint_t<kIdxBits> extract_idx(
+    cf::plugin::uint_t<kAddrBits> addr) noexcept {
+  return static_cast<cf::plugin::uint_t<kIdxBits>>(
+      (static_cast<uint64_t>(addr) >> kOffsetBits) &
+      ((1ULL << kIdxBits) - 1));
+}
+static constexpr cf::plugin::uint_t<kTagBits> extract_tag(
+    cf::plugin::uint_t<kAddrBits> addr) noexcept {
+  return static_cast<cf::plugin::uint_t<kTagBits>>(
+      (static_cast<uint64_t>(addr) >> (kOffsetBits + kIdxBits)) &
+      ((1ULL << kTagBits) - 1));
+}
+// 调用点:
+auto idx = extract_idx(addr);
+auto tag = extract_tag(addr);
+```
+
+**额外收益**：
+- 修改地址位宽（`kOffsetBits` / `kIdxBits` / `kTagBits`）时只改一处
+- Phase 6 RTL 升级时，helper 内部实现从 `shift+mask` 切换为 `addr[HI:LO]` 位选，调用点零修改
+- 编译期 constexpr，零运行时开销
+
+**配套检查**：编码规范 + code review（`tools/check_plugin_portability.sh` 暂不自动检测 —— Tier-2 约束，code review 阶段把关）。
+
+**配套决策**：[ADR-040](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) §2.1 Tier-2 #2 + §4 步骤 3
+
 ## 三、D4 静态检查的隐藏规则
 
 ### 3.1 grep 匹配**注释内容**，不仅是代码

@@ -131,6 +131,27 @@ Phase0 必须**全部满足**以下标准才能进入 Phase1：
 
 ---
 
+## 3.5 Plugin 存储修改规则（Tier-1 强制）
+
+> 本节是 [ADR-040 §2.1](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) Tier-1 约束的 Phase 0 退出标准。Phase 0 → Phase 1 过渡时，**所有** `ip/*/tlm/` 业务代码必须满足以下 6 条规则。任意一条违规 = CI FAIL = 阻塞合并。
+
+| # | 规则 | 理由 | 检查工具 | 违规示例 |
+|---|------|------|----------|----------|
+| 1 | 无 `void tick()` 业务重写 | 调度由框架确定性决定，Plugin 不持有时序 | `tools/verify_plugin_decision.sh` Check 1 | `void MyPlugin::tick() { ... }` ❌ |
+| 2 | 无状态机（`enum class State` + `switch state_`）| 控制流必须通过 `at_stage` 表达 | `tools/verify_plugin_decision.sh` Check 2 | `enum class State { IDLE, BUSY }; switch (state_) {...}` ❌ |
+| 3 | Bundle 字段用 `cf::plugin::uint_t<N>` | 为 `ch_uint<N>` 升级保留类型别名空间 | `tools/verify_plugin_decision.sh` Check 3 | `ch_uint<32> addr;` 或 `uint64_t addr;` ❌ |
+| 4 | **`at_stage` 回调内无 `if (cond) return;` 早返** | RTL 中无"早返"概念，需用 `when` 条件驱动；早返导致 commit 边界不一致 | `tools/check_plugin_portability.sh` Check 1 | `if (hit) return;` 在 `at_stage` 闭包内 ❌ |
+| 5 | **`ip/*/tlm/` 业务代码无 `ch_mem` / `ch_reg` / `ch_uint` / `ch::core::context` 渗透** | TLM 模式无 `ch::core::context` 依赖；ch_mem 仅在 RTL 路径出现 | `tools/check_plugin_portability.sh` Check 2 | `#include "core/mem.h"` 或 `ch_mem<T, N> tags_;` 在 `ip/*/tlm/**/*.cpp` ❌ |
+| 6 | **Plugin 内部不调用 `pb.run()`** | `pb.run()` 是顶层入口；Plugin 回调应只读/写 Payload，不触发调度 | `tools/check_plugin_portability.sh` Check 3 | `pb.run();` 在 `L1CachePlugin::build()` 内 ❌ |
+
+**完整约束与 5 步迁移手册**：见 [ADR-040](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) §2.1 + §4。
+
+**为什么是 Tier-1 强制**：L1CachePlugin Phase 1.2 已暴露三类不匹配点（API 形态 / 时序语义 / 抽象层级）。若 Phase 1 业务代码沿用"裸 `std::array` + 早返 + shift+mask 位提取"模式，Phase 5/6 升级时需逐文件重写，违反 ADR-037 的"Plugin-style 业务代码 Phase 6 不重写"承诺。Tier-1 约束通过 CI 强制把不匹配点消灭在源头。
+
+**Tier-2 警告**（不阻塞）：存储优先 `cf::plugin::storage::array_store`、位提取走 helper、阶段名复用统一字典、测试 API 暴露。详见 [ADR-040 §2.1](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md)。
+
+---
+
 ## 4. 风险与缓解
 
 | 风险 | 概率 | 影响 | 缓解 |

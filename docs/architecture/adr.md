@@ -41,6 +41,7 @@
   - [I. 验证框架（Phase 1）](#i-验证框架phase-1-3-条)
   - [J. 目录与组织](#j-目录与组织-2-条)
   - [K. 范式决策](#k-范式决策-1-条)
+  - [L. 可移植性约束](#l-可移植性约束-1-条)
 - [4. 漂移检测规则](#4-漂移检测规则)
 - [5. 验证脚本说明](#5-验证脚本说明)
 - [6. 变更日志](#6-变更日志)
@@ -108,6 +109,7 @@
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
+| ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）| 移植 | `include/cf/plugin/storage.h` + `tools/check_plugin_portability.sh` |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -115,7 +117,7 @@
 |----|------|------|------------|----------|
 | ADR-024 | Bundle 三层分层 | Bundle | Bundle + Protocol | Mapper 模板未实现 |
 
-### 2.3 Phase 1 提案决策（🚧）— 7 条
+### 2.3 Phase 1 提案决策（🚧）— 8 条
 
 | ID | 标题 | 类别 | 状态 | 备注 |
 |----|------|------|------|------|
@@ -126,6 +128,7 @@
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
 | ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部） |
 | ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
+| ADR-040 | TLM→HDL 移植性约束 | 移植 | 🚧（`array_store` 已实现，迁移手册待 Phase 5 验证） |
 
 ### 2.4 统计
 
@@ -141,9 +144,10 @@
 | 流水线抽象 (H) | 3 | 0 | 1 | 4 |
 | 验证框架 (I) | 0 | 0 | 3 | 3 |
 | 目录与组织 (J) | 1 | 0 | 1 | 2 |
-| **合计** | **30** | **1** | **7** | **38** |
+| 可移植性约束 (L) | 0 | 0 | 1 | 1 |
+| **合计** | **30** | **1** | **8** | **39** |
 
-**实现率**：30/38 = **79%**（含部分实现）
+**实现率**：30/39 = **77%**（含部分实现）
 
 ---
 
@@ -1142,6 +1146,55 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 ---
 
+### L. 可移植性约束（1 条）
+
+---
+
+#### ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | 🚧 Phase 1 提案（`array_store` 已实现 + CI 检查脚本已就位，迁移手册待 Phase 5 启动时验证） |
+| 来源 | Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10） |
+| 决策 | 三层不匹配点的发现、3-tier 约束模型、`cf::plugin::storage::array_store` 抽象、`PipeBuilder::register_commit_hook/commit_storages` 钩子 |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式） |
+
+**完整内容见** [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md)（含 5 步迁移手册与 `array_store` API 文档）。
+
+**Tier-1 约束摘要**（6 条，CI FAIL 阻塞合并）：
+
+1. 无 `void tick()` 业务重写
+2. 无状态机（`enum class State` + `switch state_`）
+3. Bundle 字段用 `cf::plugin::uint_t<N>`
+4. **`at_stage` 回调内无 `if (cond) return;` 早返**
+5. **`ip/*/tlm/` 业务代码无 `ch_mem` / `ch_reg` / `ch_uint` / `ch::core::context` 渗透**
+6. **Plugin 内部不调用 `pb.run()`**
+
+**Tier-2 约束摘要**（4 条，CI WARN 需 review）：`array_store` 优先、位提取 helper、统一阶段名字典、测试 API 暴露。
+
+**决策核心**：
+- **A 类不匹配**（API 形态）：`array_store<T, N>` 包装 `std::array` / `ch_mem`
+- **B 类不匹配**（时序语义）：`register_commit_hook` 在 `pb.run()` 末尾提交，Phase 6 切换为双缓冲
+- **C 类不匹配**（抽象层级）：`if (cond) return;` 重构为 `if/else` 或 `when(cond)` 块
+
+**验证命令**（必须通过）：
+```bash
+# Tier-1 强制 —— 阻塞合并
+bash tools/verify_plugin_decision.sh    # Check 1-3 (tick/state/uint_t)
+bash tools/check_plugin_portability.sh  # Check 1-3 (早返/ch_mem泄漏/pb.run)
+# Tier-2 鼓励 —— 不阻塞
+bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
+```
+
+**代码锚点**：
+- `include/cf/plugin/storage.h:70` — `template<class T, size_t N> class array_store`
+- `include/cf/plugin/pipe_builder.h:128` — `PipeBuilder::register_commit_hook(CommitHook)`
+- `include/cf/plugin/pipe_builder.h:136` — `PipeBuilder::commit_storages()`
+- `include/cf/plugin/pipe_builder.h:101` — `PipeBuilder::run()` 末尾 `commit_storages()`
+- `tools/check_plugin_portability.sh` — 4 项 Tier-1/Tier-2 检查
+
+---
+
 ## 4. 漂移检测规则
 
 ### 4.1 漂移定义（两层）
@@ -1274,10 +1327,11 @@ Summary:
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
-| 2026-06-07 | 1.0 | 初始版本：38 条 ADR，24 已实现 + 14 Phase 1 提案 |
+| 2026-06-07 | 1.0 | 初始版本：39 条 ADR，24 已实现 + 15 Phase 1 提案 |
 | | | 配套 `tools/verify_adr.sh` 同步发布 |
 | | | 与 `code-framework-mapping.md` v2.0 / `declarative-hybrid-framework.md` v2.0 对齐 |
 | 2026-06-08 | 1.1 | 新增 ADR-037（Plugin 作为设计范式）；ADR-025~036 状态映射到 Phase 0/1+/6；原 ADR-037 编号顺延为 ADR-039 |
+| 2026-06-10 | 1.2 | 新增 ADR-040（TLM→HDL 移植性约束）；新增分类 L；`array_store` 抽象 + commit 钩子已落地；新增 `tools/check_plugin_portability.sh` |
 
 ---
 

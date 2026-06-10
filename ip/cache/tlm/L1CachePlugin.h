@@ -46,6 +46,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
+#include "cf/plugin/storage.h"
 #include "cf/plugin/uint_t.h"
 #include "bundles/mem_bundles.h"
 
@@ -71,6 +72,7 @@ class L1CachePlugin : public cf::plugin::PluginBase {
   static constexpr unsigned kIdxBits  = 8;         // addr[11:4]
   static constexpr unsigned kOffsetBits = 4;       // addr[3:0] (Phase 0 简化)
   static constexpr unsigned kLineDataBits = 512;   // 64-byte line (Phase 0 退化为 uint64)
+  static constexpr unsigned kAddrBitsRaw = 64;     // 物理地址位宽 (helper 用)
 
   L1CachePlugin();
   ~L1CachePlugin() override = default;
@@ -129,6 +131,24 @@ class L1CachePlugin : public cf::plugin::PluginBase {
                  cf::plugin::uint_t<kLineDataBits> line_data);
 
   // ------------------------------------------------------------------------
+  // 位提取 helper (Phase 5/6 迁移友好)
+  //
+  // 替代 `static_cast((addr >> shift) & mask)` 这种 shift+mask 模式,
+  // 集中维护位宽常量和移位逻辑. Phase 6 切到 CppHDL 时, 内部实现可
+  // 改为 `ch::bits<MSB,LSB>(addr)`, 业务调用方不变.
+  // ------------------------------------------------------------------------
+  static cf::plugin::uint_t<kIdxBits> extract_idx(
+      cf::plugin::uint_t<kAddrBitsRaw> addr);
+  static cf::plugin::uint_t<kTagBits> extract_tag(
+      cf::plugin::uint_t<kAddrBitsRaw> addr);
+
+  // 内部存储类型别名 (Phase 1.3+ ADR-040 可移植性约束)
+  // 用 array_store 包装 std::array, Phase 6 切 ch_mem 时只改 array_store 实现
+  using TagStore   = cf::plugin::storage::array_store<cf::plugin::uint_t<kTagBits>,     kNumSets>;
+  using DataStore   = cf::plugin::storage::array_store<cf::plugin::uint_t<kLineDataBits>, kNumSets>;
+  using ValidStore  = cf::plugin::storage::array_store<cf::plugin::bool_t,            kNumSets>;
+
+  // ------------------------------------------------------------------------
   // 内部: build 时缓存 lookup/refill 节点指针, 供 at_stage 闭包访问
   // ------------------------------------------------------------------------
   // 由于 pb.at_stage(StageCallback) 接受 std::function<void()> (无参),
@@ -148,13 +168,14 @@ class L1CachePlugin : public cf::plugin::PluginBase {
 
  private:
   // ------------------------------------------------------------------------
-  // 内部存储 (TLM 模式: std::array; Phase 5/6 将替换为 ch_mem<T, N>)
+  // 内部存储 (TLM 模式: array_store = std::array 包装; Phase 5/6 切到 ch_mem 时
+  //           改 array_store 内部实现, 调用方不变 — ADR-040 移植性约束)
   // D4 §3.1: 存储数组不参与跨阶段 IPC, 仅作为 Plugin 持有的"硬件资源"
   //          跨阶段通信必须走 Payload<T>
   // ------------------------------------------------------------------------
-  std::array<cf::plugin::uint_t<kTagBits>,    kNumSets> tags_{};
-  std::array<cf::plugin::uint_t<kLineDataBits>, kNumSets> data_{};
-  std::array<cf::plugin::bool_t,               kNumSets> valid_{};
+  TagStore   tags_{};
+  DataStore  data_{};
+  ValidStore valid_{};
 
   // 重置所有 set 为 invalid (构造时和 reset_storage() 调用)
   void invalidate_all_sets();

@@ -25,6 +25,7 @@
 
 #include "ip/cache/tlm/L1CachePlugin.h"
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 
@@ -47,7 +48,7 @@ namespace {
 // 地址位宽常量 (与物理地址空间一致)
 constexpr unsigned kAddrBits = 64;
 
-// 地址 -> idx / tag 提取的掩码与移位
+// 地址 -> idx / tag 提取的掩码与移位 (集中维护, helper 使用)
 constexpr uint64_t kIdxMask =
     (1ULL << L1CachePlugin::kIdxBits) - 1;  // 0xFF
 constexpr unsigned kIdxShift = L1CachePlugin::kOffsetBits;  // 4
@@ -76,6 +77,21 @@ cf::plugin::Payload<cf::plugin::uint_t<8>>                           g_mem_id{"l
 }  // namespace
 
 // ============================================================================
+// 位提取 helper (ADR-040 §2.5: 替代 shift+mask 内联模式)
+// ============================================================================
+cf::plugin::uint_t<L1CachePlugin::kIdxBits> L1CachePlugin::extract_idx(
+    cf::plugin::uint_t<kAddrBitsRaw> addr) {
+  return static_cast<cf::plugin::uint_t<kIdxBits>>(
+      (static_cast<uint64_t>(addr) >> kIdxShift) & kIdxMask);
+}
+
+cf::plugin::uint_t<L1CachePlugin::kTagBits> L1CachePlugin::extract_tag(
+    cf::plugin::uint_t<kAddrBitsRaw> addr) {
+  return static_cast<cf::plugin::uint_t<kTagBits>>(
+      (static_cast<uint64_t>(addr) >> kTagShift) & kTagMask);
+}
+
+// ============================================================================
 // L1CachePlugin 实现
 // ============================================================================
 
@@ -90,27 +106,38 @@ void L1CachePlugin::setup(cf::plugin::PipeBuilder& /*pb*/) {
 void L1CachePlugin::build(cf::plugin::PipeBuilder& pb) {
   pb.declare_substage("lookup", "refill", 1);
 
-// lookup 与 refill 共享同一个 PipeNode (payload_node_): 跨阶段 Payload Key 必须
-// 命中同一 PayloadStore 才能传递 idx/tag/hit/data; 否则 refill 读到的是默认
-// 构造值 (hit=false 但 idx=0/数据=0), 导致写入错的 set.
-// D4 §3.1: 这只是实现细节 (PipeBuilder API 约束), 不参与跨阶段 IPC 语义.
+  // lookup 与 refill 共享同一个 PipeNode (payload_node_): 跨阶段 Payload Key 必须
+  // 命中同一 PayloadStore 才能传递 idx/tag/hit/data; 否则 refill 读到的是默认
+  // 构造值 (hit=false 但 idx=0/数据=0), 导致写入错的 set.
+  // D4 §3.1: 这只是实现细节 (PipeBuilder API 约束), 不参与跨阶段 IPC 语义.
   lookup_node_ = pb.node_of_logic_stage("lookup");
   refill_node_ = lookup_node_;
   payload_node_ = lookup_node_;  // 测试 API 也使用同一节点
 
-  // lookup 阶段 (Phase::NORMAL)
-  pb.at_stage("lookup", cf::plugin::Phase::NORMAL, [this]() {
-    auto n = lookup_node_;
-    if (!n) return;
+  // ------------------------------------------------------------------------
+  // ADR-040 存储 commit 钩子注册
+  //
+  // 当前 TLM 模式下, array_store::commit() 是 no-op (单缓冲, 即写即读).
+  // Phase 6 切到 RTL 时, 改 array_store 内部实现, 钩子自动生效,
+  // 业务调用方 (lookup / refill at_stage 闭包) 不变.
+  //
+  // 注意: 注册顺序 = commit 顺序; tags_ 先于 data_/valid_ 提交.
+  // ------------------------------------------------------------------------
+  pb.register_commit_hook([this] { tags_.commit(); });
+  pb.register_commit_hook([this] { data_.commit(); });
+  pb.register_commit_hook([this] { valid_.commit(); });
 
-    // 1. 从 addr 提取 idx / tag
+  // lookup 阶段 (Phase::NORMAL)
+  // ADR-040 §2.3: 闭包内不早返  (HDL 中无法直接表达).
+  //              build() 已 assert lookup_node_ 非空, 闭包内无须 defensive check.
+  pb.at_stage("lookup", cf::plugin::Phase::NORMAL, [this]() {
+    auto* n = lookup_node_.get();
+    assert(n && "build() must initialize lookup_node_ before at_stage callback runs");
+
+    // 1. 从 addr 提取 idx / tag (使用 helper, 替代 shift+mask 内联 — ADR-040 §2.5)
     cf::plugin::uint_t<kAddrBits> addr = n->operator()(g_addr);
-    cf::plugin::uint_t<L1CachePlugin::kIdxBits> idx =
-        static_cast<cf::plugin::uint_t<L1CachePlugin::kIdxBits>>(
-            (static_cast<uint64_t>(addr) >> kIdxShift) & kIdxMask);
-    cf::plugin::uint_t<L1CachePlugin::kTagBits> tag =
-        static_cast<cf::plugin::uint_t<L1CachePlugin::kTagBits>>(
-            (static_cast<uint64_t>(addr) >> kTagShift) & kTagMask);
+    auto idx = extract_idx(addr);
+    auto tag = extract_tag(addr);
     n->put(g_idx, idx);
     n->put(g_tag, tag);
 
@@ -119,6 +146,7 @@ void L1CachePlugin::build(cf::plugin::PipeBuilder& pb) {
     n->put(g_hit, hit);
 
     // 3. data: 命中返回存储, 未命中返回 0
+    // ADR-040 §2.3: 用 if/else 全分支展开, 不早返 (早返在 HDL 中无法直接表达)
     if (hit) {
       n->put(g_data, read_data(idx));
     } else {
@@ -128,14 +156,13 @@ void L1CachePlugin::build(cf::plugin::PipeBuilder& pb) {
   });
 
   // refill 阶段 (Phase::LATE) — 仅 miss 时执行
+  // ADR-040 §2.3: 同样用 if/else 全分支, 不早返
   pb.at_stage("refill", cf::plugin::Phase::LATE, [this]() {
-    auto n = refill_node_;
-    if (!n) return;
+    auto* n = refill_node_.get();
+    assert(n && "build() must initialize refill_node_ before at_stage callback runs");
 
     cf::plugin::bool_t hit = n->operator()(g_hit);
-    if (hit) return;  // 命中无需 refill
-
-    // 从 MemResp Payload 写入 storage
+    // 读取所有需要的 Payload (无论 hit 与否, 保证没有跨阶段 RAW 死读)
     cf::plugin::uint_t<L1CachePlugin::kLineDataBits> mem_data =
         n->operator()(g_mem_data);
     cf::plugin::uint_t<L1CachePlugin::kIdxBits> idx =
@@ -143,7 +170,10 @@ void L1CachePlugin::build(cf::plugin::PipeBuilder& pb) {
     cf::plugin::uint_t<L1CachePlugin::kTagBits> tag =
         n->operator()(g_tag);
 
-    write_set(idx, tag, mem_data);
+    if (!hit) {  // 全分支 if/else, 不早返
+      write_set(idx, tag, mem_data);
+    }
+    // hit 分支: no-op (命中 set 已有正确 data, 无需 refetch)
   });
 }
 

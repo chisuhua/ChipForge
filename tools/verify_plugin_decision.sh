@@ -1,16 +1,23 @@
 #!/bin/bash
 # tools/verify_plugin_decision.sh
 #
-# 功能描述: D4 决策静态检查 (Plugin-style 强制)
+# 功能描述: D4 决策静态检查 (Plugin-style 强制) + ADR-040 移植性检查
 # 作者: ChipForge Build System
-# 最后修改日期: 2026-06-08
+# 最后修改日期: 2026-06-10
 #
 # 验证 (D4 from .omo/drafts/decision-plugin-framework-2026-06-08.md):
 #   1. 业务代码无 void tick() 重写
 #   2. 业务代码无状态机 (enum class State + switch state_)
 #   3. Bundle 字段用 cf::plugin::uint_t<N> (非 ch_uint<N> 或 uint64_t 直接)
 #
+# 验证 (ADR-040 §2.1, 调用 check_plugin_portability.sh):
+#   4. at_stage 回调内无 `if (cond) return;` 早返
+#   5. ip/*/tlm/ 无 ch_mem / ch_reg / ch_uint / ch::core::context 渗透
+#   6. Plugin::build() 内不调用 pb.run()
+#   7. 存储声明优先 array_store ([WARN] 鼓励)
+#
 # 退出码: 0 = 全部通过, 1 = 至少一项失败
+# 总计: 3 项 D4 检查 + 4 项 ADR-040 可移植性检查 = 7 项
 
 set -e
 
@@ -77,12 +84,24 @@ fi
 echo ""
 
 # ----------------------------------------------------------------------------
+# ADR-040 TLM→HDL 移植性检查 (Tier-1/2 强制 + 鼓励)
+# ----------------------------------------------------------------------------
+echo "[4/4] 调用 check_plugin_portability.sh ..."
+if bash "${ROOT_DIR}/tools/check_plugin_portability.sh"; then
+  echo "  [PASS] 移植性检查通过"
+else
+  echo "  [FAIL] 移植性检查失败"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
 # 汇总
 # ----------------------------------------------------------------------------
 if [ ${FAIL_COUNT} -eq 0 ]; then
-  echo "=== D4 检查全部通过 (3/3) ==="
+  echo "=== D4 + ADR-040 检查全部通过 (3+4/3) ==="
   exit 0
 else
-  echo "=== D4 检查失败 (${FAIL_COUNT}/3) ==="
+  echo "=== D4 + ADR-040 检查失败 (${FAIL_COUNT} 项失败) ==="
   exit 1
 fi
