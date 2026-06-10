@@ -120,6 +120,18 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_coexistence.cpp)
   add_test(NAME test_coexistence COMMAND test_coexistence)
 endif()
 
+# Phase 1.1: 共享 Bundle 定义单元测试
+# bundles/ 位于仓库根,需要把项目根加入 include 路径
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mem_bundles.cpp)
+  add_executable(test_mem_bundles tests/test_mem_bundles.cpp)
+  target_link_libraries(test_mem_bundles PRIVATE cf_plugin)
+  target_include_directories(test_mem_bundles
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_mem_bundles COMMAND test_mem_bundles)
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
