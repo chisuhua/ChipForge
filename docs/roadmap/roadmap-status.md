@@ -49,7 +49,7 @@
 
 ### Phase 1 - TLM Foundation (L1CachePlugin)
 
-- **状态**: In Progress (~30%, 1.1 + 1.2 完成, 1.3 v2 决策已批准 (`8d80fd3`) 实施启动中)
+- **状态**: In Progress (~40%, 1.1 + 1.2 + 1.3a + 1.3e 完成; 1.3b/1.3c/1.3d/1.3f 待实施)
 - **依赖**: Phase 0
 - **预估工时**: 7-9 工作日(~1.5 周); Phase 1.3 单项重估 **1 天 → 4.5 天** (v2 决策草案 §8)
 - **已完成** (2026-06-10):
@@ -59,13 +59,20 @@
     - `ip/cache/tlm/L1CachePlugin.{h,cpp}` (256 sets × 64B line, direct-mapped)
     - 4 个单元测试 (miss / refill / hit-after-refill / D4 runtime) PASS
   - 1.2 配套: `docs/lessons/phase-1.2-l1cacheplugin.md` 7 类 15+ 模式教训 (`2a81938`)
+  - 1.3a L1CacheTLMBridge 框架层桥接 (D1=C + D1'=末尾) (`26fe7d2`)
+    - `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (Bridge 持有 PipeBuilder + Plugin)
+    - `src/cf_plugin/tests/test_l1_cache_bridge.cpp` (2 tests: tick invokes pb.run / 4-field forwarding) PASS
+    - 11/11 ChipForge ctest PASS in 3.90s
+  - 1.3e BundleMapper drift 防护 (`verify_adr.sh` ADR-024 增强)
+    - 拒绝 `bundles/bundle_mapper.h` 提前实现 (canonical 设计推迟到 Phase 5/6)
+    - 正/负向测试均通过
 - **Phase 1.3 v2 决策** (`8d80fd3` DECISION-2026-06-10-02 v2):
   - D1=C: Phase 1.3 保持 `cf::bundles::*` POD 不动, Bridge 做 4 字段窄桥 (addr/data/is_write/id)
   - D1'=末尾: Bridge `tick()` 末尾调用 `plugin_->pb.run()` (回答 `declarative-hybrid-framework.md:443-447` §4.8 开放问题 1)
   - D1''=不实现: BundleMapper 推迟 Phase 5/6, 加 `verify_adr.sh` drift 防护
   - D2=B: Bridge 在 `src/cf_plugin/bridge/`, 不在 `ip/`
   - D3=A: 仅 1.3 最小 e2e; 1.4 baseline 留到下次 session
-- **下一步**: 1.3a L1CacheTLMBridge TDD 实施 (1.5 天: 4 字段窄桥 + D1' 末尾挂载 + 单元测试)
+- **下一步**: 1.3b `soc/l1_cache_minimal.json` (0.5 天) 或 1.3d ModuleFactory JSON 集成测试 (1 天)
 
 **关键约束**(D4 强制): 业务代码无 `tick()`、Bundle 字段用 `uint_t<N>`、所有阶段用 `at_stage()`
 

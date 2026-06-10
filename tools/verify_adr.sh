@@ -535,6 +535,12 @@ verify_adr_024() {
   else
     log_pass "ADR-024" "Bundle 三层分层（核心已实现，Mapper 缺失符合 ⚠️ 状态）"
   fi
+  if [[ -e "$CHIPFORGE_ROOT/bundles/bundle_mapper.h" ]]; then
+    log_failed "ADR-024" "Bundle 三层分层 drift 防护" \
+      "bundles/bundle_mapper.h 已实现但 ADR 仍标 ⚠️ — canonical 设计推迟到 Phase5 (参见 bundles/README.md:102, plugin-framework.md:129, DECISION-2026-06-10-02 D1'')"
+  else
+    log_pass "ADR-024" "Bundle 三层分层 drift 防护 (bundles/bundle_mapper.h 未实现, 符合 Phase5 推迟约定)"
+  fi
 }
 
 # === G. 声明式 Plugin 模型 (Phase 1) ===
