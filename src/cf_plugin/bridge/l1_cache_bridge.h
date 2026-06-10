@@ -27,8 +27,10 @@
 #include "ip/cache/tlm/L1CachePlugin.h"
 
 // 前向声明: cpptlm 类型, 避免在头文件中拉入 CppTLM 依赖
-namespace cpptlm {
+// EventQueue 是全局类 (CppTLM/include/core/event_queue.hh:31, 无 namespace 前缀)
+// StreamAdapterBase 是 cpptlm 命名空间内类
 class EventQueue;
+namespace cpptlm {
 class StreamAdapterBase;
 }
 

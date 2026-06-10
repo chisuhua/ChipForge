@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 1.3d: `L1CacheTLMBridgeAdapter` (cpptlm ModuleFactory 兼容适配层)
+  - `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (继承 ChStreamModuleBase)
+  - 解决 v2 §4 决策: Bridge 构造签名 (unique_ptr<L1CachePlugin>) 与
+    ModuleFactory::registerObject 期望的 (string, EventQueue*) 不兼容
+  - Adapter 是薄包装: 内部创建默认 Plugin + Bridge, tick() 委托给 Bridge
+  - `src/cf_plugin/tests/test_l1_cache_plugin_e2e.cpp` (5 tests: ModuleFactory
+    发现 / Adapter 构造 / Bridge 持有 / Adapter::tick 触发 pb.run / 1000+ tx)
+  - 14/14 ChipForge ctest PASS in 5.28s
+  - Phase 1.3d-extras 范围 (推迟): ch_stream adapter 注册 + full JSON
+    instantiateAll e2e (需要 ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, CacheReqBundle, CacheRespBundle>)
+// Phase 1.3 全部完成: 1.3a + 1.3b + 1.3c + 1.3d + 1.3e + 1.3f (commit 待)
 - Phase 1.3f: `ip/cache/README.md` §9 Phase 1.3 使用指南 (L1CachePlugin + Bridge + JSON)
   - Status banner 更新: Phase 1.2 + 1.3a + 1.3b + 1.3c + 1.3e 已落地 (1.3d 推迟)
   - §9.1 L1CachePlugin 直接使用 (Plugin-style 单元测试 pattern)

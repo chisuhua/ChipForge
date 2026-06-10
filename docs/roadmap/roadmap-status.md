@@ -49,7 +49,7 @@
 
 ### Phase 1 - TLM Foundation (L1CachePlugin)
 
-- **状态**: In Progress (~55%, 1.1 + 1.2 + 1.3a + 1.3b + 1.3c + 1.3e + 1.3f 完成; 1.3d 待实施)
+- **状态**: In Progress (~65%, 1.1 + 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3e + 1.3f 完成; Phase 1.3 全部子任务落地)
 - **依赖**: Phase 0
 - **预估工时**: 7-9 工作日(~1.5 周); Phase 1.3 单项重估 **1 天 → 4.5 天** (v2 决策草案 §8)
 - **已完成** (2026-06-10):
@@ -78,13 +78,18 @@
     - 5 个子章节 (Plugin / Bridge / JSON / Schema / 测试汇总 + 决策)
     - 9 个相对链接全部验证 OK
     - 文档完整支持 Phase 1.3 用户 (单元测试作者 / SoC 集成者 / 配置维护者)
+  - 1.3d `L1CacheTLMBridgeAdapter` (cpptlm ModuleFactory 兼容适配层)
+    - 解决 Bridge 构造签名与 ModuleFactory::registerObject 不兼容问题
+    - 5 个 e2e 测试 (ModuleFactory 发现 / Adapter 构造 / Bridge 持有 / Adapter::tick / 1000+ tx)
+    - 14/14 ChipForge ctest PASS in 5.28s
+    - Phase 1.3d-extras 推迟: ch_stream adapter 注册 + full JSON instantiateAll
 - **Phase 1.3 v2 决策** (`8d80fd3` DECISION-2026-06-10-02 v2):
   - D1=C: Phase 1.3 保持 `cf::bundles::*` POD 不动, Bridge 做 4 字段窄桥 (addr/data/is_write/id)
   - D1'=末尾: Bridge `tick()` 末尾调用 `plugin_->pb.run()` (回答 `declarative-hybrid-framework.md:443-447` §4.8 开放问题 1)
   - D1''=不实现: BundleMapper 推迟 Phase 5/6, 加 `verify_adr.sh` drift 防护
   - D2=B: Bridge 在 `src/cf_plugin/bridge/`, 不在 `ip/`
   - D3=A: 仅 1.3 最小 e2e; 1.4 baseline 留到下次 session
-- **下一步**: 1.3d ModuleFactory JSON 集成测试 (1 天: Bridge 注册 adapter + e2e test_l1_cache_plugin_e2e.cpp; 需要架构决策: Bridge 构造签名 (string, EventQueue*) 不匹配, 需 adapter 包装)
+- **下一步**: Phase 1.3 全部子任务完成 (1.3a/1.3b/1.3c/1.3d/1.3e/1.3f). Phase 1.3d-extras (ch_stream adapter + full JSON instantiateAll) 推迟到 Phase 2+; Phase 1.4 (cpptlm::CacheTLM baseline 对比) 启动
 
 **关键约束**(D4 强制): 业务代码无 `tick()`、Bundle 字段用 `uint_t<N>`、所有阶段用 `at_stage()`
 

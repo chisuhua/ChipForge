@@ -220,6 +220,30 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cache_params_schema_json.cpp)
   )
 endif()
 
+# Phase 1.3d: L1CachePlugin e2e 测试 (ModuleFactory + JSON 集成)
+# TDD: 验证 L1CacheTLMBridgeAdapter 通过 cpptlm::ModuleFactory 注册并实例化
+# 依赖: soc/l1_cache_minimal.json + L1CachePlugin + L1CacheTLMBridge + Adapter
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_plugin_e2e.cpp)
+  add_executable(test_l1_cache_plugin_e2e
+    tests/test_l1_cache_plugin_e2e.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
+  )
+  target_link_libraries(test_l1_cache_plugin_e2e PRIVATE cf_plugin cpptlm_core)
+  target_include_directories(test_l1_cache_plugin_e2e
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/src
+      ${CMAKE_SOURCE_DIR}/CppTLM/include
+      ${CMAKE_SOURCE_DIR}/CppTLM/external/json
+  )
+  add_test(NAME test_l1_cache_plugin_e2e
+    COMMAND test_l1_cache_plugin_e2e
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
