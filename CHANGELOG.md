@@ -8,20 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Architecture documentation (8 docs in `docs/architecture/`)
-- Roadmap with 5 phases and 10 milestones (`docs/roadmap/`)
-- IP library stubs: cpu, cache, memory, interconnect, peripheral
-- CPU IP design documents (multi_isa_architecture.md, 1164 lines)
-- JSON Schema for CPU configuration (`ip/cpu/configs/cpu_params_schema.json`)
-- Documentation health check tool (`tools/doc_checker.py`)
-- 3 regression tests for the doc_checker tool
-- GitHub Actions CI for documentation health
-- Root README, CONTRIBUTING, this CHANGELOG, CODEOWNERS
+- Phase 1.2: `L1CachePlugin` (Plugin-style first IP, lookup + refill two-stage pipeline)
+  - `ip/cache/tlm/L1CachePlugin.h/.cpp` (256 sets, 64B line, direct-mapped)
+  - `src/cf_plugin/tests/test_l1_cache_plugin_unit.cpp` (4 tests: miss / refill / hit-after-refill / D4 runtime)
+  - 10/10 ChipForge ctest PASS in 2.30s; D4 verify_plugin_decision 3/3 PASS
+  - All Bundle fields `cf::plugin::uint_t<N>`; no `tick()`, no state machine; at_stage-driven
+  - Phase 0 limitation: `uint_t<512>` falls back to `uint64_t` (tracked; Phase 6 upgrade planned)
 
 ### Notes
-- Project is in pure planning/scaffolding stage
-- All 5 Phases are Not Started
-- No source code committed yet (CppTLM/CppHDL as symlinks)
+- Phase 1.1 Bundle definitions shipped in `073402c` (Bundles 6 types + 9/9 unit tests)
+- Phase 0 LSP false positives remain (cf/plugin namespace visibility); tracked, not blocking
 
 ## [0.0.1] - 2026-06-10
 
@@ -48,9 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CppHDL internal unit tests (~139) fail to build in parent project's C++17 mode; tracked as PA-4b
   - Workaround: `tools/run_chipforge_tests.sh` excludes them by name pattern
   - Permanent fix: Phase 5 (RTL co-simulation) will re-evaluate CppHDL integration
-- Application layer (`bundles/`, `ip/*/tlm/`, `ip/*/rtl/`) is empty; Phase 1 will populate
+- Application layer (`bundles/` populated in 1.1; `ip/cache/tlm/L1CachePlugin.{h,cpp}` populated in 1.2; remaining dirs pending)
 
 ### Status
 - Phase 0: ✅ Completed (5/5 P0 components, 8/8 ChipForge tests PASS)
-- Phase 1-5: Not Started (depends on Phase 1)
+- Phase 1: 🚧 In Progress, 1.1 ✅ + 1.2 ✅ + 1.3-1.5 pending (10/10 ChipForge tests PASS)
+- Phase 2-5: Not Started (depends on Phase 1)
 - Phase 6: Not Started (depends on 2-3 stable Plugin-style IPs)

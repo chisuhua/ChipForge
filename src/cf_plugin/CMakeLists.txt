@@ -132,6 +132,25 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mem_bundles.cpp)
   add_test(NAME test_mem_bundles COMMAND test_mem_bundles)
 endif()
 
+# Phase 1.2: L1CachePlugin 单元测试 (lookup + refill 两阶段, D4 Plugin-style)
+# 依赖:
+#   - bundles/ (Phase 1.1) - 需 CMAKE_SOURCE_DIR include 路径
+#   - ip/cache/tlm/L1CachePlugin.h (Phase 1.2 主实现) - 需 ip/ include 路径
+#   - ip/cache/tlm/L1CachePlugin.cpp - 直接编译进测试可执行 (Phase 1.2 单文件 lib)
+# TDD: 测试无条件注册, RED 时编译失败暴露缺失实现 (D4 §2.2)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_plugin_unit.cpp)
+  add_executable(test_l1_cache_plugin_unit
+    tests/test_l1_cache_plugin_unit.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+  )
+  target_link_libraries(test_l1_cache_plugin_unit PRIVATE cf_plugin)
+  target_include_directories(test_l1_cache_plugin_unit
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_l1_cache_plugin_unit COMMAND test_l1_cache_plugin_unit)
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
