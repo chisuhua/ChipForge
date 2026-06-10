@@ -182,6 +182,25 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_bridge.cpp)
   add_test(NAME test_l1_cache_bridge COMMAND test_l1_cache_bridge)
 endif()
 
+# Phase 1.3b: soc/l1_cache_minimal.json 结构验证 (v2 决策 §4 拓扑)
+# TDD: 验证 JSON 结构符合 v2 草案 (traffic_gen → L1CacheTLMBridge → Memory)
+# 依赖: soc/l1_cache_minimal.json (本目录上级) + nlohmann/json (CppTLM bundled)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_soc_l1_cache_minimal_json.cpp)
+  add_executable(test_soc_l1_cache_minimal_json
+    tests/test_soc_l1_cache_minimal_json.cpp
+  )
+  target_link_libraries(test_soc_l1_cache_minimal_json PRIVATE cf_plugin cpptlm_core)
+  target_include_directories(test_soc_l1_cache_minimal_json
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/CppTLM/external/json  # for nlohmann/json.hpp
+  )
+  add_test(NAME test_soc_l1_cache_minimal_json
+    COMMAND test_soc_l1_cache_minimal_json
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}  # so soc/l1_cache_minimal.json is found
+  )
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
