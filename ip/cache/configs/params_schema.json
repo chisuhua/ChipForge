@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "L1CachePlugin IP Configuration Schema",
+  "description": "Phase 1.3 L1CachePlugin configuration schema. Validates params used by L1CacheTLMBridge + L1CachePlugin. See .omo/drafts/decision-phase-1.3-bridge-2026-06-10.md §3 (D1=C: 4-field narrow bridge over POD Bundle).",
+  "type": "object",
+  "properties": {
+    "name": {"type": "string", "description": "实例名称"},
+    "type": {"type": "string", "const": "l1_cache"},
+    "impl_mode": {
+      "type": "string",
+      "enum": ["TLM_ONLY", "RTL_ONLY", "COMPARE", "SHADOW"],
+      "default": "TLM_ONLY",
+      "description": "实现模式 (Phase 1 仅 TLM_ONLY 生效)"
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "num_sets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536,
+          "default": 256,
+          "description": "缓存 set 数 (典型 32KB 8-way L1 = 256 sets)"
+        },
+        "tag_bits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 20,
+          "description": "tag 位宽 (假设 40-bit 物理地址, 8-bit idx, 12-bit offset)"
+        },
+        "idx_bits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 8,
+          "description": "idx 位宽 (决定 num_sets = 2^idx_bits)"
+        },
+        "line_data_bits": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096,
+          "default": 512,
+          "description": "cache line 数据位宽 (典型 64B = 512 bits; Phase 0 限制 >64 退化为 uint64_t)"
+        },
+        "replacement_policy": {
+          "type": "string",
+          "enum": ["LRU", "PLRU", "Random", "FIFO"],
+          "default": "LRU",
+          "description": "替换策略 (Phase 1 实际只用 direct-mapped, 此字段为 forward-compat)"
+        },
+        "write_policy": {
+          "type": "string",
+          "enum": ["WriteBack", "WriteThrough"],
+          "default": "WriteBack",
+          "description": "写策略 (Phase 1 仅 WriteBack 实现)"
+        }
+      },
+      "required": ["num_sets", "tag_bits", "idx_bits", "line_data_bits"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["name", "type", "params"],
+  "additionalProperties": false
+}

@@ -201,6 +201,25 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_soc_l1_cache_minimal_json.cpp)
   )
 endif()
 
+# Phase 1.3c: ip/cache/configs/params_schema.json 结构验证
+# TDD: 验证 JSON Schema 符合 v2 §3 (D1=C) + L1CachePlugin geometry
+# 依赖: ip/cache/configs/params_schema.json + nlohmann/json
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cache_params_schema_json.cpp)
+  add_executable(test_cache_params_schema_json
+    tests/test_cache_params_schema_json.cpp
+  )
+  target_link_libraries(test_cache_params_schema_json PRIVATE cf_plugin cpptlm_core)
+  target_include_directories(test_cache_params_schema_json
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/CppTLM/external/json
+  )
+  add_test(NAME test_cache_params_schema_json
+    COMMAND test_cache_params_schema_json
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
