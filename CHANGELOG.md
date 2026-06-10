@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 1.3f: `ip/cache/README.md` §9 Phase 1.3 使用指南 (L1CachePlugin + Bridge + JSON)
+  - Status banner 更新: Phase 1.2 + 1.3a + 1.3b + 1.3c + 1.3e 已落地 (1.3d 推迟)
+  - §9.1 L1CachePlugin 直接使用 (Plugin-style 单元测试 pattern)
+  - §9.2 L1CacheTLMBridge 使用 (cpptlm 适配层 + D1' 末尾挂载契约)
+  - §9.3 SoC JSON 拓扑 (`soc/l1_cache_minimal.json`)
+  - §9.4 参数 Schema (`ip/cache/configs/params_schema.json`)
+  - §9.5 测试套件汇总表 (13 tests PASS in 4.11s)
+  - §9.6 相关决策与 ADR (v2 决策草案 + ADR-024/037 + D4)
+  - 9 个相对链接全部验证 OK
 - Phase 1.3c: `ip/cache/configs/params_schema.json` (L1CachePlugin IP 配置 JSON Schema)
   - JSON Schema draft-07 格式, 严格模式 (additionalProperties=false)
   - 4 核心 param 字段 required: `num_sets`, `tag_bits`, `idx_bits`, `line_data_bits`
