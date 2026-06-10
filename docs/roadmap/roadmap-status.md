@@ -1,6 +1,6 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-10 (本次会话七: Phase 1.2 归档 + 文档债务清零)
+> **最后更新**: 2026-06-10 (本次会话八: Phase 1.3 v2 决策草案批准 + 实施启动)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
@@ -49,9 +49,9 @@
 
 ### Phase 1 - TLM Foundation (L1CachePlugin)
 
-- **状态**: In Progress (~30%, 1.1 Bundle 定义 + 1.2 L1CachePlugin 实现 + Lessons 沉淀完成)
+- **状态**: In Progress (~30%, 1.1 + 1.2 完成, 1.3 v2 决策已批准 (`8d80fd3`) 实施启动中)
 - **依赖**: Phase 0
-- **预估工时**: 7-9 工作日(~1.5 周)
+- **预估工时**: 7-9 工作日(~1.5 周); Phase 1.3 单项重估 **1 天 → 4.5 天** (v2 决策草案 §8)
 - **已完成** (2026-06-10):
   - 1.1 Bundle 定义 (`bundles/mem_bundles.h` 6 个 Bundle, D4 合规) + 9 个单元测试 PASS (`073402c`)
   - `bundles/README.md` 设计原则文档
@@ -59,9 +59,21 @@
     - `ip/cache/tlm/L1CachePlugin.{h,cpp}` (256 sets × 64B line, direct-mapped)
     - 4 个单元测试 (miss / refill / hit-after-refill / D4 runtime) PASS
   - 1.2 配套: `docs/lessons/phase-1.2-l1cacheplugin.md` 7 类 15+ 模式教训 (`2a81938`)
-- **下一步**: 1.3 最小 SoC JSON (`soc/l1_cache_minimal.json` 含 CPUTLM/CacheTLM/MemoryTLM/CrossbarTLM)
+- **Phase 1.3 v2 决策** (`8d80fd3` DECISION-2026-06-10-02 v2):
+  - D1=C: Phase 1.3 保持 `cf::bundles::*` POD 不动, Bridge 做 4 字段窄桥 (addr/data/is_write/id)
+  - D1'=末尾: Bridge `tick()` 末尾调用 `plugin_->pb.run()` (回答 `declarative-hybrid-framework.md:443-447` §4.8 开放问题 1)
+  - D1''=不实现: BundleMapper 推迟 Phase 5/6, 加 `verify_adr.sh` drift 防护
+  - D2=B: Bridge 在 `src/cf_plugin/bridge/`, 不在 `ip/`
+  - D3=A: 仅 1.3 最小 e2e; 1.4 baseline 留到下次 session
+- **下一步**: 1.3a L1CacheTLMBridge TDD 实施 (1.5 天: 4 字段窄桥 + D1' 末尾挂载 + 单元测试)
 
 **关键约束**(D4 强制): 业务代码无 `tick()`、Bundle 字段用 `uint_t<N>`、所有阶段用 `at_stage()`
+
+**Phase 1.3 关键参考文档**:
+- v2 决策草案: `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md` (`8d80fd3`)
+- canonical Bundle 设计: `docs/architecture/overview.md:125`, `docs/architecture/interface-design.md`
+- ADR-024 Bundle 三层分层 (⚠️ Mapper 未实现): `docs/architecture/adr.md:118`
+- 1.2 lessons: `docs/lessons/phase-1.2-l1cacheplugin.md` (TDD 教训可复用)
 
 ### Phase 2 - Bare-metal 测试套件
 

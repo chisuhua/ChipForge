@@ -159,6 +159,29 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_storage.cpp)
   add_test(NAME test_storage COMMAND test_storage)
 endif()
 
+# Phase 1.3a: L1CacheTLMBridge 单元测试 (D1' 末尾挂载契约)
+# TDD: 测试无条件注册, RED 时编译失败暴露缺失实现
+# 依赖:
+#   - bundles/ (Phase 1.1) - 需 CMAKE_SOURCE_DIR include 路径
+#   - ip/cache/tlm/L1CachePlugin.h + .cpp - 需 ip/ include 路径, 直接编译
+#   - src/cf_plugin/bridge/l1_cache_bridge.h + .cpp - 1.3a 待实现
+#   - CppTLM cpptlm::StreamAdapterBase (Phase 1.3d 预留接口) - 需 CppTLM include
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_bridge.cpp)
+  add_executable(test_l1_cache_bridge
+    tests/test_l1_cache_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
+  )
+  target_link_libraries(test_l1_cache_bridge PRIVATE cf_plugin cpptlm_core)
+  target_include_directories(test_l1_cache_bridge
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/src  # for bridge/ subdir
+      ${CMAKE_SOURCE_DIR}/CppTLM/include  # for cpptlm::StreamAdapterBase
+  )
+  add_test(NAME test_l1_cache_bridge COMMAND test_l1_cache_bridge)
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
