@@ -1,6 +1,6 @@
 # Cache IP 设计文档
 
-> ⚠️ **Status: Planning** — Code not yet implemented. See [Phase 1 roadmap](../../docs/roadmap/phases/phase-1-tlm-foundation.md) for planned structure.
+> 🚧 **Status: TLM model implemented (Phase 1.2, 2026-06-10)** — `ip/cache/tlm/L1CachePlugin.{h,cpp}` 已落地 (lookup + refill 两阶段, 256 sets × 64B line, D4 Plugin-style, 4/4 单元测试 PASS)。L1I/L2/RTL 推迟到 Phase 2+。详见 [Phase 1 roadmap](../../docs/roadmap/phases/phase-1-tlm-foundation.md) §1.2。
 
 ## 1. 功能概述
 

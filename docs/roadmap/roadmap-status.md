@@ -1,6 +1,6 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-10
+> **最后更新**: 2026-06-10 (本次会话七: Phase 1.2 归档 + 文档债务清零)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
@@ -12,7 +12,7 @@
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
 | Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
-| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | 10% (1.1 完成) | 依赖 Phase 0(已解除) | L1CachePlugin 实现 (1.2) |
+| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~30% (1.1+1.2 完成) | 依赖 Phase 0(已解除) | 1.3 最小 SoC JSON |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | ClintTlm/PlicTlm 完善 |
@@ -49,13 +49,17 @@
 
 ### Phase 1 - TLM Foundation (L1CachePlugin)
 
-- **状态**: In Progress (~10%, 1.1 Bundle 定义完成)
+- **状态**: In Progress (~30%, 1.1 Bundle 定义 + 1.2 L1CachePlugin 实现 + Lessons 沉淀完成)
 - **依赖**: Phase 0
 - **预估工时**: 7-9 工作日(~1.5 周)
 - **已完成** (2026-06-10):
-  - 1.1 Bundle 定义 (`bundles/mem_bundles.h` 6 个 Bundle, D4 合规) + 9 个单元测试 PASS
+  - 1.1 Bundle 定义 (`bundles/mem_bundles.h` 6 个 Bundle, D4 合规) + 9 个单元测试 PASS (`073402c`)
   - `bundles/README.md` 设计原则文档
-- **下一步**: 1.2 L1CachePlugin 实现 (lookup + refill 两阶段)
+  - 1.2 L1CachePlugin 实现 (lookup + refill 两阶段, Plugin-style, D4 合规) (`e8deacc`)
+    - `ip/cache/tlm/L1CachePlugin.{h,cpp}` (256 sets × 64B line, direct-mapped)
+    - 4 个单元测试 (miss / refill / hit-after-refill / D4 runtime) PASS
+  - 1.2 配套: `docs/lessons/phase-1.2-l1cacheplugin.md` 7 类 15+ 模式教训 (`2a81938`)
+- **下一步**: 1.3 最小 SoC JSON (`soc/l1_cache_minimal.json` 含 CPUTLM/CacheTLM/MemoryTLM/CrossbarTLM)
 
 **关键约束**(D4 强制): 业务代码无 `tick()`、Bundle 字段用 `uint_t<N>`、所有阶段用 `at_stage()`
 
@@ -154,6 +158,7 @@
 
 | 日期 | 事件 |
 |------|------|
+| 2026-06-10 | **本次会话七**: Phase 1.2 落地 + Phase 1.2 教训文档化 + 文档债务清零。`ip/cache/tlm/L1CachePlugin.{h,cpp}` 实现 lookup + refill 两阶段 (Plugin-style, D4 合规, 256 sets × 64B line);`test_l1_cache_plugin_unit.cpp` 4/4 PASS (miss / refill / hit-after-refill / D4 runtime);D4 静态检查 3/3 PASS;`docs/lessons/phase-1.2-l1cacheplugin.md` 沉淀 7 类 15+ 模式;`docs/roadmap/README.md` Phase 1 status 同步为 In Progress;`roadmap-status.md` Phase 1 进度 10% → ~30%;`ip/README.md` + `ip/cache/README.md` cache 状态从 🔴 规划中 → 🟡 TLM 实现中;10/10 ctest PASS, 0 warnings;3 个原子 commit (Phase 1.2 实施 + Lessons 文档 + 文档同步)。Phase 1 进度 10% → 30%。 |
 | 2026-06-10 | **本次会话六**: Phase 1.1 Bundle 定义完成。`bundles/mem_bundles.h` 实现 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle), 全部字段用 `cf::plugin::uint_t<N>` (D4 合规);`test_mem_bundles.cpp` 9/9 PASS (含 5 个 static_assert 编译期检查);`bundles/README.md` 设计原则文档;`tools/run_chipforge_tests.sh` 更新包含新测试 (9/9 PASS);捕获 Phase 0 限制 `uint_t<512>` 退化为 `uint64_t` (uint_t.h:37 兜底), Phase 6 升级方案已记录;2 个原子 commit (Phase 0 收尾 + Phase 1.1 提交)。Phase 1 进度 0% → 10%。 |
 | 2026-06-09 | **本次会话五** (Quick 准备): ADR-033 (CtrlLink 4-control-API) 🚧 → ✅ Accepted, D6 共存方案绑定 (halt_when / throw_when / flush_when / bypass);git rm `docs/roadmap/phases/phase-1-foundation.md`;修正 4 处 ip/{cache,memory,interconnect,peripheral}/README.md 链接指向 `phase-1-tlm-foundation.md`;roadmap-status.md 同步 (PA-3 状态推进 + 建议 1 删除 + Phase 1* 行 + 活动日志);1 个原子 commit 提交。Phase 1 (L1CachePlugin) Large plan 启动前的前置解锁。 |
 | 2026-06-09 | **本次会话四**: 路线图文档同步——`docs/roadmap/README.md` Phase 0 状态修正为 ✅ Completed(2026-06-08);`roadmap-status.md` §1 状态总览 + §2 Phase 0 详情同步;`docs/architecture/overview.md` 顶部新增"实现状态快照"banner,标明应用层(`bundles/`/`ip/*/`/`soc/riscv_virt.json`)待建设;消除文档-状态背离 |

@@ -22,7 +22,7 @@
 | Phase | 文档 | 状态 | 关键目标 |
 |-------|------|------|---------|
 | **Phase 0** | [Plugin 最小脚手架](phases/phase-0-plugin-scaffolding.md) | ✅ Completed (2026-06-08) | PluginBase / Payload<T> / PipeNode / PipeBuilder / CtrlLink（5/5 P0 完成，51/51 单元测试 PASS） |
-| Phase 1 | [基础 TLM 平台（Hello World = L1CachePlugin）](phases/phase-1-tlm-foundation.md) | Not Started | 第一个 Plugin-style IP 验证 Plugin 风格可行性 |
+| Phase 1 | [基础 TLM 平台（Hello World = L1CachePlugin）](phases/phase-1-tlm-foundation.md) | 🚧 In Progress (1.1+1.2 完成) | 第一个 Plugin-style IP 验证 Plugin 风格可行性 |
 | Phase 2 | [Bare-metal 测试套件](phases/phase-2-baremetal.md) | Not Started | riscv-tests RV64GC |
 | Phase 3 | [RTOS 测试套件](phases/phase-3-rtos.md) | Not Started | FreeRTOS + Zephyr |
 | Phase 4 | [Linux 启动支持](phases/phase-4-linux.md) | Not Started | OpenSBI + Linux Kernel |

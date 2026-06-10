@@ -8,7 +8,7 @@
 | IP | 状态 | 说明 |
 |----|------|------|
 | [cpu/](cpu/) | 🟡 设计中 | RISC-V CPU（Plugin + Stageable 架构） |
-| [cache/](cache/) | 🔴 规划中 | 多级缓存（L1I/L1D/L2） |
+| [cache/](cache/) | 🟡 TLM 实现中 (Phase 1.2 L1D) | 多级缓存（L1I/L1D/L2） |
 | [memory/](memory/) | 🔴 规划中 | 主存储器（SRAM/DRAM 模型） |
 | [interconnect/](interconnect/) | 🔴 规划中 | 总线/NoC 互连 |
 | [peripheral/](peripheral/) | 🔴 规划中 | 系统外设（PLIC/CLINT/UART/Timer） |
