@@ -66,6 +66,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phase 1.1 Bundle definitions shipped in `073402c` (Bundles 6 types + 9/9 unit tests)
 - Phase 0 LSP false positives remain (cf/plugin namespace visibility); tracked, not blocking
 
+### Pending (下一阶段入口)
+
+> Phase 1.3 全部 6 子任务完成 (`26fe7d2`..`c8d1dd1`, 14/14 ctest PASS).
+> 以下三项可任意顺序启动, 详见 `docs/roadmap/roadmap-status.md` §3 (PA-6~PA-9).
+
+| 阶段 | 任务 | 入口 | 前置 |
+|------|------|------|------|
+| **Phase 1.3d-extras** | ch_stream 协议转换 + full JSON `instantiateAll` e2e | PA-6 | `c8d1dd1` (Adapter 已注册) + 起草 PA-8 决策草案 |
+| **Phase 1.4** | `cpptlm::CacheTLM` baseline 对比 (`soc/l1_cache_baseline.json`) | PA-7 | Phase 1.3 + 起草 PA-9 决策草案 (5 项候选决议) |
+| **Phase 2** | bare-metal 测试套件 (riscv-tests RV64GC + SpikeBridge) | (未立项 PA) | 建议 Phase 1.3d-extras 先完成 |
+
+**当前可立即工作的入口**:
+- 起草 `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-10.md` (PA-8, 参考 v2 格式 `8d80fd3`)
+- 起草 `.omo/drafts/decision-phase-1.4-baseline-2026-06-10.md` (PA-9, 5 项候选决议: E1 baseline 选型 / E2 trace 工具 / E3 共享 traffic_gen / E4 hit rate 容差 / E5 测试时长)
+
 ## [0.0.1] - 2026-06-10
 
 ### Added
