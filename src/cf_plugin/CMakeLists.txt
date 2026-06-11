@@ -42,6 +42,24 @@ target_compile_options(cf_plugin INTERFACE
   $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
 )
 
+# ----------------------------------------------------------------------------
+# 依赖路径(从父 CMakeLists.txt 传入的隔离构建 install 路径)
+# CppTLM/CppHDL 隔离构建到 build/_deps/install/,父级以变量形式暴露给本目录:
+#   CHIPFORGE_CPPTLM_LIBRARY          = <install>/lib/libcpptlm_core.a
+#   CHIPFORGE_CPPTLM_INCLUDE_DIRS     = <install>/include/cpp-tlm[;/external/json]
+#   CHIPFORGE_CPPHDL_LIBRARY          = <install>/lib/libcpphdl.a
+#   CHIPFORGE_CPPHDL_INCLUDE_DIRS     = <install>/include/cpp-hdl
+# 用 helper 函数统一附加给所有需要的 test target,避免重复 target_include_directories
+# ----------------------------------------------------------------------------
+function(cf_plugin_link_cpptlm tgt)
+  target_link_libraries(${tgt} PRIVATE ${CHIPFORGE_CPPTLM_LIBRARY})
+  target_include_directories(${tgt} PRIVATE ${CHIPFORGE_CPPTLM_INCLUDE_DIRS})
+endfunction()
+function(cf_plugin_link_cpphdl tgt)
+  target_link_libraries(${tgt} PRIVATE ${CHIPFORGE_CPPHDL_LIBRARY})
+  target_include_directories(${tgt} PRIVATE ${CHIPFORGE_CPPHDL_INCLUDE_DIRS})
+endfunction()
+
 # 可选: 覆盖率测量 (gcov)
 option(CF_PLUGIN_COVERAGE "Enable gcov coverage for cf_plugin tests" OFF)
 if(CF_PLUGIN_COVERAGE)
@@ -101,20 +119,13 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_hello_plugin.cpp)
 endif()
 
 # Phase 0 §2.3 集成标准: 与 CppTLM ChStreamModuleBase + CppHDL ch::Component 共存
+# CppTLM/CppHDL 通过父 CMakeLists.txt 隔离构建到 build/_deps/install/,
+# 路径与库文件以变量形式传入(避免 IMPORTED target 验证路径存在性的副作用)
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_coexistence.cpp)
   add_executable(test_coexistence tests/test_coexistence.cpp)
-  target_link_libraries(test_coexistence
-    PRIVATE
-      cf_plugin
-      cpptlm_core
-      cpphdl
-  )
-  target_include_directories(test_coexistence
-    PRIVATE
-      ${CMAKE_SOURCE_DIR}/CppTLM/include
-      ${CMAKE_SOURCE_DIR}/CppTLM/external/json
-      ${CMAKE_SOURCE_DIR}/CppHDL/include
-  )
+  target_link_libraries(test_coexistence PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_coexistence)
+  cf_plugin_link_cpphdl(test_coexistence)
   # CppHDL uses C++20 (std::source_location); CppTLM is C++17 compatible
   set_target_properties(test_coexistence PROPERTIES CXX_STANDARD 20)
   add_test(NAME test_coexistence COMMAND test_coexistence)
@@ -172,12 +183,12 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_bridge.cpp)
     ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
   )
-  target_link_libraries(test_l1_cache_bridge PRIVATE cf_plugin cpptlm_core)
+  target_link_libraries(test_l1_cache_bridge PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_l1_cache_bridge)
   target_include_directories(test_l1_cache_bridge
     PRIVATE
       ${CMAKE_SOURCE_DIR}
       ${CMAKE_SOURCE_DIR}/src  # for bridge/ subdir
-      ${CMAKE_SOURCE_DIR}/CppTLM/include  # for cpptlm::StreamAdapterBase
   )
   add_test(NAME test_l1_cache_bridge COMMAND test_l1_cache_bridge)
 endif()
@@ -189,11 +200,11 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_soc_l1_cache_minimal_json.cpp)
   add_executable(test_soc_l1_cache_minimal_json
     tests/test_soc_l1_cache_minimal_json.cpp
   )
-  target_link_libraries(test_soc_l1_cache_minimal_json PRIVATE cf_plugin cpptlm_core)
+  target_link_libraries(test_soc_l1_cache_minimal_json PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_soc_l1_cache_minimal_json)
   target_include_directories(test_soc_l1_cache_minimal_json
     PRIVATE
       ${CMAKE_SOURCE_DIR}
-      ${CMAKE_SOURCE_DIR}/CppTLM/external/json  # for nlohmann/json.hpp
   )
   add_test(NAME test_soc_l1_cache_minimal_json
     COMMAND test_soc_l1_cache_minimal_json
@@ -208,11 +219,11 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cache_params_schema_json.cpp)
   add_executable(test_cache_params_schema_json
     tests/test_cache_params_schema_json.cpp
   )
-  target_link_libraries(test_cache_params_schema_json PRIVATE cf_plugin cpptlm_core)
+  target_link_libraries(test_cache_params_schema_json PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_cache_params_schema_json)
   target_include_directories(test_cache_params_schema_json
     PRIVATE
       ${CMAKE_SOURCE_DIR}
-      ${CMAKE_SOURCE_DIR}/CppTLM/external/json
   )
   add_test(NAME test_cache_params_schema_json
     COMMAND test_cache_params_schema_json
@@ -230,13 +241,12 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_plugin_e2e.cpp)
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
   )
-  target_link_libraries(test_l1_cache_plugin_e2e PRIVATE cf_plugin cpptlm_core)
+  target_link_libraries(test_l1_cache_plugin_e2e PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_l1_cache_plugin_e2e)
   target_include_directories(test_l1_cache_plugin_e2e
     PRIVATE
       ${CMAKE_SOURCE_DIR}
       ${CMAKE_SOURCE_DIR}/src
-      ${CMAKE_SOURCE_DIR}/CppTLM/include
-      ${CMAKE_SOURCE_DIR}/CppTLM/external/json
   )
   add_test(NAME test_l1_cache_plugin_e2e
     COMMAND test_l1_cache_plugin_e2e

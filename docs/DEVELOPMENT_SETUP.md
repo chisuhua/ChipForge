@@ -47,17 +47,54 @@ ls -la CppTLM CppHDL
 # 应显示指向 ../CppTLM 和 ../CppHDL 的符号链接
 ```
 
-### 2.3 CMake 配置（规划）
-未来构建时，CMake 将自动通过符号链接找到 CppTLM/CppHDL：
+### 2.3 CMake 配置（隔离构建）
 
-```cmake
-# CMakeLists.txt（规划）
-set(CPPTLM_DIR ${CMAKE_SOURCE_DIR}/CppTLM)
-set(CPPHDL_DIR ${CMAKE_SOURCE_DIR}/CppHDL)
+ChipForge 集成了 CppTLM/CppHDL 但**不直接 add_subdirectory() 嵌入父项目**——改为通过 `ExternalProject_Add` 隔离构建到 `build/_deps/`，避免 CppTLM/CppHDL 内部 build 与 ChipForge 互相影响。
 
-add_subdirectory(${CPPTLM_DIR} cpptlm_build)
-add_subdirectory(${CPPHDL_DIR} cpphdl_build)
+默认 configure + build 流程：
+
+```bash
+# 标准流程（首次会 build CppTLM/CppHDL,后续自动跳过）
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j$(nproc)
+# 产物路径: build/_deps/install/{lib,include}
 ```
+
+**显式重 build 依赖**（修改 CppTLM/CppHDL 源码后需要重新 install）：
+
+```bash
+cmake -S . -B build -DCHIPFORGE_REBUILD_DEPS=ON
+cmake --build build -j$(nproc)
+```
+
+**调试 CppTLM/CppHDL 源码时**（不走 install,直接 add_subdirectory 嵌入）：
+
+```bash
+cmake -S . -B build -DCHIPFORGE_SOURCE_DEPS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j$(nproc)
+# 此时 CppTLM/CppHDL 任何源码改动都会触发 ChipForge 重 build
+```
+
+**隔离机制说明**：
+
+| 模式 | flag | 适用场景 | CppTLM/CppHDL 源码改动行为 |
+|------|------|---------|--------------------------|
+| **默认（ExternalProject）** | 无 | 日常 ChipForge 开发 | 不触发 ChipForge 重 build,需显式 `-DCHIPFORGE_REBUILD_DEPS=ON` |
+| **强制重 build** | `-DCHIPFORGE_REBUILD_DEPS=ON` | CppTLM/CppHDL 升级或新 commit 拉取后 | 触发 `cmake --build build/_deps/*-build --target install` |
+| **源码调试** | `-DCHIPFORGE_SOURCE_DEPS=ON` | 在 CppTLM/CppHDL 源码里加断点 / 改 API | 每次 ChipForge build 都重 build CppTLM/CppHDL,等同原 add_subdirectory 行为 |
+
+**完全重置 deps**（如 CppTLM/CppHDL 升级后想从零开始）：
+
+```bash
+rm -rf build/_deps/install build/_deps/{cpptlm,cpphdl}-build
+cmake -S . -B build  # 触发首次 build
+```
+
+**注意**:
+
+- `rm -rf build` 会清掉 deps install 树(它在 build 内部),触发首次 build 重 build CppTLM/CppHDL——这是预期行为。
+- CppHDL vendored 副本在 `/workspace/project/CppHDL/CMakeLists.txt` 增加了 install 规则(`install(DIRECTORY include/) FILES_MATCHING *.h *.hpp *.tpp` + `install(TARGETS cpphdl bitvector ch_includes)`)和 inipp 头文件 install。
+- CppTLM vendored 副本在 `/workspace/project/CppTLM/CMakeLists.txt` 增加了 `install(DIRECTORY external/json/ ...)` 规则以装出 nlohmann/json.hpp。
 
 ## 3. 日常开发流程
 

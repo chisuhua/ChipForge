@@ -53,36 +53,158 @@ endif()
 # ════════════════════════════════════════════════════════════════════
 
 # ════════════════════════════════════════════════════════════════════
-# 子模块集成
+# 子模块集成 — 隔离构建 (ExternalProject + install)
 # ════════════════════════════════════════════════════════════════════
-
-# ─── CppTLM v2.1.0: TLM 框架 ✅ 已集成 ───
-# 关闭 tests/examples/docs/RTL-bridge 以减少构建时间
-# USE_SYSTEMC_STUB=ON 是默认(TLM stub,不依赖外部 SystemC)
-set(BUILD_TESTS       OFF CACHE BOOL "CppTLM tests"        FORCE)
-set(BUILD_EXAMPLES    OFF CACHE BOOL "CppTLM examples"     FORCE)
-set(BUILD_DOCS        OFF CACHE BOOL "CppTLM docs"         FORCE)
-set(BUILD_RTL         OFF CACHE BOOL "CppTLM RTL bridge"   FORCE)
-set(USE_SYSTEMC_STUB  ON  CACHE BOOL "CppTLM SystemC stub" FORCE)
-add_subdirectory(${CMAKE_SOURCE_DIR}/CppTLM cpptlm_build)
-
-# ─── CppHDL v1.0.0: HDL 框架 ✅ 已集成 ───
-# 阻塞已解除: CppHDL/tests/CMakeLists.txt 改用 ${PROJECT_SOURCE_DIR}/examples/...
-#   (commit 7fe4a5d "fix path", 2026-06-08 之前修复)
-# 关闭 JIT 避免 LLVM 依赖; Phase 0 Plugin 脚手架是纯 C++17, 不直接用 ch::Component
-#   但集成以便 Phase 5 (RTL 协同) 时零修改切换。
+# CppTLM / CppHDL 都在并行开发,且与 ChipForge 是兄弟仓库(通过 symlink 接入)。
+# 早期方案是 add_subdirectory() 直接嵌入父项目 — 这导致每次 `cmake --build build`
+# 都会递归遍历 CppTLM/CppHDL 源码,如果开发者在 CppTLM 切到不兼容分支就会污染
+# ChipForge build,而且 CppTLM/CppHDL 的 build 输出与 ChipForge 混在同一棵
+# ctest 树里,无法独立运行。
 #
-# CHIPFORGE_TEST_SCOPE: phase-0..1.4
-#   CppHDL 子项目的 tests/ (109 Catch2 + 6 perf) 与 examples/spinalhdl-ported/
-#   (16 端口示例) 默认无条件 add_subdirectory,会污染 ChipForge 自身的 ctest
-#   列表(从 ~20 膨胀到 155)。通过 CppHDL 根 CMakeLists.txt 中新增的
-#   CPPHDL_BUILD_TESTS / CPPHDL_BUILD_EXAMPLES 两个 option() 门控,让 ChipForge
-#   集成时显式关闭 CppHDL 的 ctest/示例子树(保留 cpphdl 库本身)。Phase 5
-#   (RTL 协同) 真正开始 HDL 端到端验证时,把这俩开关切回 ON,无需改其他文件。
-set(CPPHDL_BUILD_TESTS    OFF CACHE BOOL "ChipForge: build CppHDL tests subtree"    FORCE)
-set(CPPHDL_BUILD_EXAMPLES OFF CACHE BOOL "ChipForge: build CppHDL examples subtree" FORCE)
-set(CH_JIT_ENABLE     OFF CACHE BOOL "CppHDL JIT (requires LLVM)" FORCE)
-add_subdirectory(${CMAKE_SOURCE_DIR}/CppHDL cpphdl_build)
+# 新方案:用 ExternalProject_Add 把 CppTLM/CppHDL 隔离到 build/_deps/ 子目录,
+# 首次 configure 时 build + install 到 build/_deps/install/,之后默认跳过
+# 重 build(检测到 .deps-built marker),仅消费 install/ 下的 lib + headers。
+# 主动重 build 方式:cmake -DCHIPFORGE_REBUILD_DEPS=ON -B build
+#
+# 优势:
+#   - CppTLM/CppHDL 源码变动不触发 ChipForge 重 build(除非显式 -D flag)
+#   - CppTLM/CppHDL 自身的 tests/examples 完全脱离 ChipForge ctest 树
+#   - CppTLM/CppHDL install/ 产物可被其他下游项目(Phase 5+ RISC-V SoC)共享
+#
+# 限制:
+#   - 首次 build 比 add_subdirectory 慢(多一次 cmake configure + 链接)
+#   - 调试 CppTLM/CppHDL 时需要 source 模式,见下方 SOURCE_DEPS 选项
+
+option(CHIPFORGE_REBUILD_DEPS "Force rebuild + reinstall CppTLM/CppHDL deps (default: skip if installed)" OFF)
+option(CHIPFORGE_SOURCE_DEPS   "Use add_subdirectory() for CppTLM/CppHDL (debugging; bypasses install isolation)" OFF)
+
+set(_deps_install_dir "${CMAKE_BINARY_DIR}/_deps/install")
+# 用 install 目录的 lib 文件作为"已完成"marker — 比自建 .deps-built 文件更可靠
+# (文件存在 = install 成功,无需维护额外状态)
+set(_deps_cpptlm_lib "${_deps_install_dir}/lib/libcpptlm_core.a")
+set(_deps_cpphdl_lib "${_deps_install_dir}/lib/libcpphdl.a")
+set(_deps_cpptlm_src "${CMAKE_SOURCE_DIR}/CppTLM")
+set(_deps_cpphdl_src "${CMAKE_SOURCE_DIR}/CppHDL")
+set(_deps_cpptlm_bld "${CMAKE_BINARY_DIR}/_deps/cpptlm-build")
+set(_deps_cpphdl_bld "${CMAKE_BINARY_DIR}/_deps/cpphdl-build")
+
+# ─── 源码调试模式:绕过 ExternalProject,直接 add_subdirectory ───
+# 仅在显式 -DCHIPFORGE_SOURCE_DEPS=ON 时生效(开发 CppTLM/CppHDL 源码时)
+if(CHIPFORGE_SOURCE_DEPS)
+    message(STATUS "[ChipForge] SOURCE_DEPS=ON: using add_subdirectory() for CppTLM/CppHDL")
+    # CppTLM
+    set(BUILD_TESTS       OFF CACHE BOOL "CppTLM tests"        FORCE)
+    set(BUILD_EXAMPLES    OFF CACHE BOOL "CppTLM examples"     FORCE)
+    set(BUILD_DOCS        OFF CACHE BOOL "CppTLM docs"         FORCE)
+    set(BUILD_RTL         OFF CACHE BOOL "CppTLM RTL bridge"   FORCE)
+    set(USE_SYSTEMC_STUB  ON  CACHE BOOL "CppTLM SystemC stub" FORCE)
+    add_subdirectory(${_deps_cpptlm_src} cpptlm_build)
+    # CppHDL
+    set(CPPHDL_BUILD_TESTS    OFF CACHE BOOL "ChipForge: build CppHDL tests subtree"    FORCE)
+    set(CPPHDL_BUILD_EXAMPLES OFF CACHE BOOL "ChipForge: build CppHDL examples subtree" FORCE)
+    set(CH_JIT_ENABLE     OFF CACHE BOOL "CppHDL JIT (requires LLVM)" FORCE)
+    add_subdirectory(${_deps_cpphdl_src} cpphdl_build)
+else()
+    # ─── 默认:ExternalProject 隔离模式 ───
+    # 1) 决定是否需要触发 ExternalProject build
+    #    触发条件:任一 lib 不存在 OR CHIPFORGE_REBUILD_DEPS=ON
+    set(_rebuild_deps FALSE)
+    if(CHIPFORGE_REBUILD_DEPS)
+        set(_rebuild_deps TRUE)
+        message(STATUS "[ChipForge] CHIPFORGE_REBUILD_DEPS=ON: forcing CppTLM/CppHDL rebuild")
+    elseif(NOT EXISTS "${_deps_cpptlm_lib}" OR NOT EXISTS "${_deps_cpphdl_lib}")
+        set(_rebuild_deps TRUE)
+        message(STATUS "[ChipForge] CppTLM/CppHDL install incomplete, will build on first run")
+    else()
+        message(STATUS "[ChipForge] Using cached CppTLM/CppHDL install at ${_deps_install_dir}")
+        message(STATUS "[ChipForge] Pass -DCHIPFORGE_REBUILD_DEPS=ON to force rebuild")
+    endif()
+
+    include(ExternalProject)
+
+    # 2) CppTLM 隔离构建 (产物:libcpptlm_core.a + include/cpp-tlm/)
+    ExternalProject_Add(cpptlm_external
+        SOURCE_DIR       "${_deps_cpptlm_src}"
+        BINARY_DIR       "${_deps_cpptlm_bld}"
+        INSTALL_DIR      "${_deps_install_dir}"
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            -DBUILD_TESTS=OFF
+            -DBUILD_EXAMPLES=OFF
+            -DBUILD_DOCS=OFF
+            -DBUILD_RTL=OFF
+            -DUSE_SYSTEMC_STUB=ON
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        BUILD_ALWAYS      FALSE
+        BUILD_BYPRODUCTS  "${_deps_install_dir}/lib/libcpptlm_core.a"
+        STEP_TARGETS      build install
+    )
+
+    # 3) CppHDL 隔离构建 (产物:libcpphdl.a + include/cpp-hdl/)
+    ExternalProject_Add(cpphdl_external
+        SOURCE_DIR       "${_deps_cpphdl_src}"
+        BINARY_DIR       "${_deps_cpphdl_bld}"
+        INSTALL_DIR      "${_deps_install_dir}"
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            -DCPPHDL_BUILD_TESTS=OFF
+            -DCPPHDL_BUILD_EXAMPLES=OFF
+            -DCH_JIT_ENABLE=OFF
+            -DBUILD_VERILATOR=OFF
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        BUILD_ALWAYS      FALSE
+        BUILD_BYPRODUCTS  "${_deps_install_dir}/lib/libcpphdl.a"
+        STEP_TARGETS      build install
+    )
+
+    # 暴露给 cf_plugin 消费的路径变量(不用 IMPORTED target,因为它会立即验证
+    # 路径存在性 — 首次 configure 时 _deps/install/ 还不存在,会让 configure 失败)
+    # 注意: CppTLM/CppHDL 头文件内部用 #include "xxx.h" 风格(无子目录前缀),
+    # 必须在每个子目录(include/cpp-tlm/core, include/cpp-hdl/core 等)分别
+    # 加到 include 路径,否则嵌套 #include 找不到兄弟头文件
+    set(CHIPFORGE_CPPTLM_INCLUDE_DIRS
+        "${_deps_install_dir}/include/cpp-tlm"
+        "${_deps_install_dir}/include/cpp-tlm/core"
+        "${_deps_install_dir}/include/cpp-tlm/bundles"
+        "${_deps_install_dir}/include/cpp-tlm/tlm"
+        "${_deps_install_dir}/include/cpp-tlm/external/json"
+        "${_deps_install_dir}/include/cpp-tlm/external"
+    )
+    set(CHIPFORGE_CPPTLM_LIBRARY "${_deps_install_dir}/lib/libcpptlm_core.a")
+    set(CHIPFORGE_CPPHDL_INCLUDE_DIRS
+        "${_deps_install_dir}/include/cpp-hdl"
+        "${_deps_install_dir}/include/cpp-hdl/core"
+        "${_deps_install_dir}/include/cpp-hdl/ast"
+        "${_deps_install_dir}/include/cpp-hdl/bundle"
+        "${_deps_install_dir}/include/cpp-hdl/axi4"
+        "${_deps_install_dir}/include/cpp-hdl/utils"
+        "${_deps_install_dir}/include/cpp-hdl/bv"
+        "${_deps_install_dir}/include/cpp-hdl/cpu"
+        "${_deps_install_dir}/include/cpp-hdl/chlib"
+        "${_deps_install_dir}/include/cpp-hdl/lnode"
+    )
+    set(CHIPFORGE_CPPHDL_LIBRARY "${_deps_install_dir}/lib/libcpphdl.a")
+
+    # 4) 控制实际 build 时机
+    #    _rebuild_deps=TRUE → 加 add_dependencies 让 `cmake --build build` 时
+    #                          真正构建 CppTLM/CppHDL
+    #    _rebuild_deps=FALSE → 跳过(默认,让 ChipForge 自身 target 构建即可)
+    if(_rebuild_deps)
+        # 当 CHIPFORGE_REBUILD_DEPS=ON 或首次 build,强制把 ExternalProject 的
+        # build/install 阶段加入 all target
+        ExternalProject_Add_StepTargets(cpptlm_external build install)
+        ExternalProject_Add_StepTargets(cpphdl_external build install)
+    else()
+        # 已 install,创建空目标,占位让 add_dependencies 通过
+        if(NOT TARGET chipforge_deps_skip)
+            add_custom_target(chipforge_deps_skip ALL
+                COMMAND ${CMAKE_COMMAND} -E echo "CppTLM/CppHDL install cached at ${_deps_install_dir}, skipping rebuild. Pass -DCHIPFORGE_REBUILD_DEPS=ON to override."
+            )
+        endif()
+    endif()
+endif()
 
 # ════════════════════════════════════════════════════════════════════
 # ChipForge 自身目标 (按 Phase 顺序逐步添加)
@@ -123,8 +245,17 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 message(STATUS "")
 message(STATUS "ChipForge ${PROJECT_VERSION} Configuration")
 message(STATUS "  C++ Standard:    C++${CMAKE_CXX_STANDARD}")
-message(STATUS "  CppTLM:          v2.1.0  (tests/examples/docs/rtl-bridge off)")
-message(STATUS "  CppHDL:          v1.0.0  (JIT off; examples/tests off by default)")
+if(CHIPFORGE_SOURCE_DEPS)
+    message(STATUS "  CppTLM:          v2.1.0  (SOURCE_DEPS=ON; add_subdirectory)")
+    message(STATUS "  CppHDL:          v1.0.0  (SOURCE_DEPS=ON; add_subdirectory)")
+elseif(_rebuild_deps)
+    message(STATUS "  CppTLM:          v2.1.0  (ExternalProject: building + installing)")
+    message(STATUS "  CppHDL:          v1.0.0  (ExternalProject: building + installing)")
+else()
+    message(STATUS "  CppTLM:          v2.1.0  (ExternalProject: cached, no rebuild)")
+    message(STATUS "  CppHDL:          v1.0.0  (ExternalProject: cached, no rebuild)")
+endif()
+message(STATUS "  Install prefix:  ${_deps_install_dir}")
 message(STATUS "  ccache:          ${CCACHE_PROGRAM}")
 message(STATUS "  ASan:            ${ENABLE_ASAN}")
 message(STATUS "  Build type:      ${CMAKE_BUILD_TYPE}")
