@@ -70,7 +70,17 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/CppTLM cpptlm_build)
 # 阻塞已解除: CppHDL/tests/CMakeLists.txt 改用 ${PROJECT_SOURCE_DIR}/examples/...
 #   (commit 7fe4a5d "fix path", 2026-06-08 之前修复)
 # 关闭 JIT 避免 LLVM 依赖; Phase 0 Plugin 脚手架是纯 C++17, 不直接用 ch::Component
-#   但集成以便 Phase 5 (RTL 协同) 时零修改切换
+#   但集成以便 Phase 5 (RTL 协同) 时零修改切换。
+#
+# CHIPFORGE_TEST_SCOPE: phase-0..1.4
+#   CppHDL 子项目的 tests/ (109 Catch2 + 6 perf) 与 examples/spinalhdl-ported/
+#   (16 端口示例) 默认无条件 add_subdirectory,会污染 ChipForge 自身的 ctest
+#   列表(从 ~20 膨胀到 155)。通过 CppHDL 根 CMakeLists.txt 中新增的
+#   CPPHDL_BUILD_TESTS / CPPHDL_BUILD_EXAMPLES 两个 option() 门控,让 ChipForge
+#   集成时显式关闭 CppHDL 的 ctest/示例子树(保留 cpphdl 库本身)。Phase 5
+#   (RTL 协同) 真正开始 HDL 端到端验证时,把这俩开关切回 ON,无需改其他文件。
+set(CPPHDL_BUILD_TESTS    OFF CACHE BOOL "ChipForge: build CppHDL tests subtree"    FORCE)
+set(CPPHDL_BUILD_EXAMPLES OFF CACHE BOOL "ChipForge: build CppHDL examples subtree" FORCE)
 set(CH_JIT_ENABLE     OFF CACHE BOOL "CppHDL JIT (requires LLVM)" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/CppHDL cpphdl_build)
 

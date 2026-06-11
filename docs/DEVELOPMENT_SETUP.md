@@ -105,6 +105,48 @@ git add .gitmodules CppTLM CppHDL .gitignore
 git commit -m "chore: migrate from symlinks to submodules"
 ```
 
+## 4.5 CppHDL 集成边界（Phase 0–1.4 vs Phase 5）
+
+ChipForge 集成了 CppHDL 作为底层 HDL 框架，但**只消费其库与头文件**，不需要把 CppHDL 自身的回归测试（109 Catch2 + 6 perf）和示例程序（16 个 `spinalhdl-ported/*` 等）作为 ChipForge ctest 列表的一部分。
+
+### 默认行为（Phase 0–1.4）
+
+根 `CMakeLists.txt` 通过两个 cache 变量在 `add_subdirectory(CppHDL)` **之前**强制覆盖默认值：
+
+```cmake
+set(CPPHDL_BUILD_TESTS    OFF CACHE BOOL "ChipForge: build CppHDL tests subtree"    FORCE)
+set(CPPHDL_BUILD_EXAMPLES OFF CACHE BOOL "ChipForge: build CppHDL examples subtree" FORCE)
+```
+
+CppHDL 根 `CMakeLists.txt` 在顶层增加了一对 `option(CPPHDL_BUILD_TESTS ...)` / `option(CPPHDL_BUILD_EXAMPLES ...)` 门控（默认 `ON`，保持上游独立 build 时的行为），当父项目传 `=OFF` 时跳过 `add_subdirectory(samples)` / `add_subdirectory(examples/...)` / `add_subdirectory(tests)`。
+
+验证：
+
+```bash
+$ ctest -N | grep "Total Tests"
+Total Tests: 15     # 全部为 ChipForge 自身测试;无 test_forwarding/test_hazard/perf_*
+```
+
+### Phase 5 RTL 协同启用方式
+
+当 Phase 5（RTL 协同仿真）真正需要跑 HDL 端到端测试时，**不要**直接在默认 build 中打开开关污染 ctest 列表。推荐另起一个独立 build 目录：
+
+```bash
+# 默认 ChipForge build (Phase 0-1.4 范围,~15 个测试)
+cmake -S . -B build
+
+# CppHDL 全量测试 (Phase 5 / HDL 端到端)
+cmake -S . -B build-cpphdl -DCPPHDL_BUILD_TESTS=ON -DCPPHDL_BUILD_EXAMPLES=ON -DBUILD_VERILATOR=OFF
+cmake --build build-cpphdl -j$(nproc)
+ctest --test-dir build-cpphdl -L base --output-on-failure
+```
+
+### 注意事项
+
+- 这两个开关是 **add_subdirectory 范围门控**，不影响 `cpphdl` 库本身的构建。
+- 切回 `ON` 时确认系统已装 `flex`（BUILD_VERILATOR 路径需要）或显式 `-DBUILD_VERILATOR=OFF`。
+- 修改 `CppHDL/CMakeLists.txt` 是 vendored 副本修改，请避免与上游 CppHDL 同步时产生冲突注释。
+
 ## 5. 故障排查
 
 | 问题 | 原因 | 解决方案 |
