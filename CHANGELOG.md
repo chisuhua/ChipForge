@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 1.3d-extras: ch_stream adapter 注册 + full JSON instantiateAll e2e
+  - `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (Phase 1.3d-extras 增补)
+    - 静态注册 `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, ::bundles::CacheReqBundle, ::bundles::CacheRespBundle>("L1CacheTLMBridgeAdapter")`
+    - 暴露 `req_in()` / `resp_out()` ch_stream 访问器 (cpptlm::StreamAdapter<ModuleT,...> 期望接口)
+    - 4 字段窄桥 (DECISION-2026-06-13-01 F1.A, D1=C 不变): `addr/data/is_write/id` ↔ `cf::bundles::CacheReq` POD;
+      `op/burst_len/parent_id/fragment_*` 走 CppTLM default 值 (0/false/1, R6 风险 Phase 2+ 评估)
+  - `soc/l1_cache_adapter_e2e.json` (新建, full JSON instantiateAll spec, `L1CacheTLMBridgeAdapter` 类型)
+  - `src/cf_plugin/tests/test_l1_cache_json_instantiate.cpp` (新建, 5 子测试):
+    instantiateAll / 3 模块 getInstance / startAllTicks / 100 cycle 推进 / Bridge pb_run 验证
+  - 14/14 → 16/16 ChipForge ctest PASS in 4.91s
+  - **PA-6 闭环**: Phase 1.3 全部子任务完成 (1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f)
+  - 下一里程碑: PA-7 cpptlm::CacheTLM baseline 对比 (2-3 天)
 - Phase 1.3d: `L1CacheTLMBridgeAdapter` (cpptlm ModuleFactory 兼容适配层)
   - `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (继承 ChStreamModuleBase)
   - 解决 v2 §4 决策: Bridge 构造签名 (unique_ptr<L1CachePlugin>) 与

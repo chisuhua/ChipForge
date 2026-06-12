@@ -125,7 +125,7 @@
 | ADR-034 | ScoreBoard 三种变体 | 验证 | 🚧 |
 | ADR-035 | CompareDriver TLM↔RTL 驱动 | 验证 | 🚧 |
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
-| ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部） |
+| ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部; Phase 1.3d-extras L1Cache Adapter 已注册, 通用模板 Phase 5 实施） |
 | ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
 | ADR-040 | TLM→HDL 移植性约束 | 移植 | 🚧（`array_store` 已实现，迁移手册待 Phase 5 验证；2026-06-12 从 §2.1 移除, 实质仍为 Phase 1 提案） |
 
@@ -336,6 +336,19 @@ ls /workspace/project/CppTLM/include/rtl/  # 应仅含 hybrid_cache_wrapper.hh
 ```
 
 **代码锚点（当前）**：`CppTLM/include/rtl/hybrid_cache_wrapper.hh`
+
+##### 实施更新 (2026-06-13 增补, DECISION-2026-06-13-01 F1.A+F2+F3)
+
+Phase 1.3d-extras 落地 L1CacheTLMBridgeAdapter ch_stream 注册:
+
+- `ChStreamAdapterFactory::get().registerAdapter<L1CacheTLMBridgeAdapter, ::bundles::CacheReqBundle, ::bundles::CacheRespBundle>("L1CacheTLMBridgeAdapter")`
+  (静态全局, `src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp` 加载时自动执行)
+- Adapter 内部 4 字段窄桥 (F1.A, D1=C 不变): `addr/data/is_write/id` ↔ `cf::bundles::CacheReq` POD,
+  `op/burst_len/parent_id/fragment_*` 走 CppTLM default 值 (0/false/1, R6 风险, Phase 2+ 评估)
+- full JSON `instantiateAll` e2e (F3): `test_l1_cache_json_instantiate` 5 子测试通过, 16/16 ctest PASS
+
+**范围限制**: 仅 L1Cache 拓扑; 跨 TLM↔RTL 通用 StreamAdapter 模板 (`framework/tlm_rtl_bridge.hh`) 仍 Phase 5 实施,
+`verify_adr.sh --only=ADR-007` 仍 EXPECTED_MISSING (符合预期).
 
 ---
 

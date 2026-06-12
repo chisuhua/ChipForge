@@ -1,7 +1,7 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-10 (本次会话八: Phase 1.3 全部子任务完成 + 归档指引更新)
-> **当前可启动**: ① Phase 1.3d-extras (ch_stream adapter + full JSON e2e) ② Phase 1.4 (cpptlm::CacheTLM baseline 对比) ③ Phase 2 (bare-metal 测试套件)
+> **最后更新**: 2026-06-13 (本次会话九: Phase 1.3d-extras 落地, PA-6 + PA-8 闭环, 16/16 ctest PASS)
+> **当前可启动**: ① Phase 1.4 (cpptlm::CacheTLM baseline 对比, PA-7+PA-9) ② Phase 2 (bare-metal 测试套件) ③ PA-2 ~ PA-5 (Phase 1.3 已完成, 启动门槛已就绪)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
@@ -84,13 +84,26 @@
     - 5 个 e2e 测试 (ModuleFactory 发现 / Adapter 构造 / Bridge 持有 / Adapter::tick / 1000+ tx)
     - 14/14 ChipForge ctest PASS in 5.28s
     - Phase 1.3d-extras 推迟: ch_stream adapter 注册 + full JSON instantiateAll
+  - 1.3d-extras (2026-06-13, 本次 commit):
+    - `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, ::bundles::CacheReqBundle, ::bundles::CacheRespBundle>` 静态注册
+    - Adapter 内部 4 字段窄桥 (F1.A, D1=C 不变): `addr/data/is_write/id` ↔ `cf::bundles::CacheReq` POD
+    - `soc/l1_cache_adapter_e2e.json` (full JSON instantiateAll spec)
+    - `test_l1_cache_json_instantiate.cpp` (5 子测试): instantiateAll / 3 模块 getInstance / startAllTicks / 100 cycle / Bridge pb_run
+    - 16/16 ChipForge ctest PASS in 4.91s
+    - ADR-007 §2.3 L131 + §3 末尾 "实施更新 (2026-06-13)" 增补
 - **Phase 1.3 v2 决策** (`8d80fd3` DECISION-2026-06-10-02 v2):
   - D1=C: Phase 1.3 保持 `cf::bundles::*` POD 不动, Bridge 做 4 字段窄桥 (addr/data/is_write/id)
   - D1'=末尾: Bridge `tick()` 末尾调用 `plugin_->pb.run()` (回答 `declarative-hybrid-framework.md:443-447` §4.8 开放问题 1)
   - D1''=不实现: BundleMapper 推迟 Phase 5/6, 加 `verify_adr.sh` drift 防护
   - D2=B: Bridge 在 `src/cf_plugin/bridge/`, 不在 `ip/`
   - D3=A: 仅 1.3 最小 e2e; 1.4 baseline 留到下次 session
-- **下一步**: Phase 1.3 全部子任务完成 (1.3a/1.3b/1.3c/1.3d/1.3e/1.3f). Phase 1.3d-extras (ch_stream adapter + full JSON instantiateAll) 推迟到 Phase 2+; Phase 1.4 (cpptlm::CacheTLM baseline 对比) 启动
+- **Phase 1.3d-extras 决策** (`decision-phase-1.3d-extras-bridge-2026-06-13.md` DECISION-2026-06-13-01, F1-F5, 2026-06-13):
+  - F1.A: ch_stream 转换走 Bridge 内部 4 字段↔POD 路径 (不在 Bundle 上重载)
+  - F2: ChStreamAdapterFactory 静态注册 (Adapter .cpp 加载时自动执行)
+  - F3: test_l1_cache_json_instantiate 5 子测试 (拓扑连通 + 协议转换路径打通)
+  - F4: ADR-007 §2.3 + §3 末尾 "实施更新" 增补 (R6 风险保留, 通用桥接 Phase 5 实施)
+  - F5: E1-E5 退出标准 (16/16 ctest + 100 cycle 推进 + Bridge pb_run 验证)
+- **下一步**: **Phase 1.3 全部子任务完成 (1.3a/1.3b/1.3c/1.3d/1.3d-extras/1.3e/1.3f, 7/7 ✅)**. 启动 Phase 1.4 (PA-7 cpptlm::CacheTLM baseline 对比 + PA-9 baseline 决策草案).
 
 **关键约束**(D4 强制): 业务代码无 `tick()`、Bundle 字段用 `uint_t<N>`、所有阶段用 `at_stage()`
 
@@ -152,9 +165,9 @@
 
 | ID | 类型 | 项目 | 前置条件 | 状态 | 优先级 |
 |----|------|------|---------|------|-------|
-| **PA-6** | 实施 | **Phase 1.3d-extras**: ch_stream 协议转换 + full JSON `instantiateAll` e2e | Bridge 已在 `c8d1dd1` 落地; Adapter 已注册 ModuleFactory; **缺**: `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, bundles::CacheReqBundle, bundles::CacheRespBundle>` | ⏳ Not Started | P1 |
-| **PA-7** | 实施 | **Phase 1.4**: `cpptlm::CacheTLM` baseline 对比 (`soc/l1_cache_baseline.json`) | Phase 1.3 完成 (`26fe7d2`..`c8d1dd1`); 详见 `docs/roadmap/phases/phase-1-tlm-foundation.md §1.4` | ⏳ Not Started | P2 |
-| **PA-8** | 文档 | **Phase 1.3d-extras 决策草案** (`decision-phase-1.3d-extras-bridge-2026-06-10.md` 草案) | 参照 v2 决策草案格式 (`8d80fd3`) | ⏳ Not Started | P2 |
+| **PA-6** | 实施 | **Phase 1.3d-extras**: ch_stream 协议转换 + full JSON `instantiateAll` e2e | ✅ **Completed (2026-06-13)**: 静态注册 `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, ::bundles::CacheReqBundle, ::bundles::CacheRespBundle>` + Adapter 内部 4 字段窄桥 (F1.A) + `test_l1_cache_json_instantiate` 5/5 子测试 PASS + 16/16 ctest | ✅ Done | ~~P1~~ |
+| **PA-7** | 实施 | **Phase 1.4**: `cpptlm::CacheTLM` baseline 对比 (`soc/l1_cache_baseline.json`) | Phase 1.3d-extras 完成 (本次 commit, 2026-06-13); 详见 `docs/roadmap/phases/phase-1-tlm-foundation.md §1.4` | ⏳ Not Started | P1 (升级) |
+| **PA-8** | 文档 | **Phase 1.3d-extras 决策草案** (`decision-phase-1.3d-extras-bridge-2026-06-13.md` 草案) | ✅ **Completed (2026-06-13)**: `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md` (PA-6+PA-8 合并), F1-F5 决议, 状态改 Proposed v1 | ✅ Done | ~~P2~~ |
 | **PA-9** | 文档 | **Phase 1.4 baseline 决策草案** (`decision-phase-1.4-baseline-2026-06-10.md` 草案) | 5 项候选决议: E1 baseline 选型 (cpptlm::CacheTLM vs HybridCacheWrapper); E2 trace 对比工具 (手写 vs gem5 m5out); E3 共享 traffic_gen 输入; E4 hit rate 容差 (±5%); E5 测试时长 (1k vs 10k tx) | ⏳ Not Started | P2 |
 
 ---
@@ -167,7 +180,7 @@
 | R2 | 脚手架工时低估(可能 4 周 vs 计划 2-3 周) | Phase 0 | 每周评估;必要时拆为 Phase 0a/0b | ✅ Phase 0 完成, 实际 1 session |
 | R3 | CppHDL 集成阻塞(tests/CMakeLists.txt:38 路径 bug) | Phase 5+ | Phase 0-2 暂不需 CppHDL;Phase 5+ 再评估或用独立构建 | 已识别 + 缓解 |
 | R4 | 命名冲突(halt_when vs stream_halt_when 等 4 项) | Phase 0 | 决策文档 §3.5 已识别 D6-D9 方案 | ✅ ADR-033 Accepted (2026-06-09) |
-| **R6** | **Phase 1.3d-extras ch_stream 协议转换设计不确定**: 4 字段窄桥 (D1=C) 仅覆盖 addr/data/is_write/id;burst_len/parent_id/fragment_* 走 default | Phase 1.3d-extras / Phase 2 | PA-6 实施时同步起草 `decision-phase-1.3d-extras-bridge` 草案 (PA-8); 如发现 default 字段不够, 升级到 BundleMapper (canonical Phase 5/6) | ⏳ 待启动 |
+| **R6** | **Phase 1.3d-extras ch_stream 协议转换设计不确定**: 4 字段窄桥 (D1=C) 仅覆盖 addr/data/is_write/id;burst_len/parent_id/fragment_* 走 default | Phase 1.3d-extras / Phase 2 | ✅ **已闭环 (2026-06-13)**: `decision-phase-1.3d-extras-bridge-2026-06-13.md` F1.A (4 字段窄桥路径), PA-6 实施 + PA-8 草案同步完成. R6 仍跟踪: Phase 2 多拍/分片场景需重新评估, 升级路径明确为 BundleMapper (Phase 5/6) | ⏳ 监控中 (Phase 2+ 触发) |
 | **R7** | **Phase 1.4 baseline 选型不确定**: `cpptlm::CacheTLM` vs `cpptlm::HybridCacheWrapper` vs 手写 reference | Phase 1.4 | PA-9 决策草案 5 项候选决议; 优先用 `cpptlm::CacheTLM` (成熟, 已注册) | ⏳ 待启动 |
 
 ---

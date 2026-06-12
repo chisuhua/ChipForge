@@ -1,0 +1,42 @@
+{
+  "name": "L1CacheAdapterE2ESoC",
+  "description": "Phase 1.3d-extras full e2e SoC topology — traffic_gen -> L1CacheTLMBridgeAdapter (ch_stream) -> MemoryTLM. Validates registerAdapter + instantiateAll path. See .omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md F3.",
+  "impl_mode": "TLM_ONLY",
+  "modules": [
+    {
+      "name": "tg",
+      "type": "TrafficGenTLM",
+      "params": {
+        "pattern": "SEQUENTIAL",
+        "start_addr": "0x1000",
+        "end_addr": "0x2000",
+        "num_requests": 1000
+      }
+    },
+    {
+      "name": "l1",
+      "type": "L1CacheTLMBridgeAdapter",
+      "params": {}
+    },
+    {
+      "name": "mem",
+      "type": "MemoryTLM",
+      "params": {
+        "size_bytes": "1MB",
+        "latency_cycles": 50
+      }
+    }
+  ],
+  "connections": [
+    {
+      "src": "tg",
+      "dst": "l1",
+      "latency": 1
+    },
+    {
+      "src": "l1",
+      "dst": "mem",
+      "latency": 100
+    }
+  ]
+}

@@ -254,6 +254,30 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_plugin_e2e.cpp)
   )
 endif()
 
+# Phase 1.3d-extras: full JSON instantiateAll e2e (DECISION-2026-06-13-01 F3)
+# 验证 ChStreamAdapterFactory::registerAdapter<...>("L1CacheTLMBridgeAdapter") 静态注册
+# + soc/l1_cache_adapter_e2e.json → ModuleFactory::instantiateAll → 3 模块拓扑连通
+# 依赖: soc/l1_cache_adapter_e2e.json + L1CachePlugin + L1CacheTLMBridge + Adapter + chstream_register.hh
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_json_instantiate.cpp)
+  add_executable(test_l1_cache_json_instantiate
+    tests/test_l1_cache_json_instantiate.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
+  )
+  target_link_libraries(test_l1_cache_json_instantiate PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_l1_cache_json_instantiate)
+  target_include_directories(test_l1_cache_json_instantiate
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/src
+  )
+  add_test(NAME test_l1_cache_json_instantiate
+    COMMAND test_l1_cache_json_instantiate
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+endif()
+
 # ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
