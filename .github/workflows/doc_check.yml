@@ -70,6 +70,13 @@ jobs:
           name: doc-check-report
           path: doc_check_report.json
 
+      - name: Smoke-test ADR-024 (drift 防护)
+        id: verify_adr_smoke
+        continue-on-error: true  # smoke test, 不阻塞 PR
+        run: |
+          echo "=== Running verify_adr.sh --only=ADR-024 (smoke) ==="
+          bash tools/verify_adr.sh --only=ADR-024
+
       - name: Comment on PR (if failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7

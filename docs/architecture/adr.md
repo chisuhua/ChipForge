@@ -1208,6 +1208,30 @@ bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
 
 ---
 
+#### ADR-041：CI 强制架构门禁 (3 验证脚本 + GitHub Actions 集成)
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | ✅ 已实现 (2026-06-12) |
+| 来源 | `.omo/drafts/fix-plan-2026-06-12-design.md` §3 Change 4 |
+| 决策 | PR 必须通过 3 个架构验证脚本 (`verify_adr.sh` + `verify_plugin_decision.sh` + `check_plugin_portability.sh`),任一失败 → exit 1 → 阻止 merge;CI 集成在 `.github/workflows/architecture-gates.yml` (PR 阻塞) + `.github/workflows/doc_check.yml` 末尾 smoke (`--only=ADR-024`, `continue-on-error: true` 不阻塞) |
+| 理由 | 防止未来 PR 引入 ADR 漂移 / D4 违规 / 移植性约束违反;3 脚本已就位 (Phase 0/1 实施期) 但未集成 CI,本 ADR 强制集成 |
+| 后果 | ✅ PR 自动化守门, ADR/D4/移植性问题早发现;⚠️ 3 脚本任一回归 → 阻塞所有 PR,需立即修复 |
+| 验证命令 | `bash tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` 全部 exit 0 |
+| 代码锚点 | `.github/workflows/architecture-gates.yml` + `.github/workflows/doc_check.yml` + `tools/README.md` (3 脚本文档) |
+
+**脚本-Workflow 映射**:
+- `verify_adr.sh` → `architecture-gates.yml` step "Run ADR verification" (PR 阻塞, `continue-on-error: false`)
+- `verify_plugin_decision.sh` → `architecture-gates.yml` step "Run D4 Plugin-style check" (PR 阻塞)
+- `check_plugin_portability.sh` → `architecture-gates.yml` step "Run ADR-040 Portability check" (PR 阻塞)
+- `verify_adr.sh --only=ADR-024` → `doc_check.yml` step "Smoke-test ADR-024" (smoke, `continue-on-error: true`)
+
+**触发器** (`architecture-gates.yml`):
+- `on.pull_request.branches`: `[main, develop]`
+- `on.pull_request.paths`: `**/*.{h,cpp,cu,cuh,cc,cxx,hpp}` + `**/*.md` + `**/*.json` + `**/*.sh` + 关键目录 (bundles/ip/src/soc/tools/docs)
+
+---
+
 ## 4. 漂移检测规则
 
 ### 4.1 漂移定义（两层）

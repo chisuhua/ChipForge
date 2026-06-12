@@ -1,0 +1,59 @@
+name: Architecture Gates (ADR / D4 / Portability)
+
+# 本 workflow 是 PR 强制门禁: 3 个架构验证脚本任一失败 → exit 1 → 阻止 PR merge
+# 引用文档: docs/architecture/adr.md ADR-041
+# 设计来源: .omo/drafts/fix-plan-2026-06-12-design.md §3 Change 4
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**/*.{h,cpp,cu,cuh,cc,cxx,hpp}'
+      - '**/*.md'
+      - '**/*.json'
+      - '**/*.sh'
+      - 'bundles/**'
+      - 'ip/**'
+      - 'src/cf_plugin/**'
+      - 'soc/**'
+      - 'tools/**'
+      - 'docs/architecture/**'
+      - 'docs/roadmap/**'
+
+jobs:
+  architecture-gates:
+    runs-on: ubuntu-latest
+    name: Architecture Compliance Gates (3 scripts)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ADR verification (verify_adr.sh)
+        id: verify_adr
+        run: |
+          echo "=== Running verify_adr.sh ==="
+          bash tools/verify_adr.sh
+        continue-on-error: false
+
+      - name: Run D4 Plugin-style check (verify_plugin_decision.sh)
+        id: verify_d4
+        run: |
+          echo "=== Running verify_plugin_decision.sh ==="
+          bash tools/verify_plugin_decision.sh
+        continue-on-error: false
+
+      - name: Run ADR-040 Portability check (check_plugin_portability.sh)
+        id: verify_portability
+        run: |
+          echo "=== Running check_plugin_portability.sh ==="
+          bash tools/check_plugin_portability.sh
+        continue-on-error: false
+
+      - name: Summary (always)
+        if: always()
+        run: |
+          echo "=== Architecture Gates Summary ==="
+          echo "verify_adr.sh:        ${{ steps.verify_adr.outcome }}"
+          echo "verify_plugin_decision.sh:  ${{ steps.verify_d4.outcome }}"
+          echo "check_plugin_portability.sh: ${{ steps.verify_portability.outcome }}"
