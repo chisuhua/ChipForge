@@ -2,6 +2,47 @@
 
 ## 共享 Bundle 定义
 
+### 1.0 Bundle 形态演进 (Phase 1 → Phase 5 → Phase 6)
+
+> **本小节目的**: 明确 Bundle 字段类型在不同 Phase 的形态,避免架构文档 (interface-design.md) 描述 `ch_uint<N>` + `bundle_base<Self>` 与 Phase 1 代码 (`cf::plugin::uint_t<N>` POD) 之间的"双轨制"漂移。
+
+ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐:
+
+| 阶段 | 字段类型 | Bundle 形态 | 依赖 | 决策依据 |
+|------|----------|------------|------|----------|
+| **Phase 1 (TLM)** | `cf::plugin::uint_t<N>` | POD struct (无虚函数) | 仅 `cf::plugin::uint_t.h` (Phase 0 提供) | D4 Plugin-style 强制 (`bundles/README.md` §2) |
+| **Phase 5 (RTL 协同)** | `ch_uint<N>` + `bundle_base<Self>` | 派生类,需 CppHDL bundle 体系 | `CppHDL/include/bundle/bundle_base.h` | ADR-024 (⚠️ Mapper 推迟) + 路线图 §6.3 |
+| **Phase 6 (完整框架)** | 自动 codegen 派生两套 | codegen 工具生成两套 Bundle | Phase 6 调度算法 + JSON 解析 | `declarative-hybrid-framework.md` §5.5 BundleMapper 设计 |
+
+**Phase 1 (当前) Bundle 定义示例** (`bundles/mem_bundles.h`):
+```cpp
+struct CacheReq {
+  cf::plugin::uint_t<64> address{0};
+  cf::plugin::uint_t<64> data{0};
+  cf::plugin::bool_t     is_write{false};
+  cf::plugin::uint_t<2>  op{0};
+  cf::plugin::uint_t<8>  id{0};
+};
+```
+
+**Phase 5/6 (待实施) Bundle 升级路径** (草案, 见 `.omo/drafts/bundle-mapper-phase-5-6-decision.md`):
+- `BundleMapper<cf::bundles::CacheReq, bundles::CacheReqBundle>` 模板将 POD 字段映射为 `ch_uint<N>` + `CH_BUNDLE_FIELDS_T(...)` 派生
+- Phase 1 业务代码 (`ip/cache/tlm/L1CachePlugin` 等) **无需修改**, 只需切换 Bundle 头文件包含
+- 推迟依据: `plugin-framework.md` §1 + `adr.md` ADR-024 ⚠️ 状态 + `bundles/README.md` §8 表格
+
+**为什么 Phase 1 用 POD 而非 bundle_base?**
+- D4 Plugin-style 强制: 业务代码无 tick(), 无状态机, Bundle 字段用 `uint_t<N>` (D4.3)
+- POD struct 可直接 memcpy 给 ch_stream 事务层, 零开销
+- Phase 5 升级时, `BundleMapper` 是纯编译期模板, 不影响业务代码
+
+**禁止模式** (D4 静态检查, `bundles/README.md` §5):
+- ❌ `ch_uint<64> address;` (在 `bundles/*.h` 中)
+- ❌ `uint64_t address;` (在 `bundles/*.h` 中)
+- ❌ `class CacheReq : public bundle_base<CacheReq> { ... }` (在 Phase 1)
+- ✅ `cf::plugin::uint_t<64> address{0};` (Phase 1 唯一允许)
+
+**相关决策**: `.omo/drafts/bundle-mapper-phase-5-6-decision.md` (Phase 5/6 BundleMapper 实施路径, 待本次新建)
+
 所有 Bundle 继承 `bundle_base`，使用 `ch_uint<N>` / `ch_bool` 强类型，保证 TLM 和 RTL 共用同一份定义：
 
 ```cpp

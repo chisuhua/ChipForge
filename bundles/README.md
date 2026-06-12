@@ -19,6 +19,7 @@
 | **字段默认构造 = 0** | 避免未初始化字段污染事务流 |
 | **AXI 风格字段布局** | 行业事实标准 (address/data/is_write/burst_len/id) |
 | **无 IO 方向语义** | TLM 模式下方向由调用方决定；RTL 模式 (Phase 5) 引入 `as_master/slave_direction()` |
+| **Bundle 形态分阶段** | Phase 1: POD (`cf::plugin::uint_t<N>`) / Phase 5: `ch_uint<N>` + `bundle_base` / Phase 6: 自动 codegen | 详见 [interface-design.md §1.0](../docs/architecture/interface-design.md#10-bundle-形态演进-phase-1--phase-5--phase-6) + ADR-024 形态切换小节 |
 
 ## 3. 当前 Bundle 清单
 

@@ -753,6 +753,18 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 - 已实现：`core/bundle/bundle_base.h`, `bundle/stream_bundle.h`
 - 未实现：`core/bundle/bundle_mapper.h`（预期缺失）
 
+##### 形态切换 (2026-06-12 增补)
+
+Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/interface-design.md` §1.0](../interface-design.md#10-bundle-形态演进-phase-1--phase-5--phase-6):
+
+| 阶段 | 字段类型 | 实施期 |
+|------|----------|--------|
+| Phase 1 (TLM) | `cf::plugin::uint_t<N>` POD | 当前 (2026-06-12) |
+| Phase 5 (RTL 协同) | `ch_uint<N>` + `bundle_base<Self>` | 推迟,待 Phase 5 启动 |
+| Phase 6 (完整框架) | 自动 codegen 派生两套 | 推迟,待 Phase 6 启动 |
+
+**当前 ⚠️ 状态本质**: "核心已实现 + Mapper 模板未实现" = Phase 1 实施完成, Phase 5/6 BundleMapper 推迟,符合 canonical phase 切分。
+
 ---
 
 ### G. 声明式 Plugin 模型（Phase 1）— 5 条
