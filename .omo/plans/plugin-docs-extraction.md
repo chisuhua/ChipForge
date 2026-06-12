@@ -755,7 +755,7 @@ Max Concurrent: 3 (Waves 1 & 3)
   - Message: `docs(adr): correct ADR-025~033 status (Phase 0 done)`
   - Files: `docs/architecture/adr.md`
 
-- [ ] 10. 运行 `verify_adr.sh` + 手动 cross-reference 完整性检查
+- [x] 10. 运行 `verify_adr.sh` + 手动 cross-reference 完整性检查
 
   **What to do**:
   - `bash tools/verify_adr.sh 2>&1 | tee state/post-change-adr-verify.log`
@@ -815,7 +815,7 @@ Max Concurrent: 3 (Waves 1 & 3)
 
   **Commit**: NO (state/ 在 .gitignore 中)
 
-- [ ] 11. 在 `plugin-framework-revision-plan.md` 添加 Section 11 指向本计划
+- [x] 11. 在 `plugin-framework-revision-plan.md` 添加 Section 11 指向本计划
 
   **What to do**:
   - 在 `plugin-framework-revision-plan.md` 末尾添加 Section 11 "相关计划",链接到本计划
@@ -913,7 +913,7 @@ Max Concurrent: 3 (Waves 1 & 3)
 
 > 4 review agents run in PARALLEL. ALL must APPROVE.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   读取所有 6 个变更文件，验证：
   - `plugin-framework.md` §1-5 完整存在
   - `declarative-hybrid-framework.md` §4/§7 已删除，cross-ref 存在
@@ -923,7 +923,7 @@ Max Concurrent: 3 (Waves 1 & 3)
   - `verify_adr.sh` 3 处缺陷已修复
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Documentation Quality Review** — `unspecified-high`
+- [x] F2. **Documentation Quality Review** — `unspecified-high`
   检查文档质量：
   - 所有跨引用可点击（`grep -E "\\[.*\\]\\([^\\)]+\\)"` 在每个文件中能找到目标）
   - 无断链（`markdown-link-check` 或 grep 验证）
@@ -931,7 +931,7 @@ Max Concurrent: 3 (Waves 1 & 3)
   - 表格行数与文中描述一致
   Output: `Links [N/N valid] | Consistency [PASS/FAIL] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   执行端到端验证：
   - `bash tools/verify_adr.sh` 输出符合预期
   - `git diff --stat` 确认 `include/cf/plugin/` 与 `src/cf_plugin/tests/` 0 行变化
@@ -940,7 +940,7 @@ Max Concurrent: 3 (Waves 1 & 3)
   - 51/51 单元测试仍通过（`ctest --test-dir build --output-on-failure`）
   Output: `Scenarios [N/N pass] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   范围合规：
   - 6 个变更文件之外的文件 0 行变化
   - 没有 CppTLM/CppHDL 仓库的文件被触碰
