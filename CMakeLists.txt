@@ -182,7 +182,8 @@ else()
         "${_deps_install_dir}/include/cpp-hdl/utils"
         "${_deps_install_dir}/include/cpp-hdl/bv"
         "${_deps_install_dir}/include/cpp-hdl/cpu"
-        "${_deps_install_dir}/include/cpp-hdl/chlib"
+        # 不加 chlib/: 它里面有 assert.h,与 system <assert.h> 冲突
+        #  (gcc 13.3 <cassert> 内部 include <assert.h>,会被 -I chlib 路径误命中)
         "${_deps_install_dir}/include/cpp-hdl/lnode"
     )
     set(CHIPFORGE_CPPHDL_LIBRARY "${_deps_install_dir}/lib/libcpphdl.a")
