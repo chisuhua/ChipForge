@@ -1,10 +1,17 @@
 # Phase 1：基础 TLM 平台（L1CachePlugin "Hello World"）
 
-> **Status**: Not Started
+> **Status**: In Progress (~65%, Phase 1.3 全部子任务完成, 2026-06-10)
 > **Milestone**: M1 - L1CachePlugin 在 TLM 模式下端到端跑通
 > **Depends on**: Phase 0（Plugin 最小脚手架）
-> **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md`
+> **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md` + `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`
 > **目标版本**: ChipForge 0.1.x
+>
+> **实施历史** (2026-06-10):
+> - 1.1 Bundle 定义完成 (`073402c`): `bundles/mem_bundles.h` 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle), D4 合规
+> - 1.2 L1CachePlugin 完成 (`e8deacc`): `ip/cache/tlm/L1CachePlugin.{h,cpp}` lookup + refill 两阶段, 256 sets × 64B direct-mapped, 4/4 单元测试 PASS
+> - 1.3 全部子任务完成 (`26fe7d2`..`c8d1dd1`): 1.3a Bridge / 1.3b SoC JSON / 1.3c Schema / 1.3d Adapter / 1.3e drift 防护 / 1.3f README
+> - Phase 1 进度: 0% → 10% (1.1) → 30% (1.2) → 65% (1.3 全部)
+> - 14/14 ctest PASS in ~4.5s
 
 **目标**：在 Phase0 提供的 Plugin 脚手架上，实现第一个真实 Plugin（`L1CachePlugin`），验证 Plugin-style 设计在 TLM 模式下的可行性。
 
@@ -16,12 +23,12 @@
 
 ### 1.1 Bundle 层定义（1 天）
 
-- [ ] `MemReqBundle` / `MemRespBundle`（内存请求/响应）
+- [x] `MemReqBundle` / `MemRespBundle`（内存请求/响应）  ← `073402c` 完成
   - 基于 `CppHDL/include/bundle/stream_bundle.h` 现有实现
   - 字段：`address` / `data` / `is_write` / `burst_len` / `id`
-- [ ] `CacheReqBundle` / `CacheRespBundle`（缓存请求/响应）
-- [ ] `L1CachePluginBundle`（L1Cache 内部使用的 Payload 集合）
-- [ ] `IntBundle`（中断接口，预留）
+- [x] `CacheReqBundle` / `CacheRespBundle`（缓存请求/响应）  ← `073402c` 完成
+- [x] `L1CachePluginBundle`（L1Cache 内部使用的 Payload 集合）  ← `073402c` 完成
+- [x] `IntBundle`（中断接口，预留）  ← `073402c` 完成
 
 **约束**：所有 Bundle 字段类型使用 `cf::plugin::uint_t<N>`（Phase0 提供的编译期类型切换），**不直接用** `uint64_t` 或 `ch_uint<N>`。
 
@@ -68,20 +75,20 @@ private:
 ```
 
 **任务**：
-- [ ] 实现 L1CachePlugin 类（lookup + refill 两阶段）
-- [ ] 单元测试 `test_l1_cache_plugin_unit.cpp`
+- [x] 实现 L1CachePlugin 类（lookup + refill 两阶段）  ← `e8deacc` 完成
+- [x] 单元测试 `test_l1_cache_plugin_unit.cpp`  ← `e8deacc` 完成, 4/4 PASS
   - hit 路径正确性
   - miss 路径正确性
   - refill 后二次访问命中
 
 ### 1.3 最小 SoC 装配（1 天）
 
-- [ ] 创建 `soc/l1_cache_minimal.json`（最小验证拓扑）
-  - `traffic_gen`（流量生成器）→ `l1_cache`（L1CachePlugin）→ `memory`（DRAM 模型）
-- [ ] 验证 `cpptlm::ModuleFactory` 能识别 L1CachePlugin 类
-- [ ] 集成测试 `test_l1_cache_plugin_e2e.cpp`
-  - 跑 1000+ 事务
-  - hit rate 应在合理范围
+- [x] 创建 `soc/l1_cache_minimal.json`（最小验证拓扑）  ← `3dbe058` 完成
+  - `traffic_gen`（流量生成器）→ `l1_cache`（L1CacheTLMBridge）→ `memory`（DRAM 模型）
+- [x] 验证 `cpptlm::ModuleFactory` 能识别 L1CachePlugin 类  ← `c8d1dd1` 完成 (Adapter 适配)
+- [x] 集成测试 `test_l1_cache_plugin_e2e.cpp`  ← `c8d1dd1` 完成, 5/5 PASS
+  - 跑 1000+ 事务 ✅
+  - hit rate 应在合理范围 ✅
 
 ### 1.4 与 `cpptlm::CacheTLM` 对比（1-2 天）
 

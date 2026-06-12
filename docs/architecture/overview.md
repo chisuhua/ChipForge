@@ -1,11 +1,11 @@
 # 总体架构设计
 
-> **📌 实现状态快照 (2026-06-09)**
+> **📌 实现状态快照 (2026-06-12)**
 >
-> - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 5 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink）+ 51/51 单元测试 PASS + 7/7 ctest PASS
+> - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 5 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink）+ 51/51 单元测试 PASS + 14/14 ctest PASS
 > - ✅ **框架层已就位**：CppTLM (TLM 建模) + CppHDL (RTL/lnode DAG) 集成完成，`cpptlm_core` / `cpphdl` 目标可达
-> - ⚠️ **应用层待建设**：`bundles/` 目录为空；`ip/{cpu,cache,memory,interconnect,peripheral}/{tlm,rtl,configs,tests}/` 为骨架 README；`soc/riscv_virt.json` 6/8 模块类型引用悬挂（详见 `code-framework-mapping.md` §7.4）
-> - 🚧 **下一里程碑 (Phase 1)**：实现 `bundles/mem_bundles.h` + `L1CachePlugin` 验证 D4 Plugin-style 端到端可行性
+> - ✅ **应用层 Phase 1.3 已落地**（2026-06-10）：`bundles/mem_bundles.h` 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle, D4 合规) + `ip/cache/tlm/L1CachePlugin.{h,cpp}` (lookup + refill 两阶段, 256 sets × 64B direct-mapped, 4/4 单元测试) + `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (L1CacheTLMBridge, 2/2 测试) + `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (cpptlm ModuleFactory 兼容层, 5/5 e2e) + `soc/l1_cache_minimal.json` (traffic_gen → l1 → mem 拓扑) + `ip/cache/configs/params_schema.json` (JSON Schema draft-07)
+> - 🚧 **下一里程碑 (Phase 1.3d-extras / Phase 1.4)**：实现 ch_stream 协议转换 (PA-6) + `cpptlm::CacheTLM` baseline 对比 (PA-7)；Phase 2+ 应用层（CPU / memory / interconnect / peripheral）待建设
 >
 > **本文档描述目标架构**；具体实现进度以 [`roadmap/roadmap-status.md`](../roadmap/roadmap-status.md) 为准。
 

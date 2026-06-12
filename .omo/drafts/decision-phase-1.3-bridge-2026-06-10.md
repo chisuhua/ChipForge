@@ -4,7 +4,7 @@
 |------|-----|
 | 决策ID | DECISION-2026-06-10-02 (v2, 基于架构文档全面校准) |
 | 决策日期 | 2026-06-10 |
-| 决策状态 | **Proposed v2（待用户最终确认 D1/D1'/D1''/D2/D3）** |
+| 决策状态 | **Accepted v2**（2026-06-10, 6 commit 落地 `26fe7d2`..`c8d1dd1`, 与 `roadmap-status.md` §2 Phase 1.3 v2 决策一致; D1=C POD+4 字段窄桥 / D1'=末尾调 pb.run / D1''=不实现 BundleMapper+drift 防护 / D2=B 框架层 / D3=A 仅最小 e2e 全部落地）|
 | 提出方 | Sisyphus（基于 Phase 1.2 归档后的就绪度分析 + 架构文档校准） |
 | 决策影响 | Phase 1.3 启动前提、cf_plugin 独立性边界、Plugin↔ChStreamModuleBase 协作契约 |
 | 关联文档 | `docs/roadmap/phases/phase-1-tlm-foundation.md` §1.3, `docs/architecture/overview.md:125`, `docs/architecture/interface-design.md`, `docs/architecture/declarative-hybrid-framework.md` §4.8/§5.5/§6.3, `docs/architecture/plugin-framework.md` §4.1, `docs/architecture/adr.md` ADR-024/ADR-037, `bundles/README.md`, `include/cf/plugin/storage.h` (Phase 1.3+ 注释), `docs/lessons/phase-1.2-l1cacheplugin.md` |

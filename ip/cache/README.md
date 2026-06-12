@@ -1,6 +1,6 @@
 # Cache IP 设计文档
 
-> 🚧 **Status: TLM model + Bridge + JSON spec (Phase 1.2 + 1.3a + 1.3b + 1.3c + 1.3e, 2026-06-10)** — `ip/cache/tlm/L1CachePlugin.{h,cpp}` (Plugin-style, 4/4 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (L1CacheTLMBridge, 2/2 unit tests) + `soc/l1_cache_minimal.json` (最小 SoC 拓扑 spec) + `ip/cache/configs/params_schema.json` (JSON Schema)。L1I/L2/RTL/ModuleFactory JSON 集成 (1.3d) 推迟到下个 session。详见 [Phase 1.3 v2 决策草案](../../.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md) §3-4。
+> 🚧 **Status: TLM model + Bridge + JSON spec (Phase 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3e + 1.3f, 2026-06-10)** — `ip/cache/tlm/L1CachePlugin.{h,cpp}` (Plugin-style, 4/4 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (L1CacheTLMBridge, 2/2 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (cpptlm ModuleFactory 兼容层, 5/5 e2e tests) + `soc/l1_cache_minimal.json` (最小 SoC 拓扑 spec) + `ip/cache/configs/params_schema.json` (JSON Schema)。Phase 1.3d-extras (ch_stream adapter 协议转换 + full JSON `instantiateAll` e2e) 推迟到下个 session (PA-6)。详见 [Phase 1.3 v2 决策草案](../../.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md) §3-4。
 
 ## 1. 功能概述
 
@@ -170,7 +170,7 @@ assert(bridge.pb_run_count() >= 1);  // 验证 tick() 真的跑了
 }
 ```
 
-**当前状态**: JSON spec 已落地，结构验证测试 4/4 PASS (`test_soc_l1_cache_minimal_json`)。Phase 1.3d 将完成 `L1CacheTLMBridge` → `cpptlm::ModuleFactory` 注册，使此 JSON 可被 `instantiateAll()` 实例化。
+**当前状态**: JSON spec 已落地，结构验证测试 4/4 PASS (`test_soc_l1_cache_minimal_json`)。Phase 1.3d (`L1CacheTLMBridgeAdapter` 框架层) 已完成 (`c8d1dd1`)，但 ch_stream 协议转换 + full `instantiateAll()` e2e 推迟到 Phase 1.3d-extras (PA-6)。
 
 ### 9.4 参数 Schema (`ip/cache/configs/params_schema.json`)
 

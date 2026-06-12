@@ -4,7 +4,7 @@
 |------|-----|
 | 决策ID | DECISION-2026-06-08-01 |
 | 决策日期 | 2026-06-08 |
-| 决策状态 | **Proposed（待用户最终确认）** |
+| 决策状态 | **Accepted**（2026-06-08, 与 `docs/architecture/adr.md` ADR-037 Accepted 状态一致; D1-D11 全部落地: PluginBase 5/5 测试, Payload<T>, PipeNode, PipeBuilder, CtrlLink 四种控制 API）|
 | 提出方 | Prometheus（基于多轮对话分析） |
 | 决策影响 | 项目路线图重塑、技术债优先级变更 |
 | 关联文档 | `.omo/plans/plugin-framework-revision-plan.md` |
