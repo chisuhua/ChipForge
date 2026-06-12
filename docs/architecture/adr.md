@@ -109,7 +109,6 @@
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
-| ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）| 移植 | `include/cf/plugin/storage.h` + `tools/check_plugin_portability.sh` |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -128,7 +127,7 @@
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
 | ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部） |
 | ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
-| ADR-040 | TLM→HDL 移植性约束 | 移植 | 🚧（`array_store` 已实现，迁移手册待 Phase 5 验证） |
+| ADR-040 | TLM→HDL 移植性约束 | 移植 | 🚧（`array_store` 已实现，迁移手册待 Phase 5 验证；2026-06-12 从 §2.1 移除, 实质仍为 Phase 1 提案） |
 
 ### 2.4 统计
 
@@ -1204,6 +1203,8 @@ bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
 - `include/cf/plugin/pipe_builder.h:136` — `PipeBuilder::commit_storages()`
 - `include/cf/plugin/pipe_builder.h:101` — `PipeBuilder::run()` 末尾 `commit_storages()`
 - `tools/check_plugin_portability.sh` — 4 项 Tier-1/Tier-2 检查
+
+**§2.1/§2.3 分类调整 (2026-06-12)**: 此 ADR 实质为 Phase 1 提案 (`array_store` 已实现但迁移手册待 Phase 5),不应在 §2.1 (✅ 已实现) 出现。已从 §2.1 移除,仅保留在 §2.3 (🚧 Phase 1 提案)。参见 `docs/roadmap/roadmap-status.md` §6 活动日志 2026-06-10 条目。
 
 ---
 
