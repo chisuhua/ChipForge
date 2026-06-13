@@ -11,6 +11,7 @@
 | `tools/verify_adr.sh` | 验证 ADR 注册表与代码实现对齐 (39 条 ADR) | 0=PASS / 1=❌ Critical drift / 2=脚本错误 | ✅ `architecture-gates.yml` step 1 (PR 阻塞) + `doc_check.yml` smoke (`--only=ADR-024`) |
 | `tools/verify_plugin_decision.sh` | D4 Plugin-style 业务代码静态检查 (无 tick/无状态机/uint_t<N>) | 0=PASS / 1=❌ D4 违规 | ✅ `architecture-gates.yml` step 2 (PR 阻塞) |
 | `tools/check_plugin_portability.sh` | ADR-040 移植性约束 (Tier-1: 早返/ch_mem 渗透/pb.run/array_store) | 0=PASS / 1=❌ 移植性违规 | ✅ `architecture-gates.yml` step 3 (PR 阻塞) |
+| `tools/doc_link_check.sh` | 文档相对路径交叉引用完整性 (防止 2026-06-13 发现的 42 个死链回归) | 0=全 PASS / 1=有断链 | (推荐) `architecture-gates.yml` step 4 |
 
 ## 2. 脚本详情
 
@@ -55,6 +56,10 @@ bash tools/check_plugin_portability.sh
 
 # 5. 完整 ctest (附加, 不在 3 脚本内)
 bash tools/run_chipforge_tests.sh
+
+# 6. 文档链接交叉引用 (新增, 防 2026-06-13 发现的 42 死链回归)
+bash tools/doc_link_check.sh
+bash tools/doc_link_check.sh --quiet  # 仅断链, 无进度输出
 ```
 
 ## 4. CI 集成详情
