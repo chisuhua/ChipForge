@@ -13,7 +13,7 @@
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
 | Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
-| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~30% (1.1+1.2 完成) | 依赖 Phase 0(已解除) | 1.3 最小 SoC JSON |
+| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~75% (1.1+1.2+1.3全部子任务完成) | 无 | 1.4 baseline 对比 (PA-7+PA-9) |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | ClintTlm/PlicTlm 完善 |
@@ -50,7 +50,7 @@
 
 ### Phase 1 - TLM Foundation (L1CachePlugin)
 
-- **状态**: In Progress (~65%, 1.1 + 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3e + 1.3f 完成; Phase 1.3 全部子任务落地)
+- **状态**: In Progress (~75%, 1.1 + 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f 完成; Phase 1.3 全部子任务落地, 8/8 ✅)
 - **依赖**: Phase 0
 - **预估工时**: 7-9 工作日(~1.5 周); Phase 1.3 单项重估 **1 天 → 4.5 天** (v2 决策草案 §8)
 - **已完成** (2026-06-10):
@@ -185,31 +185,15 @@
 
 ---
 
-## 5. 下一步建议(Top 3)
+## 5. 下一步建议(Top 2)
 
-> Phase 1.3 全部子任务完成 (1.3a + 1.3b + 1.3c + 1.3d + 1.3e + 1.3f, commits `26fe7d2`..`c8d1dd1`)。
-> 以下三条路径可任意顺序启动, 互不阻塞。
+> Phase 1.3 全部子任务完成 (1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f, commits `26fe7d2`..`387b8ca`)。
+> PA-6 (1.3d-extras) 与 PA-8 (决策草案) 已于 2026-06-13 完成。当前仅剩 PA-7 与 PA-9 待启动。
 
-### 建议 1:Phase 1.3d-extras — ch_stream 协议转换 + full JSON e2e (1-2 天) — ⏳ P1
-
-**前置条件已就绪**:
-- ✅ `L1CacheTLMBridge` 已落地 (`26fe7d2`)
-- ✅ `L1CacheTLMBridgeAdapter` 已注册 cpptlm ModuleFactory (`c8d1dd1`)
-- ✅ `soc/l1_cache_minimal.json` 拓扑 spec 已通过 (`3dbe058`)
-- ⚠️ 缺: `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, ...>` (PA-6)
-
-**任务** (详见 `phase-1-tlm-foundation.md §1.3`):
-- 1.3d-extra.1: 起草 `decision-phase-1.3d-extras-bridge-2026-06-10.md` 决策草案 (PA-8): 4 字段窄桥是否足够? default 字段兼容性?
-- 1.3d-extra.2: 实现 `L1CacheTLMBridge` 内部 `ch_stream<CacheReqBundle>` ↔ `cf::bundles::CacheReq` 协议转换
-- 1.3d-extra.3: 注册 `ChStreamAdapterFactory::registerAdapter<...>` (消除 Phase 1.3d SEGFAULT)
-- 1.3d-extra.4: full JSON `instantiateAll` e2e: `soc/l1_cache_minimal.json` → ModuleFactory → traffic_gen ↔ cache ↔ memory 数据流
-
-**价值**: 完成 v2 §9 Step6 "Phase 1.3 归档 + lessons"; 消除 Phase 1.3 SEGFAULT; 为 Phase 2 baremetal 准备完整 SoC 数据通路
-
-### 建议 2:Phase 1.4 — cpptlm::CacheTLM baseline 对比 (1-2 天) — ⏳ P2
+### 建议 1:Phase 1.4 — cpptlm::CacheTLM baseline 对比 (1-2 天) — ⏳ P1
 
 **前置条件已就绪**:
-- ✅ Phase 1.3 Plugin-style L1Cache 完整落地
+- ✅ Phase 1.3 全部子任务完成 (含 1.3d-extras, 16/16 ctest PASS, 2026-06-13)
 - ✅ `cpptlm::CacheTLM` 已通过 `REGISTER_CHSTREAM` 注册 (`CppTLM/include/chstream_register.hh:30`)
 - ⚠️ 缺: `decision-phase-1.4-baseline-2026-06-10.md` 决策草案 (PA-9) 5 项候选决议
 
@@ -221,10 +205,10 @@
 
 **价值**: 验证 D4 Plugin-style 与传统 `tick()` 风格功能等价 (Phase 0 投入变现的关键证据); 为 Phase 2 多 Plugin 协同铺路
 
-### 建议 3:Phase 2 — bare-metal 测试套件 (5-7 天) — ⏳ P3
+### 建议 2:Phase 2 — bare-metal 测试套件 (5-7 天) — ⏳ P2
 
 **前置条件**:
-- ⚠️ Phase 1.3d-extras 建议先完成 (避免 Phase 2 启动时 SoC 集成阻塞)
+- ✅ Phase 1.3 全部子任务完成 (含 1.3d-extras)
 - ⚠️ Phase 1.4 baseline 对比可并行 (验证 Plugin-style 等价性)
 
 **任务** (详见 `phase-2-baremetal.md`):
