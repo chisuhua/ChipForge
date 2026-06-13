@@ -703,7 +703,11 @@ verify_adr_032() {
     --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1; then
     log_expected_missing "ADR-032" "PipeBuilder 统一编译器" "class PipeBuilder 不存在"
   else
-    log_stale "ADR-032" "PipeBuilder" "已实现但 ADR 仍 🚧"
+    if adr_status_is_done "ADR-032"; then
+      log_pass "ADR-032" "PipeBuilder"
+    else
+      log_stale "ADR-032" "PipeBuilder" "已实现但 ADR 仍 🚧"
+    fi
   fi
 }
 
