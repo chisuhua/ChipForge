@@ -254,6 +254,7 @@
 **解锁条件**: 用户明确指示安装工具链 (选项 1) 或调整 F2 决策 (选项 2) 或暂停 (选项 3)
 
 **What to do** (解锁后):
+- [~] **任务 1 工具链准备** (Blocked by external dependency - 4/5 RISC-V 工具未预装, 等待用户决策)
 - [ ] 验证 `riscv64-unknown-elf-gcc` (交叉编译器)
 - [ ] 验证 `spike` (性能参考)
 - [ ] 验证 `sail-riscv` (黄金参考)
@@ -294,7 +295,7 @@
 
 ---
 
-### 2. riscv-tests 集成
+### 2. riscv-tests 集成 [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
