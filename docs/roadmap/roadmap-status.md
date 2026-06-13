@@ -21,7 +21,7 @@
 | Phase 5 | M6/M7/M8/M10 - RTL | Not Started | 0% | 依赖 Phase 4 | L1CacheRtl (CppHDL) |
 | Phase 6 | M6 - 完整 PipeBuilder | Not Started | 0% | 依赖 2-3 Plugin 稳定 | 调度算法 |
 
-> *Phase 1* = 已被 `phase-1-tlm-foundation.md` 取代的旧 `phase-1-foundation.md`,待决定保留/废弃/删除
+> *Phase 1* = 旧 `phase-1-foundation.md` (已于 2026-06-09 PA-3 git rm, 仅在此处作历史记录), 现使用 `phase-1-tlm-foundation.md`
 
 ---
 
