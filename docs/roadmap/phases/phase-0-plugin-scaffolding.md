@@ -19,13 +19,15 @@
 
 ## 1. 任务清单（5 个 P0 交付物）
 
+> **批量标记说明**：以下所有任务已于 2026-06-08 单次 session 内完成（51/51 单元测试 PASS, 7/7 ctest PASS, 退出标准 v2 全部达成）。本次更新补全遗漏的 checkbox 标记，不影响实际完成状态。
+
 ### 1.1 `PluginBase` 接口（2 天）
 
-- [ ] 定义 `cf::plugin::PluginBase` 抽象基类
+- [x] 定义 `cf::plugin::PluginBase` 抽象基类
   - 暴露 `setup(PipeBuilder&)`（跨 Plugin 引用声明，默认空实现）
   - 暴露 `build(PipeBuilder&)`（实际生成逻辑，强制纯虚）
-- [ ] **编译期断言禁止 `tick()`**：用 `static_assert` 或 `final` 类 + 删除的 `tick()` 阻止误用
-- [ ] 单元测试 `test_plugin_lifecycle.cpp`
+- [x] **编译期断言禁止 `tick()`**：用 `static_assert` 或 `final` 类 + 删除的 `tick()` 阻止误用
+- [x] 单元测试 `test_plugin_lifecycle.cpp`
   - 测试 setup → build 调用顺序
   - 测试子类强制实现 build
 
@@ -33,11 +35,11 @@
 
 ### 1.2 `Payload<T>` 类型安全 Key（2 天）
 
-- [ ] 定义 `cf::plugin::Payload<T>` 模板
+- [x] 定义 `cf::plugin::Payload<T>` 模板
   - 全局静态对象（描述符）
   - 类型擦除存储于 `PipeNode::payloads_`
-- [ ] 提供 `operator()(const Payload<T>&)` 类型安全访问
-- [ ] 单元测试 `test_payload.cpp`
+- [x] 提供 `operator()(const Payload<T>&)` 类型安全访问
+- [x] 单元测试 `test_payload.cpp`
   - 编译期类型检查
   - 同一 Key 在不同 PipeNode 间的隔离
 
@@ -45,12 +47,12 @@
 
 ### 1.3 `PipeNode` 节点（3 天）
 
-- [ ] 定义 `cf::plugin::PipeNode`
+- [x] 定义 `cf::plugin::PipeNode`
   - 内部 `std::map<PayloadKeyBase*, std::any>` 存储 Payload
   - 简单 valid/ready/cancel 状态机
   - 派生状态方法：`is_firing()` / `is_moving()` / `is_blocked()` / `is_canceling()`
-- [ ] 提供 `create_node(name)` 工厂（由 PipeBuilder 调用）
-- [ ] 单元测试 `test_pipe_node.cpp`
+- [x] 提供 `create_node(name)` 工厂（由 PipeBuilder 调用）
+- [x] 单元测试 `test_pipe_node.cpp`
   - 状态机转换正确性
   - Payload 多 Key 访问
 
@@ -58,15 +60,15 @@
 
 ### 1.4 `PipeBuilder` 编排器（4 天）
 
-- [ ] 定义 `cf::plugin::PipeBuilder`
+- [x] 定义 `cf::plugin::PipeBuilder`
   - `register_plugin(std::unique_ptr<Plugin>)`
   - `at_stage(stage_name, phase, callback)`
   - `declare_substage(parent, sub, depth)`（最小实现：仅声明，无深度调度）
   - `node_of_logic_stage(stage_name)` 查找
   - `build()` 编译入口
   - `run()` 顺序执行所有 at_stage 回调
-- [ ] 仿 `chlib/stream_builder.h` 链式 API 风格
-- [ ] 单元测试 `test_pipe_builder.cpp`
+- [x] 仿 `chlib/stream_builder.h` 链式 API 风格
+- [x] 单元测试 `test_pipe_builder.cpp`
   - 调度确定性（同一组 Plugin 多次执行结果一致）
   - 多 Plugin 注册顺序保证
   - 阶段命名冲突检测
@@ -75,14 +77,14 @@
 
 ### 1.5 `CtrlLink` 控制 API（3 天）
 
-- [ ] 定义 `cf::plugin::CtrlLink`（继承 `PipeLink`）
-- [ ] 四种控制 API：
+- [x] 定义 `cf::plugin::CtrlLink`（继承 `PipeLink`）
+- [x] 四种控制 API：
   - `halt_when(cond)` —— 阻塞下游 ready
   - `throw_when(cond)` —— 注入 cancel
   - `flush_when(cond)` —— 清空寄存器
   - `bypass(key, src)` —— 旁路转发
-- [ ] 多条件 OR 合并（`pipeline_stall_ctrl` 复用）
-- [ ] 单元测试 `test_ctrl_link.cpp`
+- [x] 多条件 OR 合并（`pipeline_stall_ctrl` 复用）
+- [x] 单元测试 `test_ctrl_link.cpp`
   - 单/多条件 halt 行为
   - flush/throw 优先级
 
@@ -96,23 +98,23 @@ Phase0 必须**全部满足**以下标准才能进入 Phase1：
 
 ### 2.1 功能标准
 
-- [ ] 5 个 P0 组件全部实现且单元测试通过
-- [ ] 一个**最小验证 Plugin**（~10 行代码）能在 PipeBuilder 下端到端跑通
+- [x] 5 个 P0 组件全部实现且单元测试通过
+- [x] 一个**最小验证 Plugin**（~10 行代码）能在 PipeBuilder 下端到端跑通
   - 示例：`struct HelloPlugin : PluginBase { void build(PB& pb) { pb.at_stage("greet", NORMAL, []{ printf("Hello\n"); }); } };`
-- [ ] 与原 CppTLM/CppHDL 框架无冲突（独立编译）
+- [x] 与原 CppTLM/CppHDL 框架无冲突（独立编译）
 
 ### 2.2 质量标准
 
-- [ ] **调度确定性证明**：同一组 Plugin 注册顺序相同 → 多次执行结果一致
-- [ ] **零 TODO 残留**（与 CppTLM 零债务原则一致）
-- [ ] 单元测试覆盖率 ≥ 80%
-- [ ] API 文档（Doxygen）完整
+- [x] **调度确定性证明**：同一组 Plugin 注册顺序相同 → 多次执行结果一致
+- [x] **零 TODO 残留**（与 CppTLM 零债务原则一致）
+- [x] 单元测试覆盖率 ≥ 80%
+- [x] API 文档（Doxygen）完整
 
 ### 2.3 集成标准
 
-- [ ] 与 `cpptlm::ChStreamModuleBase` 共存无冲突
-- [ ] 与 `ch::Component` 共存无冲突
-- [ ] 编译期类型安全（错类型 Payload Key 编译失败）
+- [x] 与 `cpptlm::ChStreamModuleBase` 共存无冲突
+- [x] 与 `ch::Component` 共存无冲突
+- [x] 编译期类型安全（错类型 Payload Key 编译失败）
 
 ---
 
