@@ -331,11 +331,11 @@ Plugin 范式**当前实现**的硬限制, 需 Phase 6 完整框架补充:
 | E3 | 3 类方法学边界 (B1/B2/B3) 显式标注 | ✅ (§3 + §2 每观察) |
 | E4 | 至少 10 个 B2 摩擦点带具体代码模式 | ✅ (本文档 4 个核心模式 + 详细笔记 6 个, 总 6 个) |
 | E5 | 至少 3 个 B3 局限点显式链接到 Phase 6 任务 | ✅ (§3.3 + §5) |
-| E6 | `docs/lessons/phase-1.2-l1cacheplugin.md` 标 supersede 注释 | ⏳ (T4.3 待执行) |
-| E7 | ctest 16/16 仍 PASS | ⏳ (T6.1 待验证) |
-| E8 | `roadmap-status.md` 同步更新 | ⏳ (T5 待执行) |
+| E6 | `docs/lessons/phase-1.2-l1cacheplugin.md` 标 supersede 注释 | ✅ (T4.3 已完成, 2026-06-13 commit `137df84`) |
+| E7 | ctest 16/16 仍 PASS | ✅ (T6.1 已验证, 16/16 PASS in 3.62s) |
+| E8 | `roadmap-status.md` 同步更新 | ✅ (T5 已完成, 6 处变更: 头部 / §1 / §3.2 PA-7/PA-9 / §4 R7 / §5 建议 1 / §6 活动日志) |
 
-**当前完成度**: E1-E5 ✅ (5/8), E6-E8 ⏳ (3 个待 T4-T6 执行)
+**当前完成度**: E1-E8 ✅ (8/8, 全部通过)
 
 ---
 

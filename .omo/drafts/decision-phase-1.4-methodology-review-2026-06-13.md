@@ -2,7 +2,7 @@
 
 > **决策ID**: DECISION-2026-06-13-02
 > **决策日期**: 2026-06-13
-> **决策状态**: **Proposed v1**（待本次 session 实施 + 验证后改 Accepted v1）
+> **决策状态**: **Accepted v1** (✅ 2026-06-13 实施 + 验证完成: T1-T6 全部 ✅, F1-F4 Final Wave 4/4 APPROVE, 2 个原子 commit `137df84` + `b65ff04` push, 12 evidence + 3 notepad 全部落地, ctest 16/16 PASS, D4+ADR-040 3+4/3 全部 PASS)
 > **提出方**: Prometheus（基于用户对话 + Phase 1.3 全部子任务完成 + Phase 1.2 lessons 沉淀触发）
 > **决策影响**: 验证 ChipForge 核心方法学 (Plugin 声明式电路设计) 是否站得住脚；为 Phase 2+ 多个 Plugin-style IP (L2/ICache/Interconnect) 提供设计模板；决定 Phase 6 完整框架是否基于 Plugin 范式
 > **关联文档**:
@@ -268,12 +268,12 @@ git checkout HEAD~1 -- docs/lessons/phase-1.2-l1cacheplugin.md docs/roadmap/road
 
 | # | 决议 | 状态 |
 |---|------|------|
-| **F1** | 复盘对象 = L1CachePlugin（否决 cpptlm::CacheTLM 性能基线, 改为方法学复盘） | **Proposed** |
-| **F2** | 6 个评估维度（D1-D6） | **Proposed** |
-| **F3** | 5 类复盘输入（I1-I5） | **Proposed** |
-| **F4** | 3 类方法学边界标注（B1/B2/B3） | **Proposed** |
-| **F5** | 复盘深度 = 单例子深复盘（v1, 推迟 v2 到 Phase 2+） | **Proposed** |
-| **F6** | E1-E8 退出标准 | **Proposed** |
+| **F1** | 复盘对象 = L1CachePlugin（否决 cpptlm::CacheTLM 性能基线, 改为方法学复盘） | **Accepted** |
+| **F2** | 6 个评估维度（D1-D6） | **Accepted** |
+| **F3** | 5 类复盘输入（I1-I5） | **Accepted** |
+| **F4** | 3 类方法学边界标注（B1/B2/B3） | **Accepted** |
+| **F5** | 复盘深度 = 单例子深复盘（v1, 推迟 v2 到 Phase 2+） | **Accepted** |
+| **F6** | E1-E8 退出标准 | **Accepted** |
 
 ---
 
