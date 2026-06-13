@@ -5,7 +5,7 @@
 > **关联路线图**: `docs/roadmap/phases/phase-2-baremetal.md` (Phase 2 bare-metal 测试套件)
 > **关联里程碑**: M2 - ISA 全覆盖
 > **依赖**: Phase 1 (Plugin-style TLM Foundation) — **✅ 100% 完成** (Phase 1.4 ORCHESTRATION COMPLETE 2026-06-13)
-> **状态**: 📋 计划就绪, 待 `/start-work` 启动
+> **状态**: 🟡 **WAITING FOR USER DECISION** (boulder active, 任务 1-8 全部 [~] BLOCKED by 工具链缺失, 等待 3 个用户选项)
 
 ---
 
@@ -336,7 +336,7 @@
 
 ---
 
-### 3. RISCOF 合规认证
+### 3. RISCOF 合规认证 [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
@@ -380,7 +380,7 @@
 
 ---
 
-### 4. 自定义功能测试
+### 4. 自定义功能测试 [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
@@ -420,7 +420,7 @@
 
 ---
 
-### 5. 基准测试
+### 5. 基准测试 [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
@@ -457,7 +457,7 @@
 
 ---
 
-### 6. 自动化测试驱动
+### 6. 自动化测试驱动 [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
@@ -498,7 +498,7 @@
 
 ---
 
-### 7. DSE 基础
+### 7. DSE 基础 [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
@@ -537,7 +537,7 @@
 
 ---
 
-### 8. 自检 + 原子 commit (6 末尾)
+### 8. 自检 + 原子 commit (6 末尾) [~] BLOCKED by task 1 (chain blocked on toolchain)
 
 **What to do**:
 
