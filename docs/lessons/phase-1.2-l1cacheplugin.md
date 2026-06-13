@@ -1,5 +1,13 @@
 # Phase 1.2 L1CachePlugin 教训与模式
 
+> **⚠️ 已被 [`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md) supersede (2026-06-13, DECISION-2026-06-13-02)**
+>
+> 本文档保留作 Phase 1.2 实施期间 (commit `e8deacc`) 的**历史踩坑记录**。Phase 2+ IP 写作者请**先读 v1 方法学文档了解 6 维度 × 3 边界 + 6 个 B2 模式**, 再按需回查本文档的行级陷阱细节。
+>
+> **supersede 关系**:
+> - **v1 文档** (方法学评估): [`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md) — 6 维度 × 3 边界 + 6 个 B2 模式
+> - **本文档** (踩坑清单): 7 类行级陷阱 + 配套检查工具引用
+
 > 沉淀自 `e8deacc` 实施过程，供 Phase 2+ Plugin-style IP 开发参考。
 
 ## 一、PipeBuilder 阶段注册陷阱

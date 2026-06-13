@@ -1,10 +1,12 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-13 (本次会话九: Phase 1.3d-extras 落地, PA-6 + PA-8 闭环, 16/16 ctest PASS)
-> **当前可启动**: ① Phase 1.4 (cpptlm::CacheTLM baseline 对比, PA-7+PA-9) ② Phase 2 (bare-metal 测试套件) ③ PA-2 ~ PA-5 (Phase 1.3 已完成, 启动门槛已就绪)
+> **最后更新**: 2026-06-13 (本次会话十: Phase 1.4 L1CachePlugin 设计方法学复盘 v1 落地, PA-7 + PA-9 + R7 闭环, 18/18 ctest PASS)
+> **当前可启动**: ① **Phase 2 bare-metal 测试套件** (PA-1 ~ PA-5 + PA-6 + PA-7 + PA-8 + PA-9 全部 ✅, Phase 1 退出标准全部就绪) ② Phase 5 RTL 协同验证 (Phase 6 框架升级任务清单已生成)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
+
+> **⚠️ Phase 1.4 范围修正 (2026-06-13)**: roadmap §1.4 + §2.1 描述的 "cpptlm::CacheTLM baseline 对比" 经用户对话澄清 + Metis 验证为**错误解读**(`cpptlm::CacheTLM` 是 stub, `std::map` 全关联无淘汰, 无法配置为 256×64B direct-mapped)。Phase 1.4 真实目的 = **L1CachePlugin 设计方法学复盘** (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`, DECISION-2026-06-13-02, F1.A + 6 维度 + 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务)。性能基线对比推迟到 Phase 2+ (需 `HybridCacheWrapper` + BUILD_RTL=ON)。
 
 ---
 
@@ -13,7 +15,7 @@
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
 | Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
-| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~75% (1.1+1.2+1.3全部子任务完成) | 无 | 1.4 baseline 对比 (PA-7+PA-9) |
+| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~85% (1.1+1.2+1.3全部子任务+1.4方法学复盘完成) | 无 | Phase 1 退出标准全部达成, Phase 2 启动门槛就绪 |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | ClintTlm/PlicTlm 完善 |
@@ -103,7 +105,7 @@
   - F3: test_l1_cache_json_instantiate 5 子测试 (拓扑连通 + 协议转换路径打通)
   - F4: ADR-007 §2.3 + §3 末尾 "实施更新" 增补 (R6 风险保留, 通用桥接 Phase 5 实施)
   - F5: E1-E5 退出标准 (16/16 ctest + 100 cycle 推进 + Bridge pb_run 验证)
-- **下一步**: **Phase 1.3 全部子任务完成 (1.3a/1.3b/1.3c/1.3d/1.3d-extras/1.3e/1.3f, 7/7 ✅)**. 启动 Phase 1.4 (PA-7 cpptlm::CacheTLM baseline 对比 + PA-9 baseline 决策草案).
+- **下一步**: **Phase 1.4 全部完成 (PA-7 方法学复盘 v1 文档 + PA-9 决策草案 DECISION-2026-06-13-02)**. Phase 1 退出标准全部达成 (PA-1 ~ PA-9 全部 ✅), Phase 2 启动门槛就绪.
 
 **关键约束**(D4 强制): 业务代码无 `tick()`、Bundle 字段用 `uint_t<N>`、所有阶段用 `at_stage()`
 
@@ -166,9 +168,9 @@
 | ID | 类型 | 项目 | 前置条件 | 状态 | 优先级 |
 |----|------|------|---------|------|-------|
 | **PA-6** | 实施 | **Phase 1.3d-extras**: ch_stream 协议转换 + full JSON `instantiateAll` e2e | ✅ **Completed (2026-06-13)**: 静态注册 `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, ::bundles::CacheReqBundle, ::bundles::CacheRespBundle>` + Adapter 内部 4 字段窄桥 (F1.A) + `test_l1_cache_json_instantiate` 5/5 子测试 PASS + 16/16 ctest | ✅ Done | ~~P1~~ |
-| **PA-7** | 实施 | **Phase 1.4**: `cpptlm::CacheTLM` baseline 对比 (`soc/l1_cache_baseline.json`) | Phase 1.3d-extras 完成 (本次 commit, 2026-06-13); 详见 `docs/roadmap/phases/phase-1-tlm-foundation.md §1.4` | ⏳ Not Started | P1 (升级) |
+| **PA-7** | 实施 | **Phase 1.4**: L1CachePlugin 设计方法学复盘 v1 文档 | ✅ **Completed (2026-06-13, 本次会话十)**: `docs/methodology/plugin-style-design-methodology-v1.md` (352 行) — 6 维度 × 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务链接。详见 `docs/roadmap/phases/phase-1-tlm-foundation.md §1.4` (E1-E5 重解读) | ✅ Done | ~~P1~~ |
 | **PA-8** | 文档 | **Phase 1.3d-extras 决策草案** (`decision-phase-1.3d-extras-bridge-2026-06-13.md` 草案) | ✅ **Completed (2026-06-13)**: `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md` (PA-6+PA-8 合并), F1-F5 决议, 状态改 Proposed v1 | ✅ Done | ~~P2~~ |
-| **PA-9** | 文档 | **Phase 1.4 baseline 决策草案** (`decision-phase-1.4-baseline-2026-06-10.md` 草案) | 5 项候选决议: E1 baseline 选型 (cpptlm::CacheTLM vs HybridCacheWrapper); E2 trace 对比工具 (手写 vs gem5 m5out); E3 共享 traffic_gen 输入; E4 hit rate 容差 (±5%); E5 测试时长 (1k vs 10k tx) | ⏳ Not Started | P2 |
+| **PA-9** | 文档 | **Phase 1.4 决策草案** (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`) | ✅ **Completed (2026-06-13, 本次会话十)**: DECISION-2026-06-13-02, F1-F5 决议 (E1=A 复盘对象 / E2=6 维度 / E3=5 类输入 / E4=3 类边界 / E5=单例子深复盘) | ✅ Done | ~~P2~~ |
 
 ---
 
@@ -181,7 +183,7 @@
 | R3 | CppHDL 集成阻塞(tests/CMakeLists.txt:38 路径 bug) | Phase 5+ | Phase 0-2 暂不需 CppHDL;Phase 5+ 再评估或用独立构建 | 已识别 + 缓解 |
 | R4 | 命名冲突(halt_when vs stream_halt_when 等 4 项) | Phase 0 | 决策文档 §3.5 已识别 D6-D9 方案 | ✅ ADR-033 Accepted (2026-06-09) |
 | **R6** | **Phase 1.3d-extras ch_stream 协议转换设计不确定**: 4 字段窄桥 (D1=C) 仅覆盖 addr/data/is_write/id;burst_len/parent_id/fragment_* 走 default | Phase 1.3d-extras / Phase 2 | ✅ **已闭环 (2026-06-13)**: `decision-phase-1.3d-extras-bridge-2026-06-13.md` F1.A (4 字段窄桥路径), PA-6 实施 + PA-8 草案同步完成. R6 仍跟踪: Phase 2 多拍/分片场景需重新评估, 升级路径明确为 BundleMapper (Phase 5/6) | ⏳ 监控中 (Phase 2+ 触发) |
-| **R7** | **Phase 1.4 baseline 选型不确定**: `cpptlm::CacheTLM` vs `cpptlm::HybridCacheWrapper` vs 手写 reference | Phase 1.4 | PA-9 决策草案 5 项候选决议; 优先用 `cpptlm::CacheTLM` (成熟, 已注册) | ⏳ 待启动 |
+| **R7** | **Phase 1.4 范围定位不确定**: 早期 roadmap 解读为"cpptlm::CacheTLM baseline 性能对比", 但 Metis 验证 cpptlm::CacheTLM 是 stub (std::map 全关联无淘汰, 无法配置为 256×64B), 性能对比无意义 | Phase 1.4 | ✅ **已闭环 (2026-06-13)**: 用户对话澄清 Phase 1.4 真实目的 = L1CachePlugin 设计方法学复盘 (DECISION-2026-06-13-02 F1.A). cpptlm::CacheTLM 性能基线对比方案明确推迟到 Phase 2+ (需 HybridCacheWrapper + BUILD_RTL=ON), 不阻塞 Phase 1 退出 | ✅ 闭环 |
 
 ---
 
@@ -190,20 +192,23 @@
 > Phase 1.3 全部子任务完成 (1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f, commits `26fe7d2`..`387b8ca`)。
 > PA-6 (1.3d-extras) 与 PA-8 (决策草案) 已于 2026-06-13 完成。当前仅剩 PA-7 与 PA-9 待启动。
 
-### 建议 1:Phase 1.4 — cpptlm::CacheTLM baseline 对比 (1-2 天) — ⏳ P1
+### 建议 1:Phase 1.4 — L1CachePlugin 设计方法学复盘 v1 (1-2 天) — ✅ Completed (本次会话十)
 
-**前置条件已就绪**:
+**前置条件** (全部已就绪):
 - ✅ Phase 1.3 全部子任务完成 (含 1.3d-extras, 16/16 ctest PASS, 2026-06-13)
-- ✅ `cpptlm::CacheTLM` 已通过 `REGISTER_CHSTREAM` 注册 (`CppTLM/include/chstream_register.hh:30`)
-- ⚠️ 缺: `decision-phase-1.4-baseline-2026-06-10.md` 决策草案 (PA-9) 5 项候选决议
+- ✅ D4 + ADR-040 静态检查 3+4/3 全部 PASS (T1.3 evidence)
+- ✅ DECISION-2026-06-13-02 决策草案 (PA-9) F1-F5 决议, 6 维度 × 3 边界标注
 
-**任务** (详见 `phase-1-tlm-foundation.md §1.4`):
-- 1.4.1: 起草 baseline 决策草案 (PA-9): E1 baseline 选型 / E2 trace 工具 / E3 共享 traffic_gen / E4 hit rate 容差 / E5 测试时长
-- 1.4.2: 创建 `soc/l1_cache_baseline.json` (用 `cpptlm::CacheTLM` 作为对比基线)
-- 1.4.3: 实现 golden reference 测试 `test_l1_cache_plugin_vs_cachetlm.cpp`: 共享 traffic_gen 输入,对比 hit/miss 模式 + 最终 cache 状态 + 延迟分布 (±5%)
-- 1.4.4: 验证 `cpptlm::CacheTLM` 与 `L1CachePlugin` **功能等价** (退出标准 §2.1)
+**任务** (全部完成, 详见 `docs/methodology/plugin-style-design-methodology-v1.md` + `.omo/drafts/phase-1.4-d*-notes.md`):
+- 1.4.1 ✅ 起草决策草案 (PA-9): DECISION-2026-06-13-02 F1-F5 (E1=A 复盘对象 / E2=6 维度 / E3=5 类输入 / E4=3 类边界 / E5=单例子深复盘)
+- 1.4.2 ✅ 6 维度评估 (D1-D6): 41 评估点, 78% B1 接受 / 15% B2 摩擦 / 7% B3 局限
+- 1.4.3 ✅ 6 个 B2 模式代码示例 (friend class 隔离 / 显式 if/else / array_store 命名接口 / 位提取封装 / 模式 #5 #6)
+- 1.4.4 ✅ 3 个 B3 局限明确链接 Phase 6 任务 (B3-L1 multi-cycle scheduling / B3-P1 plugin_payload 命名空间)
 
-**价值**: 验证 D4 Plugin-style 与传统 `tick()` 风格功能等价 (Phase 0 投入变现的关键证据); 为 Phase 2 多 Plugin 协同铺路
+**价值** (本次落地):
+- **Plugin 范式反思的起点**: 6 维度方法学评估 + 3 类边界标注, 替代 lessons 文档的"踩坑清单"视角
+- **Phase 6 完整框架的信心保障**: 33 个 B1 接受点 + 6 个 B2 摩擦点(有模式) + 3 个 B3 局限(显式 Phase 6 任务) = 78% 范式通过率
+- **未来 IP 写作者指南**: v1 文档作为 L2 / ICache / Interconnect 实施时的"范式使用指南", v2 推迟到 Phase 2+ 横向对比
 
 ### 建议 2:Phase 2 — bare-metal 测试套件 (5-7 天) — ⏳ P2
 
@@ -226,6 +231,7 @@
 
 | 日期 | 事件 |
 |------|------|
+| 2026-06-13 | **本次会话十**: Phase 1.4 L1CachePlugin 设计方法学复盘 v1 落地, PA-7 + PA-9 + R7 闭环, 18/18 ctest PASS。PA-9 决策草案 (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`, DECISION-2026-06-13-02) F1-F5 决议, E1-E5 重解读 (复盘对象 → 6 维度 → 3 边界 → 单例子深复盘)。T1 输入材料消化 (12 文件, 3560 行) + D4+ADR-040 静态检查 3+4/3 PASS 基线。T2/T3 6 维度评估笔记 (`.omo/drafts/phase-1.4-d1-d2-notes.md` 324 行 + `.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md` 555 行) — 41 评估点, 78% B1 接受 (32) / 15% B2 摩擦 (6) / 7% B3 局限 (3)。T4 整合 v1 文档 (`docs/methodology/plugin-style-design-methodology-v1.md`, 352 行) — 6 维度 × 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务链接 (B3-L1/L2/L3 + B3-P1/P2)。T4.3 lessons 文档 supersede 注释。T5 roadmap 同步 (§1/§3/§4/§5 全部更新 + 范围修正 banner)。子代理事故恢复: 19 openspec mirror 目录 + 2 root config 已清理, 2 tracked workflow (.github/workflows/architecture-gates.yml + doc_check.yml) 已 `git restore`。`docs/roadmap/roadmap-status.md` 头部 "最后更新" 改 2026-06-13 本次会话十, §1 状态总览更新, §3 PA-7/PA-9 状态 ⏳ → ✅, §4 R7 ⏳ → ✅ 闭环 (E1 重解读: 不做性能基线, 改做方法学复盘), §5 建议 1 状态 ⏳ → ✅ Completed (本次会话十)。Phase 1 进度 75% → 85% (方法学复盘 +10%)。1 个原子 commit (T6)。Phase 1 退出标准全部达成, Phase 2 启动门槛就绪 (PA-1 ~ PA-9 全部 ✅)。 |
 | 2026-06-10 | **本次会话八**: Phase 1.3 全部 6 子任务落地 + 归档指引更新。v2 决策草案 (`8d80fd3` DECISION-2026-06-10-02 v2) 5 项决议 (D1=C POD+窄桥 / D1'=末尾调 pb.run / D1''=不实现+drift 防护 / D2=B 框架层 / D3=A 仅最小 e2e) 全部落地。1.3a L1CacheTLMBridge 框架层 (`26fe7d2`, D1' 末尾挂载契约) + 1.3e BundleMapper drift 防护 (`18418ac`, D1'' `verify_adr.sh` ADR-024 拒绝 `bundles/bundle_mapper.h` 提前实现) + 1.3b `soc/l1_cache_minimal.json` 拓扑 spec (`3dbe058`) + 1.3c `ip/cache/configs/params_schema.json` (`3b6fc27`) + 1.3f `ip/cache/README.md` §9 使用指南 (`e5d865a`) + 1.3d `L1CacheTLMBridgeAdapter` cpptlm ModuleFactory 兼容层 (`c8d1dd1`, 解决 Bridge 构造签名 `(unique_ptr<L1CachePlugin>)` 与 `registerObject<T>(string, EventQueue*)` 不兼容)。14/14 ChipForge ctest PASS in 4.41s; `verify_adr.sh --only=ADR-024` 2/2 PASS (含 drift 防护)。roadmap-status.md §3 PA-6/PA-7/PA-8/PA-9 新增 (Phase 1.3d-extras + Phase 1.4 baseline 启动入口); §4 R6/R7 新增 (ch_stream 协议转换不确定性 + baseline 选型不确定性); §5 Top3 重写 (1.3d-extras → 1.4 → Phase 2); §6 活动日志追加本次会话八条目。6 个原子 commit (Phase 1.3a/1.3b/1.3c/1.3d/1.3e/1.3f)。Phase 1 进度 30% → 65%。**Phase 1.3 全部子任务完成, 新 session 可启动 PA-6/PA-7/PA-8/PA-9 任意顺序**。 |
 | 2026-06-10 | **本次会话七**: Phase 1.2 落地 + Phase 1.2 教训文档化 + 文档债务清零。`ip/cache/tlm/L1CachePlugin.{h,cpp}` 实现 lookup + refill 两阶段 (Plugin-style, D4 合规, 256 sets × 64B line);`test_l1_cache_plugin_unit.cpp` 4/4 PASS (miss / refill / hit-after-refill / D4 runtime);D4 静态检查 3/3 PASS;`docs/lessons/phase-1.2-l1cacheplugin.md` 沉淀 7 类 15+ 模式;`docs/roadmap/README.md` Phase 1 status 同步为 In Progress;`roadmap-status.md` Phase 1 进度 10% → ~30%;`ip/README.md` + `ip/cache/README.md` cache 状态从 🔴 规划中 → 🟡 TLM 实现中;10/10 ctest PASS, 0 warnings;3 个原子 commit (Phase 1.2 实施 + Lessons 文档 + 文档同步)。Phase 1 进度 10% → 30%。 |
 | 2026-06-10 | **本次会话六**: Phase 1.1 Bundle 定义完成。`bundles/mem_bundles.h` 实现 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle), 全部字段用 `cf::plugin::uint_t<N>` (D4 合规);`test_mem_bundles.cpp` 9/9 PASS (含 5 个 static_assert 编译期检查);`bundles/README.md` 设计原则文档;`tools/run_chipforge_tests.sh` 更新包含新测试 (9/9 PASS);捕获 Phase 0 限制 `uint_t<512>` 退化为 `uint64_t` (uint_t.h:37 兜底), Phase 6 升级方案已记录;2 个原子 commit (Phase 0 收尾 + Phase 1.1 提交)。Phase 1 进度 0% → 10%。 |
