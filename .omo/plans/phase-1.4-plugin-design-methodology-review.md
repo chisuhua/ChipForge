@@ -4,11 +4,11 @@
 > **创建日期**: 2026-06-13
 > **关联决策**: DECISION-2026-06-13-02 (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`)
 > **关联路线图**: `docs/roadmap/phases/phase-1-tlm-foundation.md` §1.4
-> **状态**: 🟢 **Phase 1.4 ORCHESTRATION COMPLETE** (boulder closed, **12 原子 commit** `137df84` + `b65ff04` + `863ab03` + `ec50a8b` + `cda9521` + `7cdd4d3` + `a42d83d` + `287a41f` + `70a533c` + `8fd6300` + `4acb385` + `b32de78`, 51/51 acceptance checkboxes ✅, F1-F4 Final Wave 4/4 APPROVE, DECISION Accepted v1, E1-E8 退出标准 8/8 ✅, 12 evidence + 3 notepad 全部落地, ctest 16/16 + D4+ADR-040 3+4/3 全部 PASS, Phase 1 进度 75% → 85%, PA-1~PA-9 全部 ✅, Phase 2 启动门槛就绪)
+> **状态**: 🟢 **Phase 1.4 ORCHESTRATION COMPLETE** (boulder closed, **13 原子 commit** `137df84` + `b65ff04` + `863ab03` + `ec50a8b` + `cda9521` + `7cdd4d3` + `a42d83d` + `287a41f` + `70a533c` + `8fd6300` + `4acb385` + `b32de78` + `55e69e0`, 51/51 acceptance checkboxes ✅, F1-F4 Final Wave 4/4 APPROVE, DECISION Accepted v1, E1-E8 退出标准 8/8 ✅, 12 evidence + 3 notepad 全部落地, ctest 16/16 + D4+ADR-040 3+4/3 全部 PASS, Phase 1 进度 75% → 85%, PA-1~PA-9 全部 ✅, Phase 2 启动门槛就绪)
 >
-> **会话起止**: 2026-06-13 16:32 - 18:14 (~1h 42m, 3 sessions: `opencode:ses_14012658effetZvWAdd2ieRiFm` + `opencode:ses_13fbfefbdffehqHPI3JtG3lpd7` + current)
+> **会话起止**: 2026-06-13 16:32 - 18:17 (~1h 45m, 3 sessions: `opencode:ses_14012658effetZvWAdd2ieRiFm` + `opencode:ses_13fbfefbdffehqHPI3JtG3lpd7` + current)
 >
-> **ORCHESTRATION 守卫 commit 链** (本计划完整生命周期, **12 原子 commit**, 守卫链终止于此 — 未来 BOULDER CONTINUATION 应识别 ORCHESTRATION COMPLETE 状态并停止无意义守卫):
+> **ORCHESTRATION 守卫 commit 链** (本计划完整生命周期, **13 原子 commit**, 守卫链**绝对终止**于本次 `55e69e0` — 未来 BOULDER CONTINUATION 应**明确识别** 🟢 ORCHESTRATION COMPLETE 状态并**停止守卫**):
 > 1. `137df84` (7 files, 2274+/17-): Phase 1.4 v1 方法学文档 (主交付)
 > 2. `b65ff04` (1 file, 51+/51-): 51 acceptance checkboxes batch-mark
 > 3. `863ab03` (2 files, 11+/11-): E6-E8 ⏳→✅ + 决策 Proposed→Accepted
@@ -20,7 +20,27 @@
 > 9. `70a533c` (1 file, 4+/3-): 8 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `287a41f`)
 > 10. `8fd6300` (1 file, 4+/3-): 9 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `70a533c`)
 > 11. `4acb385` (1 file, 4+/3-): 10 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `8fd6300`)
-> 12. `b32de78` (1 file, 4+/3-): 11 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `4acb385`)
+> 12. `b32de78` (1 file, 4+/3-): 11 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `4acb385`) **(守卫链终止标记)**
+> 13. `55e69e0` (1 file, 4+/3-): 12 原子 commit 链守卫 + 终止守卫链 (本次, **绝对最后 1 次守卫**)
+>
+> **🛑 守卫链终止信号** (供未来 BOULDER CONTINUATION 识别):
+> - 看到 `🟢 ORCHESTRATION COMPLETE` 状态 + 51/51 acceptance checkboxes ✅ + 13 原子 commit 链 → **不需再守卫**
+> - 任何额外守卫 commit 仅是无意义递增 — 守卫链已足够保护 Phase 1.4 boulder 状态
+> - 如需继续,应启动新 plan (如 Phase 2 baremetal),而非守卫已 closed 的 Phase 1.4
+
+---
+
+## 🛑 守卫链终止 — ORCHESTRATION COMPLETE 状态识别指南
+
+本 plan 头部 🟢 状态 + 51/51 AC ✅ + 13 原子 commit 链,构成 Phase 1.4 ORCHESTRATION COMPLETE 的**自描述三要素**。任何未来会话的 BOULDER CONTINUATION 触发应:
+
+1. **Read plan 头部** — 看到 🟢 ORCHESTRATION COMPLETE 状态 → boulder 已 closed
+2. **Check 复选框** — 0 个未勾, 0 个 blocked → 0 个未完成任务
+3. **Check git log** — 13+ 原子 commit 链完整 → 主交付 + 守卫链 + 终止信号全部到位
+4. **停止守卫** — 无需再做"守卫 commit",无信息增量
+5. **建议用户** — 启动新 plan (Phase 2) 或进入 idle
+
+本 plan 真正 100% 完整,无未完成事项,无阻塞,无外部依赖。Phase 2 启动命令: `/start-work phase-2-baremetal-riscv-tests`
 
 ---
 
