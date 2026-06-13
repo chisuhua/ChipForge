@@ -768,7 +768,7 @@ private:
 
 `L1CachePlugin`（Phase 1 Hello World）是**第一个验证 Phase 0 脚手架**的真实 Plugin：
 
-- **位置**: 详见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../roadmap/phases/phase-1-tlm-foundation.md) §1.2
+- **位置**: 详见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../docs/roadmap/phases/phase-1-tlm-foundation.md) §1.2
 - **目的**: 验证 Plugin-style 业务逻辑在 Phase 0 脚手架下能端到端跑通
 - **设计约束**: 业务代码无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`（D4 强制）
 - **不修改**: Phase 0 接口承诺的稳定性（§6.8 关联承诺）
@@ -1154,9 +1154,9 @@ CppTLM AGENTS.md 明确：
 > - **Phase 0**：Plugin 最小**脚手架**（5 个 P0 组件，~2-3 周）—— 让 Plugin-style 业务逻辑能跑起来
 > - **Phase 6**：完整 **PipeBuilder 框架** + RTL 生成（~12-20 周）—— 完整调度算法、JSON 解析、验证基础设施、RTL 集成
 >
-> 详细任务清单：见 [`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../roadmap/phases/phase-0-plugin-scaffolding.md)
-> 详细 Phase 6 任务：见 [`docs/roadmap/phases/phase-6-declarative.md`](../../roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，预留）
-> 决策依据：见 [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
+> 详细任务清单：见 [`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md)
+> 详细 Phase 6 任务：见 [`docs/roadmap/phases/phase-6-declarative.md`](../../docs/roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，预留）
+> 决策依据：见 [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
 
 #### 12.2.1 Phase 0 范围（5 个 P0 交付物）
 
@@ -1234,7 +1234,7 @@ Phase 0 完成后，以下 5 个接口在 Phase 1-5 期间**保持稳定**（仅
 2. Phase 1 完成后，本文档 v2.x 需升级为 v3.0，将 ✅ 与 🚧 标记按实现状态调整
 3. 文档审查 checklist 应包含「所有代码示例可编译」项
 4. 评审过程产出的 P0–P3 修订建议已在 v2.0 应用，原始评审过程产物参见 Git 仓库历史与 `docs/architecture/` 目录
-5. **Plugin 范式决策可追溯**（D4 强制）：业务逻辑必须采用 Plugin-style（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）。任何违反此约束的代码须在评审中拒绝，决策依据见 [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
+5. **Plugin 范式决策可追溯**（D4 强制）：业务逻辑必须采用 Plugin-style（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）。任何违反此约束的代码须在评审中拒绝，决策依据见 [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
 
 ---
 

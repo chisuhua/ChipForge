@@ -5,7 +5,7 @@
 | 版本号 | 1.0 |
 | 日期 | 2026-06-09 |
 | 状态 | **Active (Phase 0 已完成, 5/5 P0 组件稳定)** |
-| 关联决策 | [decision-plugin-framework-2026-06-08](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md) |
+| 关联决策 | [decision-plugin-framework-2026-06-08](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) |
 | 适用范围 | ChipForge 插件架构（独立于 CppTLM/CppHDL 框架层） |
 
 > (内容由 Task 4/5 填充)
@@ -20,7 +20,7 @@
 
 ## 1. 设计动机
 
-ChipForge 的电路设计有两种主要风格：命令式的 `tick()` 风格（每个模块自己实现 `tick()` 推进仿真）和声明式的 Plugin 风格（每个模块通过 `at_stage` 注册阶段回调，调度由 `PipeBuilder` 决定）。本节列出选择 Plugin 风格的五个关键动机。这些论证直接引用决策文档 [`decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md) §2.1-2.3 的三段式论证。
+ChipForge 的电路设计有两种主要风格：命令式的 `tick()` 风格（每个模块自己实现 `tick()` 推进仿真）和声明式的 Plugin 风格（每个模块通过 `at_stage` 注册阶段回调，调度由 `PipeBuilder` 决定）。本节列出选择 Plugin 风格的五个关键动机。这些论证直接引用决策文档 [`decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) §2.1-2.3 的三段式论证。
 
 ### 1.1 替换 `tick()`：Plugin 是范式不是工具
 
@@ -116,7 +116,7 @@ Plugin 风格强制一个明确的生命周期，每个阶段职责清晰：
 
 > Plugin 框架的目的不是"提供调度"，而是"用声明式风格替代 `tick()` 风格"。调度本身仍然由业务代码决定；框架只提供类型安全 Key、阶段回调、状态机、声明式控制这四类基础设施。
 
-详细决策依据见 [decision-plugin-framework-2026-06-08.md §2.1-2.3](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md)。
+详细决策依据见 [decision-plugin-framework-2026-06-08.md §2.1-2.3](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)。
 
 ---
 
@@ -128,9 +128,9 @@ Phase 0 锁定 5 个最小可行组件（`PluginBase` / `Payload<T>` / `PipeNode
 - **包含**：`setup` + `build` 生命周期、类型安全 Key、节点状态机、阶段注册、声明式控制、位宽语义。
 - **不包含**：依赖分析、JSON 配置、ScoreBoard、CompareDriver、RTL AST 生成、BundleMapper（全部推迟到 Phase 6）。
 
-**完整 API 参考**：详见 [docs/api/cf_plugin.md](../../api/cf_plugin.md)
+**完整 API 参考**：详见 [docs/api/cf_plugin.md](../api/cf_plugin.md)
 
-> 上一节（§1）回答了"为什么需要 Plugin 风格"。本节回答"Plugin 风格的 5 个 P0 组件分别是什么、长什么样"。每个组件给出：设计意图、公共 API 列表（高层视图）、头文件位置、测试文件位置、关键约束。完整方法签名请翻阅 [cf_plugin.md](../../api/cf_plugin.md)。
+> 上一节（§1）回答了"为什么需要 Plugin 风格"。本节回答"Plugin 风格的 5 个 P0 组件分别是什么、长什么样"。每个组件给出：设计意图、公共 API 列表（高层视图）、头文件位置、测试文件位置、关键约束。完整方法签名请翻阅 [cf_plugin.md](../api/cf_plugin.md)。
 
 ### 2.1 PluginBase
 
@@ -143,7 +143,7 @@ Phase 0 锁定 5 个最小可行组件（`PluginBase` / `Payload<T>` / `PipeNode
 2. **派生类自由**：派生类只 override 必需的方法，没有"必须填的回调"。
 3. **禁止 `tick()` 业务重写**（D4 决策）：`tick()` 设为 `private = delete`，派生类无法意外定义同名函数。这把"Plugin-style vs tick()-style"从编码约定升级为编译期约束。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
 
 | 成员 | 类别 | 用途 |
 |------|------|------|
@@ -186,7 +186,7 @@ struct MyPlugin : cf::plugin::PluginBase {
 - 取值时如果类型不对，`std::any_cast` 抛 `bad_any_cast` 异常，错误信息不友好。
 - `Payload<T>` 用模板强制把 Key 写成有类型的全局对象，三个问题全部解决。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
 
 #### `PayloadKeyBase`（类型擦除基类）
 
@@ -281,7 +281,7 @@ state                       │
 - `CANCELING` + `complete_cancel()` → `IDLE`
 - `reset()` → 直接回到 `IDLE`
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
 
 #### 构造与查询
 
@@ -357,7 +357,7 @@ enum class Phase {
 2. **未来扩展**（Phase 6）：如果引入"先跑完所有 EARLY 再跑 NORMAL 再跑 LATE"的分桶调度，字段已就位。
 3. **可读性**：用户在 `at_stage` 时显式选 Phase，强迫思考"这个回调属于早/中/晚哪一段"。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
 
 #### Plugin 管理
 
@@ -437,7 +437,7 @@ ctrl.halt_when([&] { return node.is_blocked(); })
 
 空 `Condition`（`!cond`）被静默忽略，不会崩。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
 
 | 成员 | 用途 |
 |------|------|
@@ -475,7 +475,7 @@ ctrl.halt_when([&] { return node.is_blocked(); })
 
 为什么不在 Phase 0 直接用 `ch_uint<N>`：Phase 0 是 TLM 模式验证阶段，引入 RTL 抽象会增加复杂度但没有可见收益。`uint_t<N>` 是"位宽语义"的占位 typedef，行为与标准类型一致；Phase 6 再决定是否替换为 `ch_uint<N>`（届时会有 BundleMapper 等基础设施配合）。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
 
 | 成员 | 用途 |
 |------|------|
@@ -511,7 +511,7 @@ static_assert(std::is_same<bool_t, bool>::value,   "bool_t must be bool (Phase 0
 
 ---
 
-**完整 API 参考**：详见 [docs/api/cf_plugin.md](../../api/cf_plugin.md)
+**完整 API 参考**：详见 [docs/api/cf_plugin.md](../api/cf_plugin.md)
 
 ---
 
@@ -654,7 +654,7 @@ static int run_hello_pipeline() {
 - 想给上述 Cache 注入"tag lookup 逻辑"——实现 `Plugin`，用 `Payload<T>` 共享状态，由 `at_stage` 阶段调度
 - 二者通过**配置层**（JSON 模块列表 + C++ Plugin 注册）组合，而非通过**代码继承**组合
 
-> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../roadmap/phases/phase-1-tlm-foundation.md)）。
+> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../docs/roadmap/phases/phase-1-tlm-foundation.md)）。
 
 ### 4.2 Component
 
@@ -765,13 +765,13 @@ D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业�
 | Phase 6 | 🚧 待开发 | 完整 PipeBuilder 框架 + RTL 生成（12-20 周）；推迟的 Phase 1a/1b/1c 内容合并到此阶段 |
 
 > **详细阶段定义**：
-> - Phase 0：[`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../roadmap/phases/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
-> - Phase 1：[`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../roadmap/phases/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
-> - Phase 6：[`docs/roadmap/phases/phase-6-declarative.md`](../../roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
+> - Phase 0：[`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
+> - Phase 1：[`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../docs/roadmap/phases/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
+> - Phase 6：[`docs/roadmap/phases/phase-6-declarative.md`](../../docs/roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
 
 ### 5.2 Phase 0 接口稳定性承诺
 
-> **引用**：[`phase-0-plugin-scaffolding.md` §6.1](../../roadmap/phases/phase-0-plugin-scaffolding.md) + [`declarative-hybrid-framework.md` §12.2.3](declarative-hybrid-framework.md)
+> **引用**：[`phase-0-plugin-scaffolding.md` §6.1](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md) + [`declarative-hybrid-framework.md` §12.2.3](declarative-hybrid-framework.md)
 
 Phase 0 完成后，以下 **5 个接口**在 Phase 1-5 期间**保持稳定**（仅 Phase 6 才升级）：
 

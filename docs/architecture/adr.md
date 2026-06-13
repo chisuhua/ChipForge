@@ -767,7 +767,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 
 ##### 形态切换 (2026-06-12 增补)
 
-Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/interface-design.md` §1.0](../interface-design.md#10-bundle-形态演进-phase-1--phase-5--phase-6):
+Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/interface-design.md` §1.0](./interface-design.md#10-bundle-形态演进-phase-1--phase-5--phase-6):
 
 | 阶段 | 字段类型 | 实施期 |
 |------|----------|--------|

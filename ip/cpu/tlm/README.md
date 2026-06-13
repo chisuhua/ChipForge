@@ -5,11 +5,11 @@
 > ⚠️ **DEPRECATED 术语 (2026-06-08)**:
 > - `PipelineCore` → 废弃，改用 `PipeBuilder`（见 [multi_isa_architecture.md v2.0 §2.4](../docs/multi_isa_architecture.md)）
 > - `Stageable` → 废弃，改用 `Payload<T>`（见 [multi_isa_architecture.md v2.0 §2.3](../docs/multi_isa_architecture.md)）
-> - 权威设计：[`docs/architecture/declarative-hybrid-framework.md` v2.0.2](../../docs/architecture/declarative-hybrid-framework.md)
-> - 决策依据：[`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
+> - 权威设计：[`docs/architecture/declarative-hybrid-framework.md` v2.0.2](../../../docs/architecture/declarative-hybrid-framework.md)
+> - 决策依据：[`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
 
 ## 概述
-基于 CppTLM 框架的 RISC-V ISS（指令集模拟器），采用 Plugin 架构（[Plugin-style 设计](../../docs/roadmap/phases/phase-1-tlm-foundation.md)）。
+基于 CppTLM 框架的 RISC-V ISS（指令集模拟器），采用 Plugin 架构（[Plugin-style 设计](../../../docs/roadmap/phases/phase-1-tlm-foundation.md)）。
 
 ## 核心组件
 - **PipeBuilder** *(原 PipelineCore)*：声明式编译期调度生成器（见 [multi_isa_architecture.md v2.0 §2.4](../docs/multi_isa_architecture.md)）
