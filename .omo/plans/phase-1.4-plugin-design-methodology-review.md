@@ -72,12 +72,12 @@
 
 ### Definition of Done
 
-- [ ] `wc -l docs/methodology/plugin-style-design-methodology-v1.md` ≥ 200
-- [ ] 文档含 D1-D6 6 维度标题 + B1/B2/B3 边界标注
-- [ ] ≥ 10 个 B2 摩擦点带具体代码模式
-- [ ] ≥ 3 个 B3 局限点链接 Phase 6 任务
-- [ ] `ctest --test-dir build --output-on-failure` 16/16 仍 PASS
-- [ ] `git status` 干净 (无未追踪文件)
+- [x] `wc -l docs/methodology/plugin-style-design-methodology-v1.md` ≥ 200
+- [x] 文档含 D1-D6 6 维度标题 + B1/B2/B3 边界标注
+- [x] ≥ 10 个 B2 摩擦点带具体代码模式
+- [x] ≥ 3 个 B3 局限点链接 Phase 6 任务
+- [x] `ctest --test-dir build --output-on-failure` 16/16 仍 PASS
+- [x] `git status` 干净 (无未追踪文件)
 
 ### Must Have
 
@@ -108,13 +108,13 @@
 
 ### 文档自检清单
 
-- [ ] 字数: 200-400 行 (`wc -l`)
-- [ ] D1-D6 标题存在 (`grep "^## D[1-6]"`)
-- [ ] B1/B2/B3 标注 ≥ 13 处 (`grep -cE "B[123]"`)
-- [ ] B2 模式 ≥ 10 个 (`grep -c "B2"`)
-- [ ] B3 局限 ≥ 3 个 (`grep -c "B3"`)
-- [ ] 跨章节引用完整 (每个 B3 链接 Phase 6 任务)
-- [ ] Phase 1.2 lessons supersede 标注存在
+- [x] 字数: 200-400 行 (`wc -l`)
+- [x] D1-D6 标题存在 (`grep "^## D[1-6]"`)
+- [x] B1/B2/B3 标注 ≥ 13 处 (`grep -cE "B[123]"`)
+- [x] B2 模式 ≥ 10 个 (`grep -c "B2"`)
+- [x] B3 局限 ≥ 3 个 (`grep -c "B3"`)
+- [x] 跨章节引用完整 (每个 B3 链接 Phase 6 任务)
+- [x] Phase 1.2 lessons supersede 标注存在
 
 ---
 
@@ -193,9 +193,9 @@ T1 (决策审阅) ──→ T3 (维度 D3-D6 评估) ─┘
   - `.omo/drafts/decision-plugin-framework-2026-06-08.md` D4 (Plugin-style 强制)
 
   **Acceptance Criteria**:
-  - [ ] 决策草案 5 决议 (F1-F5) 全部理解, 能在白板上复述
-  - [ ] Phase 1.2 lessons 7 类教训能列举
-  - [ ] L1CachePlugin 类结构 + at_stage 注册位置能在源码定位
+  - [x] 决策草案 5 决议 (F1-F5) 全部理解, 能在白板上复述
+  - [x] Phase 1.2 lessons 7 类教训能列举
+  - [x] L1CachePlugin 类结构 + at_stage 注册位置能在源码定位
 
   **QA Scenarios (MANDATORY)**:
   ```
@@ -270,10 +270,10 @@ T1 (决策审阅) ──→ T3 (维度 D3-D6 评估) ─┘
   - D2: `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md` D1' (末尾调 pb_.run() 契约)
 
   **Acceptance Criteria**:
-  - [ ] D1 评估含 5-8 个具体观察点 (代码引用 + 行号)
-  - [ ] D1 明确"成功 / 摩擦 / 局限"分类
-  - [ ] D2 跑过 `tools/check_plugin_decision.sh` 3/3 PASS
-  - [ ] D2 明确每个 D4 条款的"已实现"状态
+  - [x] D1 评估含 5-8 个具体观察点 (代码引用 + 行号)
+  - [x] D1 明确"成功 / 摩擦 / 局限"分类
+  - [x] D2 跑过 `tools/check_plugin_decision.sh` 3/3 PASS
+  - [x] D2 明确每个 D4 条款的"已实现"状态
 
   **QA Scenarios (MANDATORY)**:
   ```
@@ -349,11 +349,11 @@ T1 (决策审阅) ──→ T3 (维度 D3-D6 评估) ─┘
   - D6: `ip/cache/tlm/L1CachePlugin.h:88-131` (helper API: issue_request / refill_from_memory / read_response)
 
   **Acceptance Criteria**:
-  - [ ] D3 评估含 ADR-040 4 个 Tier 的对照表
-  - [ ] D4 评估明确 lookup+refill 两阶段的边界类型
-  - [ ] D5 评估含 Key 命名规范 + 跨翻译单元问题的处理
-  - [ ] D6 评估含 helper API 泄漏程度判断 (生产路径 vs 测试路径)
-  - [ ] 4 维度共 20-30 个具体观察点
+  - [x] D3 评估含 ADR-040 4 个 Tier 的对照表
+  - [x] D4 评估明确 lookup+refill 两阶段的边界类型
+  - [x] D5 评估含 Key 命名规范 + 跨翻译单元问题的处理
+  - [x] D6 评估含 helper API 泄漏程度判断 (生产路径 vs 测试路径)
+  - [x] 4 维度共 20-30 个具体观察点
 
   **QA Scenarios (MANDATORY)**:
   ```
@@ -423,12 +423,12 @@ T1 (决策审阅) ──→ T3 (维度 D3-D6 评估) ─┘
   - 决策草案 §2 F6 (退出标准 E1-E8)
 
   **Acceptance Criteria**:
-  - [ ] 文档存在, 字数 200-400 行
-  - [ ] 6 维度标题完整 (D1-D6)
-  - [ ] 3 边界标注 ≥ 13 处
-  - [ ] B2 模式 ≥ 10 个 + B3 局限 ≥ 3 个
-  - [ ] §6 退出标准章节引用 F6 E1-E8
-  - [ ] 关联文档链接完整 (回指决策草案 + lessons + D4 决策)
+  - [x] 文档存在, 字数 200-400 行
+  - [x] 6 维度标题完整 (D1-D6)
+  - [x] 3 边界标注 ≥ 13 处
+  - [x] B2 模式 ≥ 10 个 + B3 局限 ≥ 3 个
+  - [x] §6 退出标准章节引用 F6 E1-E8
+  - [x] 关联文档链接完整 (回指决策草案 + lessons + D4 决策)
 
   **QA Scenarios (MANDATORY)**:
   ```
@@ -495,12 +495,12 @@ T1 (决策审阅) ──→ T3 (维度 D3-D6 评估) ─┘
   - `docs/roadmap/roadmap-status.md` 现状 (基线)
 
   **Acceptance Criteria**:
-  - [ ] §1 状态总览 Phase 1 进度更新
-  - [ ] §3.2 PA-7/PA-9 状态更新为 ✅
-  - [ ] §4 R7 状态更新为闭环
-  - [ ] §5 建议 1 状态更新为 Completed
-  - [ ] §6 活动日志追加本次会话条目
-  - [ ] "最后更新" 日期 2026-06-13
+  - [x] §1 状态总览 Phase 1 进度更新
+  - [x] §3.2 PA-7/PA-9 状态更新为 ✅
+  - [x] §4 R7 状态更新为闭环
+  - [x] §5 建议 1 状态更新为 Completed
+  - [x] §6 活动日志追加本次会话条目
+  - [x] "最后更新" 日期 2026-06-13
 
   **QA Scenarios (MANDATORY)**:
   ```
@@ -557,11 +557,11 @@ T1 (决策审阅) ──→ T3 (维度 D3-D6 评估) ─┘
   - `.opencode/skills/git-master` (原子 commit 规范)
 
   **Acceptance Criteria**:
-  - [ ] `ctest 16/16 PASS`
-  - [ ] `verify_adr.sh ALL PASS`
-  - [ ] `git status` 干净 (只有本次变更的 3 个文件: 新建 v1 文档 + lessons supersede + roadmap 更新)
-  - [ ] commit message 引用 DECISION-2026-06-13-02
-  - [ ] 1 个原子 commit, 无拆 commit
+  - [x] `ctest 16/16 PASS`
+  - [x] `verify_adr.sh ALL PASS`
+  - [x] `git status` 干净 (只有本次变更的 3 个文件: 新建 v1 文档 + lessons supersede + roadmap 更新)
+  - [x] commit message 引用 DECISION-2026-06-13-02
+  - [x] 1 个原子 commit, 无拆 commit
 
   **QA Scenarios (MANDATORY)**:
   ```
@@ -710,12 +710,12 @@ git status --porcelain  # 期望: 空 (commit 后)
 
 ### Final Checklist
 
-- [ ] 6 维度评估完整 (D1-D6)
-- [ ] 3 边界标注 ≥ 13 处 (B1/B2/B3)
-- [ ] B2 摩擦模式 ≥ 10 个
-- [ ] B3 局限 ≥ 3 个 + Phase 6 任务链接
-- [ ] lessons supersede 注释
-- [ ] roadmap 同步 (§1/§3/§4/§5/§6 全部更新)
-- [ ] 16/16 ctest PASS (不退化)
-- [ ] D4 静态检查 ALL PASS (不退化)
-- [ ] 1 个原子 commit, 引用 DECISION-2026-06-13-02
+- [x] 6 维度评估完整 (D1-D6)
+- [x] 3 边界标注 ≥ 13 处 (B1/B2/B3)
+- [x] B2 摩擦模式 ≥ 10 个
+- [x] B3 局限 ≥ 3 个 + Phase 6 任务链接
+- [x] lessons supersede 注释
+- [x] roadmap 同步 (§1/§3/§4/§5/§6 全部更新)
+- [x] 16/16 ctest PASS (不退化)
+- [x] D4 静态检查 ALL PASS (不退化)
+- [x] 1 个原子 commit, 引用 DECISION-2026-06-13-02
