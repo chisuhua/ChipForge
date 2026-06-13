@@ -1,0 +1,337 @@
+{
+  "schema_version": 2,
+  "active_work_id": "phase-1-4-plugin-design-methodology-review-015435c8",
+  "works": {
+    "adr-033-naming-lock-af826767": {
+      "work_id": "adr-033-naming-lock-af826767",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/adr-033-naming-lock.md",
+      "plan_name": "adr-033-naming-lock",
+      "status": "completed",
+      "started_at": "2026-06-09T03:01:11.169Z",
+      "updated_at": "2026-06-09T03:56:03.415Z",
+      "session_ids": [
+        "opencode:ses_157dc51d4ffemCorFhx6LBQm9Y"
+      ],
+      "session_origins": {
+        "opencode:ses_157dc51d4ffemCorFhx6LBQm9Y": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "§1 status overview table L16: Phase 1* row 备注 column — change \"处置 phase-1-foundation.md\" → \"已删除 (2026-06-09)\"",
+          "session_id": "opencode:ses_15595f091ffeAtd1ZxbpzjLK37",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "started_at": "2026-06-09T03:06:58.598Z",
+          "ended_at": "2026-06-09T03:32:22.639Z",
+          "elapsed_ms": 1524041,
+          "status": "completed",
+          "updated_at": "2026-06-09T03:32:22.639Z"
+        },
+        "todo:2": {
+          "task_key": "todo:2",
+          "task_label": "2",
+          "task_title": "git rm phase-1-foundation.md",
+          "session_id": "opencode:ses_155a280d5ffeskqMnlm6YkuFAm",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-06-09T03:17:40.883Z",
+          "started_at": "2026-06-09T03:16:21.466Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T03:17:40.883Z",
+          "elapsed_ms": 79417
+        },
+        "todo:3": {
+          "task_key": "todo:3",
+          "task_label": "3",
+          "task_title": "修正 4 处 ip/*/README.md 活链接",
+          "session_id": "opencode:ses_1559c4986ffeDDAizpkneLuPUx",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-06-09T03:24:09.193Z",
+          "started_at": "2026-06-09T03:23:09.434Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T03:24:09.193Z",
+          "elapsed_ms": 59759
+        },
+        "todo:5": {
+          "task_key": "todo:5",
+          "task_label": "5",
+          "task_title": "单个原子 commit + 负向测试验证",
+          "session_id": "opencode:ses_1558a88a6ffeNuT0kHah4vapoh",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-06-09T03:47:49.133Z",
+          "started_at": "2026-06-09T03:46:04.267Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T03:47:49.133Z",
+          "elapsed_ms": 104866
+        },
+        "final-wave:f1": {
+          "task_key": "final-wave:f1",
+          "task_label": "F1",
+          "task_title": "**Plan Compliance Audit** — `oracle`",
+          "session_id": "opencode:ses_15580c112ffeDbY83EZdpHDlPQ",
+          "agent": "oracle",
+          "updated_at": "2026-06-09T03:55:15.128Z",
+          "started_at": "2026-06-09T03:51:00.123Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T03:55:15.128Z",
+          "elapsed_ms": 255005
+        }
+      },
+      "ended_at": "2026-06-09T03:56:03.415Z",
+      "elapsed_ms": 3292246
+    },
+    "plugin-docs-extraction-ec19ae20": {
+      "work_id": "plugin-docs-extraction-ec19ae20",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/plugin-docs-extraction.md",
+      "plan_name": "plugin-docs-extraction",
+      "status": "completed",
+      "started_at": "2026-06-09T11:16:16.719Z",
+      "updated_at": "2026-06-09T13:46:57.972Z",
+      "session_ids": [
+        "opencode:ses_1545a23a7ffeJPdUatlkNq6Jyq"
+      ],
+      "session_origins": {
+        "opencode:ses_1545a23a7ffeJPdUatlkNq6Jyq": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "创建 `plugin-framework.md` 骨架",
+          "session_id": "opencode:ses_153e51b50ffeTr6HrT5GzOSQjl",
+          "agent": "Sisyphus-Junior",
+          "started_at": "2026-06-09T11:21:25.544Z",
+          "status": "completed",
+          "updated_at": "2026-06-09T11:58:44.387Z",
+          "ended_at": "2026-06-09T11:58:44.387Z",
+          "elapsed_ms": 2238843
+        },
+        "todo:4": {
+          "task_key": "todo:4",
+          "task_label": "4",
+          "task_title": "填充 `plugin-framework.md` §1 设计动机 + §2 5 个 P0 组件 API 摘要",
+          "session_id": "opencode:ses_153bee5fdffe1q5hhUuBrFGwmn",
+          "agent": "Sisyphus-Junior",
+          "category": "writing",
+          "updated_at": "2026-06-09T12:25:02.924Z",
+          "started_at": "2026-06-09T12:21:53.798Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T12:25:02.924Z",
+          "elapsed_ms": 189126
+        },
+        "todo:7": {
+          "task_key": "todo:7",
+          "task_label": "7",
+          "task_title": "从 `declarative-hybrid-framework.md` 移除 §4/§7 并升级到 v2.1.0",
+          "session_id": "opencode:ses_153a70cc8ffemzyihuJnyxMbYv",
+          "agent": "Sisyphus-Junior",
+          "category": "writing",
+          "updated_at": "2026-06-09T12:58:14.284Z",
+          "started_at": "2026-06-09T12:35:16.834Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T12:58:14.284Z",
+          "elapsed_ms": 1377450
+        },
+        "todo:10": {
+          "task_key": "todo:10",
+          "task_label": "10",
+          "task_title": "运行 `verify_adr.sh` + 手动 cross-reference 完整性检查",
+          "session_id": "opencode:ses_153872b49ffenkjLJKAPjHGQkj",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-09T13:29:19.783Z",
+          "started_at": "2026-06-09T13:26:17.091Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T13:29:19.783Z",
+          "elapsed_ms": 182692
+        },
+        "final-wave:f1": {
+          "task_key": "final-wave:f1",
+          "task_label": "F1",
+          "task_title": "**Plan Compliance Audit** — `oracle`",
+          "session_id": "opencode:ses_1536b2973ffeUQpZIHBhH0hOES",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-09T13:45:29.676Z",
+          "started_at": "2026-06-09T13:39:05.784Z",
+          "status": "completed",
+          "ended_at": "2026-06-09T13:45:29.676Z",
+          "elapsed_ms": 383892
+        }
+      },
+      "ended_at": "2026-06-09T13:46:57.972Z",
+      "elapsed_ms": 9041253
+    },
+    "fix-roadmap-doc-sync-2026-06-12-a685a57a": {
+      "work_id": "fix-roadmap-doc-sync-2026-06-12-a685a57a",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/fix-roadmap-doc-sync-2026-06-12.md",
+      "plan_name": "fix-roadmap-doc-sync-2026-06-12",
+      "status": "completed",
+      "started_at": "2026-06-12T15:48:00.000Z",
+      "updated_at": "2026-06-12T16:30:00.000Z",
+      "ended_at": "2026-06-12T16:30:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "48ac8a5"
+    },
+    "fix-bundle-type-dual-track-2026-06-12-5b0d3d13": {
+      "work_id": "fix-bundle-type-dual-track-2026-06-12-5b0d3d13",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/fix-bundle-type-dual-track-2026-06-12.md",
+      "plan_name": "fix-bundle-type-dual-track-2026-06-12",
+      "status": "completed",
+      "started_at": "2026-06-12T16:30:00.000Z",
+      "updated_at": "2026-06-12T17:00:00.000Z",
+      "ended_at": "2026-06-12T17:00:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "8105dae"
+    },
+    "adr-040-internal-consistency-2026-06-12-6925ea74": {
+      "work_id": "adr-040-internal-consistency-2026-06-12-6925ea74",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/adr-040-internal-consistency-2026-06-12.md",
+      "plan_name": "adr-040-internal-consistency-2026-06-12",
+      "status": "completed",
+      "started_at": "2026-06-12T17:00:00.000Z",
+      "updated_at": "2026-06-12T17:15:00.000Z",
+      "ended_at": "2026-06-12T17:15:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "654df9c"
+    },
+    "ci-architecture-gates-2026-06-12-11ffbd79": {
+      "work_id": "ci-architecture-gates-2026-06-12-11ffbd79",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/ci-architecture-gates-2026-06-12.md",
+      "plan_name": "ci-architecture-gates-2026-06-12",
+      "status": "completed",
+      "started_at": "2026-06-12T17:15:00.000Z",
+      "updated_at": "2026-06-12T18:45:00.000Z",
+      "ended_at": "2026-06-12T18:45:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "58c4d11"
+    },
+    "phase-1.3d-extras-bridge-2026-06-13-5084b1e4": {
+      "work_id": "phase-1.3d-extras-bridge-2026-06-13-5084b1e4",
+      "active_plan": "/workspace/project/ChipForge/.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md",
+      "plan_name": "phase-1.3d-extras-bridge-2026-06-13",
+      "status": "completed",
+      "started_at": "2026-06-13T00:30:00.000Z",
+      "updated_at": "2026-06-13T01:45:00.000Z",
+      "ended_at": "2026-06-13T01:45:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "387b8ca"
+    },
+    "roadmap-alignment-phase1-status-2026-06-13-3564144f": {
+      "work_id": "roadmap-alignment-phase1-status-2026-06-13-3564144f",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/roadmap-alignment-phase1-status-2026-06-13.md",
+      "plan_name": "roadmap-alignment-phase1-status-2026-06-13",
+      "status": "completed",
+      "started_at": "2026-06-13T13:00:00.000Z",
+      "updated_at": "2026-06-13T13:10:00.000Z",
+      "ended_at": "2026-06-13T13:10:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "88bda25"
+    },
+    "roadmap-alignment-recommendations-2026-06-13-c8b0b57d": {
+      "work_id": "roadmap-alignment-recommendations-2026-06-13-c8b0b57d",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/roadmap-alignment-recommendations-2026-06-13.md",
+      "plan_name": "roadmap-alignment-recommendations-2026-06-13",
+      "status": "completed",
+      "started_at": "2026-06-13T13:10:00.000Z",
+      "updated_at": "2026-06-13T13:15:00.000Z",
+      "ended_at": "2026-06-13T13:15:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "2e96aa1"
+    },
+    "roadmap-alignment-phase0-checkboxes-2026-06-13-36b51384": {
+      "work_id": "roadmap-alignment-phase0-checkboxes-2026-06-13-36b51384",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/roadmap-alignment-phase0-checkboxes-2026-06-13.md",
+      "plan_name": "roadmap-alignment-phase0-checkboxes-2026-06-13",
+      "status": "completed",
+      "started_at": "2026-06-13T13:15:00.000Z",
+      "updated_at": "2026-06-13T13:20:00.000Z",
+      "ended_at": "2026-06-13T13:20:00.000Z",
+      "session_ids": [],
+      "session_origins": {},
+      "agent": "sisyphus-junior",
+      "task_sessions": {},
+      "commit_sha": "4c5f52e"
+    },
+    "phase-1-4-plugin-design-methodology-review-015435c8": {
+      "work_id": "phase-1-4-plugin-design-methodology-review-015435c8",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/phase-1.4-plugin-design-methodology-review.md",
+      "plan_name": "phase-1.4-plugin-design-methodology-review",
+      "status": "completed",
+      "started_at": "2026-06-13T08:32:30.747Z",
+      "updated_at": "2026-06-13T09:15:00.000Z",
+      "ended_at": "2026-06-13T09:15:00.000Z",
+      "elapsed_ms": 2549253,
+      "session_ids": [
+        "opencode:ses_14012658effetZvWAdd2ieRiFm",
+        "opencode:ses_13fbfefbdffehqHPI3JtG3lpd7"
+      ],
+      "session_origins": {
+        "opencode:ses_14012658effetZvWAdd2ieRiFm": "direct",
+        "opencode:ses_13fbfefbdffehqHPI3JtG3lpd7": "appended"
+      },
+      "agent": "atlas",
+      "task_sessions": {},
+      "commit_sha": "137df84"
+    },
+    "phase-2-baremetal-riscv-tests-c1aecba": {
+      "work_id": "phase-2-baremetal-riscv-tests-c1aecba",
+      "active_plan": "/workspace/project/ChipForge/.omo/plans/phase-2-baremetal-riscv-tests.md",
+      "plan_name": "phase-2-baremetal-riscv-tests",
+      "status": "active",
+      "started_at": "2026-06-13T13:44:30.399Z",
+      "updated_at": "2026-06-13T13:50:00.000Z",
+      "session_ids": [
+        "opencode:ses_14012658effetZvWAdd2ieRiFm"
+      ],
+      "session_origins": {
+        "opencode:ses_14012658effetZvWAdd2ieRiFm": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {},
+      "commit_sha": "c1aecba"
+    }
+  },
+  "active_plan": null,
+  "started_at": "2026-06-13T08:32:30.747Z",
+  "status": "completed",
+  "updated_at": "2026-06-13T09:15:00.000Z",
+  "session_ids": [
+    "opencode:ses_14012658effetZvWAdd2ieRiFm",
+    "opencode:ses_13fbfefbdffehqHPI3JtG3lpd7"
+  ],
+  "session_origins": {
+    "opencode:ses_14012658effetZvWAdd2ieRiFm": "direct",
+    "opencode:ses_13fbfefbdffehqHPI3JtG3lpd7": "appended"
+  },
+  "plan_name": "phase-1.4-plugin-design-methodology-review",
+  "task_sessions": {},
+  "agent": "atlas"
+}
