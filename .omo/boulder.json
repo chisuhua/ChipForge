@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "active_work_id": "phase-1-4-plugin-design-methodology-review-015435c8",
+  "active_work_id": "phase-2-baremetal-riscv-tests-c1aecba",
   "works": {
     "adr-033-naming-lock-af826767": {
       "work_id": "adr-033-naming-lock-af826767",
@@ -283,7 +283,7 @@
     "phase-1-4-plugin-design-methodology-review-015435c8": {
       "work_id": "phase-1-4-plugin-design-methodology-review-015435c8",
       "active_plan": "/workspace/project/ChipForge/.omo/plans/phase-1.4-plugin-design-methodology-review.md",
-      "plan_name": "phase-1.4-plugin-design-methodology-review",
+  "plan_name": "phase-2-baremetal-riscv-tests",
       "status": "completed",
       "started_at": "2026-06-13T08:32:30.747Z",
       "updated_at": "2026-06-13T09:15:00.000Z",
@@ -319,10 +319,10 @@
       "commit_sha": "c1aecba"
     }
   },
-  "active_plan": null,
-  "started_at": "2026-06-13T08:32:30.747Z",
-  "status": "completed",
-  "updated_at": "2026-06-13T09:15:00.000Z",
+  "active_plan": "/workspace/project/ChipForge/.omo/plans/phase-2-baremetal-riscv-tests.md",
+  "started_at": "2026-06-13T13:44:30.399Z",
+  "status": "active",
+  "updated_at": "2026-06-13T13:50:00.000Z",
   "session_ids": [
     "opencode:ses_14012658effetZvWAdd2ieRiFm",
     "opencode:ses_13fbfefbdffehqHPI3JtG3lpd7"

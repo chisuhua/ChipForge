@@ -219,7 +219,46 @@
 
 ## TODOs
 
-### 1. 工具链准备
+### 1. 工具链准备 [~] BLOCKED by external dependency
+
+**Status**: Blocked by external dependency (2026-06-13 13:55)
+
+**Why blocked**: 4 个 RISC-V 工具未预装:
+- `riscv64-unknown-elf-gcc` (RISC-V 交叉编译器) — 未安装
+- `spike` (性能参考 ISA simulator) — 未安装
+- `sail-riscv` (RISC-V 黄金参考实现) — 未安装
+- `riscof` (RISC-V 合规认证框架) — 未安装
+
+**Verification** (`which` 命令):
+- `which riscv64-unknown-elf-gcc` → empty
+- `which spike` → empty
+- `which sail-riscv` → empty
+- `which riscof` → empty
+- `which python3` → `/home/ubuntu/venv/bin/python3` ✅ (Python 3.12.3 已装)
+
+**F2 决策冲突**:
+- F2 决议"工具链策略 = 直接用预装, 不重编译"
+- 实际 4/5 工具未预装 (仅 python3)
+- 按 F2 决议"如工具链缺失, 阻塞需用户决策" — 当前是用户决策点
+
+**需要 user 决策**:
+1. **安装 RISC-V 工具链** (sudo apt install gcc-riscv64-unknown-elf spike + 安装 sail-riscv + pip install riscof)
+2. **接受部分工具链缺失** (修改 F2 决议, 仅用 Python 验证 + L1CachePlugin as memory model, 不依赖完整 RISC-V 工具链)
+3. **暂停 Phase 2** (等其他环境 ready)
+
+**Why not 自动执行**:
+- 工具链安装需 sudo 权限 + 系统级操作, 超出 atlas 编排器范围
+- 修改 F2 决策需 Prometheus 重新起草决策草案, 是新决策
+- Phase 2 范围 = 完整 RISC-V ISA 验证, 无工具链则无法实现 8 任务中任意一个
+
+**解锁条件**: 用户明确指示安装工具链 (选项 1) 或调整 F2 决策 (选项 2) 或暂停 (选项 3)
+
+**What to do** (解锁后):
+- [ ] 验证 `riscv64-unknown-elf-gcc` (交叉编译器)
+- [ ] 验证 `spike` (性能参考)
+- [ ] 验证 `sail-riscv` (黄金参考)
+- [ ] 验证 `riscof` (合规框架)
+- [ ] 验证 `python3` (测试驱动)
 
 **What to do**:
 
