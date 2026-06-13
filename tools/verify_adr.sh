@@ -124,8 +124,42 @@ log_failed() {
 }
 
 log_verbose() {
-  [[ "$VERBOSE" -eq 1 ]] && echo -e "    ${C_GRAY}→ $1${C_RESET}" || true
+  [[ "$VERBOSE" -eq 1 ]] && echo -e "    ${C_GRAY}→ $1${C_GRAY}" || true
 }
+
+# ----------------------------------------------------------------------------
+# ADR 详细记录状态检查 (2026-06-13 增强, 解决 3 处 STALE 误报)
+#
+# 解析 `docs/architecture/adr.md` 中 `#### <id>：...` 章节下的
+# `| 状态 | <value> |` 行, 判断是否已 "实现" (含 ✅) 或仍 "待实现" (含 🚧).
+#
+# 返回 0 (true) = 已实现, 1 (false) = 未实现 / 未找到
+# ----------------------------------------------------------------------------
+adr_status_is_done() {
+  local id="$1"
+  local adr_file="$CHIPFORGE_ROOT/docs/architecture/adr.md"
+  [[ -f "$adr_file" ]] || return 1
+
+  # 提取 #### <id>：章节下的 `| 状态 | ... |` 行
+  local status_line
+  status_line=$(awk -v target="#### ${id}：" '
+    $0 ~ target { found=1; next }
+    found && /^#### / { exit }
+    found && /^\| 状态 \|/ { print; exit }
+  ' "$adr_file")
+
+  [[ -z "$status_line" ]] && return 1
+
+  # ✅ / 已实现 / Accepted / Implemented / Phase N 提案 (但已完成核心) 都视为 done
+  if echo "$status_line" | grep -qE "✅"; then
+    return 0
+  fi
+  if echo "$status_line" | grep -qE "Accepted|已实现|已落地|Implemented"; then
+    return 0
+  fi
+  return 1
+}
+
 
 should_run() {
   local id="$1"
@@ -567,7 +601,12 @@ verify_adr_026() {
     --include="*.h" --include="*.hh" --include="*.hpp" --include="*.cpp" --include="*.cc" 2>/dev/null | head -1; then
     log_expected_missing "ADR-026" "at_stage() 逻辑阶段名绑定" "方法不存在"
   else
-    log_stale "ADR-026" "at_stage()" "方法已存在但 ADR 仍 🚧"
+    # 代码已实现 → 检查 ADR 详细记录状态 (2026-06-13 增强: 避免误报 STALE)
+    if adr_status_is_done "ADR-026"; then
+      log_pass "ADR-026" "at_stage()"
+    else
+      log_stale "ADR-026" "at_stage()" "方法已存在但 ADR 仍 🚧"
+    fi
   fi
 }
 
@@ -590,7 +629,11 @@ verify_adr_028() {
     --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1; then
     log_expected_missing "ADR-028" "declare_substage() 动态扩展子流水线" "方法不存在"
   else
-    log_stale "ADR-028" "declare_substage()" "已实现但 ADR 仍 🚧"
+    if adr_status_is_done "ADR-028"; then
+      log_pass "ADR-028" "declare_substage()"
+    else
+      log_stale "ADR-028" "declare_substage()" "已实现但 ADR 仍 🚧"
+    fi
   fi
 }
 
@@ -619,7 +662,11 @@ verify_adr_030() {
     --include="*.h" --include="*.hh" --include="*.hpp" 2>/dev/null | head -1; then
     log_expected_missing "ADR-030" "PipeNode 三态握手" "class PipeNode 不存在"
   else
-    log_stale "ADR-030" "PipeNode" "已实现但 ADR 仍 🚧"
+    if adr_status_is_done "ADR-030"; then
+      log_pass "ADR-030" "PipeNode"
+    else
+      log_stale "ADR-030" "PipeNode" "已实现但 ADR 仍 🚧"
+    fi
   fi
 }
 
