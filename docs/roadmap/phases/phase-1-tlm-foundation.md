@@ -1,6 +1,6 @@
 # Phase 1：基础 TLM 平台（L1CachePlugin "Hello World"）
 
-> **Status**: In Progress (~65%, Phase 1.3 全部子任务完成, 2026-06-10)
+> **Status**: In Progress (~75%, Phase 1.3 全部子任务完成含1.3d-extras, 2026-06-13)
 > **Milestone**: M1 - L1CachePlugin 在 TLM 模式下端到端跑通
 > **Depends on**: Phase 0（Plugin 最小脚手架）
 > **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md` + `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`
@@ -9,8 +9,8 @@
 > **实施历史** (2026-06-10):
 > - 1.1 Bundle 定义完成 (`073402c`): `bundles/mem_bundles.h` 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle), D4 合规
 > - 1.2 L1CachePlugin 完成 (`e8deacc`): `ip/cache/tlm/L1CachePlugin.{h,cpp}` lookup + refill 两阶段, 256 sets × 64B direct-mapped, 4/4 单元测试 PASS
-> - 1.3 全部子任务完成 (`26fe7d2`..`c8d1dd1`): 1.3a Bridge / 1.3b SoC JSON / 1.3c Schema / 1.3d Adapter / 1.3e drift 防护 / 1.3f README
-> - Phase 1 进度: 0% → 10% (1.1) → 30% (1.2) → 65% (1.3 全部)
+> - 1.3 全部子任务完成 (`26fe7d2`..`387b8ca`): 1.3a Bridge / 1.3b SoC JSON / 1.3c Schema / 1.3d Adapter / 1.3d-extras ch_stream注册 / 1.3e drift 防护 / 1.3f README
+> - Phase 1 进度: 0% → 10% (1.1) → 30% (1.2) → 65% (1.3) → 75% (1.3d-extras)
 > - 14/14 ctest PASS in ~4.5s
 
 **目标**：在 Phase0 提供的 Plugin 脚手架上，实现第一个真实 Plugin（`L1CachePlugin`），验证 Plugin-style 设计在 TLM 模式下的可行性。
