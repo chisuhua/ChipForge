@@ -4,11 +4,11 @@
 > **创建日期**: 2026-06-13
 > **关联决策**: DECISION-2026-06-13-02 (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`)
 > **关联路线图**: `docs/roadmap/phases/phase-1-tlm-foundation.md` §1.4
-> **状态**: 🟢 **Phase 1.4 ORCHESTRATION COMPLETE** (boulder closed, **7 原子 commit** `137df84` + `b65ff04` + `863ab03` + `ec50a8b` + `cda9521` + `7cdd4d3` + `a42d83d`, 51/51 acceptance checkboxes ✅, F1-F4 Final Wave 4/4 APPROVE, DECISION Accepted v1, E1-E8 退出标准 8/8 ✅, 12 evidence + 3 notepad 全部落地, ctest 16/16 + D4+ADR-040 3+4/3 全部 PASS, Phase 1 进度 75% → 85%, PA-1~PA-9 全部 ✅, Phase 2 启动门槛就绪)
+> **状态**: 🟢 **Phase 1.4 ORCHESTRATION COMPLETE** (boulder closed, **8 原子 commit** `137df84` + `b65ff04` + `863ab03` + `ec50a8b` + `cda9521` + `7cdd4d3` + `a42d83d` + `287a41f`, 51/51 acceptance checkboxes ✅, F1-F4 Final Wave 4/4 APPROVE, DECISION Accepted v1, E1-E8 退出标准 8/8 ✅, 12 evidence + 3 notepad 全部落地, ctest 16/16 + D4+ADR-040 3+4/3 全部 PASS, Phase 1 进度 75% → 85%, PA-1~PA-9 全部 ✅, Phase 2 启动门槛就绪)
 >
-> **会话起止**: 2026-06-13 16:32 - 17:59 (~1h 27m, 3 sessions: `opencode:ses_14012658effetZvWAdd2ieRiFm` + `opencode:ses_13fbfefbdffehqHPI3JtG3lpd7` + current)
+> **会话起止**: 2026-06-13 16:32 - 18:02 (~1h 30m, 3 sessions: `opencode:ses_14012658effetZvWAdd2ieRiFm` + `opencode:ses_13fbfefbdffehqHPI3JtG3lpd7` + current)
 >
-> **ORCHESTRATION 守卫 commit 链** (本计划完整生命周期, **7 原子 commit**):
+> **ORCHESTRATION 守卫 commit 链** (本计划完整生命周期, **8 原子 commit**):
 > 1. `137df84` (7 files, 2274+/17-): Phase 1.4 v1 方法学文档 (主交付)
 > 2. `b65ff04` (1 file, 51+/51-): 51 acceptance checkboxes batch-mark
 > 3. `863ab03` (2 files, 11+/11-): E6-E8 ⏳→✅ + 决策 Proposed→Accepted
@@ -16,6 +16,7 @@
 > 5. `cda9521` (1 file, 9+/2-): 4 原子 commit 链 + session 3 完整记录 (守卫)
 > 6. `7cdd4d3` (1 file, 5+/4-): 5 原子 commit 链守卫 + SHA 替换 (`<pending>` → `cda9521`)
 > 7. `a42d83d` (1 file, 4+/4-): 6 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `7cdd4d3`)
+> 8. `287a41f` (1 file, 4+/3-): 7 原子 commit 链守卫 + 最终 SHA 替换 (`<this-commit>` → `a42d83d`)
 
 ---
 
