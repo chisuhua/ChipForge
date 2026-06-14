@@ -1,0 +1,52 @@
+=== Phase 2 任务 1: RISC-V 工具链安装 evidence ===
+
+时间: 2026-06-14 08:17-08:53 (Phase 2 work session day 2)
+用户授权: 选项 1 (启动安装 RISC-V 工具链)
+安装策略: 混合 (apt + 预编译 + source build)
+
+### 4 工具安装结果
+
+| 工具 | 版本 | 来源 | 状态 |
+|------|------|------|------|
+| riscv64-unknown-elf-gcc | 13.2.0 (apt) | apt install gcc-riscv64-unknown-elf | ✅ DONE |
+| sail-riscv | 0.12 (prebuilt) | GitHub release sail-riscv-Linux-x86_64.tar.gz → /usr/local/bin/sail_riscv | ✅ DONE |
+| riscof | 1.25.3 (pip) | pip3 install riscof (aliyun mirror + trusted-host) | ✅ DONE |
+| spike | 1.1.1-dev (source build) | codeload master branch → /opt/riscv-tools/spike | 🔄 BUILDING (PID 1021716, in background, expected ~15-20min) |
+
+### 安装路径
+
+- riscv64-unknown-elf-gcc: /usr/bin/riscv64-unknown-elf-gcc (apt)
+- sail_riscv: /usr/local/bin/sail_riscv → /workspace/project/ChipForge/sail-riscv-Linux-x86_64/bin/sail_riscv_sim
+- sail-riscv-Linux-x86_64: /workspace/project/ChipForge/sail-riscv-Linux-x86_64/ (extracted)
+- riscof: /home/ubuntu/venv/bin/riscof
+- spike (build 完成后): /opt/riscv-tools/spike/bin/spike
+
+### 关键命令
+
+1. apt install: `sudo apt-get install -y gcc-riscv64-unknown-elf device-tree-compiler libfdt-dev`
+2. sail-riscv 下载: `curl -L -o sail-riscv-Linux-x86_64.tar.gz https://github.com/rems-project/sail-riscv/releases/download/0.12/sail-riscv-Linux-x86_64.tar.gz`
+3. sail-riscv 链接: `sudo ln -sf /workspace/project/ChipForge/sail-riscv-Linux-x86_64/bin/sail_riscv_sim /usr/local/bin/sail_riscv`
+4. riscof 安装: `pip3 install --index-url http://mirrors.cloud.aliyuncs.com/pypi/simple/ --trusted-host mirrors.cloud.aliyuncs.com riscof`
+5. spike source: `curl -L -o spike-master.tar.gz https://codeload.github.com/riscv-software-src/riscv-isa-sim/tar.gz/refs/heads/master`
+6. spike build: `cd riscv-isa-sim-master && mkdir build && cd build && ../configure --prefix=/opt/riscv-tools/spike && make -j2`
+
+### 验证
+
+- riscv64-unknown-elf-gcc --version: 13.2.0 ✅
+- sail_riscv --version: 0.12 ✅
+- riscof --version: RISC-V Architectural Test Framework, version 1.25.3 ✅
+- spike: BUILDING (预计 15-20min 总编译时间)
+
+### git ignore 决策
+
+工具链产物 (spike build 目录 + sail-riscv 解压目录) 不入 git repo:
+- /workspace/project/ChipForge/sail-riscv-Linux-x86_64/ (2.8M 工具链产物)
+- /workspace/project/ChipForge/sail-riscv-Linux-x86_64.tar.gz (2.8M 缓存)
+- /home/ubuntu/riscv-isa-sim-master/ (源码 568K + build 313 obj, ~1GB total)
+- /home/ubuntu/spike-master.tar.gz (568K 缓存)
+
+需在 .gitignore 添加:
+- sail-riscv-Linux-x86_64/
+- sail-riscv-Linux-x86_64.tar.gz
+- spike-master.tar.gz
+- /home/ubuntu/riscv-isa-sim-master/  (在 .gitignore 全局)

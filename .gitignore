@@ -38,3 +38,9 @@ dist/
 .DS_Store
 # Added by code-review-graph
 .code-review-graph/
+
+
+# Phase 2 RISC-V toolchain prebuilt (not source)
+sail-riscv-Linux-x86_64/
+sail-riscv-Linux-x86_64.tar.gz
+spike-master.tar.gz
