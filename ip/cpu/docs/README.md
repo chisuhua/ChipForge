@@ -10,10 +10,6 @@
 
 以下文档记录了早期设计探索过程，保留用于理解架构演进。**实现时请以 multi_isa_architecture.md 为准。**
 
-| 文档 | 说明 | 状态 |
-|------|------|------|
-| [riscv/VexRiscvArch.md](riscv/VexRiscvArch.md) | 早期 RV64I Plugin 架构设计（回调模型） | Deprecated |
-| [riscv/VexRiscvOnCppTLM.md](riscv/VexRiscvOnCppTLM.md) | CppTLM 上的 VexRiscv 风格 Plugin 系统方案探索 | Deprecated |
 
 ## 架构演进路线
 
