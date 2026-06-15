@@ -44,3 +44,65 @@ dist/
 sail-riscv-Linux-x86_64/
 sail-riscv-Linux-x86_64.tar.gz
 spike-master.tar.gz
+
+# Workspace / workflow transient state (local-only)
+state/
+inst.log
+commits.log
+
+# AI agent / IDE config (single source-of-truth: ./AGENTS.md)
+.claude/
+.cursorrules
+.windsurfrules
+.github/code-review-graph.instruction.md
+
+# .omo/ workflow subdirs that are transient (plans/ and drafts/ are tracked)
+.omo/evidence/
+.omo/notepads/
+.omo/run-continuation/
+
+# riscv-arch-test: only the chipforge config overlay is tracked; the rest
+# is a local clone for reference and must not enter version control.
+# 4 tracked files live under config/cores/chipforge/...
+/3rdparty/riscv-arch-test/*
+!/3rdparty/riscv-arch-test/.gitignore
+!/3rdparty/riscv-arch-test/.gitmodules
+!/3rdparty/riscv-arch-test/.gitattributes
+!/3rdparty/riscv-arch-test/.editorconfig
+!/3rdparty/riscv-arch-test/config/
+/3rdparty/riscv-arch-test/docs/
+/3rdparty/riscv-arch-test/framework/
+/3rdparty/riscv-arch-test/generators/
+/3rdparty/riscv-arch-test/tests/
+/3rdparty/riscv-arch-test/tests-dev/
+/3rdparty/riscv-arch-test/testplans/
+/3rdparty/riscv-arch-test/config/imperas/
+/3rdparty/riscv-arch-test/config/qemu/
+/3rdparty/riscv-arch-test/config/sail/
+/3rdparty/riscv-arch-test/config/spike/
+/3rdparty/riscv-arch-test/config/whisper/
+/3rdparty/riscv-arch-test/config/cores/cva6/
+/3rdparty/riscv-arch-test/config/cores/cve2/
+/3rdparty/riscv-arch-test/config/cores/cve4/
+/3rdparty/riscv-arch-test/config/cores/cvw/
+/3rdparty/riscv-arch-test/CHANGELOG.md
+/3rdparty/riscv-arch-test/CONTRIBUTING.md
+/3rdparty/riscv-arch-test/COPYING.APACHE
+/3rdparty/riscv-arch-test/COPYING.BSD
+/3rdparty/riscv-arch-test/COPYING.CC
+/3rdparty/riscv-arch-test/Dockerfile
+/3rdparty/riscv-arch-test/Makefile
+/3rdparty/riscv-arch-test/README.md
+/3rdparty/riscv-arch-test/pyproject.toml
+/3rdparty/riscv-arch-test/renovate.json
+/3rdparty/riscv-arch-test/run_tests.py
+/3rdparty/riscv-arch-test/uv.lock
+/3rdparty/riscv-arch-test/.codespellrc
+/3rdparty/riscv-arch-test/.dockerignore
+/3rdparty/riscv-arch-test/.editorconfig
+/3rdparty/riscv-arch-test/.github/
+/3rdparty/riscv-arch-test/.gitignore
+/3rdparty/riscv-arch-test/.gitmodules
+/3rdparty/riscv-arch-test/.mise.toml
+/3rdparty/riscv-arch-test/.pre-commit-config.yaml
+/3rdparty/riscv-arch-test/.python-version
