@@ -55,6 +55,8 @@ commits.log
 .cursorrules
 .windsurfrules
 .github/code-review-graph.instruction.md
+.opencode/
+openspec/
 
 # .omo/ workflow subdirs that are transient (plans/ and drafts/ are tracked)
 .omo/evidence/
