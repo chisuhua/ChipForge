@@ -1,0 +1,130 @@
+# yaml-language-server: $schema=../../../../external/riscv-unified-db/spec/schemas/config_schema.json
+# Copyright (c) 2026, Chi Suhua
+# SPDX-License-Identifier: Apache-2.0
+# UDB Architecture Configuration for ChipForge chipforge-tlm-rv64.
+#
+# 适配说明:
+# - ChipForge Phase 2 仅作为 memory model (L1CachePlugin as memory model)
+# - 不含完整 CPU Core, 不含 PLIC/CLINT/PMP/UART
+# - 仅支持 riscv-arch-test ACT4 I/M/Zicsr/Zifencei/Zba/Zbb/Zbs/C 子集
+# - 排除: Sm (privilege/CSR 完整套, M-mode 部分), F/D (浮点), V (向量)
+# - 推迟: Phase 3+ 引入 PLIC/CLINT 后才能跑 priv tests (Sm)
+
+$schema: config_schema.json#
+kind: architecture configuration
+type: fully configured
+name: chipforge-tlm-rv64
+description: |
+  ChipForge Phase 2 bare-metal verification configuration.
+  L1CachePlugin as memory model, no CPU Core.
+  Compatible with riscv-arch-test ACT4 framework (I/M/Zicsr/Zifencei/C).
+
+implemented_extensions:
+  # === Base RV64I ===
+  - { name: I, version: "= 2.1" }
+
+  # === RV64M (Multiply/Divide, RV64 only) ===
+  - { name: M, version: "= 2.0" }
+
+  # === RV64C (Compressed, RVC) ===
+  - { name: C, version: "= 2.0" }
+
+  # === Bitmanip sub-extensions (B 扩展拆分) ===
+  - { name: Zba, version: "= 1.0.0" }   # Address generation
+  - { name: Zbb, version: "= 1.0.0" }   # Basic bit-manipulation
+  - { name: Zbs, version: "= 1.0.0" }   # Single-bit instructions
+
+  # === Interrupt/CSR/Fence sub-extensions ===
+  - { name: Zicsr, version: "= 2.0" }    # CSR instructions
+  - { name: Zifencei, version: "= 2.0" } # Fence.i instruction
+
+  # === 推迟 (Phase 3+) ===
+  # - { name: Sm, version: "= 1.12.0" }   # M-mode privilege (需 PLIC/CLINT)
+  # - { name: F, version: "= 2.2" }      # Single-precision FP (需 FPU)
+  # - { name: D, version: "= 2.2" }      # Double-precision FP (需 FPU)
+  # - { name: V, version: "= 1.0" }      # Vector (需 VPU)
+
+params:
+  # Base & ISA mutability
+  MXLEN: 64
+  MUTABLE_MISA_M: false
+  MUTABLE_MISA_C: false
+  MUTABLE_MISA_Zicsr: false
+  MUTABLE_MISA_Zifencei: false
+  MUTABLE_MISA_Zba: false
+  MUTABLE_MISA_Zbb: false
+  MUTABLE_MISA_Zbs: false
+
+  # Addressing & Memory
+  PHYS_ADDR_WIDTH: 40             # RV64 standard (not 39-bit sv39 limit)
+  M_MODE_ENDIANNESS: little        # Standard RISC-V + ChipForge (L1CachePlugin is LE)
+  PMA_GRANULARITY: 4              # 4-byte PMA, matches picolibc
+
+  # Privilege & Modes (Phase 2 限制: 仅 M-mode, 不可 S/U)
+  # RVS (Supervisor) 和 RVU (User) False
+  # 推迟到 Phase 3+ 引入 PLIC/CLINT 后
+  RVS: false
+  RVU: false
+  TRAP_ON_ECALL_FROM_M: true
+  TRAP_ON_EBREAK: true
+  MISALIGNED_LDST: false          # 不处理 misaligned (Phase 2 范围外)
+
+  # Exceptions & Traps
+  PRECISE_SYNCHRONOUS_EXCEPTIONS: true
+  MTVAL_WIDTH: 64                 # full mtval support
+  MTVEC_ILLEGAL_WRITE_BEHAVIOR: retain
+  MISALIGNED_LDST_EXCEPTION_PRIORITY: low
+  TRAP_ON_ILLEGAL_WLRL: false
+  TRAP_ON_UNIMPLEMENTED_INSTRUCTION: true
+  TRAP_ON_RESERVED_INSTRUCTION: true
+  TRAP_ON_UNIMPLEMENTED_CSR: true
+
+  # mtval and trap reporting behavior (Phase 2 仅基础 support)
+  REPORT_ENCODING_IN_MTVAL_ON_ILLEGAL_INSTRUCTION: true
+  REPORT_VA_IN_MTVAL_ON_BREAKPOINT: false        # Phase 3 引入
+  REPORT_VA_IN_MTVAL_ON_LOAD_MISALIGNED: false
+  REPORT_VA_IN_MTVAL_ON_STORE_AMO_MISALIGNED: false
+  REPORT_VA_IN_MTVAL_ON_INSTRUCTION_ACCESS_FAULT: false
+  REPORT_VA_IN_MTVAL_ON_INSTRUCTION_MISALIGNED: false
+  REPORT_VA_IN_MTVAL_ON_LOAD_ACCESS_FAULT: false
+  REPORT_VA_IN_MTVAL_ON_STORE_AMO_ACCESS_FAULT: false
+
+  # Trap Handling (仅 direct mode (0) 支持 MTVEC)
+  MTVEC_ACCESS: rw
+  MTVEC_MODES: [0]
+  MTVEC_BASE_ALIGNMENT_DIRECT: 4
+  NUM_PMP_ENTRIES: 0              # 0 PMP regions (Phase 3 引入)
+
+  # Identification
+  CONFIG_PTR_ADDRESS: 0x0
+  MARCHID_IMPLEMENTED: true
+  ARCH_ID_VALUE: 0x80000000       # ChipForge vendor-specific
+  MIMPID_IMPLEMENTED: true
+  IMP_ID_VALUE: 0x20260615        # YYYYMMDD 标识实现版本
+  MISA_CSR_IMPLEMENTED: true
+  VENDOR_ID_BANK: 0xC             # 'C' for ChipForge
+  VENDOR_ID_OFFSET: 0xF
+  MCOUNTINHIBIT_IMPLEMENTED: true
+
+  # HPM (Hardware Performance Monitor) — Phase 2 仅 cycle/instret
+  COUNTINHIBIT_EN:
+    [
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+    ]
+  HPM_COUNTER_EN:
+    [
+      true, true, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+    ]
+  MCOUNTENABLE_EN:
+    [
+      true, true, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+      false, false, false, false, false, false, false, false,
+    ]

@@ -1,0 +1,108 @@
+# ChipForge Toolchain Lockfile (Phase 2 Bare-Metal Verification)
+# Created: 2026-06-15
+# Author: Chi Suhua <chisuhua@gmail.com>
+# Phase: 2 (M2 - ISA Compliance)
+# Decision: DECISION-2026-06-15-01 (v1.1 适配版)
+# Spec: .omo/drafts/decision-phase-2-baremetal-v1.1-toolchain-guide-2026-06-15.md §2.1
+
+# =====================================================================
+# Section 1: RISC-V Cross-Compiler Toolchain (apt-locked, dpkg-verified)
+# =====================================================================
+
+# GCC cross-compiler (Ubuntu 24.04 noble repo)
+riscv64-unknown-elf-gcc:13.2.0-11ubuntu1+12
+# Binutils (assembler, linker, objdump, etc.)
+binutils-riscv64-unknown-elf:2.42-1ubuntu1+6
+# C library (picolibc — replaces newlib for Phase 0 size constraints)
+picolibc-riscv64-unknown-elf:1.8.6-2
+
+# 备选说明: riscv-gnu-toolchain 完整工具链与 apt 包冲突 (riscv64-unknown-elf-gcc 13.2 vs 15.2),
+# 当前锁定 apt 包路径。后续如需升级到 riscv-gnu-toolchain, 需先卸载 apt 包并加 PATH-only 模式。
+
+# =====================================================================
+# Section 2: RISC-V ISA Simulators (source-built, path-locked)
+# =====================================================================
+
+# Spike 1.1.1-dev — built from riscv-isa-sim master branch
+# Build date: 2026-06-14 (Phase 2 task 1)
+# Path: /workspace/project/opt/riscv/bin/spike (用户预装)
+# Build command: ../configure --prefix=/opt/riscv-tools/spike && make -j2
+# GCC 13 fesvr 兼容性: master 分支含兼容 fesvr (v1.1.0 与 GCC 13 不兼容)
+# 编译参数: 1000+ .cc 文件, ~40 min, 包含 RVV 1.0 全套 + Zfa/Zfh/Zicond/Zihintpause
+spike:1.1.1-dev@/workspace/project/opt/riscv/bin/spike
+spike_alias:/usr/local/bin/spike  # symlink to /workspace/project/opt/riscv/bin/spike
+
+# Sail RISC-V 0.12 — official prebuilt (GitHub release)
+# Download: https://github.com/rems-project/sail-riscv/releases/download/0.12/sail-riscv-Linux-x86_64.tar.gz
+# Install path: /workspace/project/ChipForge/sail-riscv-Linux-x86_64/bin/sail_riscv_sim
+# 注意: 实际命令名是 sail_riscv (下划线), 不是 sail-riscv (连字符)
+sail-riscv:0.12@/workspace/project/ChipForge/sail-riscv-Linux-x86_64/bin/sail_riscv_sim
+sail_alias:/usr/local/bin/sail_riscv  # symlink to sail_riscv_sim
+
+# =====================================================================
+# Section 3: Compliance Framework (Python, pip-locked)
+# =====================================================================
+
+# RISCOF 1.25.3 (备选 — ACT4 框架已取代 riscof, 仅作 reference)
+# Install: pip install riscof (via aliyun mirror + trusted-host bypass SSL)
+riscof:1.25.3@/home/ubuntu/venv/bin/riscof
+
+# riscv-arch-test (ACT4 framework) — **本指南主用合规框架**
+# Repo: https://github.com/riscv/riscv-arch-test
+# Branch: act4 (commit 09b4999ed3fb7350c082d92816e7909a85a82d62)
+# Note: ACT4 在 2026-04 完全取代 riscof, 不再使用 ACT3.x 流程
+# 旧 API (begin_signature/end_signature 外部 dump) 已弃用
+# 新 API: self-checking ELF + tohost 监测 (RVTEST_SIGUPD macro)
+riscv-arch-test:act4@09b4999ed3fb7350c082d92816e7909a85a82d62  # 待 submodule add
+
+# =====================================================================
+# Section 4: TLM Framework (ChipForge 集成, ExternalProject-locked)
+# =====================================================================
+
+# CppTLM 2.0.3 — sibling repo, symlinked
+# Repo: https://github.com/chisuhua/CppTLM
+# Commit: c6079357265064ad6aa40f1213caed42bd08f6af
+# ChipForge 集成: ExternalProject_Add, install to build/_deps/install/
+# 重要限制 (v1.1 §3.2): 无 set_streaming_width / tlm_phase / pybind11
+cpptlm:2.0.3@commit-c6079357
+
+# =====================================================================
+# Section 5: Python Toolchain (host system, locked version)
+# =====================================================================
+
+python3:3.12.3@/home/ubuntu/venv/bin/python3
+pip:24.0+@/home/ubuntu/venv/bin/pip
+pyelftools:0.31+  # ELF 解析 (run_arch_test.py 用)
+
+# =====================================================================
+# Section 6: riscv32 工具链 (用户原有, 互不冲突)
+# =====================================================================
+
+# riscv32-unknown-elf-gcc 15.2.0 (用户自编译, 在 /workspace/project/opt/riscv/bin/)
+# 主要用于 riscv32 兼容性测试, Phase 2 不强制
+riscv32-unknown-elf-gcc:15.2.0@/workspace/project/opt/riscv/bin/riscv32-unknown-elf-gcc
+
+# qemu-riscv64 10.2.2 (备选 ISS, 用户预装)
+# Note: qemu 的 HTIF 协议与 spike 不同 (syscall-based), 不可直接互换
+qemu-riscv64:10.2.2@/workspace/project/opt/riscv/bin/qemu-riscv64
+
+# =====================================================================
+# Section 7: Phase 3+ 推迟引入 (本期不安装, 仅记录)
+# =====================================================================
+
+# riscv-dv:master@commit-TBD
+# 原因: riscv-dv 需 RTL + SystemVerilog UVM-1.2 + instruction tracer,
+#       当前 CPU-less TLM 环境不可达, 推迟到 Phase 3 (有 RTL 后)
+
+# verilator:5.020+
+# 原因: Phase 5 (RTL 协同验证) 范围, 当前不需要
+
+# riscv64-unknown-elf-gdb:14+
+# 原因: Phase 2 P4 可选 (GDB 调试支持), 不阻塞 P0-P1
+
+# =====================================================================
+# Verification Commands (运行以确认所有工具就绪)
+# =====================================================================
+
+# run: bash tools/verify_toolchain.sh
+# 期望输出: 6/6 PASS (gcc, spike, sail_riscv, riscof, python3, cpptlm)

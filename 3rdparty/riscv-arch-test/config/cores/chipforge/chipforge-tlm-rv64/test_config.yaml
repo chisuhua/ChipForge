@@ -1,0 +1,55 @@
+# ChipForge chipforge-tlm-rv64 — test_config.yaml
+# 适配 riscv-arch-test ACT4 (commit 09b4999e)
+# 决策依据: .omo/drafts/decision-phase-2-baremetal-v1.1-toolchain-guide-2026-06-15.md §四
+# 创建日期: 2026-06-15
+# SPDX-License-Identifier: Apache-2.0
+
+# ---------------------------------------------------------------------------
+# ACT4 framework configuration
+# 在 3rdparty/riscv-arch-test/ 目录下运行:
+#   CONFIG_FILES=config/cores/chipforge/chipforge-tlm-rv64/test_config.yaml \
+#     make EXCLUDE_EXTENSIONS=Sm,PMPSm,ExceptionsSm \
+#          EXTENSIONS=I,M,Zicsr,Zifencei,Zba,Zbb,Zbs,C \
+#          --jobs=$(nproc)
+# 期望输出: work/chipforge-tlm-rv64/elfs/I-add-00.elf, I-add-01.elf, ...
+# ---------------------------------------------------------------------------
+
+name: chipforge-tlm-rv64
+
+# 编译器: 与 requirements-toolchain.txt §1 锁定
+compiler_exe: riscv64-unknown-elf-gcc
+# 工具链特定 flags (CVA6 模板基础上, 加 ChipForge picolibc 路径)
+# 注: ACT4 框架会自行添加 RVTEST_SIGUPD 等宏, 我们只需保证链接正确
+# -march=rv64imac_zicsr_zifencei 对应 I/M/C/Zicsr/Zifencei 子集
+compiler_flags:
+  - "-march=rv64imac_zicsr_zifencei"
+  - "-mabi=lp64"
+  - "-mcmodel=medany"
+  - "-static"
+  - "-mno-relax"  # 重要: 防止 auipc 优化, 与 spike HTIF 调试 4 件套一致
+
+# 汇编器 (用于 rvmodel_macros.h 展开)
+objdump_exe: riscv64-unknown-elf-objdump
+
+# Golden Reference Model: sail_riscv (commit 0.12)
+# 命名注意: sail_riscv (下划线), 不是 sail-riscv (连字符)
+ref_model_exe: sail_riscv_sim
+# sail_riscv_sim 路径: /workspace/project/ChipForge/sail-riscv-Linux-x86_64/bin/sail_riscv_sim
+# (若 sail_riscv_sim 不在 PATH, 用全路径)
+
+# UDB 配置: 适配 ChipForge L1CachePlugin as memory model
+udb_config: chipforge-tlm-rv64.yaml
+
+# 链接器脚本: 0x80000000 起, .data 对齐 0x4000 (ACT4 标准)
+linker_script: link.ld
+
+# DUT 特定头文件目录: 当前目录 (rvmodel_macros.h)
+dut_include_dir: .
+
+# Python 虚拟环境 (riscof 用了 venv)
+# 实际不需要, ACT4 框架用 mise trust 启动
+# venv: /home/ubuntu/venv
+
+# 生成选项
+# tests 目录: 默认 tests/, 跳过 priv/ (Sm 等需 PLIC/CLINT, Phase 3 范围)
+include_priv_tests: false
