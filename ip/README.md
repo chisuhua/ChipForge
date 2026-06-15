@@ -41,6 +41,19 @@ ip/{name}/
 ## 文档模板
 新 IP 开发请参考 [IP 文档模板](../docs/templates/IP_TEMPLATE.md)
 
+## `ip/<name>/docs/` 标准子结构
+
+每个 IP 的 `docs/` 目录建议采用如下最小子结构 (便于跨 IP 一致性):
+
+| 文件 | 作用 | 必备 |
+| --- | --- | --- |
+| `README.md` | 文档索引 + 状态标签 + 子结构说明 | ✓ |
+| `architecture.md` | 微架构 / 接口 / 时序 | ✓ |
+| `configuration.md` | 可调参数 (Knobs) 及默认值, 对应 `configs/params_schema.json` | 推荐 |
+| `integration.md` | 如何被 SoC / 其他 IP 集成 (总线挂点、地址映射、依赖 IP) | 可选 |
+
+`ip/cpu/` 是历史最久的 IP, 当前未完全遵守此结构; 新增 IP 应当按此标准落地。
+
 ## 相关文档
 - [项目架构总览](../docs/architecture/overview.md)
 - [接口设计详解](../docs/architecture/interface-design.md)
