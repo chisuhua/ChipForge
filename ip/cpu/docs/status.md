@@ -2,7 +2,7 @@
 
 > **本文件位置**: `ip/cpu/docs/status.md`
 > **作用**: M1.x 任务粒度的实时状态 (PASS/FAIL/进度%)。**唯一高频改文件**。
-> **最后更新**: 2026-06-16 (拆分日, 全部任务 🔵 待启动)
+> **最后更新**: 2026-06-16 22:xx (C1 commit: M1 探索报告发布, M1 启动公告, 进入 🟡 探索完成态)
 
 > **本文件不包含**任务详细描述。 见 [`implementation-plan/M1..M5`](implementation-plan/)。
 > **本文件不包含**静态架构、决策、范围。 见 [`blueprint.md`](blueprint.md) / [`cpu_implementation_guide_v2.0.md`](cpu_implementation_guide_v2.0.md) / [`implementation-plan/README.md`](implementation-plan/README.md)。
@@ -37,18 +37,19 @@
 ## 1. M1 状态 — CPU 核心框架层
 
 > 详细任务: [`implementation-plan/M1-cpu-skeleton.md`](implementation-plan/M1-cpu-skeleton.md)
+> **🟡 2026-06-16 探索完成**: cf_plugin Phase 0 已实现 M1.1+M1.2 实质内容; CtrlLink 部分覆盖 M1.3+M1.4; M1.5+M1.7 全新; M1.6 增量。 详细基线复用表见 M1-cpu-skeleton.md §0.2。 **待 D-α/D-β/D-γ 3 决策确认后进入 C2-C6 commit 实施。**
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| M1.1 | 扩展 `cf::plugin::PipeBuilder` 增加 `at_stage` | 🔵 待启动 | 0% | test_pipe_builder PASS | |
-| M1.2 | 扩展 `cf::plugin::PipeBuilder` 增加 `declare_substage` | 🔵 待启动 | 0% | test_pipe_builder PASS | |
-| M1.3 | 新增 `cf::plugin::PipeLink` StageLink | 🔵 待启动 | 0% | test_ctrl_link PASS | |
-| M1.4 | 新增 `cf::plugin::PipeLink` DirectLink | 🔵 待启动 | 0% | test_ctrl_link PASS | |
-| M1.5 | 新增 `cf::plugin::PipeArbitration` | 🔵 待启动 | 0% | test_pipe_node PASS | |
-| M1.6 | 集成 PipeArbitration 到 PipeNode | 🔵 待启动 | 0% | test_pipe_node PASS | |
-| M1.7 | 新增 `ip/cpu/core/payload_common.h` | 🔵 待启动 | 0% | test_payload PASS | |
-| M1.8 | 4/4 框架级单元测试 PASS | 🔵 待启动 | 0% | ctest 4/4 | |
-| **M1 累计** | | 🔵 待启动 | **0/8 (0%)** | ctest 4/4 + 16/16 不退化 | |
+| M1.1 | 扩展 `cf::plugin::PipeBuilder` 增加 `at_stage` | 🟢 基线复用 | 100% (cf_plugin Phase 0) | test_pipe_builder PASS | C1 公告, 0 实施量 |
+| M1.2 | 扩展 `cf::plugin::PipeBuilder` 增加 `declare_substage` | 🟢 基线复用 | 100% (cf_plugin Phase 0) | test_pipe_builder PASS | C1 公告, 0 实施量 |
+| M1.3 | 新增 `cf::plugin::PipeLink` StageLink | 🟡 进行中 | 0% → C2 | test_ctrl_link PASS | CtrlLink 存在, 扩 StageLink/DirectLink 模式 |
+| M1.4 | 新增 `cf::plugin::PipeLink` DirectLink | 🟡 进行中 | 0% → C2 | test_ctrl_link PASS | 同 M1.3 |
+| M1.5 | 新增 `cf::plugin::PipeArbitration` | 🟡 进行中 | 0% → C2 | test_pipe_node PASS | 全新文件 |
+| M1.6 | 集成 PipeArbitration 到 PipeNode | 🔵 待启动 | 0% → C3 | test_pipe_node PASS | 增量加 arb_ 字段, 兼容 L1Cache |
+| M1.7 | 新增 `ip/cpu/core/payload_common.h` | 🔵 待启动 | 0% → C4 | test_payload PASS | 全新文件, 8 Key + DecodePayload |
+| M1.8 | 4/4 框架级单元测试 PASS | 🔵 待启动 | 0% → C5+C6 | ctest 4/4 | 3/4 已存在, 1 新增 test_payload_common |
+| **M1 累计** | | 🟡 进行中 | **0/8 (0%)**, 但 M1.1+M1.2 = 基线复用 | ctest 4/4 + 16/16 不退化 | 等 D-α/β/γ 决策后 C2 启动 |
 
 ---
 
