@@ -322,7 +322,7 @@ endforeach()
 # ----------------------------------------------------------------------------
 # Phase 2: M3 RISC-V Plugin 单元测试
 # ----------------------------------------------------------------------------
-foreach(test_name IN ITEMS test_decode test_int_alu test_branch test_mul test_lsu)
+foreach(test_name IN ITEMS test_decode test_int_alu test_branch test_mul test_lsu test_decode_full test_int_alu_full)
   if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/${test_name}.cpp)
     add_executable(${test_name} ${CMAKE_SOURCE_DIR}/tests/cpu/${test_name}.cpp)
     target_link_libraries(${test_name} PRIVATE cf_plugin)

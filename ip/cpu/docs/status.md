@@ -88,9 +88,9 @@
 | M3.8 | `RiscvCsrPlugin` P2 stub | 🟢 PASS | 100% | 占位存在 | M3.8 commit (P2 stub) |
 | M3.9 | `arch/riscv/fpu.h` P3+ 占位 | 🟢 PASS | 100% | 占位存在 | M3.9 commit (P3+) |
 | M3.10 | 5 × 单元测试 PASS | 🟢 PASS | 100% | ctest 5/5 (5/6 目标) | 缺 test_payload_riscv, 并入 test_decode |
-| M3.11 | RV32I 译码正确性 (35+ 指令) | 🔵 待启动 | 0% | 35+ PASS | M3.11 = 扩展 test_decode 到 35+ 用例 |
-| M3.12 | RV32I 整数运算 (10 指令) | 🔵 待启动 | 0% | 10 PASS | M3.12 = 扩展 test_int_alu 到 10 用例 |
-| **M3 累计** | | 🟡 进行中 | **10/12 (83%)** | ctest 5/5 + 18/18 不退化 | M3.1-M3.10 done, M3.11-M3.12 扩展 |
+| M3.11 | RV32I 译码正确性 (35+ 指令) | 🟢 PASS | 100% | 40 用例 PASS | test_decode_full 40+ RV32I 指令 |
+| M3.12 | RV32I 整数运算 (10 指令) | 🟢 PASS | 100% | 38 用例 PASS | test_int_alu_full 10 算术指令 |
+| **M3 累计** | | 🟢 完成 | **12/12 (100%)** | ctest 7/7 + 28/28 不退化 | M3 全部完成 |
 
 ---
 
