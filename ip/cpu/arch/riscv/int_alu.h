@@ -50,16 +50,17 @@ class RiscvIntAluPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("execute", cf::plugin::Phase::NORMAL, [&pb]() {
       auto* n = pb.node_of_logic_stage("execute").get();
-      if (!n) return;
-      T rs1_val = n->operator()(KeyType::RS1);
-      T rs2_val = n->operator()(KeyType::RS2);
-      const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+      if (n) {
+        T rs1_val = n->operator()(KeyType::RS1);
+        T rs2_val = n->operator()(KeyType::RS2);
+        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
 
-      // 推断 OpCode (简化: 根据 funct3/funct7)
-      OpCode op = infer_opcode(rv.funct3, rv.funct7);
+        // 推断 OpCode (简化: 根据 funct3/funct7)
+        OpCode op = infer_opcode(rv.funct3, rv.funct7);
 
-      T result = compute(op, rs1_val, rs2_val);
-      n->operator()(KeyType::RESULT) = result;
+        T result = compute(op, rs1_val, rs2_val);
+        n->operator()(KeyType::RESULT) = result;
+      }
     });
   }
 

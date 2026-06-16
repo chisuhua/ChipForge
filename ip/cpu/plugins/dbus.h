@@ -46,19 +46,20 @@ class DBusPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
-      if (!n) return;
-      const auto& dec = n->operator()(KeyType::DECODE);
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
 
-      if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::LOAD) {
-        T addr = n->operator()(KeyType::MEM_ADDR);
-        // M2 阶段: 存根, 直接返回 0
-        // M4 集成 TLM 后: 发起总线读事务
-        n->operator()(KeyType::MEM_DATA) = T{0};
-      } else if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::STORE) {
-        T addr = n->operator()(KeyType::MEM_ADDR);
-        T data = n->operator()(KeyType::MEM_DATA);
-        // M2 阶段: 存根
-        // M4 集成 TLM 后: 发起总线写事务
+        if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::LOAD) {
+          T addr = n->operator()(KeyType::MEM_ADDR);
+          // M2 阶段: 存根, 直接返回 0
+          // M4 集成 TLM 后: 发起总线读事务
+          n->operator()(KeyType::MEM_DATA) = T{0};
+        } else if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::STORE) {
+          T addr = n->operator()(KeyType::MEM_ADDR);
+          T data = n->operator()(KeyType::MEM_DATA);
+          // M2 阶段: 存根
+          // M4 集成 TLM 后: 发起总线写事务
+        }
       }
     });
   }

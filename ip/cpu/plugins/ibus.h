@@ -46,12 +46,13 @@ class IBusPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
-      if (!n) return;
-      T pc = n->operator()(KeyType::PC);
+      if (n) {
+        T pc = n->operator()(KeyType::PC);
 
-      // M2 阶段: 存根, 直接返回假指令
-      // M4 集成 TLM 后: 发起总线事务, 等待响应
-      n->operator()(KeyType::INSTRUCTION) = cf::plugin::uint_t<32>(0x00000013);  // NOP
+        // M2 阶段: 存根, 直接返回假指令
+        // M4 集成 TLM 后: 发起总线事务, 等待响应
+        n->operator()(KeyType::INSTRUCTION) = cf::plugin::uint_t<32>(0x00000013);  // NOP
+      }
     });
   }
 

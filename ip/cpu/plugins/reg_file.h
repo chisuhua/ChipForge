@@ -88,16 +88,18 @@ class RegFilePlugin : public cf::plugin::PluginBase {
 
   // 读寄存器 (直接访问 storage, 测试用)
   T read_reg(std::size_t idx) const {
-    if (idx == 0) return T{0};  // x0 恒为 0
-    if (idx >= kNumRegs) return T{0};
-    return regs_[idx];
+    T result = T{0};
+    if (idx != 0 && idx < kNumRegs) {
+      result = regs_[idx];
+    }
+    return result;
   }
 
   // 写寄存器 (直接访问 storage, 测试用; x0 屏蔽)
   void write_reg(std::size_t idx, T value) {
-    if (idx == 0) return;  // x0 写屏蔽
-    if (idx >= kNumRegs) return;
-    regs_[idx] = value;
+    if (idx != 0 && idx < kNumRegs) {
+      regs_[idx] = value;
+    }
   }
 
   // 全部置 0 (测试间隔离)
@@ -121,31 +123,31 @@ class RegFilePlugin : public cf::plugin::PluginBase {
     // 读阶段: "decode" 阶段读取 RS1/RS2 数据
     pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("decode").get();
-      if (!n) return;
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
 
-      const auto& dec = n->operator()(KeyType::DECODE);
+        if (dec.reads_rs1) {
+          auto rs1_data = this->read_reg(dec.rs1_idx);
+          n->put(KeyType::RS1, rs1_data);
+        }
 
-      if (dec.reads_rs1) {
-        auto rs1_data = this->read_reg(dec.rs1_idx);
-        n->put(KeyType::RS1, rs1_data);
-      }
-
-      if (dec.reads_rs2) {
-        auto rs2_data = this->read_reg(dec.rs2_idx);
-        n->put(KeyType::RS2, rs2_data);
+        if (dec.reads_rs2) {
+          auto rs2_data = this->read_reg(dec.rs2_idx);
+          n->put(KeyType::RS2, rs2_data);
+        }
       }
     });
 
     // 写阶段: "writeback" 阶段写回 RD
     pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("writeback").get();
-      if (!n) return;
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
 
-      const auto& dec = n->operator()(KeyType::DECODE);
-
-      if (dec.writes_rd) {
-        auto rd_data = n->operator()(KeyType::RD_DATA);
-        this->write_reg(dec.rd_idx, rd_data);
+        if (dec.writes_rd) {
+          auto rd_data = n->operator()(KeyType::RD_DATA);
+          this->write_reg(dec.rd_idx, rd_data);
+        }
       }
     });
   }

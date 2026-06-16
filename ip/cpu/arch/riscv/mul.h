@@ -52,13 +52,14 @@ class RiscvMulPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("execute", cf::plugin::Phase::NORMAL, [&pb]() {
       auto* n = pb.node_of_logic_stage("execute").get();
-      if (!n) return;
-      T rs1_val = n->operator()(KeyType::RS1);
-      T rs2_val = n->operator()(KeyType::RS2);
-      const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+      if (n) {
+        T rs1_val = n->operator()(KeyType::RS1);
+        T rs2_val = n->operator()(KeyType::RS2);
+        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
 
-      T result = compute(rv.funct3, rv.funct7, rs1_val, rs2_val);
-      n->operator()(KeyType::RESULT) = result;
+        T result = compute(rv.funct3, rv.funct7, rs1_val, rs2_val);
+        n->operator()(KeyType::RESULT) = result;
+      }
     });
   }
 

@@ -51,51 +51,52 @@ class RiscvBranchPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("execute", cf::plugin::Phase::NORMAL, [&pb]() {
       auto* n = pb.node_of_logic_stage("execute").get();
-      if (!n) return;
-      T rs1_val = n->operator()(KeyType::RS1);
-      T rs2_val = n->operator()(KeyType::RS2);
-      T pc_val = n->operator()(KeyType::PC);
-      const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
-      const auto& dec = n->operator()(KeyType::DECODE);
+      if (n) {
+        T rs1_val = n->operator()(KeyType::RS1);
+        T rs2_val = n->operator()(KeyType::RS2);
+        T pc_val = n->operator()(KeyType::PC);
+        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+        const auto& dec = n->operator()(KeyType::DECODE);
 
-      bool taken = false;
-      T target = pc_val + 4;  // 默认 next_pc
+        bool taken = false;
+        T target = pc_val + 4;  // 默认 next_pc
 
-      // 根据 funct3 判断分支条件 (B-type)
-      switch (rv.funct3) {
-        case 0b000: taken = (rs1_val == rs2_val); break;  // BEQ
-        case 0b001: taken = (rs1_val != rs2_val); break;  // BNE
-        case 0b100: taken = (static_cast<std::int32_t>(rs1_val) <
-                             static_cast<std::int32_t>(rs2_val)); break;  // BLT
-        case 0b101: taken = (static_cast<std::int32_t>(rs1_val) >=
-                             static_cast<std::int32_t>(rs2_val)); break;  // BGE
-        case 0b110: taken = (rs1_val < rs2_val); break;  // BLTU
-        case 0b111: taken = (rs1_val >= rs2_val); break;  // BGEU
-      }
+        // 根据 funct3 判断分支条件 (B-type)
+        switch (rv.funct3) {
+          case 0b000: taken = (rs1_val == rs2_val); break;  // BEQ
+          case 0b001: taken = (rs1_val != rs2_val); break;  // BNE
+          case 0b100: taken = (static_cast<std::int32_t>(rs1_val) <
+                               static_cast<std::int32_t>(rs2_val)); break;  // BLT
+          case 0b101: taken = (static_cast<std::int32_t>(rs1_val) >=
+                               static_cast<std::int32_t>(rs2_val)); break;  // BGE
+          case 0b110: taken = (rs1_val < rs2_val); break;  // BLTU
+          case 0b111: taken = (rs1_val >= rs2_val); break;  // BGEU
+        }
 
-      if (taken) {
-        // B-type 目标: PC + imm (imm 已在 RISCV_DETAIL.imm)
-        target = pc_val + static_cast<T>(rv.imm);
-      }
-
-      // JAL: 无条件跳转, 链接 PC+4 到 RD
-      // JALR: 跳转到 rs1+imm, 链接 PC+4 到 RD
-      if (dec.op_class == Dp::OpClass::BRANCH && rv.funct7 == 0) {
-        // JAL/JALR: 总是跳转
-        if (rv.funct3 == 0) {  // JALR
-          target = rs1_val + static_cast<T>(rv.imm);
-        } else {
+        if (taken) {
+          // B-type 目标: PC + imm (imm 已在 RISCV_DETAIL.imm)
           target = pc_val + static_cast<T>(rv.imm);
         }
-        taken = true;
-        n->operator()(KeyType::RD_DATA) = pc_val + 4;  // link
-      }
 
-      // 写结果到通用 payload (RISC-V 特有)
-      auto& dec_mut = n->operator()(KeyType::DECODE);
-      dec_mut.branch_taken = taken;
-      dec_mut.branch_target = target;
-      n->operator()(RvKey::BRANCH_TARGET) = target;
+        // JAL: 无条件跳转, 链接 PC+4 到 RD
+        // JALR: 跳转到 rs1+imm, 链接 PC+4 到 RD
+        if (dec.op_class == Dp::OpClass::BRANCH && rv.funct7 == 0) {
+          // JAL/JALR: 总是跳转
+          if (rv.funct3 == 0) {  // JALR
+            target = rs1_val + static_cast<T>(rv.imm);
+          } else {
+            target = pc_val + static_cast<T>(rv.imm);
+          }
+          taken = true;
+          n->operator()(KeyType::RD_DATA) = pc_val + 4;  // link
+        }
+
+        // 写结果到通用 payload (RISC-V 特有)
+        auto& dec_mut = n->operator()(KeyType::DECODE);
+        dec_mut.branch_taken = taken;
+        dec_mut.branch_target = target;
+        n->operator()(RvKey::BRANCH_TARGET) = target;
+      }
     });
   }
 

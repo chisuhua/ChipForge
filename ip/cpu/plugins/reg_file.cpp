@@ -41,37 +41,37 @@ void RegFilePlugin<T>::build(cf::plugin::PipeBuilder& pb) {
   // 读阶段: "decode" 阶段读取 RS1/RS2 数据
   //   从 DecodePayload.rs1_idx / rs2_idx 取索引
   //   从 storage 取数据写入 RS1 / RS2 Payload
-  pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this]() {
+  pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
     auto* n = pb.node_of_logic_stage("decode").get();
-    if (!n) return;
+    if (n) {
+      const auto& dec = n->operator()(pl::keys_rv32::DECODE);
 
-    const auto& dec = n->operator()(pl::keys_rv32::DECODE);
+      // 读 RS1 (如果指令需要)
+      if (dec.reads_rs1) {
+        auto rs1_data = this->read_reg(dec.rs1_idx);
+        n->put(pl::keys_rv32::RS1, rs1_data);
+      }
 
-    // 读 RS1 (如果指令需要)
-    if (dec.reads_rs1) {
-      auto rs1_data = this->read_reg(dec.rs1_idx);
-      n->put(pl::keys_rv32::RS1, rs1_data);
-    }
-
-    // 读 RS2 (如果指令需要)
-    if (dec.reads_rs2) {
-      auto rs2_data = this->read_reg(dec.rs2_idx);
-      n->put(pl::keys_rv32::RS2, rs2_data);
+      // 读 RS2 (如果指令需要)
+      if (dec.reads_rs2) {
+        auto rs2_data = this->read_reg(dec.rs2_idx);
+        n->put(pl::keys_rv32::RS2, rs2_data);
+      }
     }
   });
 
   // 写阶段: "writeback" 阶段写回 RD
   //   从 DecodePayload.rd_idx 取索引, 从 RD_DATA Payload 取数据
   //   写入 storage (x0 屏蔽在 write_reg 内处理)
-  pb.at_stage("writeback", cf::plugin::Phase::LATE, [this]() {
+  pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb]() {
     auto* n = pb.node_of_logic_stage("writeback").get();
-    if (!n) return;
+    if (n) {
+      const auto& dec = n->operator()(pl::keys_rv32::DECODE);
 
-    const auto& dec = n->operator()(pl::keys_rv32::DECODE);
-
-    if (dec.writes_rd) {
-      auto rd_data = n->operator()(pl::keys_rv32::RD_DATA);
-      this->write_reg(dec.rd_idx, rd_data);
+      if (dec.writes_rd) {
+        auto rd_data = n->operator()(pl::keys_rv32::RD_DATA);
+        this->write_reg(dec.rd_idx, rd_data);
+      }
     }
   });
 }

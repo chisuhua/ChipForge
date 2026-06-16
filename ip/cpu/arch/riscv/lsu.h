@@ -52,22 +52,23 @@ class RiscvLsuPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [&pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
-      if (!n) return;
-      T rs1_val = n->operator()(KeyType::RS1);
-      const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
-      const auto& dec = n->operator()(KeyType::DECODE);
+      if (n) {
+        T rs1_val = n->operator()(KeyType::RS1);
+        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+        const auto& dec = n->operator()(KeyType::DECODE);
 
-      // 地址生成: rs1 + imm
-      T addr = rs1_val + static_cast<T>(rv.imm);
+        // 地址生成: rs1 + imm
+        T addr = rs1_val + static_cast<T>(rv.imm);
 
-      if (dec.op_class == Dp::OpClass::LOAD) {
-        n->operator()(KeyType::MEM_ADDR) = addr;
-        // M2 stub: 返回 0, M4 集成 TLM 事务
-        n->operator()(KeyType::MEM_DATA) = T{0};
-      } else if (dec.op_class == Dp::OpClass::STORE) {
-        T rs2_val = n->operator()(KeyType::RS2);
-        n->operator()(KeyType::MEM_ADDR) = addr;
-        n->operator()(KeyType::MEM_DATA) = rs2_val;
+        if (dec.op_class == Dp::OpClass::LOAD) {
+          n->operator()(KeyType::MEM_ADDR) = addr;
+          // M2 stub: 返回 0, M4 集成 TLM 事务
+          n->operator()(KeyType::MEM_DATA) = T{0};
+        } else if (dec.op_class == Dp::OpClass::STORE) {
+          T rs2_val = n->operator()(KeyType::RS2);
+          n->operator()(KeyType::MEM_ADDR) = addr;
+          n->operator()(KeyType::MEM_DATA) = rs2_val;
+        }
       }
     });
   }

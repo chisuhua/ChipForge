@@ -119,19 +119,20 @@ class HazardPlugin : public cf::plugin::PluginBase {
     // decode 阶段: 检测冒险并标记新的飞行中寄存器
     pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("decode").get();
-      if (!n) return;
-      const auto& dec = n->operator()(KeyType::DECODE);
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
 
-      // 检测 RAW / WAW 冒险
-      bool hazard = this->has_hazard(dec);
-      if (hazard) {
-        // M2 阶段: 仅记录冒险, 不实际阻塞 (M4 集成后通过 CtrlLink 阻塞)
-        // 当前仅设置 Payload 标志供测试验证
-        // 不 mark_in_flight (阻塞时该指令不进入执行)
-      } else {
-        // 无冒险: 标记目标寄存器为飞行中
-        if (dec.writes_rd) {
-          this->mark_in_flight(dec.rd_idx);
+        // 检测 RAW / WAW 冒险
+        bool hazard = this->has_hazard(dec);
+        if (hazard) {
+          // M2 阶段: 仅记录冒险, 不实际阻塞 (M4 集成后通过 CtrlLink 阻塞)
+          // 当前仅设置 Payload 标志供测试验证
+          // 不 mark_in_flight (阻塞时该指令不进入执行)
+        } else {
+          // 无冒险: 标记目标寄存器为飞行中
+          if (dec.writes_rd) {
+            this->mark_in_flight(dec.rd_idx);
+          }
         }
       }
     });
@@ -139,10 +140,11 @@ class HazardPlugin : public cf::plugin::PluginBase {
     // writeback 阶段: 清除飞行标记
     pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("writeback").get();
-      if (!n) return;
-      const auto& dec = n->operator()(KeyType::DECODE);
-      if (dec.writes_rd) {
-        this->clear_in_flight(dec.rd_idx);
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
+        if (dec.writes_rd) {
+          this->clear_in_flight(dec.rd_idx);
+        }
       }
     });
   }

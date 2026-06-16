@@ -95,24 +95,26 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     // fetch 阶段: 预测分支 (基于当前 PC)
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
-      if (!n) return;
-      T pc = n->operator()(KeyType::PC);
+      if (n) {
+        T pc = n->operator()(KeyType::PC);
 
-      T predicted = this->predict(pc);
-      if (predicted != 0) {
-        // 预测跳转: 设置 next_pc 为预测目标
-        // M2 阶段: 仅存储预测结果, M4 集成后通过 CtrlLink 修改 PC
+        T predicted = this->predict(pc);
+        if (predicted != 0) {
+          // 预测跳转: 设置 next_pc 为预测目标
+          // M2 阶段: 仅存储预测结果, M4 集成后通过 CtrlLink 修改 PC
+        }
       }
     });
 
     // execute 阶段: 验证预测并更新
     pb.at_stage("execute", cf::plugin::Phase::LATE, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("execute").get();
-      if (!n) return;
-      const auto& dec = n->operator()(KeyType::DECODE);
-      if (dec.op_class == DecodePayload::OpClass::BRANCH) {
-        T pc = n->operator()(KeyType::PC);
-        this->update(pc, dec.branch_taken, static_cast<T>(dec.branch_target));
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
+        if (dec.op_class == DecodePayload::OpClass::BRANCH) {
+          T pc = n->operator()(KeyType::PC);
+          this->update(pc, dec.branch_taken, static_cast<T>(dec.branch_target));
+        }
       }
     });
   }

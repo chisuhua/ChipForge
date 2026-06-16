@@ -60,29 +60,30 @@ class RiscvDecodePlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("decode", cf::plugin::Phase::NORMAL, [&pb]() {
       auto* n = pb.node_of_logic_stage("decode").get();
-      if (!n) return;
-      std::uint32_t inst = static_cast<std::uint32_t>(n->operator()(KeyType::INSTRUCTION));
+      if (n) {
+        std::uint32_t inst = static_cast<std::uint32_t>(n->operator()(KeyType::INSTRUCTION));
 
-      OpCode op = decode_rv32(inst);
-      auto& dec = n->operator()(KeyType::DECODE);
-      auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+        OpCode op = decode_rv32(inst);
+        auto& dec = n->operator()(KeyType::DECODE);
+        auto& rv = n->operator()(RvKey::RISCV_DETAIL);
 
-      // 填通用 DecodePayload
-      dec.op_class = static_cast<Dp::OpClass>(get_op_class(op));
-      dec.writes_rd = (get_rd(inst) != 0);  // rd != x0 才写回
-      dec.reads_rs1 = true;                 // 大多数指令都读 rs1
-      dec.reads_rs2 = is_rs2_used(op);
-      dec.rd_class = 0;                     // 0 = GPR
-      dec.rs1_idx = get_rs1(inst);
-      dec.rs2_idx = get_rs2(inst);
-      dec.rd_idx = get_rd(inst);
+        // 填通用 DecodePayload
+        dec.op_class = static_cast<Dp::OpClass>(get_op_class(op));
+        dec.writes_rd = (get_rd(inst) != 0);  // rd != x0 才写回
+        dec.reads_rs1 = true;                 // 大多数指令都读 rs1
+        dec.reads_rs2 = is_rs2_used(op);
+        dec.rd_class = 0;                     // 0 = GPR
+        dec.rs1_idx = get_rs1(inst);
+        dec.rs2_idx = get_rs2(inst);
+        dec.rd_idx = get_rd(inst);
 
-      // 填 RISC-V 特有 RiscvDecodeDetail
-      rv.funct3 = get_funct3(inst);
-      rv.funct7 = get_funct7(inst);
-      rv.funct12 = get_funct12(inst);
-      rv.imm = get_imm(op, inst);
-      rv.csr_addr = (op == OpCode::SYSTEM) ? get_funct12(inst) : 0;
+        // 填 RISC-V 特有 RiscvDecodeDetail
+        rv.funct3 = get_funct3(inst);
+        rv.funct7 = get_funct7(inst);
+        rv.funct12 = get_funct12(inst);
+        rv.imm = get_imm(op, inst);
+        rv.csr_addr = (op == OpCode::SYSTEM) ? get_funct12(inst) : 0;
+      }
     });
   }
 
