@@ -59,8 +59,8 @@
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| M2.1 | 实施 `RegFilePlugin` (array_store 模板) | 🔵 待启动 | 0% | test_reg_file 4-6 PASS | |
-| M2.2 | 实施 `HazardPlugin` (RAW/WAW/WAR 检测) | 🔵 待启动 | 0% | test_hazard 4-6 PASS | |
+| M2.1 | 实施 `RegFilePlugin` (array_store 模板) | 🟢 PASS | 100% | test_reg_file 4-6 PASS | M2.1 commit |
+| M2.2 | 实施 `HazardPlugin` (RAW/WAW/WAR 检测) | 🟢 PASS | 100% | test_hazard 4-6 PASS | M2.2 commit |
 | M2.3 | 实施 `BranchPredictorPlugin` (P1) | 🔵 待启动 | 0% | test_branch_predictor 4-6 PASS | |
 | M2.4 | 实施 `IBusPlugin` | 🔵 待启动 | 0% | test_ibus 4-6 PASS | |
 | M2.5 | 实施 `DBusPlugin` | 🔵 待启动 | 0% | test_dbus 4-6 PASS | |
@@ -68,7 +68,7 @@
 | M2.7 | `mmu.h` P3+ 占位 | 🔵 待启动 | 0% | 占位存在 | |
 | M2.8 | `exception.h` P3+ 占位 | 🔵 待启动 | 0% | 占位存在 | |
 | M2.9 | 5/5 P0 单元测试 PASS | 🔵 待启动 | 0% | ctest 5/5 | |
-| **M2 累计** | | 🔵 待启动 | **0/9 (0%)** | ctest 5/5 + 16/16 不退化 | |
+| **M2 累计** | | 🟡 进行中 | **2/9 (22%)** | ctest 5/5 + 16/16 不退化 | M2.1+M2.2 done |
 
 ---
 
