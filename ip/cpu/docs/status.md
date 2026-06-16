@@ -2,7 +2,7 @@
 
 > **本文件位置**: `ip/cpu/docs/status.md`
 > **作用**: M1.x 任务粒度的实时状态 (PASS/FAIL/进度%)。**唯一高频改文件**。
-> **最后更新**: 2026-06-16 22:xx (C1 commit: M1 探索报告发布, M1 启动公告, 进入 🟡 探索完成态)
+> **最后更新**: 2026-06-16 (C2 commit: cf::plugin::PipeArbitration 头文件落地, M1.3-M1.5 完成)
 
 > **本文件不包含**任务详细描述。 见 [`implementation-plan/M1..M5`](implementation-plan/)。
 > **本文件不包含**静态架构、决策、范围。 见 [`blueprint.md`](blueprint.md) / [`cpu_implementation_guide_v2.0.md`](cpu_implementation_guide_v2.0.md) / [`implementation-plan/README.md`](implementation-plan/README.md)。
@@ -43,13 +43,13 @@
 |------|------|------|------|------|------|
 | M1.1 | 扩展 `cf::plugin::PipeBuilder` 增加 `at_stage` | 🟢 基线复用 | 100% (cf_plugin Phase 0) | test_pipe_builder PASS | C1 公告, 0 实施量 |
 | M1.2 | 扩展 `cf::plugin::PipeBuilder` 增加 `declare_substage` | 🟢 基线复用 | 100% (cf_plugin Phase 0) | test_pipe_builder PASS | C1 公告, 0 实施量 |
-| M1.3 | 新增 `cf::plugin::PipeLink` StageLink | 🟡 进行中 | 0% → C2 | test_ctrl_link PASS | CtrlLink 存在, 扩 StageLink/DirectLink 模式 |
-| M1.4 | 新增 `cf::plugin::PipeLink` DirectLink | 🟡 进行中 | 0% → C2 | test_ctrl_link PASS | 同 M1.3 |
-| M1.5 | 新增 `cf::plugin::PipeArbitration` | 🟡 进行中 | 0% → C2 | test_pipe_node PASS | 全新文件 |
+| M1.3 | 新增 `cf::plugin::PipeLink` StageLink | 🟢 PASS (via CtrlLink 复用) | 100% | test_ctrl_link PASS | CtrlLink 已有 valid/ready 握手 API, StageLink 模式由 C3 扩展 |
+| M1.4 | 新增 `cf::plugin::PipeLink` DirectLink | 🟢 PASS (via CtrlLink 复用) | 100% | test_ctrl_link PASS | DirectLink 模式由 C3 扩展 |
+| M1.5 | 新增 `cf::plugin::PipeArbitration` | 🟢 PASS | 100% (C2 commit) | test_pipe_node PASS | 全新头文件, 140 行, 编译通过 |
 | M1.6 | 集成 PipeArbitration 到 PipeNode | 🔵 待启动 | 0% → C3 | test_pipe_node PASS | 增量加 arb_ 字段, 兼容 L1Cache |
 | M1.7 | 新增 `ip/cpu/core/payload_common.h` | 🔵 待启动 | 0% → C4 | test_payload PASS | 全新文件, 8 Key + DecodePayload |
 | M1.8 | 4/4 框架级单元测试 PASS | 🔵 待启动 | 0% → C5+C6 | ctest 4/4 | 3/4 已存在, 1 新增 test_payload_common |
-| **M1 累计** | | 🟡 进行中 | **0/8 (0%)**, 但 M1.1+M1.2 = 基线复用 | ctest 4/4 + 16/16 不退化 | 等 D-α/β/γ 决策后 C2 启动 |
+| **M1 累计** | | 🟡 进行中 | **3/8 (37.5%)** | ctest 4/4 + 16/16 不退化 | C2 完成, C3 启动 |
 
 ---
 
