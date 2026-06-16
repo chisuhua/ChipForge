@@ -1,14 +1,17 @@
 // include/cf/plugin/pipe_node.h
 //
-// 功能描述: PipeNode 节点 (Phase 0 P0 #3)
+// 功能描述: PipeNode 节点 (Phase 0 P0 #3) —— 5 态状态机 + Phase 1.5 仲裁
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-08
+// 最后修改日期: 2026-06-16
 //
 // 设计:
 //   - 封装 PayloadStore (类型擦除的 Key-Value 存储)
 //   - 简单状态机: IDLE / FIRING / MOVING / BLOCKED / CANCELING
 //   - 提供 is_*() 派生状态查询
 //   - operator()(Payload<T>&) 提供类型安全访问
+//   - Phase 1.5+: 集成 PipeArbitration arb_ 字段 (M1.6, 蓝图 §6.2.3)
+//     注意: 5 态方法与 arb_ 字段并存, 互不委托。 业务 Plugin 可自由选择
+//     用 5 态方法 (老 API) 或 arb_ 字段 (新 API, 跨阶段 IPC 更轻量)
 //
 // 借鉴:
 //   - declarative-hybrid-framework.md §7.1 (PipeNode 设计)
@@ -22,6 +25,7 @@
 #include <utility>
 
 #include "cf/plugin/payload.h"
+#include "cf/plugin/pipe_arbitration.h"
 
 namespace cf {
 namespace plugin {
@@ -104,6 +108,28 @@ class PipeNode {
     return std::make_unique<PipeNode>(std::move(name));
   }
 
+  // ------------------------------------------------------------------------
+  // Phase 1.5+: PipeArbitration arb_ 字段 (M1.6, 蓝图 §6.2.3)
+  //
+  // 用法 (新代码, 跨阶段 IPC 推荐):
+  //   n->arb().assert_valid();
+  //   n->arb().assert_ready();
+  //   if (n->arb().fired()) { ... }
+  //
+  // 与 5 态方法并存, 互不委托:
+  //   - 5 态方法 (assert_valid/assert_ready/...) 保持原状, 内部用 state_ 字段
+  //   - arb_ 字段独立, 业务 Plugin 自由选择
+  //   - 蓝图意图: 长期看, 老 Plugin 可逐步迁移到 arb_, 但不强制
+  //
+  // const 访问: arb() 返回 const 引用 (只读)
+  // 可写访问:  arb_mut() 返回引用 (供老代码测试或迁移期)
+  // ------------------------------------------------------------------------
+  const PipeArbitration& arb() const noexcept { return arb_; }
+  PipeArbitration& arb_mut() noexcept { return arb_; }
+
+  // arb_ 直接访问 (兼容老代码别名, 等价 arb_mut())
+  PipeArbitration& arbitration() noexcept { return arb_; }
+
   static const char* state_name(State s) noexcept {
     switch (s) {
       case State::IDLE:      return "IDLE";
@@ -119,6 +145,9 @@ class PipeNode {
   std::string name_;
   State state_ = State::IDLE;
   PayloadStore payloads_;
+  // Phase 1.5+: 仲裁字段 (M1.6, 蓝图 §6.2.3)。 默认构造: 全 false (idle)。
+  // 与 state_ 字段并存, 不委托; 业务 Plugin 自选用法。
+  PipeArbitration arb_;
 };
 
 }  // namespace plugin

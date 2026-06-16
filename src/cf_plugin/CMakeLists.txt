@@ -279,9 +279,36 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_l1_cache_json_instantiate.cpp)
 endif()
 
 # ----------------------------------------------------------------------------
+# Phase 1.5: M1.5 PipeArbitration 单元测试 (蓝图 §6.2.3)
+# 验证 cf::plugin::PipeArbitration POD 3-state 派生方法 + 与 PipeNode arb_ 字段集成
+# 依赖: ip/cpu 头文件路径 (项目根 + ip/ 路径)
+# TDD: 测试无条件注册, RED 时编译失败暴露缺失实现
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_pipe_arbitration.cpp)
+  add_executable(test_pipe_arbitration tests/test_pipe_arbitration.cpp)
+  target_link_libraries(test_pipe_arbitration PRIVATE cf_plugin)
+  add_test(NAME test_pipe_arbitration COMMAND test_pipe_arbitration)
+endif()
+
+# ----------------------------------------------------------------------------
+# Phase 1.5: M1.7 ip/cpu/core/payload_common.h 单元测试
+# 验证 8 Payload Key + DecodePayload struct + RV32/RV64 双实例化
+# 依赖: ip/cpu 头文件路径 (项目根, payload_common.h 路径 ip/cpu/core/)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_payload_common.cpp)
+  add_executable(test_payload_common tests/test_payload_common.cpp)
+  target_link_libraries(test_payload_common PRIVATE cf_plugin)
+  target_include_directories(test_payload_common
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_payload_common COMMAND test_payload_common)
+endif()
+
+# ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
-message(STATUS "  cf_plugin:        Phase 0 (5/5 P0 components) ✅")
+message(STATUS "  cf_plugin:        Phase 0 (5/5 P0 components) ✅ + M1 框架扩展 (PipeArbitration + arb_ + payload_common)")
 
 # ----------------------------------------------------------------------------
 # Phase 0 实施 checklist (实施时按需启用)
@@ -293,5 +320,7 @@ message(STATUS "  cf_plugin:        Phase 0 (5/5 P0 components) ✅")
 # [x] 1.3 添加 include/cf/plugin/pipe_node.h + 单元测试
 # [x] 1.4 完整化 include/cf/plugin/pipe_builder.h + 单元测试
 # [x] 1.5 添加 include/cf/plugin/ctrl_link.h + 单元测试
+# [x] M1.5 添加 include/cf/plugin/pipe_arbitration.h + 单元测试 (Phase 1.5)
+# [x] M1.7 添加 ip/cpu/core/payload_common.h + 单元测试 (Phase 1.5)
 # [ ] 转换 INTERFACE → STATIC (如出现非模板 .cpp) — Phase 0 暂不需要
 # [ ] 启用 cpptlm_core 依赖 (Phase 1+ 业务代码需要)

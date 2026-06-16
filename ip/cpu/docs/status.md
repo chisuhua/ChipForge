@@ -2,7 +2,7 @@
 
 > **本文件位置**: `ip/cpu/docs/status.md`
 > **作用**: M1.x 任务粒度的实时状态 (PASS/FAIL/进度%)。**唯一高频改文件**。
-> **最后更新**: 2026-06-16 (C4 commit: ip/cpu/core/payload_common.h 落地, M1.7 完成)
+> **最后更新**: 2026-06-16 (C3+C5+C6 commit: PipeNode arb_ 集成 + 2 套测试 + M1 收官, 8/8 PASS)
 
 > **本文件不包含**任务详细描述。 见 [`implementation-plan/M1..M5`](implementation-plan/)。
 > **本文件不包含**静态架构、决策、范围。 见 [`blueprint.md`](blueprint.md) / [`cpu_implementation_guide_v2.0.md`](cpu_implementation_guide_v2.0.md) / [`implementation-plan/README.md`](implementation-plan/README.md)。
@@ -16,9 +16,9 @@
 | **v2.0 文档** | 🟢 Accepted (用户 2026-06-15 接受 F1-F6 + 议题 1-8) |
 | **v2.0 拆分 commit** | ✅ 已 push (commit `06721f1`, 2026-06-16) |
 | **v2.0 baseline tag** | ✅ 已创建 `phase-1.5-cpu-v2.0-baseline-2026-06-16` |
-| **M1 启动** | 🔵 待启动 (用户授权) |
-| **M1-M5 累计完成** | 0 / 49 子任务 (0%) |
-| **ctest 全局** | 16/16 PASS (基线, M1 启动后需保持) |
+| **M1 启动** | 🟢 M1 完成 (C1-C6 全部 commit, 8/8 子任务 PASS) |
+| **M1-M5 累计完成** | **8 / 49 子任务 (16.3%, M1 段 100%)** |
+| **ctest 全局** | **18/18 PASS** (16 既有 + 2 新增: test_pipe_arbitration + test_payload_common) |
 | **git tag** (终点) | 🔵 待 M5 创建 `phase-1.5-cpu-v2.0-2026-MM-DD` (不同于 baseline tag) |
 
 ### 状态图例
@@ -37,19 +37,19 @@
 ## 1. M1 状态 — CPU 核心框架层
 
 > 详细任务: [`implementation-plan/M1-cpu-skeleton.md`](implementation-plan/M1-cpu-skeleton.md)
-> **🟡 2026-06-16 探索完成**: cf_plugin Phase 0 已实现 M1.1+M1.2 实质内容; CtrlLink 部分覆盖 M1.3+M1.4; M1.5+M1.7 全新; M1.6 增量。 详细基线复用表见 M1-cpu-skeleton.md §0.2。 **待 D-α/D-β/D-γ 3 决策确认后进入 C2-C6 commit 实施。**
+> **🟢 2026-06-16 M1 收官**: C1-C6 全部 commit 完成, 8/8 子任务 PASS, 18/18 ctest 全局不退化。 实施路径 1.1 d (原估 3-4 d, 节省 2-3 d 复用成本)。
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
 | M1.1 | 扩展 `cf::plugin::PipeBuilder` 增加 `at_stage` | 🟢 基线复用 | 100% (cf_plugin Phase 0) | test_pipe_builder PASS | C1 公告, 0 实施量 |
 | M1.2 | 扩展 `cf::plugin::PipeBuilder` 增加 `declare_substage` | 🟢 基线复用 | 100% (cf_plugin Phase 0) | test_pipe_builder PASS | C1 公告, 0 实施量 |
-| M1.3 | 新增 `cf::plugin::PipeLink` StageLink | 🟢 PASS (via CtrlLink 复用) | 100% | test_ctrl_link PASS | CtrlLink 已有 valid/ready 握手 API, StageLink 模式由 C3 扩展 |
-| M1.4 | 新增 `cf::plugin::PipeLink` DirectLink | 🟢 PASS (via CtrlLink 复用) | 100% | test_ctrl_link PASS | DirectLink 模式由 C3 扩展 |
-| M1.5 | 新增 `cf::plugin::PipeArbitration` | 🟢 PASS | 100% (C2 commit) | test_pipe_node PASS | 全新头文件, 140 行, 编译通过 |
-| M1.6 | 集成 PipeArbitration 到 PipeNode | 🔵 待启动 | 0% → C3 | test_pipe_node PASS | 增量加 arb_ 字段, 兼容 L1Cache |
-| M1.7 | 新增 `ip/cpu/core/payload_common.h` | 🟢 PASS | 100% (C4 commit) | test_payload PASS | 全新头文件, 8 Key + DecodePayload, 167 行 |
-| M1.8 | 4/4 框架级单元测试 PASS | 🔵 待启动 | 0% → C5+C6 | ctest 4/4 | 3/4 已存在, 1 新增 test_payload_common |
-| **M1 累计** | | 🟡 进行中 | **4/8 (50%)** | ctest 4/4 + 16/16 不退化 | C2+C4 完成, C3+C5+C6 待办 |
+| M1.3 | 新增 `cf::plugin::PipeLink` StageLink | 🟢 PASS (via CtrlLink 复用) | 100% | test_ctrl_link PASS | CtrlLink 已有 valid/ready 握手 API |
+| M1.4 | 新增 `cf::plugin::PipeLink` DirectLink | 🟢 PASS (via CtrlLink 复用) | 100% | test_ctrl_link PASS | 同 M1.3 |
+| M1.5 | 新增 `cf::plugin::PipeArbitration` | 🟢 PASS | 100% (C2 commit) | test_pipe_arbitration PASS | 全新头文件 140 行 + 7 用例测试 |
+| M1.6 | 集成 PipeArbitration 到 PipeNode | 🟢 PASS | 100% (C3 commit) | test_pipe_arbitration PASS (Test 6) | arb_ 字段 + arb()/arb_mut()/arbitration() API, 5 态方法保留 |
+| M1.7 | 新增 `ip/cpu/core/payload_common.h` | 🟢 PASS | 100% (C4 commit) | test_payload_common PASS | 全新头文件 152 行 + 7 用例测试 |
+| M1.8 | 4/4 框架级单元测试 PASS | 🟢 PASS | 100% (C5+C6 commit) | **ctest 18/18 PASS** (2 新增 + 16 既有不退化) | test_pipe_arbitration + test_payload_common |
+| **M1 累计** | | 🟢 **M1 完成** | **8/8 (100%)** | ctest 18/18 + 16/16 不退化 | C1-C6 全部 commit, 实施 1.1 d |
 
 ---
 
@@ -138,12 +138,12 @@
 
 | 阶段 | 子任务数 | 完成 | 进度 | 累计 ctest |
 |------|----------|------|------|------------|
-| M1 | 8 | 0 | 0% | 4/4 |
+| **M1** | **8** | **8** | **100%** ✅ | **4/4 + 18/18 全局** |
 | M2 | 9 | 0 | 0% | 5/5 |
 | M3 | 12 | 0 | 0% | 6/6 |
 | M4 | 11 | 0 | 0% | 2/2 |
 | M5 | 9 | 0 | 0% | 4-6 ELF |
-| **总计** | **49** | **0** | **0%** | — |
+| **总计** | **49** | **8** | **16.3%** (M1 段完成) | — |
 
 ---
 
