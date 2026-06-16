@@ -64,11 +64,11 @@
 | M2.3 | 实施 `BranchPredictorPlugin` (P1) | 🟢 PASS | 100% | test_branch_predictor 4-6 PASS | M2.3 commit |
 | M2.4 | 实施 `IBusPlugin` | 🟢 PASS | 100% | test_ibus 4-6 PASS | M2.4 commit (stub) |
 | M2.5 | 实施 `DBusPlugin` | 🟢 PASS | 100% | test_dbus 4-6 PASS | M2.5 commit (stub) |
-| M2.6 | `fpu.h` P3+ 占位 | 🔵 待启动 | 0% | 占位存在 | |
-| M2.7 | `mmu.h` P3+ 占位 | 🔵 待启动 | 0% | 占位存在 | |
-| M2.8 | `exception.h` P3+ 占位 | 🔵 待启动 | 0% | 占位存在 | |
-| M2.9 | 5/5 P0 单元测试 PASS | 🔵 待启动 | 0% | ctest 5/5 | |
-| **M2 累计** | | 🟡 进行中 | **5/9 (56%)** | ctest 5/5 + 16/16 不退化 | M2.1-M2.5 done |
+| M2.6 | `fpu.h` P3+ 占位 | 🟢 PASS | 100% | 占位存在 | M2.6 commit |
+| M2.7 | `mmu.h` P3+ 占位 | 🟢 PASS | 100% | 占位存在 | M2.7 commit |
+| M2.8 | `exception.h` P3+ 占位 | 🟢 PASS | 100% | 占位存在 | M2.8 commit |
+| M2.9 | 5/5 P0 单元测试 PASS | 🟢 PASS | 100% | ctest 5/5 | test_reg_file/hazard/branch_predictor/ibus/dbus 全 PASS |
+| **M2 累计** | | 🟢 完成 | **9/9 (100%)** | ctest 23/23 + 16/16 不退化 | M2 全部完成 |
 
 ---
 
