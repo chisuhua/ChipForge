@@ -23,7 +23,7 @@
 - [1. 决策快照: F1-F6 决议 + 议题 1-8 选择](#1-决策快照-f1-f6-决议--议题-1-8-选择)
   - [1.1 决议草案 (F1-F6) — 全部 Accepted](#11-决议草案-f1-f6--全部-accepted)
   - [1.2 议题 1-8 选择 — 全部用户回复](#12-议题-1-8-选择--全部用户回复)
-  - [1.3 议题 1 备注 — 解决 VexRiscv 思路 (用户主动提出)](#13-议题-1-备注--解决-vexriscv-思路-用户主动提出)
+  - [1.3 议题 1 备注 — 借鉴 VexRiscv 思路 (用户主动提出)](#13-议题-1-备注--解决-vexriscv-思路-用户主动提出)
 - [2. 文档状态: Accepted](#2-文档状态-accepted)
 - [3. 拆分迁移说明 (2026-06-16)](#3-拆分迁移说明-2026-06-16)
 
@@ -59,14 +59,14 @@
 
 > **议题详细论证与实施层细节** 见 [`implementation-plan/README.md` §3](implementation-plan/README.md)。
 
-### 1.3 议题 1 备注 — 解决 VexRiscv 思路 (用户主动提出)
+### 1.3 议题 1 备注 — 借鉴 VexRiscv 思路 (用户主动提出)
 
 > 用户在议题 1 选择 C (复用 cf_plugin) 后, 主动备注:
-> "**再实施过程中, 同时解决 VexRiscv 的思路**"
+> "**再实施过程中, 同时借鉴 VexRiscv 的思路**"
 
 含义:
 - 复用 cf_plugin Phase 0 (PluginBase / Payload / PipeNode / PipeBuilder / CtrlLink) 5 个头文件
-- 解决 VexRiscv 思路 = 在实施 CPU Plugin 过程中, 借鉴 VexRiscv Plugin 设计模式, 解决 multi_isa v2.0 §2-4 描述的 PipeLink / DirectLink / declare_substage 等尚未实现的 API
+- 借鉴 VexRiscv 思路 = 在实施 CPU Plugin 过程中, 借鉴 VexRiscv Plugin 设计模式, 解决 multi_isa v2.0 §2-4 描述的 PipeLink / DirectLink / declare_substage 等尚未实现的 API
 - VexRiscv 的 40+ 复杂 Plugin (Cache, MMU, CSR, Debug, Interrupt) 共享同一流水线骨架, 我们参考其**Plugin 分类** (核心/扩展/可选) 但不直接移植其 Scala 代码
 - 实施过程中如发现 cf_plugin 缺 API (例如 declare_substage, PipeLink), 应**扩展 cf_plugin** 而非在 ip/cpu 内部重新实现
 

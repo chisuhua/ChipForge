@@ -86,6 +86,10 @@ struct DecodePayload {
   bool     reads_rs1  = false;
   bool     reads_rs2  = false;
   std::uint8_t rd_class = 0;  // 0=普通 GPR, 1=CSR (M3 细化)
+  // M2.1 补充: 寄存器索引 (通用字段, 任何 ISA 都有)
+  std::uint8_t rs1_idx = 0;   // 源寄存器 1 索引 (x0-x31, 5-bit)
+  std::uint8_t rs2_idx = 0;   // 源寄存器 2 索引 (x0-x31, 5-bit)
+  std::uint8_t rd_idx  = 0;   // 目标寄存器索引 (x0-x31, 5-bit)
 };
 
 // ----------------------------------------------------------------------------
