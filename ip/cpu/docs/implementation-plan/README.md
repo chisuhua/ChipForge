@@ -298,25 +298,25 @@ soc/cpu_l1_picolibc demo.json
 
 ---
 
-## 8. M1 启动前置检查清单 (用户授权后)
+## 8. M1 启动前置检查清单
 
-> **当前状态 (2026-06-15)**: v2.0 文档已交付, 用户已接受 F1-F6 + 议题 1-8。 等待 git commit 授权 + 启动 M1。
+> **当前状态 (2026-06-16)**: v2.0 文档已交付, 用户已接受 F1-F6 + 议题 1-8。 v2.0 拆分 commit `06721f1` 已 push, baseline tag `phase-1.5-cpu-v2.0-baseline-2026-06-16` 已创建。 等待 M1 启动授权。
 
 | 项 | 状态 |
 |----|------|
-| **v2.0 文档** 用户授权 commit | 🟡 待用户授权 |
-| **git tag** `phase-1.5-cpu-v2.0-baseline-2026-06-15` | 🟡 待用户授权 |
-| **8 文件 staged** (v2.0 doc + 修订的 cf_plugin 扩展点) | 🟡 待 M1 启动前 |
+| **v2.0 拆分 commit** `06721f1` | ✅ 已 push (2026-06-16) |
+| **baseline tag** `phase-1.5-cpu-v2.0-baseline-2026-06-16` | ✅ 已创建 + push (2026-06-16) |
+| **M1 启动授权** | 🔵 待用户授权 |
 
-### 8.1 M1 启动步骤 (用户授权后)
+### 8.1 M1 启动步骤
 
-1. **git commit** v2.0 文档 + tag `phase-1.5-cpu-v2.0-baseline-2026-06-15`
-2. **M1 启动**: 扩展 `cf::plugin::PipeBuilder` 增加 `at_stage` / `declare_substage` (议题 1 选 C)
-3. **M1 验证**: 4/4 框架级单元测试 PASS
-4. **进入 M2**: ISA 无关 5 个 Plugin
-5. **进入 M3**: RISC-V ISA 6 个 Plugin
-6. **进入 M4**: CpuFactory + JSON + 集成测试
-7. **进入 M5**: 联调 + 文档收尾 + 最终 commit
+1. ✅ **v2.0 文档 commit + tag** (已完成, 2026-06-16)
+2. 🔵 **M1 启动**: 扩展 `cf::plugin::PipeBuilder` 增加 `at_stage` / `declare_substage` (议题 1 选 C)
+3. 🔵 **M1 验证**: 4/4 框架级单元测试 PASS
+4. 🔵 **进入 M2**: ISA 无关 5 个 Plugin
+5. 🔵 **进入 M3**: RISC-V ISA 6 个 Plugin
+6. 🔵 **进入 M4**: CpuFactory + JSON + 集成测试
+7. 🔵 **进入 M5**: 联调 + 文档收尾 + 最终 commit + 终 tag `phase-1.5-cpu-v2.0-2026-MM-DD`
 
 ---
 
