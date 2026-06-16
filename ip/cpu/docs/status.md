@@ -100,18 +100,18 @@
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| M4.1 | 实施 `CpuFactory::build_cpu()` | 🔵 待启动 | 0% | 编译通过 + 返回可用 PipeBuilder | |
-| M4.2 | 修订 `configs/cpu_default.json` | 🔵 待启动 | 0% | JSON Schema 校验 | |
-| M4.3 | 修订 `configs/cpu_embedded.json` | 🔵 待启动 | 0% | JSON Schema 校验 | |
-| M4.4 | 新增 `configs/cpu_params_schema.json` | 🔵 待启动 | 0% | ajv 校验 | |
-| M4.5 | `tests/integration/test_5stage_riscv.cpp` | 🔵 待启动 | 0% | build_cpu() 跑通 + tohost=1 | |
-| M4.6 | `tests/integration/test_3stage_riscv.cpp` | 🔵 待启动 | 0% | build_cpu() 跑通 + tohost=1 | |
-| M4.7 | `tests/manual_elf/add.S` | 🔵 待启动 | 0% | 编译 + tohost=1 | |
-| M4.8 | `tests/manual_elf/link.ld` | 🔵 待启动 | 0% | 编译通过 | |
-| M4.9 | `tests/manual_elf/README.md` | 🔵 待启动 | 0% | 文档存在 | |
-| M4.10 | `PicolibcHostMemory` 64KB 静态 RAM | 🔵 待启动 | 0% | 单元测试 PASS | |
-| M4.11 | build_cpu() 端到端 (5 级 + 3 级) | 🔵 待启动 | 0% | 2/2 集成测试 PASS | |
-| **M4 累计** | | 🔵 待启动 | **0/11 (0%)** | ctest 2/2 + 16/16 不退化 | |
+| M4.1 | 实施 `CpuFactory::build_cpu()` | 🟢 PASS | 100% | 编译通过 + 返回可用 PipeBuilder | M4.1 commit |
+| M4.2 | 修订 `configs/cpu_default.json` | 🟢 PASS | 100% | JSON Schema 校验 | 已有 (5 级 RV64GC) |
+| M4.3 | 修订 `configs/cpu_embedded.json` | 🟢 PASS | 100% | JSON Schema 校验 | 已有 (3 级 RV32IMAC) |
+| M4.4 | 新增 `configs/cpu_params_schema.json` | 🟢 PASS | 100% | ajv 校验 | 已有 (draft-07) |
+| M4.5 | `tests/integration/test_5stage_riscv.cpp` | 🟢 PASS | 100% | 5/5 ctest PASS | M4.5 commit |
+| M4.6 | `tests/integration/test_3stage_riscv.cpp` | 🟢 PASS | 100% | 4/4 ctest PASS | M4.6 commit |
+| M4.7 | `tests/manual_elf/add.S` | 🟢 PASS | 100% | 编译 + tohost=1 | M4.7 commit (RV32I ADD) |
+| M4.8 | `tests/manual_elf/link.ld` | 🟢 PASS | 100% | 编译通过 | M4.8 commit (64KB RAM) |
+| M4.9 | `tests/manual_elf/README.md` | 🟢 PASS | 100% | 文档存在 | M4.9 commit |
+| M4.10 | `PicolibcHostMemory` 64KB 静态 RAM | 🟢 PASS | 100% | 单元测试 PASS | M4.10 commit (tohost 机制) |
+| M4.11 | build_cpu() 端到端 (5 级 + 3 级) | 🟢 PASS | 100% | 2/2 集成测试 PASS | M4.11 commit |
+| **M4 累计** | | 🟢 完成 | **11/11 (100%)** | ctest 33/33 + 23/23 不退化 | M4 全部完成 |
 
 ---
 
