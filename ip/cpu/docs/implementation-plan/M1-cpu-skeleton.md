@@ -45,7 +45,7 @@
 
 ### 0.4 探索中的其他发现
 
-**D-1: 测试结构不与 IP 目录绑定** — 所有测试在 `src/cf_plugin/tests/`, **不是** `ip/ccpu/tests/`。 L1CachePlugin 4/4 测试在 `src/cf_plugin/tests/test_l1_cache_plugin_unit.cpp`。 推论: M1 的 4 个测试中, 3 个已有 (test_pipe_builder/test_ctrl_link/test_pipe_node/test_payload), 1 个新增应该是 `test_payload_common.cpp` 放在 `src/cf_plugin/tests/` (与 cf_plugin 头文件同区), **不是**新建 `ip/cpu/tlm/tests/`。
+**D-1: 测试结构不与 IP 目录绑定** — 所有测试在 `tests/`, 按家族 (framework/cpu/cache/soc/bundles) 子目录划分。 L1CachePlugin 4/4 测试在 `tests/cache/test_l1_cache_plugin_unit.cpp`。 M1 的测试在 `tests/cpu/` 和 `tests/framework/`。 本决策从 C1 的 `src/cf_plugin/tests/` 修正为 `tests/`, 理由: M1 收官后 17 个测试分布 4 家族, 原单一目录混杂。 详见 `tests/README.md` 和 `docs/lessons/m1-cpu-framework.md` §D-1 修正记录。
 
 **D-2: 命名空间约定** — L1CachePlugin 用 `cf::ip::cache::tlm::L1CachePlugin` (cf::ip::<module>::tlm::*), 蓝图说"新增 `cf::plugin::PipeLink` / `PipeArbitration`" (cf::plugin::* 框架层), `ip/cpu/core/payload_common.h` 用 `cf::cpu::core::payload::*` (cf::cpu::core::* IP 层, 但**不应**用 cf::ip::cpu:: — 与 L1Cache 的 cf::ip::cache 区分)。
 
