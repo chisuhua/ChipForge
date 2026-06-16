@@ -337,7 +337,7 @@ endforeach()
 # ----------------------------------------------------------------------------
 # Phase 2: M4 集成测试 (tests/cpu/integration/)
 # ----------------------------------------------------------------------------
-foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv)
+foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv test_demo_soc)
   if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/integration/${test_name}.cpp)
     add_executable(${test_name} ${CMAKE_SOURCE_DIR}/tests/cpu/integration/${test_name}.cpp)
     target_link_libraries(${test_name} PRIVATE cf_plugin)

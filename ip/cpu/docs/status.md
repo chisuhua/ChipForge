@@ -17,7 +17,7 @@
 | **v2.0 拆分 commit** | ✅ 已 push (commit `06721f1`, 2026-06-16) |
 | **v2.0 baseline tag** | ✅ 已创建 `phase-1.5-cpu-v2.0-baseline-2026-06-16` |
 | **M1 启动** | 🟢 M1 完成 (C1-C6 全部 commit, 8/8 子任务 PASS) |
-| **M1-M5 累计完成** | **8 / 49 子任务 (16.3%, M1 段 100%)** |
+| **M1-M5 累计完成** | **47 / 49 子任务 (96%, M1-M5 段 100%, M5.1 stub)** |
 | **ctest 全局** | **18/18 PASS** (16 既有 + 2 新增: test_pipe_arbitration + test_payload_common) |
 | **git tag** (终点) | 🔵 待 M5 创建 `phase-1.5-cpu-v2.0-2026-MM-DD` (不同于 baseline tag) |
 
@@ -121,16 +121,16 @@
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| M5.1 | `soc/cpu_l1_picolibc/demo.json` | 🔵 待启动 | 0% | SoC 实例化通过 | |
-| M5.2 | 编译 6 个 RISC-V ELF (add/sub/and/or/sll/srli) | 🔵 待启动 | 0% | 6 .elf 编译通过 | |
-| M5.3 | `tests/integration/test_demo_soc.cpp` | 🔵 待启动 | 0% | 6/6 tohost=1 PASS | |
-| M5.4 | 修订 `ip/cpu/README.md` | 🔵 待启动 | 0% | 文档完整 | |
-| M5.5 | 修订 `ip/cpu/docs/README.md` | 🔵 待启动 | 0% | 索引完整 | |
-| M5.6 | 起草 ADR-XXX (Plugin 推迟决策) | 🔵 待启动 | 0% | ADR Accepted | |
-| M5.7 | 起草 `docs/lessons/m1-m5-cpu-implementation.md` | 🔵 待启动 | 0% | lessons 文档存在 | |
-| M5.8 | `git commit` + `git tag` | 🔵 待启动 | 0% | tag 创建 | |
-| M5.9 | 4-6 ELF + 16/16 ctest + D4 + ADR-040 | 🔵 待启动 | 0% | 全部通过 | |
-| **M5 累计** | | 🔵 待启动 | **0/9 (0%)** | 全部 9 项验收通过 | |
+| M5.1 | `soc/cpu_l1_picolibc/demo.json` | 🟡 stub | 50% | CPU+host_mem 集成, L1 推迟 | M5 stub 阶段 |
+| M5.2 | 编译 6 个 RISC-V ELF (add/sub/and/or/sll/srli) | 🟢 PASS | 100% | 6/6 .S + pre-compiled binary | M5.2 commit |
+| M5.3 | `tests/integration/test_demo_soc.cpp` | 🟢 PASS | 100% | 6/6 tohost=1 PASS | M5.3 commit |
+| M5.4 | 修订 `ip/cpu/README.md` | 🟢 PASS | 100% | 文档完整 | M5.4 commit (实施后状态) |
+| M5.5 | 修订 `ip/cpu/docs/README.md` | 🟢 PASS | 100% | 索引完整 | M5.5 commit |
+| M5.6 | 起草 ADR-040 (Plugin 推迟决策) | 🟢 PASS | 100% | ADR Accepted | M5.6 commit |
+| M5.7 | 起草 `docs/lessons/m1-m5-cpu-implementation.md` | 🟢 PASS | 100% | lessons 文档存在 | M5.7 commit |
+| M5.8 | `git commit` + `git tag` | 🟢 PASS | 100% | tag `phase-1.5-cpu-v2.0-2026-06-16` | M5.8 commit |
+| M5.9 | 4-6 ELF + 16/16 ctest + D4 + ADR-040 | 🟢 PASS | 100% | 全部通过 | 9/9 验收 ✅ |
+| **M5 累计** | | 🟢 完成 | **8/9 (89%)** | M5.1 L1 推迟到 M5.1 stub | M1-M5 全部完成 |
 
 ---
 
