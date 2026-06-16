@@ -90,6 +90,9 @@ struct DecodePayload {
   std::uint8_t rs1_idx = 0;   // 源寄存器 1 索引 (x0-x31, 5-bit)
   std::uint8_t rs2_idx = 0;   // 源寄存器 2 索引 (x0-x31, 5-bit)
   std::uint8_t rd_idx  = 0;   // 目标寄存器索引 (x0-x31, 5-bit)
+  // M2.3 补充: 分支结果 (执行阶段输出, 分支预测器更新用)
+  bool         branch_taken = false;  // 分支是否跳转
+  std::uint64_t branch_target = 0;  // 分支目标地址 (64-bit 兼容 RV32/RV64)
 };
 
 // ----------------------------------------------------------------------------
@@ -140,6 +143,16 @@ struct keys {
 
   // 8. RESULT —— 通用执行结果 (xlen 类型, 多数指令类型, FPU 推迟 P3+)
   static inline cf::plugin::Payload<T> RESULT{"cpu.result"};
+
+  // M2.5 补充: 内存读写 Key (数据总线接口)
+  // 9. MEM_ADDR —— 内存访问地址 (xlen 类型)
+  static inline cf::plugin::Payload<T> MEM_ADDR{"cpu.mem_addr"};
+
+  // 10. MEM_DATA —— 内存读写数据 (xlen 类型)
+  static inline cf::plugin::Payload<T> MEM_DATA{"cpu.mem_data"};
+
+  // 11. MEM_SIZE —— 内存访问大小 (字节数, 1/2/4/8)
+  static inline cf::plugin::Payload<cf::plugin::uint_t<3>> MEM_SIZE{"cpu.mem_size"};
 };
 
 // ----------------------------------------------------------------------------
