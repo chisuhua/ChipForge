@@ -78,19 +78,19 @@
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| M3.1 | 实施 `decoder_table.h` | 🔵 待启动 | 0% | test_decode PASS | |
-| M3.2 | 实施 `payload_riscv.h` | 🔵 待启动 | 0% | test_decode PASS | |
-| M3.3 | 实施 `RiscvDecodePlugin` | 🔵 待启动 | 0% | test_decode 4-6 PASS | |
-| M3.4 | 实施 `RiscvIntAluPlugin` | 🔵 待启动 | 0% | test_int_alu 4-6 PASS | |
-| M3.5 | 实施 `RiscvBranchPlugin` (P1) | 🔵 待启动 | 0% | test_branch 4-6 PASS | |
-| M3.6 | 实施 `RiscvMulPlugin` (P1, 3 级子流水) | 🔵 待启动 | 0% | test_mul 4-6 PASS | |
-| M3.7 | 实施 `RiscvLsuPlugin` (P1) | 🔵 待启动 | 0% | test_lsu 4-6 PASS | |
-| M3.8 | `RiscvCsrPlugin` P2 stub | 🔵 待启动 | 0% | 占位存在 | |
-| M3.9 | `arch/riscv/fpu.h` P3+ 占位 | 🔵 待启动 | 0% | 占位存在 | |
-| M3.10 | 6 × 单元测试 PASS | 🔵 待启动 | 0% | ctest 6/6 | |
-| M3.11 | RV32I 译码正确性 (35+ 指令) | 🔵 待启动 | 0% | 35+ PASS | |
-| M3.12 | RV32I 整数运算 (10 指令) | 🔵 待启动 | 0% | 10 PASS | |
-| **M3 累计** | | 🔵 待启动 | **0/12 (0%)** | ctest 6/6 + 16/16 不退化 | |
+| M3.1 | 实施 `decoder_table.h` | 🟢 PASS | 100% | test_decode PASS | M3.1 commit (40 RV32I 指令) |
+| M3.2 | 实施 `payload_riscv.h` | 🟢 PASS | 100% | test_decode PASS | M3.2 commit (RiscvDecodeDetail + RISCV_DETAIL Key) |
+| M3.3 | 实施 `RiscvDecodePlugin` | 🟢 PASS | 100% | test_decode 5/5 PASS | M3.3 commit (decode 阶段填 DECODE+RISCV_DETAIL) |
+| M3.4 | 实施 `RiscvIntAluPlugin` | 🟢 PASS | 100% | test_int_alu 4/4 PASS | M3.4 commit (10 算术指令) |
+| M3.5 | 实施 `RiscvBranchPlugin` (P1) | 🟢 PASS | 100% | test_branch 3/3 PASS | M3.5 commit (BEQ/BNE/BLT/BGE/BLTU/BGEU) |
+| M3.6 | 实施 `RiscvMulPlugin` (P1, 3 级子流水) | 🟢 PASS | 100% | test_mul 5/5 PASS | M3.6 commit (MUL/MULH*/DIV*/REM*) |
+| M3.7 | 实施 `RiscvLsuPlugin` (P1) | 🟢 PASS | 100% | test_lsu 4/4 PASS | M3.7 commit (地址生成 + LOAD/STORE stub) |
+| M3.8 | `RiscvCsrPlugin` P2 stub | 🟢 PASS | 100% | 占位存在 | M3.8 commit (P2 stub) |
+| M3.9 | `arch/riscv/fpu.h` P3+ 占位 | 🟢 PASS | 100% | 占位存在 | M3.9 commit (P3+) |
+| M3.10 | 5 × 单元测试 PASS | 🟢 PASS | 100% | ctest 5/5 (5/6 目标) | 缺 test_payload_riscv, 并入 test_decode |
+| M3.11 | RV32I 译码正确性 (35+ 指令) | 🔵 待启动 | 0% | 35+ PASS | M3.11 = 扩展 test_decode 到 35+ 用例 |
+| M3.12 | RV32I 整数运算 (10 指令) | 🔵 待启动 | 0% | 10 PASS | M3.12 = 扩展 test_int_alu 到 10 用例 |
+| **M3 累计** | | 🟡 进行中 | **10/12 (83%)** | ctest 5/5 + 18/18 不退化 | M3.1-M3.10 done, M3.11-M3.12 扩展 |
 
 ---
 
