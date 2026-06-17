@@ -89,6 +89,24 @@ public:
 - **可复现**：每次仿真的完整配置和结果都持久化存储
 - **渐进式**：从单参数扫描到多维 Pareto 优化
 
+### 当前实际状态 (2026-06-17 实证)
+
+> **本节由审计添加, 区分"文档承诺"vs"实际可用"**。详细 DSE 设计见 [`../../ip/cpu/docs/dse_architecture.md`](../../ip/cpu/docs/dse_architecture.md)。
+
+| 工具/脚本 | 本文档描述 | 2026-06-17 实际状态 |
+|-----------|-----------|-------------------|
+| `tools/dse/sweep_driver.py` | ✅ 已存在 (见本文 Python 驱动脚本一节) | ✅ **已创建** — 2026-06-17, 笛卡尔积展开 + 并行执行 + JSON 输出 |
+| `tools/dse/pareto_analyzer.py` | ✅ 已存在 (见本文结果分析与可视化一节) | ✅ **已创建** — 2026-06-17, 多目标 Pareto 前沿计算 |
+| `tools/dse/sweep_config.example.json` | 隐含 | ✅ **已创建** |
+| `tools/dse/README.md` | 隐含 | ✅ **已创建** — DSE 工具索引 + 用法 |
+| `cpu_sim` 二进制 (CLI wrapper) | 隐含 | 🔵 **待 M5.16 实施** — sweep_driver.py 调用入口 |
+| `sweep_space` driver | ✅ 已存在 (见本文 Python 驱动脚本一节) | ✅ **已在 sweep_driver.py::gen_configs() 实现** |
+| `parse_results.py` | 隐含 | 🔵 **未拆分** — sweep_driver.py 内联 `parse_metrics()` 已实现,功能等价 |
+
+> **注**: 上述行号引用上一版本 (2026-06-17 前),现以语义 anchor 替代,避免再次编辑时漂移。
+
+**关键变更**: 本节原描述的 `SweepDriver` 类已被 [`../../ip/cpu/docs/dse_architecture.md`](../../ip/cpu/docs/dse_architecture.md) §8.3 重构为独立可执行脚本 (`tools/dse/sweep_driver.py`),以子进程方式调用 `cpu_sim` 二进制,避免 Python 直接绑定 C++ 类。
+
 ### JSON 配置驱动的参数化体系
 
 #### SoC 配置文件
@@ -274,9 +292,9 @@ class SweepDriver:
         """执行单次仿真"""
         # 生成 SoC 配置（基于 base_config + 参数覆盖）
         soc_config = self.apply_overrides(param_dict)
-        # 调用仿真器
+        # 调用仿真器 (Q3 决策: 统一为 ./build/sim/cpu_sim, 与 sweep_driver.py 默认值 + dse_architecture.md §8.4 一致)
         subprocess.run([
-            "./build/chipforge_sim",
+            "./build/sim/cpu_sim",
             "--config", f"{output_dir}/config.json",
             "--elf", benchmark,
             "--stats", f"{output_dir}/stats.json"
