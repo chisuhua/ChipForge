@@ -13,8 +13,9 @@
 > - [`blueprint.md`](blueprint.md) — **静态架构蓝图** (微架构/目录/Plugin 套件/CpuFactory/cf_plugin 扩展点/方法学复用/VexRiscv 关系)
 > - [`implementation-plan/`](implementation-plan/) — **总体实施规划** (范围/议题 1-8 实施层决策/测试金字塔/风险/M1-M5 总览) **+ 各阶段详细任务** (M1..M5)
 > - [`status.md`](status.md) — **任务状态看板** (49 个 M1.x 任务粒度 PASS/FAIL/进度%)
+> - **[`dse_architecture.md`](dse_architecture.md)** — **DSE 实现方案** (2026-06-17 v1.0 新增, 流水线深度/分支预测/MUL 延迟/ISA 扩展等可探索维度的代码改动路径, 实证校核 + 完整实施路线图)
 >
-> 本文件**仅保留** §3 决议与议题选择, 决策不再分散。 架构细节去 `blueprint.md`, 实施去 `implementation-plan/`, 状态去 `status.md`。
+> 本文件**仅保留** §3 决议与议题选择, 决策不再分散。 架构细节去 `blueprint.md`, 实施去 `implementation-plan/`, 状态去 `status.md`, **DSE 设计去 `dse_architecture.md`**。
 
 ---
 
@@ -143,14 +144,15 @@ ip/cpu/docs/
 ├── cpu_implementation_guide_v2.0.md         (原, 现 ~230 行) 决策入口
 ├── blueprint.md                              (新, ~700 行) 静态架构蓝图
 ├── status.md                                 (新, ~250 行) 任务状态看板
+├── dse_architecture.md                       (新, 2026-06-17 v1.0) DSE 实现方案
 ├── multi_isa_architecture.md                 (原) 权威设计, 不动
 ├── implementation-plan/                      (新目录)
 │   ├── README.md                             (新, ~400 行) 总体实施规划
 │   ├── M1-cpu-skeleton.md                    (新, ~80 行) M1 详细任务
 │   ├── M2-core-plugins.md                    (新, ~70 行) M2 详细任务
 │   ├── M3-riscv-plugins.md                   (新, ~80 行) M3 详细任务
-│   ├── M4-integration.md                     (新, ~80 行) M4 详细任务
-│   └── M5-verification.md                    (新, ~70 行) M5 详细任务
+│   ├── M4-integration.md                     (新, ~100 行) M4 详细任务 (含 M4.12-M4.19 DSE)
+│   └── M5-verification.md                    (新, ~100 行) M5 详细任务 (含 M5.10-M5.19 DSE)
 └── riscv/                                    (原) 旧参考, 不动
 ```
 
