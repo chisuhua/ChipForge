@@ -1,0 +1,32 @@
+{
+  "name": "RiscvCpu_deep_pipeline",
+  "type": "cpu",
+  "params": {
+    "isa": "rv64gc",
+    "pipeline_stages": 10,
+    "clock_freq_mhz": 500,
+    "split_if_id": true,
+    "enable_branch_predictor": true,
+    "branch_predictor": "tournament",
+    "btb_entries": 256,
+    "ghr_bits": 16,
+    "ext_m": true,
+    "mul_latency": 5,
+    "ext_zicsr": true,
+    "ext_f": false,
+    "ext_d": false,
+    "enable_mmu": true,
+    "mmu_mode": "sv48",
+    "enable_pmp": true,
+    "icache_latency_cycles": 2,
+    "dcache_latency_cycles": 2,
+    "use_strict_scoreboard": true,
+    "collect_stats": true
+  },
+  "ports": {
+    "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "dbus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "irq": {"type": "signal", "width": 16}
+  },
+  "stats": ["ipc", "branch_miss_rate", "cache_hit_rate", "cycles", "mul_latency_effective", "pipeline_depth"]
+}
