@@ -1,0 +1,30 @@
+{
+  "name": "RiscvCpu_superscalar",
+  "type": "cpu",
+  "params": {
+    "isa": "rv64gc",
+    "pipeline_stages": 7,
+    "clock_freq_mhz": 200,
+    "split_if_id": true,
+    "enable_branch_predictor": true,
+    "branch_predictor": "gshare",
+    "btb_entries": 128,
+    "ghr_bits": 16,
+    "ext_m": true,
+    "mul_latency": 3,
+    "ext_zicsr": true,
+    "enable_mmu": true,
+    "mmu_mode": "sv39",
+    "enable_pmp": true,
+    "icache_latency_cycles": 1,
+    "dcache_latency_cycles": 2,
+    "use_strict_scoreboard": true,
+    "collect_stats": true
+  },
+  "ports": {
+    "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "dbus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "irq": {"type": "signal", "width": 16}
+  },
+  "stats": ["ipc", "branch_miss_rate", "cache_hit_rate", "cycles", "mul_latency_effective"]
+}
