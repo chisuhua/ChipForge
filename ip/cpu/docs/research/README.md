@@ -9,7 +9,8 @@ This directory contains research reports and surveys that inform the CPU Design 
 | Document | Description | Date | Status |
 |----------|-------------|------|--------|
 | [dse_architecture.md](../dse_architecture.md) | DSE architecture v1.0 — current implementation plan | 2026-06-17 | ✅ Implemented |
-| [dse_architecture_v2.md](../dse_architecture_v2.md) | DSE architecture v2.0 — forward-compatibility improvements | 2026-06-17 | 🟡 Proposed |
+| [dse_architecture_v2_locks.md](../dse_architecture_v2_locks.md) | DSE v2.0 Phase 1 forward-compatibility locks (D.1-D.4, Oracle-approved) | 2026-06-17 | 🟢 Accepted for Phase 1 |
+| [dse_architecture_v2_design_research.md](../dse_architecture_v2_design_research.md) | DSE v2.0 design research — gem5/BOOM/XiangShan/Chipyard/SMT surveys + Phase 5+ proposals | 2026-06-17 | 🔵 Reference (Phase 5+ prep) |
 
 ### Reference Surveys
 
@@ -17,7 +18,7 @@ This directory contains research reports and surveys that inform the CPU Design 
 |----------|-------------|------|--------|
 | [gem5_dse_reference.md](../gem5_dse_reference.md) | gem5 DSE patterns and architectural insights | 2026-06-17 | Background agent bg_9668b73e |
 | [ooo_forward_compat_gap_analysis.md](../ooo_forward_compat_gap_analysis.md) | OoO/Superscalar/SMT forward-compatibility gap analysis | 2026-06-17 | Background agent bg_45968b90 |
-| [dse-open-source-riscv-survey.md](./dse-open-source-riscv-survey.md) | Open-source RISC-V CPU DSE survey (BOOM, XiangShan, etc.) | 2026-06-17 | Background agent bg_2d204563 |
+| [dse-open-source-riscv-survey.md](../../../docs/research/dse-open-source-riscv-survey.md) | Open-source RISC-V CPU DSE survey (BOOM, XiangShan, etc.) | 2026-06-17 | Background agent bg_2d204563 |
 | [smt-interface-design-survey.md](./smt-interface-design-survey.md) | SMT (Simultaneous Multithreading) interface design survey | 2026-06-17 | Background agent bg_41470f52 |
 | [dse-framework-survey.md](./dse-framework-survey.md) | CPU DSE frameworks and methodology survey | 2026-06-17 | Background agent bg_a592c1cb |
 

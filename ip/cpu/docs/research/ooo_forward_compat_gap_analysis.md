@@ -4,7 +4,7 @@
 |---|---|
 | Version | 1.0 |
 | Date | 2026-06-17 |
-| Status | 🟡 Draft (input for `dse_architecture_v2.md`) |
+| Status | 🟡 Draft (input for `dse_architecture_v2_locks.md` and `dse_architecture_v2_design_research.md`) |
 | Scope | `ip/cpu/` Phase 1-4 abstractions vs Phase 5+ OoO/Superscalar/SMT requirements |
 | Inputs | `dse_architecture.md` v1.0, `multi_isa_architecture.md` v2.0, `blueprint.md`, `cpu_implementation_guide_v2.0.md`, plus 13 source files |
 
@@ -586,7 +586,8 @@ Add to the file-level comment:
 //   - commit_hook(cb)             = end-of-cycle commit (OoO commit point)
 //   - CtrlLink::flush_when(cond)  = speculative squash on mispredict
 // Per-instruction identity (IID) and per-thread tagging are Plugin-level
-// concerns, not framework concerns. See ip/cpu/docs/dse_architecture_v2.md.
+// concerns, not framework concerns. See ip/cpu/docs/dse_architecture_v2_locks.md and
+// ip/cpu/docs/dse_architecture_v2_design_research.md.
 ```
 
 ---
@@ -612,4 +613,4 @@ If the Phase 5 designer is tempted to "make PayloadStore hold N instructions", *
 
 ---
 
-*Document end. This is input for `dse_architecture_v2.md` § "Phase 1 must include".*
+*Document end. This is input for `dse_architecture_v2_locks.md` § "Phase 1 must lock" and `dse_architecture_v2_design_research.md` §3.*

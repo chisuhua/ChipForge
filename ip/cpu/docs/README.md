@@ -6,6 +6,8 @@
 |------|------|------|
 | [multi_isa_architecture.md](multi_isa_architecture.md) | 多 ISA 架构设计：三层分离（core/arch/tlm+rtl）、ExecContext 接口、Plugin 分类体系 | **Active** |
 | [dse_architecture.md](dse_architecture.md) | **DSE 实现方案 (v1.0, 2026-06-17)** — 流水线深度/分支预测/MUL 延迟/ISA 扩展等可探索维度的完整代码改动路径, 含实证校核 (哪些是真 stub / 哪些是文档超前) | 🟡 Accepted (待实施 M4-DSE / M5-DSE) |
+| [dse_architecture_v2_locks.md](dse_architecture_v2_locks.md) | **DSE v2.0 Phase 1 锁定决策 (2026-06-17, Oracle 评审通过)** — 仅 D.1-D.4 (~108 行 header churn)，防止 ~2000 行 Phase 5+ 重构 | 🟢 **Accepted for Phase 1** |
+| [dse_architecture_v2_design_research.md](dse_architecture_v2_design_research.md) | **DSE v2.0 设计研究 (2026-06-17)** — 完整调研（gem5/BOOM/XiangShan/Chipyard/SMT/DSE 方法论）+ Phase 5+ 设计方案，推迟到 Phase 5 准备时实施 | 🔵 Reference (Phase 5+ prep) |
 
 ## 实施文档（v2.0 拆分后，2026-06-16；DSE 子阶段 2026-06-17）
 
@@ -13,12 +15,13 @@
 |------|------|------|----------|
 | [cpu_implementation_guide_v2.0.md](cpu_implementation_guide_v2.0.md) | 决策入口 — F1-F6 决议 + 议题 1-8 完整选择 | 决策审计 | **只读** (决议不变) |
 | [blueprint.md](blueprint.md) | 静态架构蓝图 — 微架构/目录/Plugin 套件/CpuFactory/cf_plugin 扩展点/方法学/VexRiscv 关系 | 架构师 | 极少 (重大设计变更时) |
-| [status.md](status.md) | 任务状态看板 — M1-M5 49 个子任务 + **M4-DSE / M5-DSE 子任务** PASS/FAIL/进度% | 项目管理者 | **高频** (每次 Mx.y 完成即更新) |
-| [implementation-plan/README.md](implementation-plan/README.md) | 总体实施规划 — 范围/议题 1-8 实施层细节/测试金字塔/风险/M1-M5 总览 | 实施者 | 中 (范围/风险调整时) |
+| [status.md](status.md) | 任务状态看板 — M1-M5 49 个子任务 + **M4G + M4-DSE / M5-DSE 子任务** PASS/FAIL/进度% | 项目管理者 | **高频** (每次 Mx.y 完成即更新) |
+| [implementation-plan/README.md](implementation-plan/README.md) | 总体实施规划 — 范围/议题 1-8 实施层细节/测试金字塔/风险/M1-M5 + M4G 总览 | 实施者 | 中 (范围/风险调整时) |
 | [implementation-plan/M1-cpu-skeleton.md](implementation-plan/M1-cpu-skeleton.md) | M1 详细任务清单 (8 个子任务) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M2-core-plugins.md](implementation-plan/M2-core-plugins.md) | M2 详细任务清单 (9 个子任务) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M3-riscv-plugins.md](implementation-plan/M3-riscv-plugins.md) | M3 详细任务清单 (12 个子任务) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M4-integration.md](implementation-plan/M4-integration.md) | M4 详细任务清单 (**19 个子任务**, 含 M4.12-M4.19 DSE 接线) | 实施者 | 任务粒度变化时 |
+| [implementation-plan/M4G-forward-compat-locks.md](implementation-plan/M4G-forward-compat-locks.md) | **M4G 详细任务清单 (8 个子任务, 2026-06-17 新增)** — Phase 1 Forward-Compatibility Locks (D.1-D.4, Oracle 评审通过) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M5-verification.md](implementation-plan/M5-verification.md) | M5 详细任务清单 (**19 个子任务**, 含 M5.10-M5.19 DSE 验证) | 实施者 | 任务粒度变化时 |
 
 > **拆分说明**: 原 `cpu_implementation_guide_v2.0.md` 1220 行混杂 4 类内容, 已拆分为 4 类文档。 详细迁移表见 v2.0 §3。

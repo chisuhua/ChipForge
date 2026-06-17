@@ -4,10 +4,10 @@
 |---|---|
 | Version | 1.0 |
 | Date | 2026-06-17 |
-| Status | 🔵 Reference (informs `dse_architecture_v2.md` planning) |
+| Status | 🔵 Reference (informs `dse_architecture_v2_design_research.md` planning) |
 | Scope | ChipForge IP/CPU Phase 5+ DSE work, derived from gem5 source |
 | Upstream | gem5 @ `/workspace/project/gem5/` |
-| Audience | Authors of `dse_architecture_v2.md` and PipeBuilder/PluginBase evolution |
+| Audience | Authors of `dse_architecture_v2_design_research.md` and PipeBuilder/PluginBase evolution |
 
 > **Purpose**: Document the actual gem5 implementation patterns that the
 > ChipForge plugin-based DSE architecture will need to accommodate when
@@ -1206,4 +1206,4 @@ This is a flat list, sorted by file, for quick lookup.
 
 ---
 
-*Report end. Use this to inform `dse_architecture_v2.md`.*
+*Report end. Use this to inform `dse_architecture_v2_design_research.md`.*

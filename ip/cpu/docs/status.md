@@ -2,7 +2,7 @@
 
 > **本文件位置**: `ip/cpu/docs/status.md`
 > **作用**: M1.x 任务粒度的实时状态 (PASS/FAIL/进度%)。**唯一高频改文件**。
-> **最后更新**: 2026-06-16 (C3+C5+C6 commit: PipeNode arb_ 集成 + 2 套测试 + M1 收官, 8/8 PASS)
+> **最后更新**: 2026-06-17 (新增 M4G 子阶段, Oracle 评审通过)
 
 > **本文件不包含**任务详细描述。 见 [`implementation-plan/M1..M5`](implementation-plan/)。
 > **本文件不包含**静态架构、决策、范围。 见 [`blueprint.md`](blueprint.md) / [`cpu_implementation_guide_v2.0.md`](cpu_implementation_guide_v2.0.md) / [`implementation-plan/README.md`](implementation-plan/README.md)。
@@ -16,9 +16,11 @@
 | **v2.0 文档** | 🟢 Accepted (用户 2026-06-15 接受 F1-F6 + 议题 1-8) |
 | **v2.0 拆分 commit** | ✅ 已 push (commit `06721f1`, 2026-06-16) |
 | **v2.0 baseline tag** | ✅ 已创建 `phase-1.5-cpu-v2.0-baseline-2026-06-16` |
+| **v2.0-locks 文档** | 🟢 Accepted (Oracle 评审通过, 2026-06-17) |
 | **M1 启动** | 🟢 M1 完成 (C1-C6 全部 commit, 8/8 子任务 PASS) |
 | **M1-M5 累计完成** | **47 / 49 子任务 (96%, M1-M5 段 100%, M5.1 stub)** |
-| **M4-DSE / M5-DSE 子阶段** | 🔵 待启动 — 见 [dse_architecture.md](dse_architecture.md) |
+| **M4G 子阶段** | 🔵 **Ready to Start** (Oracle 评审通过, 8 个新子任务) |
+| **M4-DSE / M5-DSE 子阶段** | 🔵 待启动 — 依赖 M4G 完成 |
 | **ctest 全局** | **18/18 PASS** (16 既有 + 2 新增: test_pipe_arbitration + test_payload_common) |
 | **git tag** (终点) | 🔵 待 M5 创建 `phase-1.5-cpu-v2.0-2026-MM-DD` (不同于 baseline tag) |
 
@@ -131,6 +133,34 @@
 | M4.19 | test_cpu_factory 升级: 断言 `plugin_count()` / `stage_names()` / 拓扑 | 🔵 待启动 | 0% | 8 个用例 PASS | 测试从 "非空" 升级到 "正确" |
 | **M4-DSE 累计** | | 🔵 待启动 | **0/8** | — | 见 [dse_architecture.md §9 Phase A+B](dse_architecture.md#9-实施路线图) |
 
+### 4.2 M4G 子阶段 — Phase 1 Forward-Compatibility Locks
+
+> **本节为 [dse_architecture_v2_locks.md](dse_architecture_v2_locks.md) 的任务拆分 (Oracle 评审通过, 2026-06-17)**。
+> **详细设计**: 见 [dse_architecture_v2_locks.md](dse_architecture_v2_locks.md) 和 [implementation-plan/M4G-forward-compat-locks.md](implementation-plan/M4G-forward-compat-locks.md)
+> **状态**: 🔵 **Ready to Start** (依赖 M4 完成 ✅)
+> **必须先于 M4-DSE 实施**: M4G 完成后, M4-DSE 的 `build_cpu` 实现才能安全触及 3 个模板化插件
+
+| 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
+|------|------|------|------|------|------|
+| G.1 | D.1: 添加 `UID` / `THREAD_ID` / `IID_PC` Payloads | 🔵 Ready | 0% | 编译通过 + 18/18 ctest 不退化 | 3 行 header |
+| G.2 | D.2: 模板化 `RegFilePlugin<T, N_REGS, N_THREADS>` | 🔵 Ready | 0% | 默认参数兼容 + 新增多线程测试 | ~30 行 header |
+| G.3 | D.2: 模板化 `HazardPlugin<T, N_REGS, N_THREADS>` | 🔵 Ready | 0% | 默认参数兼容 + per-thread scoreboard 隔离 | ~30 行 header |
+| G.4 | D.2 + D.4: 模板化 `BranchPredictorPlugin<T, ..., N_THREADS>` + `predict`/`update` 接受 `tid` | 🔵 Ready | 0% | 默认参数兼容 + per-thread GHR 隔离 | ~40 行 header |
+| G.5 | D.3: `HazardPlugin::has_hazard` 返回 `HazardKind` enum | 🔵 Ready | 0% | 0 个外部调用者 break + 4 个 enum 值正确 | ~5 行 |
+| G.6 | D.4: `BranchPredictorPlugin::predict`/`update` 接受 `tid` | 🔵 Ready | 0% | (G.4 已覆盖) | 0h (G.4 合并) |
+| G.7 | 单元测试: D.1-D.4 所有锁的验证 (`test_forward_compat.cpp` 新建) | 🔵 Ready | 0% | 8+ 个 ctest PASS | ~150 行测试 |
+| G.8 | 文档同步: `blueprint.md` / `README.md` | 🔵 Ready | 0% | 文档完整且一致 | ~1h |
+| **M4G 累计** | | 🔵 Ready | **0/8** | — | Oracle 评审: D.1-D.4 是 sound, 总成本 ~108 行 header churn, 防止 ~2000 行 Phase 5+ 重构 |
+
+**M4G 关键约束**:
+- ✅ 默认参数保持向后兼容 (N_REGS=32, N_THREADS=1, BTB_SIZE=16 等)
+- ✅ 零行为改变 (单线程 in-order 行为不变)
+- ✅ Header-only 实施 (无 .cpp 修改, 除 BranchPredictor 的 10 个显式实例化外)
+- ✅ 编译时间增加 ~10% (acceptable)
+- ❌ 不引入 `BranchPredictorFactory` (Oracle: 破坏插件模型一致性)
+- ❌ 不引入 `ThreadContext` / `Cpu<T, MAX_THREADS>` (Oracle: 投机性死代码)
+- ❌ 不修改 `D.5` stage-name 成员 (Oracle: 错误抽象)
+
 ---
 
 ## 5. M5 状态 — 联调 + 文档收尾
@@ -179,10 +209,12 @@
 | M2 | 9 | 9 | 100% ✅ | 5/5 |
 | M3 | 12 | 12 | 100% ✅ | 6/6 |
 | M4 (v2.0) | 11 | 11 | 100% ✅ | 2/2 |
+| **M4G** (前瞻锁定) | **8** | **0** | **0% 🔵** | **Oracle 评审通过, Ready to Start** |
 | M5 (v2.0, 含 M5.1 stub 50%) | 9 | 8 | 89% 🟡 | 4-6 ELF (6/6 tohost=1) |
-| M4-DSE 子阶段 | 8 | 0 | 0% 🔵 | — |
+| M4-DSE 子阶段 | 8 | 0 | 0% 🔵 | — (依赖 M4G) |
 | M5-DSE 子阶段 | 10 | 0 | 0% 🔵 | — |
 | **总计 (v2.0)** | **49** | **48** | **98%** (M5.1 stub) | **18/18 ctest + 6/6 tohost** |
+| **总计 (v2.0 + M4G)** | **57** | **48** | **84%** (M5.1 stub + M4G 待启动) | — |
 
 ---
 
@@ -211,8 +243,14 @@
 - **静态架构**: [`blueprint.md`](blueprint.md)
 - **总体实施规划**: [`implementation-plan/README.md`](implementation-plan/README.md)
 - **决策入口**: [`cpu_implementation_guide_v2.0.md`](cpu_implementation_guide_v2.0.md)
+- **DSE v2.0 锁定决策** (Oracle 评审通过): [`dse_architecture_v2_locks.md`](dse_architecture_v2_locks.md)
+- **DSE v2.0 设计研究** (Phase 5+ 参考): [`dse_architecture_v2_design_research.md`](dse_architecture_v2_design_research.md)
+- **DSE v1.0 完整方案**: [`dse_architecture.md`](dse_architecture.md)
+- **OoO 缺口分析**: [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md)
+- **gem5 参考**: [`gem5_dse_reference.md`](gem5_dse_reference.md)
 - **M1 详细**: [`implementation-plan/M1-cpu-skeleton.md`](implementation-plan/M1-cpu-skeleton.md)
 - **M2 详细**: [`implementation-plan/M2-core-plugins.md`](implementation-plan/M2-core-plugins.md)
 - **M3 详细**: [`implementation-plan/M3-riscv-plugins.md`](implementation-plan/M3-riscv-plugins.md)
 - **M4 详细**: [`implementation-plan/M4-integration.md`](implementation-plan/M4-integration.md)
+- **M4G 详细** (Phase 1 前瞻锁定): [`implementation-plan/M4G-forward-compat-locks.md`](implementation-plan/M4G-forward-compat-locks.md)
 - **M5 详细**: [`implementation-plan/M5-verification.md`](implementation-plan/M5-verification.md)

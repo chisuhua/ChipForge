@@ -7,7 +7,7 @@
 | Date | 2026-06-17 |
 | Scope | Production CPU SMT implementations, RISC-V status, interface patterns for plugin-based extensibility |
 | Word Count | ~2,550 words |
-| Status | 🔵 Reference (informs dse_architecture_v2.md §7) |
+| Status | 🔵 Reference (informs `dse_architecture_v2_design_research.md` §7) |
 
 ---
 

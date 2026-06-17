@@ -7,7 +7,7 @@
 | Date | 2026-06-17 |
 | Scope | Academic, industrial, and Chisel-based DSE frameworks for CPU architecture exploration |
 | Word Count | ~3,000 words |
-| Status | 🔵 Reference (informs dse_architecture_v2.md §8) |
+| Status | 🔵 Reference (informs `dse_architecture_v2_design_research.md` §8) |
 
 ---
 

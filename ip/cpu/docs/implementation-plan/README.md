@@ -227,9 +227,9 @@ TEST(Integration, RV32I_3Stage_Add) {
 
 ---
 
-## 6. 实施里程碑 (M1-M5 总览)
+## 6. 实施里程碑 (M1-M5 + M4G 总览)
 
-> **详细任务清单** 见各 M 文件: [`M1-cpu-skeleton.md`](M1-cpu-skeleton.md), [`M2-core-plugins.md`](M2-core-plugins.md), [`M3-riscv-plugins.md`](M3-riscv-plugins.md), [`M4-integration.md`](M4-integration.md), [`M5-verification.md`](M5-verification.md)。
+> **详细任务清单** 见各 M 文件: [`M1-cpu-skeleton.md`](M1-cpu-skeleton.md), [`M2-core-plugins.md`](M2-core-plugins.md), [`M3-riscv-plugins.md`](M3-riscv-plugins.md), [`M4-integration.md`](M4-integration.md), [`M4G-forward-compat-locks.md`](M4G-forward-compat-locks.md) (新增), [`M5-verification.md`](M5-verification.md)。
 > **任务状态** (PASS/FAIL/进度) 见 [`../status.md`](../status.md)。
 
 | 阶段 | 内容 | 验收 | 估时 |
@@ -238,8 +238,26 @@ TEST(Integration, RV32I_3Stage_Add) {
 | **M2** | **ISA 无关 Plugin** (议题 2 选 B: 5 个核心 P0)<br>• `ip/cpu/plugins/reg_file.h` (议题 3 选 B+C: array_store)<br>• `ip/cpu/plugins/hazard.h`<br>• `ip/cpu/plugins/branch_predictor.h` (P1)<br>• `ip/cpu/plugins/ibus.h`<br>• `ip/cpu/plugins/dbus.h`<br>• `ip/cpu/plugins/fpu.h` (P3+ 占位)<br>• `ip/cpu/plugins/mmu.h` (P3+ 占位)<br>• `ip/cpu/plugins/exception.h` (P3+ 占位) | 5/5 P0 单元测试 PASS<br>• P3+ 占位 (.h 声明, .cpp TODO) | **2-3 d** |
 | **M3** | **RISC-V ISA 特有 Plugin** (议题 2 选 B: 6 个 P0/P1/P2)<br>• `arch/riscv/decoder_table.h` (P0)<br>• `arch/riscv/payload_riscv.h` (P0)<br>• `arch/riscv/decode.h` (P0)<br>• `arch/riscv/int_alu.h` (P0)<br>• `arch/riscv/mul.h` (P1)<br>• `arch/riscv/branch.h` (P1)<br>• `arch/riscv/lsu.h` (P1)<br>• `arch/riscv/csr.h` (P2 stub)<br>• `arch/riscv/fpu.h` (P3+ 占位) | 6 × 单元测试 PASS<br>• RV32I 译码正确性<br>• RV32I 整数运算 | **4-5 d** |
 | **M4** | **CpuFactory + JSON 配置 + 集成测试** (议题 4 选 B + 议题 5 选 B + 议题 8 选 B)<br>• `ip/cpu/cpu_factory.h` (集中 PluginOrder)<br>• 修订 `configs/cpu_default.json` (multi_isa v2.0 §6.1 字段)<br>• 修订 `configs/cpu_embedded.json`<br>• 新增 `configs/cpu_params_schema.json` (修订版)<br>• `tests/integration/test_5stage_riscv.cpp`<br>• `tests/integration/test_3stage_riscv.cpp`<br>• `tests/manual_elf/add.S` + `link.ld` + 编译脚本<br>• 议题 6 选 C: `PicolibcHostMemory` 静态 RAM | build_cpu() 跑通<br>• 5 级 + 3 级 end-to-end 跑通 `add.elf`<br>• tohost = 1 (PASS) | **2-3 d** |
+| **M4G** | **Phase 1 Forward-Compatibility Locks** (2026-06-17 新增, Oracle 评审通过)<br>• D.1: 添加 `UID` / `THREAD_ID` / `IID_PC` Payloads<br>• D.2: 模板化 `RegFilePlugin<T, N_REGS, N_THREADS>`<br>• D.2: 模板化 `HazardPlugin<T, N_REGS, N_THREADS>`<br>• D.2: 模板化 `BranchPredictorPlugin<T, ..., N_THREADS>`<br>• D.3: `HazardPlugin::has_hazard` 返回 `HazardKind` enum<br>• D.4: `BranchPredictorPlugin::predict`/`update` 接受 `tid`<br>• 测试: 8+ forward_compat ctest PASS | 18/18 现有 ctest 不退化<br>• 8+ 新增 ctest PASS<br>• ~108 行 header churn, 0 行为改变<br>• 防止 ~2000 行 Phase 5+ 重构 | **2 d** |
 | **M5** | **联调 + 文档收尾** (议题 6 选 C)<br>• CPU + L1CachePlugin + PicolibcHostMemory 联调<br>• 跑通 4-6 个基础 RISC-V ELF (add/sub/and/or/sll/srli)<br>• 修订 `ip/cpu/README.md` + `ip/cpu/docs/README.md`<br>• ADR-XXX: Plugin 推迟决策<br>• `git commit` + tag | 4-6 ELF 全 PASS<br>• 16/16 ctest 不退化<br>• D4 + ADR-040 3+4/3 PASS | **1-2 d** |
-| **总计** | | | **12-17 d** |
+| **总计** | | | **14-19 d** (含 M4G) |
+
+### 6.1 阶段间依赖
+
+```
+M1 (框架层) ──► M2 (ISA 无关 Plugin) ──► M3 (RISC-V Plugin) ──► M4 (集成) ──► M4G (前瞻锁定) ──► M5 (联调)
+                                       │                                              │
+                                       └──► M4 (CpuFactory 集成 M2+M3)                 │
+                                                                                      │
+                                       M4-DSE (Phase A+B: CpuFactory stub 真实化) ◄───┤
+                                                                                      │
+                                       M5-DSE (Phase C+D+E: 拓扑展开 + Sweep 脚本) ◄────┘
+```
+
+**M4G 必须在 M4-DSE 之前完成**，因为：
+- M4-DSE 的 `build_cpu` 实现 (M4.14) 会触及 `RegFilePlugin`/`HazardPlugin`/`BranchPredictorPlugin`
+- M4-DSE 的 `parse_config` (M4.16) 会读取 `CPUConfig` 字段并实例化插件
+- 如果 M4D 先实施, 后续 M4G 改动会引发 M4-DSE 的代码冲突
 
 ### 6.1 阶段间依赖
 
