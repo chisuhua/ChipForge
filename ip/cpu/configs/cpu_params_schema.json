@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "RISC-V CPU IP Configuration Schema",
+  "title": "RISC-V CPU IP Configuration Schema (v2.0 + DSE 扩展)",
+  "description": "v2.0 字段 + M4-DSE/M5-DSE 新增 12 个字段 (2026-06-17). 见 ip/cpu/docs/dse_architecture.md §4",
   "type": "object",
   "properties": {
     "name": {"type": "string", "description": "实例名称"},
@@ -22,10 +23,9 @@
         },
         "pipeline_stages": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 12,
+          "enum": [3, 5, 7, 10],
           "default": 5,
-          "description": "流水线级数"
+          "description": "流水线级数 (3=embedded, 5=default, 7=superscalar, 10=deep pipeline)"
         },
         "clock_freq_mhz": {
           "type": "integer",
@@ -75,12 +75,81 @@
           "maximum": 32,
           "default": 1,
           "description": "DCache 命中延迟"
+        },
+        "enable_branch_predictor": {
+          "type": "boolean",
+          "default": true,
+          "description": "[M4-DSE 新增] 是否启用分支预测器 (3 级嵌入式可关)"
+        },
+        "split_if_id": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] 7 级模式把 fetch 拆 IF1/IF2"
+        },
+        "merge_ex_mem": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] 3 级模式合并 EX+MEM"
+        },
+        "ghr_bits": {
+          "type": "integer",
+          "enum": [8, 16],
+          "default": 8,
+          "description": "[M4-DSE 新增] GShare 全局历史寄存器位数"
+        },
+        "ext_m": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] RISC-V M 扩展 (MUL/DIV)"
+        },
+        "ext_a": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] RISC-V A 扩展 (atomic)"
+        },
+        "ext_f": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] RISC-V F 扩展 (单精度 FPU, stub)"
+        },
+        "ext_d": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] RISC-V D 扩展 (双精度 FPU, stub)"
+        },
+        "ext_zicsr": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] RISC-V Zicsr 扩展 (CSR)"
+        },
+        "ext_zifencei": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M4-DSE 新增] RISC-V Zifencei 扩展"
+        },
+        "mul_latency": {
+          "type": "integer",
+          "enum": [1, 3, 5],
+          "default": 1,
+          "description": "[M5-DSE 新增] MUL 指令延迟 (cycle 数)"
+        },
+        "use_strict_scoreboard": {
+          "type": "boolean",
+          "default": true,
+          "description": "[M4-DSE 新增] HazardPlugin 严格 scoreboard 模式"
+        },
+        "collect_stats": {
+          "type": "boolean",
+          "default": false,
+          "description": "[M5-DSE 新增] 是否收集运行统计 (IPC/branch_miss/cache_hit)"
         }
       },
       "required": ["isa"],
       "allOf": [
         {"if": {"properties": {"enable_mmu": {"const": true}}}, "then": {"required": ["mmu_mode"]}},
-        {"if": {"properties": {"isa": {"enum": ["rv32i", "rv32im", "rv32imac"]}}}, "then": {"properties": {"mmu_mode": {"const": "sv32"}}}}
+        {"if": {"properties": {"isa": {"enum": ["rv32i", "rv32im", "rv32imac"]}}}, "then": {"properties": {"mmu_mode": {"const": "sv32"}}}},
+        {"if": {"properties": {"pipeline_stages": {"const": 3}}}, "then": {"properties": {"branch_predictor": {"enum": ["static", "bimodal"]}}, "btb_entries": {"enum": [16, 32]}}},
+        {"if": {"properties": {"pipeline_stages": {"const": 7}}}, "then": {"properties": {"branch_predictor": {"enum": ["gshare", "tournament"]}}}}
       ]
     },
     "ports": {
