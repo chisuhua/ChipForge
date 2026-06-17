@@ -174,9 +174,15 @@ RiscvDecodePlugin  (arch/riscv/decode.h)
 
 ## 5. CpuFactory — 流水线组装入口 (议题 5 选 B)
 
+> **⚠️ 2026-06-17 实证状态**: 当前 `ip/cpu/cpu_factory.h` 的 `build_cpu()` 是 **空 stub** — 三个 `register_*_plugins` 私有方法仅 `(void)pb; (void)sizeof(U);`, **零个 plugin 被注册**。本文档描述的是**设计意图**, 真实落实路径见 [`dse_architecture.md`](dse_architecture.md) §7 (M4-DSE 实施后 `build_cpu` 真实实现)。
+>
+> 详细实施状态: [`dse_architecture.md` §1.1](../dse_architecture.md) (审计结果) + [`status.md` §4.1](../status.md) (M4-DSE 子任务清单)
+
 ```cpp
 // ip/cpu/cpu_factory.h
 // 议题 5 选 B: CpuFactory 内置 PluginOrder 列表, 集中管理
+// 当前 (M4 之前): STUB — 11 个 plugin 一个都没注册
+// M4-DSE 实施后 (见 dse_architecture.md §7): 真实 register 所有 plugin + 拓扑展开 + BTB/MUL 编译期 switch
 
 #pragma once
 

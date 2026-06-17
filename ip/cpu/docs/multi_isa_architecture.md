@@ -727,6 +727,12 @@ build_cpu(const json& config, ImplMode mode) {
 
 ### 6.1 JSON 配置 Schema
 
+> **三种 ISA 表示法的关系 (2026-06-17 校核)**:
+> - **`isa` 字符串前缀** (`rv32i`/`rv32im`/`rv64gc`) 是 [`cpu_params_schema.json`](../../configs/cpu_params_schema.json) 的唯一权威字段,也是所有 `configs/cpu_*.json` 实例文件实际使用的形式
+> - **`isa_extensions` 数组** (本节描述) 是设计意图视图,与字符串前缀语义等价 (运行时归并)
+> - **`ext_*` boolean 字段** 是 DSE 工具 ([`../dse_architecture.md` §4.2](../dse_architecture.md)) 为笛卡尔积扫描引入的 flat 形式,运行时与字符串前缀互验
+> 三者冗余但等价,所有变更应同时反映到 `cpu_params_schema.json`
+
 ```json
 {
   "$schema": "./cpu_params_schema.json",
@@ -1158,6 +1164,55 @@ TEST(Compare, RV32I_AllPayloadsMatch) {
 - [Gem5](https://www.gem5.org/) — 多 ISA 对比参考
 - [QEMU TCG](https://wiki.qemu.org/Documentation/TCG) — 解释器对比
 - [Chipyard](https://chipyard.readthedocs.io/) — Generator 范式对比
+
+---
+
+## 11. 附录: 实施状态标注 (2026-06-17 实证校核)
+
+> 本节**由审计添加**, 用于区分"设计意图 (本文 §1-9)" vs "已落地实施 (2026-06-17 实证)"。
+> 详细 DSE 实施方案见 [`dse_architecture.md`](dse_architecture.md) v1.0。
+
+### 11.1 已落实的部分
+
+| § | 设计意图 | 落地状态 (2026-06-17) |
+|---|---------|----------------------|
+| §3.2 Plugin 调度顺序 (EARLY/NORMAL/LATE) | 设计意图 | ✅ Phase enum + PipeBuilder::build() 顺序调 setup → build 已实现 |
+| §4.2 Pipeline 内部 Payload Bundle (POD-style) | 设计意图 | ✅ `core/payload_common.h` 实现 8+3 通用 Key |
+| §5.1 取消 ExecContext | 设计意图 | ✅ 无 ExecContext 类, ISA 逻辑全部 Plugin 化 |
+| §5.2 双 Payload 共存 (通用 + ISA 特有) | 设计意图 | ✅ `payload_common.h::DecodePayload` + `payload_riscv.h::RiscvDecodeDetail` |
+| §6.1 JSON 配置 Schema | 设计意图 | ✅ `cpu_params_schema.json` 存在 |
+| §7 目录结构 | 设计意图 | ✅ core/plugins/arch/configs/ 目录结构符合 |
+
+### 11.2 设计超前于实现的部分 (待 M4-DSE / M5-DSE 实施)
+
+| § | 设计意图 | 当前差距 (2026-06-17) |
+|---|---------|----------------------|
+| §5.3 ISA 切换 = 更换 Plugin Registry | CpuFactory 应 dispatch `isa == "riscv"` / `"arm"` | ❌ **CpuFactory::build_cpu() 是空 stub**, 三 register_*_plugins 方法仅 `(void)pb; (void)sizeof(U);`, 0 个 plugin 被注册 |
+| §6.2 3/5/7/10 级映射 | pipeline_stages 字段控制拓扑 | ❌ `CpuFactory` stub 未消费 `pipeline_stages`; `declare_substage` 当前 `depth` 参数被注释, 无法合并 Node |
+| §6.3 Plugin declare_substage (mul 子流水) | FpuPlugin 用 declare_substage 声明子流水 | ⚠️ `BranchPredictorPlugin` 等未用 declare_substage; 仅 `L1CachePlugin` 调过 1 次 |
+| §6.4 配置校验 | JSON 校验后再 build | ⚠️ JSON 解析未实现 (CpuFactory 接受 `CPUConfig` struct, 不接受 JSON 字符串) |
+| §6.5 三种配置实例 (default/embedded/superscalar) | superscalar/deep_pipeline 示例 | ⚠️ superscalar.json 缺失 (待 M5.18 新建) |
+
+### 11.3 当前真正可调的维度
+
+**仅以下 5 个 `CPUConfig` 字段在改造后生效** (见 [`dse_architecture.md` §2.1](dse_architecture.md)):
+
+1. `isa ∈ {rv32i, rv32im, rv32imac, rv64i, rv64gc}` (字符串, factory dispatch)
+2. `pipeline_stages ∈ {3, 5, 7, 10}` (拓扑展开)
+3. `branch_predictor ∈ {static, bimodal, gshare, tournament}` (4 选 1)
+4. `btb_entries ∈ {16, 32, 64, 128, 256}` (编译期 5 选 1)
+5. `ext_m / ext_a / ext_f / ext_d / ext_zicsr / ext_zifencei` (6 个 ISA 扩展开关, 新增)
+
+### 11.4 明确推迟 (Phase 5+)
+
+| 维度 | 推迟理由 |
+|------|----------|
+| 乱序 (OoO) / ROB / RS / Rename / Wakeup | Phase 5+, 无抽象 |
+| 超标量 / 多发射 / Issue Queue | Phase 5+ |
+| 跨 ISA (非 RISC-V) | `payload_common.h:115,117` 静态断言卡 XLEN=32/64 |
+| L2/L3 cache / 真实 MMU/PMP / FPU | `ip/memory/` 仅 README, plugin 占位 |
+| 多核 / SMT | Phase 6+ |
+| RTL_ONLY / COMPARE | `cf::plugin::ImplMode` 枚举未在 PipeBuilder 实现 |
 
 ---
 
