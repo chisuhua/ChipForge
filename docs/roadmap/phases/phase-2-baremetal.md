@@ -58,7 +58,7 @@ class TestRunner:
 
 ### 6. 设计空间探索基础
 
-- [ ] 实现 `tools/dse/sweep_driver.py` 参数扫描驱动
+- [x] 实现 `tools/dse/sweep_driver.py` 参数扫描驱动 (2026-06-17)
 - [ ] 编写 `configs/sweep/cache_sweep.json` 示例扫描配置
 - [ ] 支持多基准测试 x 多参数组合的批量执行
 - [ ] 实现基本的 CSV/JSON 结果汇总
