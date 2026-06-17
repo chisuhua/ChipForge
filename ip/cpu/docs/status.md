@@ -18,6 +18,7 @@
 | **v2.0 baseline tag** | ✅ 已创建 `phase-1.5-cpu-v2.0-baseline-2026-06-16` |
 | **M1 启动** | 🟢 M1 完成 (C1-C6 全部 commit, 8/8 子任务 PASS) |
 | **M1-M5 累计完成** | **47 / 49 子任务 (96%, M1-M5 段 100%, M5.1 stub)** |
+| **M4-DSE / M5-DSE 子阶段** | 🔵 待启动 — 见 [dse_architecture.md](dse_architecture.md) |
 | **ctest 全局** | **18/18 PASS** (16 既有 + 2 新增: test_pipe_arbitration + test_payload_common) |
 | **git tag** (终点) | 🔵 待 M5 创建 `phase-1.5-cpu-v2.0-2026-MM-DD` (不同于 baseline tag) |
 
@@ -111,7 +112,24 @@
 | M4.9 | `tests/manual_elf/README.md` | 🟢 PASS | 100% | 文档存在 | M4.9 commit |
 | M4.10 | `PicolibcHostMemory` 64KB 静态 RAM | 🟢 PASS | 100% | 单元测试 PASS | M4.10 commit (tohost 机制) |
 | M4.11 | build_cpu() 端到端 (5 级 + 3 级) | 🟢 PASS | 100% | 2/2 集成测试 PASS | M4.11 commit |
-| **M4 累计** | | 🟢 完成 | **11/11 (100%)** | ctest 33/33 + 23/23 不退化 | M4 全部完成 |
+| **M4 累计 (v2.0)** | | 🟢 **M4 完成** | **11/11 (100%)** | ctest 33/33 + 23/23 不退化 | M4 全部完成 |
+
+### 4.1 M4-DSE 子阶段 — CpuFactory stub 真实化 + DSE 旋钮接入
+
+> **本节为 dse_architecture.md Phase A + B 的任务拆分**。详细设计见 [dse_architecture.md §9](dse_architecture.md)。
+> **状态**: 🔵 待启动 (M5 收官后或并行启动)
+
+| 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
+|------|------|------|------|------|------|
+| M4.12 | `PluginBase::setup_with_config(pb, const void*)` 加 3 行 | 🔵 待启动 | 0% | 编译通过 + 现有 ctest 不退化 | cf_plugin 最小改动 |
+| M4.13 | `PipeBuilder::merge_stage(name, parent)` 新增方法 | 🔵 待启动 | 0% | 单元测试 PASS | 解决 3 级拓扑合并 |
+| M4.14 | `CpuFactory::build_cpu` 替换 stub, 真实 register 11 个 plugin | 🔵 待启动 | 0% | test_cpu_factory 升级 PASS | 核心工作量 (~140 行) |
+| M4.15 | 修复 `reg_file.cpp:40` 双重定义 bug (删除 .cpp build() 重定义) | 🔵 待启动 | 0% | reg_file_test PASS | 真 Bug 修复 |
+| M4.16 | `parse_config(json_text)` + `validate_config(cfg)` + CPUConfig +12 字段 | 🔵 待启动 | 0% | 4 个示例 JSON 解析通过 | JSON 子集手写解析 |
+| M4.17 | `BranchPredictorPlugin` 模板参数化 + 10 种显式实例化 | 🔵 待启动 | 0% | 5 种 BTB 大小编译通过 | 让 btb_entries 字段真正生效 |
+| M4.18 | `IBusPlugin` / `DBusPlugin` / `HazardPlugin` 接受 cfg 字段 | 🔵 待启动 | 0% | 字段接受, 默认行为不变 | stub 行为升级 |
+| M4.19 | test_cpu_factory 升级: 断言 `plugin_count()` / `stage_names()` / 拓扑 | 🔵 待启动 | 0% | 8 个用例 PASS | 测试从 "非空" 升级到 "正确" |
+| **M4-DSE 累计** | | 🔵 待启动 | **0/8** | — | 见 [dse_architecture.md §9 Phase A+B](dse_architecture.md#9-实施路线图) |
 
 ---
 
@@ -130,7 +148,26 @@
 | M5.7 | 起草 `docs/lessons/m1-m5-cpu-implementation.md` | 🟢 PASS | 100% | lessons 文档存在 | M5.7 commit |
 | M5.8 | `git commit` + `git tag` | 🟢 PASS | 100% | tag `phase-1.5-cpu-v2.0-2026-06-16` | M5.8 commit |
 | M5.9 | 4-6 ELF + 16/16 ctest + D4 + ADR-040 | 🟢 PASS | 100% | 全部通过 | 9/9 验收 ✅ |
-| **M5 累计** | | 🟢 完成 | **8/9 (89%)** | M5.1 L1 推迟到 M5.1 stub | M1-M5 全部完成 |
+| **M5 累计 (v2.0)** | | 🟢 完成 | **8/9 (89%)** | M5.1 L1 推迟到 M5.1 stub | M1-M5 全部完成 |
+
+### 5.1 M5-DSE 子阶段 — 流水线深度真实展开 + MUL 子流水 + Sweep 脚本
+
+> **本节为 dse_architecture.md Phase C + D + E 的任务拆分**。详细设计见 [dse_architecture.md §9](dse_architecture.md)。
+> **状态**: 🔵 待启动 (依赖 M4-DSE 完成)
+
+| 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
+|------|------|------|------|------|------|
+| M5.10 | `TopologyBuilder::expand(cfg)` 实现 3/5/7/10 级拓扑展开 | 🔵 待启动 | 0% | 4 种深度编译通过 | CpuFactory.h 内部类 |
+| M5.11 | 3/5 级集成测试拓扑断言 | 🔵 待启动 | 0% | test_3stage / test_5stage 升级 PASS | topology 验证 |
+| M5.12 | 7 级集成测试 (`test_7stage_riscv.cpp` 新建) | 🔵 待启动 | 0% | 7 个 Node + 拓扑 PASS | 端到端跑 add.elf |
+| M5.13 | 10 级深流水测试 (`test_10stage_riscv.cpp` 新建) | 🔵 待启动 | 0% | ≥10 Node + 拓扑 PASS | 端到端跑 add.elf |
+| M5.14 | `RiscvMulPlugin<T, 1/3/5>` 模板实例化 + 子流水 | 🔵 待启动 | 0% | mul_latency=3 比 1 慢 ≥2 cycle | 真正让 mul_latency 字段生效 |
+| M5.15 | `tools/dse/sweep_driver.py` + `parse_results.py` + `pareto_analyzer.py` | 🔵 待启动 | 0% | 跑通 100 个 config | 完整 DSE sweep 工具链 |
+| M5.16 | `cpu_sim` 二进制支持 `--config --cycles` | 🔵 待启动 | 0% | 命令行接口可用 | CLI 封装 |
+| M5.17 | 完整 sweep 一次 (4×3×3×2×2×2×2 = 576 config) | 🔵 待启动 | 0% | 输出 results/sweep.json | Pareto 前沿输出 |
+| M5.18 | 新建 `cpu_superscalar.json` + `cpu_deep_pipeline.json` 示例配置 | 🔵 待启动 | 0% | JSON Schema 校验通过 | DSE 配置示例 |
+| M5.19 | `cpu_params_schema.json` 加 12 个新字段 schema | 🔵 待启动 | 0% | ajv 校验通过 | schema 与 CPUConfig 同步 |
+| **M5-DSE 累计** | | 🔵 待启动 | **0/10** | — | 见 [dse_architecture.md §9 Phase C+D+E](dse_architecture.md#9-实施路线图) |
 
 ---
 
@@ -139,11 +176,13 @@
 | 阶段 | 子任务数 | 完成 | 进度 | 累计 ctest |
 |------|----------|------|------|------------|
 | **M1** | **8** | **8** | **100%** ✅ | **4/4 + 18/18 全局** |
-| M2 | 9 | 0 | 0% | 5/5 |
-| M3 | 12 | 0 | 0% | 6/6 |
-| M4 | 11 | 0 | 0% | 2/2 |
-| M5 | 9 | 0 | 0% | 4-6 ELF |
-| **总计** | **49** | **8** | **16.3%** (M1 段完成) | — |
+| M2 | 9 | 9 | 100% ✅ | 5/5 |
+| M3 | 12 | 12 | 100% ✅ | 6/6 |
+| M4 (v2.0) | 11 | 11 | 100% ✅ | 2/2 |
+| M5 (v2.0, 含 M5.1 stub 50%) | 9 | 8 | 89% 🟡 | 4-6 ELF (6/6 tohost=1) |
+| M4-DSE 子阶段 | 8 | 0 | 0% 🔵 | — |
+| M5-DSE 子阶段 | 10 | 0 | 0% 🔵 | — |
+| **总计 (v2.0)** | **49** | **48** | **98%** (M5.1 stub) | **18/18 ctest + 6/6 tohost** |
 
 ---
 

@@ -45,7 +45,7 @@
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | isa | string | "rv64gc" | 指令集架构 |
-| pipeline_stages | int (1-12) | 5 | 流水线级数 |
+| pipeline_stages | int (3/5/7/10) | 5 | 流水线级数 (3=embedded, 5=default, 7=superscalar, 10=deep pipeline; 见 `cpu_params_schema.json` enum) |
 | clock_freq_mhz | int (1-2000) | 100 | 时钟频率 (MHz) |
 | enable_pmp | bool | true | 物理内存保护 |
 | enable_mmu | bool | true | 虚拟内存开关 |
