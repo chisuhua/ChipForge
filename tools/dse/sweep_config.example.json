@@ -1,0 +1,9 @@
+{
+  "_comment": "Example DSE sweep configuration. Pass to sweep_driver.py via --space.",
+  "pipeline_stages":     [3, 5, 7],
+  "btb_entries":         [16, 64],
+  "branch_predictor":    ["static", "gshare"],
+  "ext_m":               [false, true],
+  "mul_latency":         [1],
+  "isa":                 ["rv32i", "rv64i"]
+}
