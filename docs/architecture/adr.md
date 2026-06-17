@@ -75,7 +75,7 @@
 
 > **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 30 条
+### 2.1 已实现决策（✅）— 31 条
 
 | ID | 标题 | 类别 | 验证路径 |
 |----|------|------|----------|
@@ -109,6 +109,7 @@
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
+| ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -139,14 +140,14 @@
 | 注册与发现 (D) | 3 | 0 | 0 | 3 |
 | 端口与信号 (E) | 3 | 0 | 0 | 3 |
 | Bundle 与协议 (F) | 3 | 1 | 0 | 4 |
-| 声明式 Plugin (G) | 4 | 0 | 1 | 5 |
+| 声明式 Plugin (G) | 5 | 0 | 1 | 6 |
 | 流水线抽象 (H) | 3 | 0 | 1 | 4 |
 | 验证框架 (I) | 0 | 0 | 3 | 3 |
 | 目录与组织 (J) | 1 | 0 | 1 | 2 |
 | 可移植性约束 (L) | 0 | 0 | 1 | 1 |
-| **合计** | **30** | **1** | **8** | **39** |
+| **合计** | **31** | **1** | **8** | **40** |
 
-**实现率**：30/39 = **77%**（含部分实现）
+**实现率**：31/40 = **78%**（含部分实现）
 
 ---
 
@@ -779,7 +780,7 @@ Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/in
 
 ---
 
-### G. 声明式 Plugin 模型（Phase 1）— 5 条
+### G. 声明式 Plugin 模型（Phase 1）— 6 条
 
 ---
 
@@ -794,6 +795,8 @@ Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/in
 | 后果 | ✅ 已实现；`include/cf/plugin/plugin_base.h:48` 定义 `PluginBase`，仅提供 `name() / setup() / build()`，无 `tick()`。`PluginLoader`（ADR-017）是无关的 dlopen 加载器 |
 
 **完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.1
+
+**与 ADR-041 的关系**：D4（Plugin 基类无 tick）仅强制 `cf::plugin::PluginBase` 派生类。Bridge 适配层不继承 `PluginBase`，故不受 D4 强制，**可**实现 `tick()`。详见 [ADR-041](./adr/ADR-041-bridge-tick-pattern.md)。
 
 **验证命令**（必须通过）：
 ```bash
@@ -870,6 +873,27 @@ grep -nE "void\s+declare_substage\s*\(" /workspace/project/ChipForge/include/cf/
 ```
 
 **代码锚点**：`include/cf/plugin/pipe_builder.h:77`（`PipeBuilder::declare_substage`）
+
+---
+
+#### ADR-041：Bridge 适配层允许 `tick()` 模式（业务 Plugin vs Bridge 适配边界）
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | ✅ Accepted（2026-06-17, doc-code-realignment 实施） |
+| 来源 | 本次会话 doc-code-realignment §5 桥接模式合法性整理（基于 L1CachePlugin ↔ CppTLM CacheTLM 桥接实施经验，2026-06-10 ~ 2026-06-17） |
+| 决策 | 区分"业务 Plugin"（严格无 tick，受 D4 强制）与"Bridge 适配层"（允许 tick，但 body 仅协议转换 + 委托 `pb.run()`）；明确两类组件的命名空间、目录布局 |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-040（TLM→HDL 移植性约束，含 Tier-1 限制） |
+
+**关键约束**：
+- 业务 Plugin：`cf::plugin::PluginBase` 派生，`private: void tick() = delete;` 强制（D4）
+- Bridge 适配：`cf::bridge::` 命名空间，`src/cf_plugin/bridge/` 目录，**不**继承 PluginBase，不受 D4 强制
+- Bridge.tick() body 仅协议转换 + `plugin_->pb.run()` 委托，**不**允许业务状态变更
+- Bridge 受 ADR-040 Tier-1 限制（不调 `ch_mem` / `ch_reg` / `ch_uint` 等 RTL 原语）
+
+**完整内容见** [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md)
+
+**代码锚点**：`src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}`、`src/cf_plugin/bridge/L1CacheTLMBridgeAdapter.{h,cpp}`（Phase 1.3 落地）
 
 ---
 
@@ -959,6 +983,8 @@ grep -nE "^class\s+CtrlLink\b" /workspace/project/ChipForge/include/cf/plugin/ct
 | 后果 | ✅ 脚手架已实现；`class PipeBuilder` 在 `include/cf/plugin/pipe_builder.h:53`，聚合 `register_plugin / at_stage / declare_substage / node_of_logic_stage`；`build()`/`tick()` 调度闭环待 Phase 6 完善 |
 
 **完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+
+**与 ADR-041 的关系**：`PipeBuilder` 是业务 Plugin 的统一编译器入口（`pb.run()`），其内部**不**直接实现 `tick()`，而是委托给 `PluginBase` 派生类的 `at_stage()` 回调。Bridge 适配层（如 `L1CacheTLMBridge`）绕过 PipeBuilder，由 CppTLM EventQueue 直接调用其 `tick()`，并在 `tick()` body 末尾调用 `plugin_->pb.run()` 完成业务执行。详见 [ADR-041](./adr/ADR-041-bridge-tick-pattern.md)。
 
 **验证命令**（必须通过）：
 ```bash

@@ -18,7 +18,7 @@
 | Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~85% (1.1+1.2+1.3全部子任务+1.4方法学复盘完成) | 无 | Phase 1 退出标准全部达成, Phase 2 启动门槛就绪 |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
-| Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | ClintTlm/PlicTlm 完善 |
+| Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | CLINT/PLIC IP 完善 |
 | Phase 4 | M5 - Linux 启动 | Not Started | 0% | 依赖 Phase 3 | Sv39 + VirtIO Block |
 | Phase 5 | M6/M7/M8/M10 - RTL | Not Started | 0% | 依赖 Phase 4 | L1CacheRtl (CppHDL) |
 | Phase 6 | M6 - 完整 PipeBuilder | Not Started | 0% | 依赖 2-3 Plugin 稳定 | 调度算法 |

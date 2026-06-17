@@ -12,10 +12,10 @@
 
 ### 1. CppHDL RTL 开发
 
-以 `L1CacheRtl` 为第一个 RTL 模型：
+以 `L1CacheRtl`（CppHDL Component）为第一个 RTL 模型：
 
 - [ ] 用 `Component` + `LogicNode` 描述缓存逻辑
-- [ ] 用 `Simulator::run()` 直接 C++ 仿真，对标 `L1CacheTlm`
+- [ ] 用 `Simulator::run()` 直接 C++ 仿真，对标 `L1CachePlugin`
 - [ ] 调用 `VerilogCodeGen::generate("l1_cache.v")` 输出 Verilog
 - [ ] Verilator 编译 -> 生成 `VL1Cache` C++ 模型 -> 替换 `L1CacheRtl`
 
@@ -29,15 +29,17 @@ riscv-dv 生成随机测试程序
          |
          v
 RiscvVirtSoC (ImplMode::COMPARE)
-         +-- TLM 执行路径 ------+
-         +-- RTL 执行路径 ------+
-                                v
-                          ScoreBoard
-                    （逐条指令对比寄存器写回）
-                                v
-                         PASS / FAIL 报告
-                         （含执行迹 JSON）
+          +-- TLM 执行路径 ------+
+          +-- RTL 执行路径 ------+
+                                 v
+                           ScoreBoard
+                     （逐条指令对比寄存器写回）
+                                 v
+                          PASS / FAIL 报告
+                          （含执行迹 JSON）
 ```
+
+> 注：上述 `RiscvVirtSoC` 是 Phase 2 计划的 SoC 装配类（待实施），不是 `soc/riscv_virt.json`（已删除）。
 
 - [ ] 实现 `ImplMode::COMPARE` 模式：TLM + RTL 并行执行 + ScoreBoard 逐周期对比
 - [ ] 实现 `ImplMode::SHADOW` 模式：RTL 跟踪 TLM 主路径
@@ -80,7 +82,7 @@ public:
 
 ### 5. ISA 抽象层与 ImplMode 完善
 
-- [ ] 确保所有 CPU IP（RiscvIssTlm、ArmIssTlm 等）暴露统一 `ch_stream<MemReqBundle>` 接口，实现 SoC 层零修改切换 ISA
+- [ ] 确保所有 CPU IP 暴露统一 `ch_stream<MemReqBundle>` 接口，实现 SoC 层零修改切换 ISA（ISA 无关性详细见 [overview.md §"ch_stream 接口即 ISA 无关层"](../architecture/overview.md)）
 - [ ] DSE 扩展至 RTL 参数空间（Pipeline 深度、Buffer 大小等）
 
 ### 6. 可选：GPU SoC 扩展

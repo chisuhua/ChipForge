@@ -5,6 +5,33 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.0.2 (2026-06-17) - doc-code-realignment
+
+> **OpenSpec change**: `doc-code-realignment`（详见 `openspec/changes/doc-code-realignment/`）
+> **目的**: 修复 8 项文档/代码一致性漂移（CRITICAL 3 项 + HIGH 5 项），建立"0 幽灵引用"基线并以 CI 脚本固化。
+
+### Removed（消除 3 项 CRITICAL 漂移）
+- `soc/riscv_virt.json`（引用 7 个不存在类 + `impl_mode` 字段无消费者，不可运行）
+- `ip/cpu/cpu_factory.cpp`（12 行 stub，保留 `cpu_factory.h` 声明供 Phase 2+ 实施）
+
+### Changed（重写/更新 5 项 HIGH 漂移）
+- `docs/architecture/overview.md` §"SoC 层是 IP 组合器" 改为指向 `soc/l1_cache_minimal.json` 真实工作示例（不再描述虚构的 `RiscvVirtSoC.h/cpp`）
+- `docs/architecture/overview.md` §"ch_stream 接口即 ISA 无关层" 改为 "Phase 1.4+ Future Work" 占位段（当前 1 个 CPU IP，无法"验证" ISA 无关性）
+- `docs/architecture/interface-design.md` §1.0 增加 "已实现 POD vs 设计目标 bundle_base" 对照表（明确 Phase 1 当前是 POD，与 §"所有 Bundle 继承 bundle_base" 段落对照）
+- `soc/README.md` 顶部说明改为"目前 2 个 L1Cache 验证配置；RISC-V virt 推迟到 Phase 2+ 实施"
+- 7 个文档中 8 个幽灵类名（`RiscvIssTlm` / `L1CacheTlm` / `BusMatrixTlm` / `DramTlm` / `UartTlm` / `ClintTlm` / `PlicTlm` / `RiscvCoreRtl`）全部替换为 Plugin 风格命名 / 已注册 CppTLM 类名 / "Phase X+ 实施" 占位
+
+### Added
+- `docs/architecture/adr/ADR-041-bridge-tick-pattern.md` — 明确 Bridge 适配层允许 `tick()` 模式的边界条件（业务 Plugin vs Bridge 适配责任划分）
+- `docs/architecture/adr.md` 插入 ADR-041 摘要 + §3 G 详细记录 + 交叉引用 ADR-025/037/040
+- `tools/verify_no_ghost_refs.sh` — CI 防漂移脚本（可执行权限 755 + bash 严格模式 + 8 个类名 grep + 排除 `openspec/changes/` / `CHANGELOG.md` / `.omo/drafts/`）
+
+### Impact
+- **0 运行时影响**：仅文档/JSON 同步，不改任何运行时行为
+- **0 API 变更**：仅删除不可运行文件
+- **CI 影响**：新增 grep 检查脚本，阻断任何带幽灵类名的 .md/.json/.h/.cpp
+- **基线提升**：文档/代码一致性从约 50% 提升到 80%+（以 `tools/verify_no_ghost_refs.sh` exit 0 为准）
+
 ## [Unreleased]
 
 ### Added

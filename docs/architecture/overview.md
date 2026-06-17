@@ -23,7 +23,7 @@
                              | 统一平台接口
 +----------------------------v-------------------------------------+
 |                      SoC 组合层                                   |
-|  RiscvVirtSoC (RV64GC)  RiscvEmbedSoC (RV32IMC)  GpuSoC ...     |
+|  （Phase 2+ 实施）RV64GC virt / RV32IMC embed / GPU SoC ...      |
 |  按产品形态装配组件，ImplMode 决定 TLM/RTL 混插比例               |
 +---------+------------------------------------------+-------------+
           | ch_stream<T>                              | Port<T>
@@ -33,11 +33,11 @@
 |     CppTLM 组件层           |    |      CppHDL 组件层             |
 |  高速功能建模               |    |  周期精确 RTL 建模             |
 |  -------------------------  |    |  ----------------------------- |
-|  cpu/tlm/  RiscvIssTlm     |    |  cpu/rtl/  RiscvCoreRtl        |
-|  cache/tlm/ L1/L2CacheTlm  |    |  cache/rtl/ L1CacheRtl         |
-|  memory/tlm/ DramTlm       |    |  memory/rtl/ DramCtrlRtl       |
-|  interconnect/tlm/ BusTlm  |    |  interconnect/rtl/ CrossbarRtl |
-|  peripheral/tlm/ Uart/Plic |    |  peripheral/rtl/ UartRtl       |
+|  cpu/tlm/  CPUTLM          |    |  cpu/rtl/  （Phase 5 实施）    |
+|  cache/tlm/ CacheTLM       |    |  cache/rtl/ （Phase 5 实施）    |
+|  memory/tlm/ MemoryTLM     |    |  memory/rtl/ （Phase 5 实施）  |
+|  interconnect/tlm/ CrossbarTLM | | interconnect/rtl/ （Phase 5）|
+|  peripheral/tlm/ （Phase 3+ 实施）| | peripheral/rtl/（Phase 5+）|
 +---------+----------------------------------+    +---+-------------------------------+
           |                                           |
           +------------------+------------------------+
@@ -107,11 +107,11 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 {
   "name": "cache_ip_test",
   "modules": [
-    {"name": "tg", "type": "TrafficGenTlm",
+    {"name": "tg", "type": "TrafficGenTLM",
      "params": {"pattern": "HOTSPOT", "num_requests": 5000}},
-    {"name": "cache", "type": "L1CacheTlm",
-     "params": {"size_kb": 32, "replacement_policy": "LRU"}},
-    {"name": "mem", "type": "DramTlm", "params": {"latency_ns": 50}}
+    {"name": "cache", "type": "CacheTLM",
+     "params": {"size": 32768, "replacement_policy": "LRU"}},
+    {"name": "mem", "type": "MemoryTLM", "params": {"latency_ns": 50}}
   ],
   "connections": [
     {"src": "tg", "dst": "cache", "latency": 0},
@@ -133,50 +133,32 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 `soc/` 目录仅负责把 `ip/` 目录下的独立 IP **组合连接**为产品形态：
 
 - 不包含业务逻辑，仅做 IP 实例化和连接
-- 根据 `ImplMode` 参数决定各 IP 用 TLM 还是 RTL 实现
 - 不同产品形态只需新建一个 SoC JSON 配置文件
-- 通过 CppTLM 的 `ModuleFactory` + JSON 配置实现零代码装配
+- 当前 Phase 1.3 已落地 2 个 L1Cache 验证配置（`l1_cache_minimal.json` + `l1_cache_adapter_e2e.json`），作为新 SoC 配置的参考模板
+- 完整的 RISC-V virt SoC 装配（CPU + 多级 Cache + 总线 + 内存 + 外设）推迟到 Phase 2+ 实施
 
-ModuleFactory 是 CppTLM 提供的基础设施（`include/core/module_factory.hh`），支持：
-- JSON 配置解析（modules / connections）
-- 模块类型注册
-- 自动实例化和连接
-
-ChipForge 项目需要在各 IP 的 `tlm/` 目录中实现具体模块，并通过 `REGISTER_MODULE(type, class)` 宏注册到 ModuleFactory。例如：
-```cpp
-// ip/cpu/tlm/register.cpp
-#include "RiscvIssTlm.h"
-REGISTER_MODULE("RiscvIssTlm", RiscvIssTlm);
-```
+**当前已工作的 SoC 配置示例**（`soc/l1_cache_minimal.json`）：
 
 ```json
 {
-  "name": "RiscvVirtSoC",
-  "impl_mode": "TLM_ONLY",
+  "name": "l1_cache_minimal",
+  "description": "Minimal L1 cache SoC - L1CachePlugin + CppTLM CacheTLM",
   "modules": [
-    {"name": "cpu_0", "type": "RiscvIssTlm", "params": {"isa": "rv64gc"}},
-    {"name": "l1i",   "type": "L1CacheTlm", "params": {"size_kb": 32, "assoc": 8}},
-    {"name": "l1d",   "type": "L1CacheTlm", "params": {"size_kb": 32, "assoc": 8}},
-    {"name": "l2",    "type": "L2CacheTlm", "params": {"size_kb": 512}},
-    {"name": "bus",   "type": "BusMatrixTlm"},
-    {"name": "dram",  "type": "DramTlm", "params": {"size_mb": 512}},
-    {"name": "uart",  "type": "UartTlm"},
-    {"name": "clint", "type": "ClintTlm"},
-    {"name": "plic",  "type": "PlicTlm"}
+    {"name": "cpu",     "type": "TrafficGenPlugin", "params": {"isa": "rv64gc"}},
+    {"name": "l1_cache", "type": "L1CachePlugin",   "params": {"size_kb": 32, "assoc": 8}}
   ],
   "connections": [
-    {"src": "cpu_0.ibus", "dst": "l1i.cpu_port"},
-    {"src": "cpu_0.dbus", "dst": "l1d.cpu_port"},
-    {"src": "l1i.mem_port", "dst": "bus.port.0"},
-    {"src": "l1d.mem_port", "dst": "bus.port.1"},
-    {"src": "bus.port.2", "dst": "l2.cpu_port"},
-    {"src": "l2.mem_port", "dst": "dram.port"},
-    {"src": "bus.port.3", "dst": "uart.port"},
-    {"src": "bus.port.4", "dst": "clint.port"},
-    {"src": "bus.port.5", "dst": "plic.port"}
+    {"src": "cpu.ibus", "dst": "l1_cache.cpu_port"},
+    {"src": "cpu.dbus", "dst": "l1_cache.cpu_port"}
   ]
 }
 ```
+
+**关于 JSON 装配的现状说明**：
+
+- 当前 `soc/*.json` 是 SoC 装配的目标格式（计划中），但 `soc/` 目录下当前 2 个 L1Cache 配置的实际可工作流程是 CMake/ctest 直接调用对应的 C++ 单元测试（见 `soc/README.md`）
+- ModuleFactory + `REGISTER_MODULE` 宏机制是 CppTLM 提供的标准装配机制，将随 Phase 2 RISC-V virt SoC 实施时启用
+- 业务 IP 全部以 Plugin 风格实现（`cf::plugin::PluginBase`），不依赖 ModuleFactory 反射机制（参见 ADR-037 + ADR-041）
 
 ### CppHDL 渐进演进
 
@@ -205,36 +187,19 @@ chipforge/
 
 ### ch_stream 接口即 ISA 无关层
 
-ISA 无关性**无需抽象基类**，而是通过 `ch_stream<Bundle>` 接口天然实现：
+> ⚠️ 推迟到 Phase 1.4+ 实际有第 2 个 CPU IP 时再验证
 
-- RISC-V Core 暴露 `ch_stream<MemReqBundle>` 指令/数据总线接口
-- ARM Core 暴露相同的 `ch_stream<MemReqBundle>` 接口
-- GPU Shader Core 暴露相同的 `ch_stream<MemReqBundle>` 接口
+**当前 Phase 1.3 状态**：
 
-在 SoC 组合层，任何暴露相同 Bundle 接口的 CPU IP 都可以通过 JSON 配置互换：
+- 仅有 1 个 CPU IP（`ip/cpu/` 处于 M4 Plugin + Stageable 设计中，尚未提供对外可工作的 TLM 模型）
+- 唯一对外可工作的"CPU 流量"是 `tests/` 中的 TrafficGen / Driver（不属于 IP 层）
+- 因此 `ch_stream<Bundle>` 接口的"ISA 无关层"性质当前**没有第 2 个 CPU IP 来验证**
 
-```json
-{
-  "modules": [
-    {"name": "cpu_0", "type": "RiscvIssTlm", "params": {"isa": "rv64gc"}},
-    {"name": "l1_cache", "type": "L1CacheTlm", "params": {"size_kb": 32}}
-  ],
-  "connections": [
-    {"src": "cpu_0.dbus", "dst": "l1_cache.cpu_port", "latency": 0}
-  ]
-}
-```
+**设计原则（待 Phase 1.4+ 实施时再验证）**：
 
-切换为 ARM 核心只需更改一行配置：
-```json
-    {"name": "cpu_0", "type": "ArmIssTlm", "params": {"profile": "cortex-a55"}}
-```
-
-**设计原则**：
 - 模块间仅通过 Bundle 数据结构通信（`ch_stream<T>` 握手协议）
-- Cache、Memory、Interconnect 等 IP 完全 ISA 无关
-- 测试框架按 ISA 类型自动选择测试套件，但 IP 验证环境可跨 ISA 复用
-- 新增 ISA 支持仅需实现一个新的 CPU IP（继承 `ChStreamModuleBase`），无需修改其余组件
+- Cache、Memory、Interconnect 等 IP 完全 ISA 无关（仅暴露 `ch_stream<MemReqBundle>` 接口）
+- 新增 ISA 支持仅需实现一个新的 CPU IP，无需修改其余组件
 
 ### 可插拔策略模式（Policy Pattern）
 
@@ -244,10 +209,10 @@ ISA 无关性**无需抽象基类**，而是通过 `ch_stream<Bundle>` 接口天
 组件 = 骨架（固定硬件结构） + 策略（可替换算法）
 
 例如：
-L1CacheTlm = 缓存骨架 + 替换策略 + 预取策略
-BusMatrixTlm = 总线骨架 + 仲裁策略
-NoCTlm = 路由器骨架 + 路由算法
-RiscvIssTlm = 流水线骨架 + 分支预测策略
+L1Cache (Plugin 风格) = 缓存骨架 + 替换策略 + 预取策略
+CrossbarTLM = 总线骨架 + 仲裁策略
+NoC Router (Plugin 风格) = 路由器骨架 + 路由算法
+CPU Pipeline (Plugin 风格) = 流水线骨架 + 分支预测策略
 ```
 
 #### 策略接口规范
@@ -290,9 +255,9 @@ class RRIPPolicy   : public ReplacementPolicy { /* Re-reference Interval Predict
 ```json
 {
   "name": "l1_cache",
-  "type": "L1CacheTlm",
+  "type": "CacheTLM",
   "params": {
-    "size_kb": 32,
+    "size": 32768,
     "assoc": 8,
     "line_size": 64,
     "replacement_policy": "PLRU",
@@ -335,18 +300,10 @@ chipforge/
 |
 +-- ip/                             # * IP 组件库（每个 IP 独立验证）
 |   +-- cpu/                        # CPU IP
-|   |   +-- tlm/
-|   |   |   +-- RiscvIssTlm.h/cpp   # RISC-V ISS（Spike 封装）
-|   |   |   +-- ArmIssTlm.h/cpp     # ARM ISS（未来扩展）
-|   |   |   +-- TrafficGenTlm.h/cpp # 通用流量驱动器
-|   |   +-- rtl/
-|   |   |   +-- RiscvCoreRtl.h/cpp  # CppHDL RISC-V 核心
-|   |   |   +-- Pipeline.h/cpp      # 流水线 RTL 模型
+|   |   +-- tlm/                    # （RISC-V ISS 推迟到 Phase 2 实施）
+|   |   +-- rtl/                    # （Phase 5 实施）
 |   |   +-- test/                   # CPU IP 独立验证环境
-|   |   |   +-- test_riscv_iss.cc   # ISS 单元测试
-|   |   |   +-- test_cpu_e2e.cc     # CPU 端到端测试
 |   |   +-- configs/                # CPU IP 测试配置
-|   |       +-- cpu_minimal_test.json
 |   |
 |   +-- cache/                      # Cache IP
 |   |   +-- policies/               # 可插拔策略实现
@@ -355,65 +312,34 @@ chipforge/
 |   |   |   +-- plru_policy.h/cpp
 |   |   |   +-- random_policy.h/cpp
 |   |   |   +-- prefetch_policy.h/cpp
-|   |   +-- tlm/
-|   |   |   +-- L1CacheTlm.h/cpp    # L1 TLM 模型
-|   |   |   +-- L2CacheTlm.h/cpp    # L2 TLM 模型
-|   |   +-- rtl/
-|   |   |   +-- L1CacheRtl.h/cpp    # CppHDL L1 Cache
+|   |   +-- tlm/                    # CppTLM 通用 CacheTLM 模板（无 L1/L2 特化）
+|   |   +-- rtl/                    # （Phase 5 实施）
 |   |   +-- test/                   # Cache IP 独立验证环境
-|   |   |   +-- test_cache_unit.cc  # 策略单元测试
-|   |   |   +-- test_cache_stream.cc # ch_stream 集成测试
-|   |   |   +-- test_cache_e2e.cc   # TrafficGen->Cache->Mem E2E
 |   |   +-- configs/
 |   |       +-- cache_minimal.json  # 最小测试拓扑
 |   |       +-- cache_sweep.json    # 缓存 DSE 配置
 |   |
 |   +-- memory/                     # Memory IP
-|   |   +-- tlm/
-|   |   |   +-- DramTlm.h/cpp       # DRAM 模型（含 DMI 加速）
-|   |   |   +-- RomTlm.h/cpp        # ROM / Flash 模型
-|   |   +-- rtl/
-|   |   |   +-- DramCtrlRtl.h/cpp   # DDR 控制器 RTL
+|   |   +-- tlm/                    # CppTLM 通用 MemoryTLM 模板
+|   |   +-- rtl/                    # （Phase 5 实施）
 |   |   +-- test/
-|   |   |   +-- test_memory_e2e.cc
 |   |   +-- configs/
-|   |       +-- memory_test.json
 |   |
 |   +-- interconnect/               # Interconnect IP
-|   |   +-- tlm/
-|   |   |   +-- BusMatrixTlm.h/cpp  # AXI/TileLink 总线
-|   |   |   +-- CrossbarTlm.h/cpp   # Crossbar 交叉开关
-|   |   |   +-- NoCRouterTlm.h/cpp  # Mesh/Ring NoC 路由器
-|   |   +-- rtl/
-|   |   |   +-- CrossbarRtl.h/cpp
+|   |   +-- tlm/                    # CrossbarTLM（4 端口）
+|   |   +-- rtl/                    # （Phase 5 实施）
 |   |   +-- test/
-|   |   |   +-- test_bus_e2e.cc
-|   |   |   +-- test_noc_mesh.cc
 |   |   +-- configs/
-|   |       +-- bus_test.json
-|   |       +-- mesh_4x4.json
 |   |
 |   +-- peripheral/                 # Peripheral IP
-|       +-- tlm/
-|       |   +-- UartTlm.h/cpp       # NS16550A UART
-|       |   +-- ClintTlm.h/cpp      # CLINT（mtime/mtimecmp）
-|       |   +-- PlicTlm.h/cpp       # PLIC（多优先级中断）
-|       |   +-- VirtioBlockTlm.h/cpp # VirtIO Block
-|       |   +-- VirtioNetTlm.h/cpp  # VirtIO Net
-|       +-- rtl/
-|       |   +-- UartRtl.h/cpp
+|       +-- tlm/                    # （Phase 3+ 实施：UART/CLINT/PLIC/VirtIO）
+|       +-- rtl/                    # （Phase 5+ 实施）
 |       +-- test/
-|       |   +-- test_uart.cc
-|       |   +-- test_plic.cc
 |       +-- configs/
-|           +-- peripheral_test.json
 |
 +-- soc/                            # * SoC 组合层（用 IP 装配产品形态）
 |   +-- MemoryMap.h                 # 统一内存地图
-|   +-- RiscvVirtSoC.h/cpp          # RV64GC virt（用于 Linux）
-|   +-- RiscvEmbedSoC.h/cpp         # RV32IMC embed（用于 RTOS）
-|   +-- MultiCoreSoC.h/cpp          # SMP 多核形态
-|   +-- GpuSoC.h/cpp               # GPU 形态（Phase 5+）
+|   +-- RiscvVirtSoC 等具体 SoC 类 （Phase 2+ 实施）
 |
 +-- metrics/                        # * 统计收集框架 (规划中, Phase 2 创建)
 |   +-- statistics.h                # Scalar/Distribution/Vector/Formula

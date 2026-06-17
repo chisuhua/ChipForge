@@ -18,7 +18,7 @@ Level B: 功能级
 
 Level A: 组件级
     各组件独立单元测试（Google Test / Catch2）
-    L1CacheTlm vs L1CacheRtl 对比
+    L1Cache TLM vs L1Cache RTL 对比（Phase 5+ 实施）
 ```
 
 ### HTIF 通信协议
@@ -117,11 +117,10 @@ public:
 {
   "name": "RiscvVirtSoC",
   "description": "RV64GC Virtual Platform - Default Configuration",
-  "impl_mode": "TLM_ONLY",
   "modules": [
     {
       "name": "cpu_0",
-      "type": "RiscvIssTlm",
+      "type": "CPUTLM",
       "params": {
         "isa": "rv64gc",
         "clock_freq_mhz": 50,
@@ -130,9 +129,9 @@ public:
     },
     {
       "name": "l1i_cache",
-      "type": "L1CacheTlm",
+      "type": "CacheTLM",
       "params": {
-        "size_kb": 32,
+        "size": 32768,
         "assoc": 8,
         "line_size": 64,
         "replacement_policy": "PLRU",
@@ -141,9 +140,9 @@ public:
     },
     {
       "name": "l1d_cache",
-      "type": "L1CacheTlm",
+      "type": "CacheTLM",
       "params": {
-        "size_kb": 32,
+        "size": 32768,
         "assoc": 8,
         "line_size": 64,
         "replacement_policy": "LRU",
@@ -153,9 +152,9 @@ public:
     },
     {
       "name": "l2_cache",
-      "type": "L2CacheTlm",
+      "type": "CacheTLM",
       "params": {
-        "size_kb": 512,
+        "size": 524288,
         "assoc": 16,
         "inclusion": "inclusive",
         "replacement_policy": "PLRU"
@@ -163,13 +162,13 @@ public:
     },
     {
       "name": "dram",
-      "type": "DramTlm",
-      "params": {"size_mb": 512, "latency_ns": 50, "enable_dmi": true}
+      "type": "MemoryTLM",
+      "params": {"size": "512M", "latency_ns": 50, "enable_dmi": true}
     },
     {
       "name": "bus",
-      "type": "BusMatrixTlm",
-      "params": {"arbitration": "RoundRobin"}
+      "type": "CrossbarTLM",
+      "params": {"masters": 2, "slaves": 2}
     }
   ],
   "connections": [
@@ -177,8 +176,8 @@ public:
     {"src": "cpu_0.dbus", "dst": "l1d_cache.cpu_port", "latency": 0},
     {"src": "l1i_cache.mem_port", "dst": "l2_cache.cpu_port.0", "latency": 1},
     {"src": "l1d_cache.mem_port", "dst": "l2_cache.cpu_port.1", "latency": 1},
-    {"src": "l2_cache.mem_port", "dst": "bus.port.0", "latency": 2},
-    {"src": "bus.port.1", "dst": "dram.port", "latency": 1}
+    {"src": "l2_cache.mem_port", "dst": "bus.master[0]", "latency": 2},
+    {"src": "bus.slave[0]", "dst": "dram.port", "latency": 1}
   ]
 }
 ```
@@ -206,7 +205,7 @@ public:
 #### 组件统计注
 
 ```cpp
-class L1CacheTlm : public ChStreamModuleBase {
+class L1CacheExampleTlm : public ChStreamModuleBase {
     tlm_stats::Scalar hits_, misses_, evictions_, writebacks_;
     tlm_stats::Distribution miss_latency_;
     tlm_stats::Formula hit_ratio_;

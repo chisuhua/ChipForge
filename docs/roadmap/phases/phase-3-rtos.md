@@ -12,8 +12,8 @@
 
 ### 1. 需要补充的外设建模
 
-- [ ] `ClintTlm`：精确的 `mtime` 计数器（按仿真时间递增），`mtimecmp` 定时中断触发
-- [ ] `PlicTlm`：完整多优先级中断，支持 32 个外部中断源，S-mode claim/complete 流程
+- [ ] CLINT IP（`ip/peripheral/clint/`）：精确的 `mtime` 计数器（按仿真时间递增），`mtimecmp` 定时中断触发
+- [ ] PLIC IP（`ip/peripheral/plic/`）：完整多优先级中断，支持 32 个外部中断源，S-mode claim/complete 流程
 
 ### 2. FreeRTOS 移植
 
@@ -50,7 +50,7 @@ sw/rtos/zephyr/boards/riscv/chipforge_virt/
 ### 4. 可插拔策略实现
 
 - [ ] 实现 `ReplacementPolicy` 接口及 LRU、PLRU、Random、FIFO 四种策略
-- [ ] L1CacheTlm 支持通过 JSON 配置切换替换策略
+- [ ] L1Cache Plugin 支持通过 JSON 配置切换替换策略
 - [ ] 实现 `PrefetchPolicy` 接口及 Stride、NextLine 两种策略
 - [ ] 统计框架完善：Distribution（延迟分布）、Formula（衍生指标）
 - [ ] DSE 工具增强：`pareto_analyzer.py` 和 `sensitivity_plot.py`

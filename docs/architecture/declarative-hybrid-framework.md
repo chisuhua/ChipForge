@@ -250,7 +250,7 @@ public:
 | `cpptlm::CacheTLM` | `CppTLM/include/tlm/cache_tlm.hh` | 通用缓存模板（**非 L1 特化**） |
 | `cpptlm::MemoryTLM` | `CppTLM/include/tlm/memory_tlm.hh` | 内存模型（**非 DRAM 控制器**） |
 | `cpptlm::CrossbarTLM` | `CppTLM/include/tlm/crossbar_tlm.hh` | 4 端口交叉开关（**非通用 AXI 互联**） |
-| `cpptlm::CPUTLM` | `CppTLM/include/tlm/cpu_tlm.hh` | TLM CPU 模型（**非 RiscvIssTlm**） |
+| `cpptlm::CPUTLM` | `CppTLM/include/tlm/cpu_tlm.hh` | TLM CPU 模型（**非项目自有 RISC-V ISS**） |
 | `cpptlm::TrafficGenTLM` | `CppTLM/include/tlm/traffic_gen_tlm.hh` | 流量生成器 |
 | `cpptlm::ArbiterTLM<N>` | `CppTLM/include/tlm/arbiter_tlm.hh` | N 路仲裁器 |
 | `cpptlm::tlm::RouterTLM` | `CppTLM/include/tlm/router_tlm.hh` | 5 端口路由器（双向） |
@@ -261,8 +261,8 @@ public:
 | `stress_patterns` | `CppTLM/include/tlm/stress_patterns.hh` | 压力测试模式 |
 
 > **重要修正**：
-> - 原文档中 `L1CacheTlm` / `L1CacheRtl` / `CpuTlm` / `DramTlm` / `AxiCrossbar` / `UartTlm` 等类名**均不存在**。
-> - `UartTlm` 完全不存在于 CppTLM，需要在 `ip/peripheral/` 自行实现。
+> - 原文档中 `L1Cache*` / `L1CacheRtl` / `CpuTlm` / `Dram*` / `AxiCrossbar` / `Uart*` 等类名**均不存在**（项目内无 L1/L2/DRAM/UART 等以 `Tlm` 后缀命名的类）。
+> - 任何 `Uart*` 类完全不存在于 CppTLM，需要在 `ip/peripheral/` 自行实现。
 
 ### 2.8 代码位置表（已修正路径）
 
@@ -602,19 +602,19 @@ enum class ImplMode {
 >
 > | JSON 引用类型 | 实际状态 | 备注 |
 > |--------------|---------|------|
-> | `RiscvIssTlm` | ❌ 类不存在 | CppTLM 框架内无 ISS 模型 |
-> | `L1CacheTlm` | ❌ 名称错误 | 应为 `CacheTLM`（通用缓存模板，非 L1 特化） |
-> | `BusMatrixTlm` | ❌ 名称错误 | 应为 `CrossbarTLM`（4 端口，非通用总线矩阵） |
-> | `DramTlm` | ❌ 名称错误 | 应为 `MemoryTLM`（通用内存模型，非 DRAM 控制器） |
-> | `UartTlm` | ❌ 类不存在 | 需在 `ip/peripheral/` 自行实现 |
-> | `ClintTlm` | ❌ 类不存在 | 需自行实现 |
-> | `PlicTlm` | ❌ 类不存在 | 需自行实现 |
+> | RISC-V ISS | ❌ 类不存在 | CppTLM 框架内无 ISS 模型（应使用 `cpptlm::CPUTLM` + 业务 Plugin） |
+> | L1Cache (Tlm 后缀) | ❌ 名称错误 | 应为 `CacheTLM`（通用缓存模板，非 L1 特化） |
+> | BusMatrix (Tlm 后缀) | ❌ 名称错误 | 应为 `CrossbarTLM`（4 端口，非通用总线矩阵） |
+> | Dram (Tlm 后缀) | ❌ 名称错误 | 应为 `MemoryTLM`（通用内存模型，非 DRAM 控制器） |
+> | UART (Tlm 后缀) | ❌ 类不存在 | 需在 `ip/peripheral/` 自行实现 |
+> | CLINT (Tlm 后缀) | ❌ 类不存在 | 需自行实现 |
+> | PLIC (Tlm 后缀) | ❌ 类不存在 | 需自行实现 |
 > | `"impl_mode": "TLM_ONLY"` | ❌ 字段未被 ModuleFactory 解析 | 整 ImplMode 机制未实现 |
 >
 > **修复路径**（三选一）：
 > 1. **删除 `riscv_virt.json`**：避免悬挂引用误导读者
 > 2. **重写 JSON**：使用 §8.2 示例中的正确类名（`CPUTLM` / `CacheTLM` / `MemoryTLM` / `CrossbarTLM`），并删除 `impl_mode` 字段
-> 3. **实现缺失的 IP**：在 `ip/cpu/`、`ip/cache/`、`ip/peripheral/` 中补齐 RiscvIssTlm / UartTlm / ClintTlm / PlicTlm，并加入 `REGISTER_CHSTREAM` 注册表
+> 3. **实现缺失的 IP**：在 `ip/cpu/`、`ip/cache/`、`ip/peripheral/` 中补齐 RISC-V ISS / UART / CLINT / PLIC 等业务 IP（Plugin 风格），并加入 `REGISTER_CHSTREAM` 注册表
 >
 > 当前推荐路径 (2)：保留最小可用示例，详见 §8.2。
 
@@ -658,7 +658,7 @@ private:
 ```
 
 > **重要修正**：
-> - 原文档中 `class L1CacheTlm : public ChStreamModuleBase { ch_stream<CacheReqBundle> cpu_req_; ... }` 模式**完全虚构**。
+> - 原文档中 `class L1Cache* : public ChStreamModuleBase { ch_stream<CacheReqBundle> cpu_req_; ... }` 模式**完全虚构**。
 > - 实际 IP 类继承自标准模板（如 `CacheTLM`），通过 `set_stream_adapter()` 接收适配器，没有 `ch_stream<Bundle>` 成员变量。
 
 ### 6.4 RTL 模块开发范式（已实现）
@@ -789,7 +789,7 @@ L1CachePlugin 不依赖 §6.8 描述的通用 TLM↔RTL 桥接（它仅做 TLM�
 
 ### 8.1 模块注册机制（已实现）
 
-> **重要修正**：原文档描述的 `REGISTER_MODULE(L1CacheTlm)` 每类单独注册宏**不存在**。实际是 `REGISTER_CHSTREAM` 一次性批量注册宏（定义在 `CppTLM/include/chstream_register.hh:29-64`）。
+> **重要修正**：原文档描述的 `REGISTER_MODULE(L1Cache*)` 每类单独注册宏**不存在**。实际是 `REGISTER_CHSTREAM` 一次性批量注册宏（定义在 `CppTLM/include/chstream_register.hh:29-64`）。
 
 ```cpp
 // CppTLM/include/chstream_register.hh（实际代码）
@@ -817,7 +817,7 @@ REGISTER_CHSTREAM;
 | `cpptlm::tlm::LinkTLM` | `CppTLM/include/tlm/link_tlm.hh` | `"LinkTLM"` |
 | `cpptlm::rtl::HybridCacheWrapper` | `CppTLM/include/rtl/hybrid_cache_wrapper.hh` | `"HybridCacheWrapper"` |
 
-> **澄清**：原文档列出的 `L1CacheTlm` / `L1CacheRtl` / `CpuTlm` / `DramTlm` / `AxiCrossbar` / `UartTlm` 等类**均不存在**于已注册表中。如需这些 IP，需在 `ip/<name>/` 实现并加入 `chstream_register.hh` 的 `REGISTER_CHSTREAM` 列表。
+> **澄清**：原文档列出的 `L1Cache*` / `L1CacheRtl` / `CpuTlm` / `Dram*` / `AxiCrossbar` / `Uart*` 等类**均不存在**于已注册表中。如需这些 IP，需在 `ip/<name>/` 实现并加入 `chstream_register.hh` 的 `REGISTER_CHSTREAM` 列表。
 
 ### 8.2 JSON 拓扑配置（已实现）
 
@@ -842,8 +842,8 @@ REGISTER_CHSTREAM;
 ```
 
 > **修正要点**：
-> - 实际类名是 `CPUTLM` / `CacheTLM` / `MemoryTLM` / `CrossbarTLM`，**非** `CpuTlm` / `L1CacheTlm` / `DramTlm` / `AxiCrossbar`
-> - `UartTlm` 不存在（无法在 JSON 中引用）
+> - 实际类名是 `CPUTLM` / `CacheTLM` / `MemoryTLM` / `CrossbarTLM`，**非** `CpuTlm` / `L1Cache*` / `Dram*` / `AxiCrossbar`
+> - 任何 `Uart*` 类不存在（无法在 JSON 中引用）
 
 ### 8.3 自动 StreamAdapter 创建流程（已实现）
 

@@ -14,6 +14,22 @@ ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐
 | **Phase 5 (RTL 协同)** | `ch_uint<N>` + `bundle_base<Self>` | 派生类,需 CppHDL bundle 体系 | `CppHDL/include/bundle/bundle_base.h` | ADR-024 (⚠️ Mapper 推迟) + 路线图 §6.3 |
 | **Phase 6 (完整框架)** | 自动 codegen 派生两套 | codegen 工具生成两套 Bundle | Phase 6 调度算法 + JSON 解析 | `declarative-hybrid-framework.md` §5.5 BundleMapper 设计 |
 
+#### 1.0.1 已实现 POD vs 设计目标 bundle_base 对照表
+
+> ⚠️ **Phase 1 当前状态是 POD**, 不是 `bundle_base` 派生类。`bundle_base` 是 Phase 5+ 设计目标。
+
+| 维度 | Phase 1 (已实现) | Phase 5+ (设计目标) | 升级路径 |
+|------|------------------|--------------------|----------|
+| **字段类型** | `cf::plugin::uint_t<N>` (typedef 占位) | `ch_uint<N>` (CppHDL 强类型) | BundleMapper 模板映射 (Phase 5) |
+| **Bundle 形态** | POD struct (可 memcpy) | `: public bundle_base<Self>` 派生 | 同上 |
+| **元信息宏** | 无 (POD 无虚函数) | `CH_BUNDLE_FIELDS_T(...)` | 编译期 codegen |
+| **Direction 切换** | 手动 (master/slave 各自定义) | `make_output(...)` 自动 | CppHDL runtime |
+| **典型 Bundle 位置** | `bundles/mem_bundles.h` (待实现, Phase 0 仅头文件声明) | `CppHDL/include/bundle/mem_bundles.h` | include 路径切换 |
+| **业务代码影响** | 0 (Phase 1 Plugin 已用 POD) | 0 (Mapper 编译期映射) | 切换头文件即可 |
+| **决策依据** | D4 Plugin-style 强制 | ADR-024 + 路线图 Phase 5 | `.omo/drafts/bundle-mapper-phase-5-6-decision.md` |
+
+**关键澄清**：本文档其他段落（如 §"所有 Bundle 继承 bundle_base"）展示的是 **Phase 5+ 目标形态**，不是 Phase 1 当前代码。Phase 1 业务代码以 POD 写就，无需也无法直接编译 §后续代码块中的 `bundle_base` 派生示例。
+
 **Phase 1 (当前) Bundle 定义示例** (`bundles/mem_bundles.h`):
 ```cpp
 struct CacheReq {
@@ -43,7 +59,7 @@ struct CacheReq {
 
 **相关决策**: `.omo/drafts/bundle-mapper-phase-5-6-decision.md` (Phase 5/6 BundleMapper 实施路径, 待本次新建)
 
-所有 Bundle 继承 `bundle_base`，使用 `ch_uint<N>` / `ch_bool` 强类型，保证 TLM 和 RTL 共用同一份定义：
+所有 Bundle **在 Phase 5+ 设计目标中**继承 `bundle_base`，使用 `ch_uint<N>` / `ch_bool` 强类型，保证 TLM 和 RTL 共用同一份定义。**当前 Phase 1 业务代码使用 POD struct（见 §1.0.1 对照表）**。Phase 5+ 目标代码示例（待实施）：
 
 ```cpp
 // bundles/mem_bundles.h
@@ -119,13 +135,14 @@ enum class ImplMode {
 
 ```cpp
 // ═══════════════════════════════════════════════════════════════
-// TLM 组件设计视角（以 CPU ISS 为例）
+// TLM 组件设计视角（以 CPU 为例）
 // ═══════════════════════════════════════════════════════════════
 
 // 模块继承 ChStreamModuleBase，不是 sc_module
-class RiscvIssTlm : public ChStreamModuleBase {
+// （示例：cpptlm::CPUTLM 已被注册到 CppTLM ModuleFactory；项目自有 RISC-V ISS 处于设计中）
+class CpuTlmExample : public ChStreamModuleBase {
 public:
-    RiscvIssTlm(const std::string& name, EventQueue* eq)
+    CpuTlmExample(const std::string& name, EventQueue* eq)
         : ChStreamModuleBase(name, eq) {}
 
     // ── ch_stream 是模块内部接口（设计视角）──
@@ -157,7 +174,7 @@ public:
 
 // ── 框架组装视角（用户无需关心）──
 // ModuleFactory 自动完成以下操作：
-// 1. 解析 JSON 配置，实例化 RiscvIssTlm
+// 1. 解析 JSON 配置，实例化 CPU TLM 类
 // 2. 为每个 ch_stream 创建 StreamAdapter
 // 3. StreamAdapter 将 ch_stream 暴露为 MasterPort/SlavePort
 // 4. 通过 JSON 连接描述完成端口互连
@@ -165,7 +182,7 @@ public:
 // JSON 配置示例（soc 级别）：
 // {
 //   "modules": [
-//     {"name": "cpu_0", "type": "RiscvIssTlm", "params": {"isa": "rv64gc"}}
+//     {"name": "cpu_0", "type": "CPUTLM", "params": {"cores": 1}}
 //   ],
 //   "connections": [
 //     {"from": "cpu_0.ibus_req", "to": "icache_0.req_in"}
@@ -228,9 +245,10 @@ public:
 // soc/RiscvVirtSoC.h
 // 推荐使用 JSON 配置驱动组装（见下方）
 // 以下手工 C++ 组装仅供理解参考
-class RiscvVirtSoC {
+// 实际 SoC 装配推迟到 Phase 2+ 实施；当前推荐使用 JSON + ModuleFactory
+class ExampleVirtSoC {
 public:
-    explicit RiscvVirtSoC(ImplMode mode = ImplMode::TLM_ONLY);
+    explicit ExampleVirtSoC(ImplMode mode = ImplMode::TLM_ONLY);
 
     void build();    // 实例化并连接所有组件
     void run(uint64_t cycles);
@@ -239,18 +257,18 @@ public:
 private:
     ImplMode mode_;
 
-    // CPU 始终用 TLM（ISS 驱动）
-    std::unique_ptr<RiscvIssTlm>   cpu_;
+    // CPU：TLM（ISS 驱动，cpptlm::CPUTLM 业务扩展待 Phase 2 实施）
+    std::unique_ptr<ComponentBase> cpu_;
 
-    // Cache：按 mode_ 决定实现
-    std::unique_ptr<ComponentBase> l1_cache_;  // L1CacheTlm 或 L1CacheRtl
+    // Cache：按 mode_ 决定实现（CppTLM 标准 CacheTLM；Phase 5+ 才有 L1CacheRtl）
+    std::unique_ptr<ComponentBase> l1_cache_;
 
-    // 其余组件（TLM）
-    std::unique_ptr<DramTlm>       dram_;
-    std::unique_ptr<BusMatrixTlm>  bus_;
-    std::unique_ptr<ClintTlm>      clint_;
-    std::unique_ptr<PlicTlm>       plic_;
-    std::unique_ptr<UartTlm>       uart_;
+    // 其余组件（TLM 通用模板，无 L1/DRAM/外设特化）
+    std::unique_ptr<ComponentBase> dram_;    // cpptlm::MemoryTLM
+    std::unique_ptr<ComponentBase> bus_;     // cpptlm::CrossbarTLM
+    std::unique_ptr<ComponentBase> clint_;   // 需在 ip/peripheral/ 自行实现
+    std::unique_ptr<ComponentBase> plic_;    // 需在 ip/peripheral/ 自行实现
+    std::unique_ptr<ComponentBase> uart_;    // 需在 ip/peripheral/ 自行实现
 
     // 连接通过 Port 接口完成（由 StreamAdapter 从 ch_stream 自动映射而来）
     void connect_all();
@@ -279,7 +297,7 @@ int main(int argc, char* argv[]) {
     factory.instantiateAll(config);
 
     // 加载 ELF 并运行仿真
-    auto cpu = factory.getInstance<RiscvIssTlm>("cpu_0");
+    auto cpu = factory.getInstance<CpuTlmExample>("cpu_0");
     cpu->load_elf(argv[2]);
     eq.run(10000000);  // 运行 10M 周期
 

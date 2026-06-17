@@ -393,27 +393,44 @@
 | 概念 | 文档/代码来源 | 状态 |
 |------|---------|---------|
 | **cf::plugin 5 个 P0 组件**（`PluginBase` / `Payload<T>` / `PipeNode` / `PipeBuilder` / `CtrlLink` + `uint_t<N>`） | `include/cf/plugin/`（6 头文件，约 667 行）+ `src/cf_plugin/tests/`（7 测试，51/51 PASS） | ✅ **Phase 0 已完成** (2026-06-08) — 详见 [`plugin-framework.md`](plugin-framework.md) |
-| **IP 级别的 TLM 实现**（`RiscvIssTlm` / `L1CacheTlm` / `BusMatrixTlm` / `DramTlm` / `UartTlm` 等） | `soc/riscv_virt.json` 引用 | `ip/*/tlm/` 目录全部为空（仅 `README.md`） |
+| **IP 级别的 TLM 实现**（RISC-V ISS / L1Cache TLM Plugin / BusMatrix TLM / DRAM TLM / UART TLM 等） | 已被 doc-code-realignment (2026-06-17) 移除幽灵 JSON 引用 | `ip/*/tlm/` 目录全部为空（仅 `README.md`） |
 
-### 7.4 文档与代码背离（❌ 必须修正）
+### 7.4 文档与代码背离（待修复）
 
 | 文档声称 | 实际代码状态 | 修正方向 |
 |---------|------------|---------|
 | `interface-design.md` L8-22: `bundles/mem_bundles.h` 定义 `MemReqBundle` | `bundles/` 目录为空；`MemReqBundle` 在 CppTLM/CppHDL 中 0 匹配 | 要么实现 Bundle 定义，要么从文档中删除 |
 | `interface-design.md` L39-65: `bundles/cache_bundles.h` 定义 `CacheReqBundle` | 不存在 | 同上 |
 | `interface-design.md` L68-75: `bundles/impl_mode.h` 定义 `enum class ImplMode {TLM_ONLY, RTL_ONLY, COMPARE, SHADOW}` | `impl_mode.h` 不存在；`ImplMode` 在 CppTLM/CppHDL/ChipForge 全部 0 匹配 | 同上 |
-| `interface-design.md` L186-217: `soc/RiscvVirtSoC.h/cpp` 已存在 | 不存在；`soc/` 仅有 `riscv_virt.json` | 要么构建 SoC 装配类，要么删除示例代码 |
-| `overview.md` L131-141: 各 IP 使用 `REGISTER_MODULE` 宏 | `REGISTER_MODULE` 在 ChipForge 中 0 匹配 | 同上 |
-| `soc/riscv_virt.json` L4: `"impl_mode": "TLM_ONLY"` | 无代码解析此字段 | 删除该字段或实现 `ImplMode` 支持 |
-| 2026-06-09 | `declarative-hybrid-framework.md` §4/§7 标 "100% not in code" | Phase 0 5/5 已完成 | 已抽离至 [`plugin-framework.md`](plugin-framework.md)，文档升级至 v2.1.0 |
+
+> **说明**：8 项文档/代码背离（幽灵 JSON + 幽灵类名 + Bundle 状态混淆）已通过 `openspec/changes/doc-code-realignment` (2026-06-17) 全部修复，详见 [§7.6](#76-已修复-2026-06-17)。
 
 ### 7.5 建议的修正优先级
 
-1. **紧急**：明确 `interface-design.md` 与 `overview.md` 的文档性质（设计提案 vs 已完成体系结构）
-2. **紧急**：删除或补全 `bundles/` 目录的引用
-3. **高**：要么实现 `RiscvVirtSoC.cpp` 入口，要么删除 `soc/riscv_virt.json`（避免悬挂引用）
-4. **中**：实现 `bundles/impl_mode.h` 与 `ImplMode` 框架支持（如确实需要 TLM↔RTL 切换）
+1. ✅ **完成 2026-06-17**：明确 `interface-design.md` 与 `overview.md` 的文档性质（设计提案 vs 已完成体系结构）—— §1.0.1 增加"已实现 POD vs 设计目标 bundle_base"对照表
+2. ✅ **完成 2026-06-17**：删除 8 个幽灵类名（详见 [`tools/verify_no_ghost_refs.sh` 头部注释](../../tools/verify_no_ghost_refs.sh)）在 7 文档中的所有引用
+3. ✅ **完成 2026-06-17**：删除 `soc/riscv_virt.json`（7 个悬挂类引用 + `impl_mode` 字段无消费者）；新增 CI 脚本 `tools/verify_no_ghost_refs.sh` 防止回归
+4. ✅ **完成 2026-06-17**：删除 `ip/cpu/cpu_factory.cpp`（12 行 stub）；`RiscvVirtSoC.h/cpp` 推迟到 Phase 2+ 实施
 5. ✅ **已执行 (2026-06-09)**：将 PipeNode / 声明式 Plugin 的设计从 `multi_isa_architecture.md` 拆分到独立 RFC 文档 [`plugin-framework.md`](plugin-framework.md)
+6. **中**：实现 `bundles/impl_mode.h` 与 `ImplMode` 框架支持（如确实需要 TLM↔RTL 切换）—— 推迟到 Phase 5+
+7. **中**：实现 `bundles/mem_bundles.h` / `bundles/cache_bundles.h` 的实际定义（Phase 1.4+ 启动时）
+
+### 7.6 已修复 (2026-06-17)
+
+通过 [`openspec/changes/doc-code-realignment`](../CHANGELOG.md#v002-2026-06-17---doc-code-realignment) 实施的 8 项修复：
+
+| # | 漂移项 | 修复方式 | 关联任务 |
+|---|--------|----------|----------|
+| 1 | `soc/riscv_virt.json` 引用 7 个不存在类 + `impl_mode` 字段无消费者 | 删除文件 | Task 1.1 |
+| 2 | `ip/cpu/cpu_factory.cpp` 是 12 行 stub | 删除 `.cpp`（保留 `.h` 声明） | Task 1.2 |
+| 3 | `docs/architecture/overview.md` §"SoC 层是 IP 组合器" 描述了不存在的 `RiscvVirtSoC.h/cpp` | 改为指向 `soc/l1_cache_minimal.json` 真实工作示例 | Task 2.1 |
+| 4 | `docs/architecture/overview.md` §"ch_stream 接口即 ISA 无关层" 在 1 个 CPU IP 情况下"验证"无意义 | 改为 "Phase 1.4+ Future Work" 占位段 + `> ⚠️ 推迟到 Phase 1.4+` 标记 | Task 2.2 |
+| 5 | 8 个幽灵类名在 7 个文档中散布（详见 `tools/verify_no_ghost_refs.sh`） | 全部替换为 Plugin 风格命名 / 已注册 CppTLM 类名 / "Phase X+ 实施"占位 | Task 3.2 |
+| 6 | `soc/README.md` 顶部描述"已实现 RISC-V virt" | 改为"目前 2 个 L1Cache 验证配置；RISC-V virt 推迟到 Phase 2+" | Task 4.2 |
+| 7 | Bridge 适配层 `tick()` 合法性无 ADR 记录 | 新增 [ADR-041-bridge-tick-pattern.md](./adr/ADR-041-bridge-tick-pattern.md) 明确业务 Plugin vs Bridge 适配边界 | Task 5.1 |
+| 8 | 无 CI 防护防止幽灵类名回归 | 新增 `tools/verify_no_ghost_refs.sh`（可执行 + bash 严格模式 + 8 个类名 grep） | Task 6.1 |
+
+**文档/代码一致性基线**：从约 50% 提升到 80%+（以 `tools/verify_no_ghost_refs.sh` exit 0 为准）
 
 ---
 
