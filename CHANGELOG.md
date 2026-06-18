@@ -5,6 +5,35 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.0.5 (2026-06-17) - empty-directory-cleanup
+
+> **OpenSpec change**: `empty-directory-cleanup`（详见 `openspec/changes/empty-directory-cleanup/`）
+> **目的**: 清理项目结构噪音（22 个仅含 .gitkeep 的空目录），建立 IP 状态目录约定（`STATUS.md` 模板），明确"测试在 `tests/<ip>/` 而非 `ip/<ip>/test/`"的不变式。
+
+### Removed（清理空目录噪音）
+- `ip/memory/{tlm,rtl,test,configs}/` — 4 个仅含 .gitkeep 的占位目录
+- `ip/interconnect/{tlm,rtl,test,configs}/` — 4 个仅含 .gitkeep 的占位目录
+- `ip/peripheral/{tlm,rtl,test,configs}/` — 4 个仅含 .gitkeep 的占位目录
+- `ip/cpu/test/` — 1 个 README-only 目录（README 移到 `ip/cpu/docs/verification.md`）
+
+### Added（建立 IP 状态目录约定）
+- `ip/memory/STATUS.md` — PLANNED 变体（0 LOC, Phase 2+）
+- `ip/interconnect/STATUS.md` — PLANNED 变体（0 LOC, Phase 2+）
+- `ip/peripheral/STATUS.md` — PLANNED 变体（0 LOC, Phase 3+）
+- `ip/tilecore/STATUS.md` — INITIAL DESIGN 变体（有 docs/architecture.md, Phase 5+）
+- `ip/tilecopy/STATUS.md` — INITIAL DESIGN 变体（有 docs/architecture.md, Phase 5+）
+- `docs/templates/IP_STATUS_TEMPLATE.md` — 3 个变体（PLANNED / INITIAL DESIGN / PARTIAL）的可复用模板
+- `ip/README.md` 顶部加 "STATUS 约定" 段，列出 7 个 IP 的状态表
+
+### Changed（同步文档 + 修正 CPU IP 目录结构）
+- `src/cf_plugin/CMakeLists.txt` L30 后插入注释：明确 cf_plugin 单元测试在 `tests/framework/`
+- `ip/cpu/README.md` 顶部加 "测试位置" 段：明确 CPU 测试在 `../tests/cpu/`
+- `ip/cpu/test/README.md` → `ip/cpu/docs/verification.md`（移动而非删除，保留验证规范文档）
+
+### Impact
+- **0 运行时影响**：仅清理空目录 + 文档同步
+- **变更规模**: 12 个 .gitkeep 目录删除 + 5 个新 STATUS.md + 1 个新 docs/templates/ + 3 个文档修改
+
 ## v0.0.2 (2026-06-17) - doc-code-realignment
 
 > **OpenSpec change**: `doc-code-realignment`（详见 `openspec/changes/doc-code-realignment/`）
