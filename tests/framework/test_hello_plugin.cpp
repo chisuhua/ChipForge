@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_hello_plugin.cpp
+// tests/framework/test_hello_plugin.cpp
 //
 // 功能描述: 最小验证 Plugin (Phase 0 退出标准 §2.1)
 // 作者: ChipForge Plugin Team

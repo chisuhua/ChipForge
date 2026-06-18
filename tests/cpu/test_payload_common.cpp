@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_payload_common.cpp
+// tests/cpu/test_payload_common.cpp
 //
 // 功能描述: ip/cpu/core/payload_common.h 单元测试 (M1.7 验证)
 // 作者: ChipForge Plugin Team
@@ -15,7 +15,7 @@
 //
 // 约束:
 //   - 纯 main() + assert (与 cf_plugin 现有测试一致)
-//   - 必须放 src/cf_plugin/tests/ (D-1 决策: 测试与 IP 目录解耦)
+//   - 放 tests/cpu/ (2026-06-16 重构: 测试按家族分目录, 替代原 D-1 决策的 src/cf_plugin/tests/ 统一入口)
 
 #include <cassert>
 #include <cstdint>

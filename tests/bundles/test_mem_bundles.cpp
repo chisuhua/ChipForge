@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_mem_bundles.cpp
+// tests/bundles/test_mem_bundles.cpp
 //
 // 功能描述: bundles/mem_bundles.h 单元测试 (Phase 1.1)
 // 作者: ChipForge Plugin Team

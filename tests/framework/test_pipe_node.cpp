@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_pipe_node.cpp
+// tests/framework/test_pipe_node.cpp
 //
 // 功能描述: PipeNode 单元测试 (Phase 0 P0 #3)
 // 作者: ChipForge Plugin Team

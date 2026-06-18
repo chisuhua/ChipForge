@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_ctrl_link.cpp
+// tests/framework/test_ctrl_link.cpp
 //
 // 功能描述: CtrlLink 单元测试 (Phase 0 P0 #5)
 

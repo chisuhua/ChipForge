@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_plugin_lifecycle.cpp
+// tests/framework/test_plugin_lifecycle.cpp
 //
 // 功能描述: PluginBase 单元测试 (Phase 0 P0 #1)
 // 作者: ChipForge Plugin Team

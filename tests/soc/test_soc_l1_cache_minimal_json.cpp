@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_soc_l1_cache_minimal_json.cpp
+// tests/soc/test_soc_l1_cache_minimal_json.cpp
 //
 // 功能描述: soc/l1_cache_minimal.json 结构验证 (Phase 1.3b)
 // 作者: ChipForge Plugin Team

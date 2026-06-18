@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_storage.cpp
+// tests/framework/test_storage.cpp
 //
 // 功能描述: cf::plugin::storage::array_store<T, N> 单元测试
 // 作者: ChipForge Plugin Team

@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_l1_cache_bridge.cpp
+// tests/cache/test_l1_cache_bridge.cpp
 //
 // 功能描述: L1CacheTLMBridge 单元测试 (Phase 1.3a TDD)
 // 作者: ChipForge Plugin Team

@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_coexistence.cpp
+// tests/framework/test_coexistence.cpp
 //
 // 功能描述: cf_plugin 与 CppTLM/CppHDL 共存测试 (Phase 0 §2.3)
 // 作者: ChipForge Plugin Team

@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_payload.cpp
+// tests/framework/test_payload.cpp
 //
 // 功能描述: Payload<T> 单元测试 (Phase 0 P0 #2)
 // 作者: ChipForge Plugin Team

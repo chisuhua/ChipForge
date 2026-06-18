@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_l1_cache_json_instantiate.cpp
+// tests/cache/test_l1_cache_json_instantiate.cpp
 //
 // 功能描述: L1CacheTLMBridgeAdapter full JSON instantiateAll e2e 测试 (Phase 1.3d-extras)
 // 作者: ChipForge Plugin Team

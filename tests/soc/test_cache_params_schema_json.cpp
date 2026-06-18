@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_cache_params_schema_json.cpp
+// tests/soc/test_cache_params_schema_json.cpp
 //
 // 功能描述: ip/cache/configs/params_schema.json 结构验证 (Phase 1.3c)
 // 作者: ChipForge Plugin Team

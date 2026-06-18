@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_l1_cache_plugin_unit.cpp
+// tests/cache/test_l1_cache_plugin_unit.cpp
 //
 // 功能描述: L1CachePlugin 单元测试 (Phase 1.2)
 // 作者: ChipForge Plugin Team

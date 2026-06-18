@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_pipe_builder.cpp
+// tests/framework/test_pipe_builder.cpp
 //
 // 功能描述: PipeBuilder 单元测试 (Phase 0 P0 #4)
 

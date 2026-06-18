@@ -1,4 +1,4 @@
-// src/cf_plugin/tests/test_pipe_arbitration.cpp
+// tests/framework/test_pipe_arbitration.cpp
 //
 // 功能描述: PipeArbitration 单元测试 (M1.5 + M1.6 验证, Phase 1.5+)
 // 作者: ChipForge Plugin Team
