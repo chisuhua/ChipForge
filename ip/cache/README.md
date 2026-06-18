@@ -48,25 +48,29 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 
 ## 4. 可插拔策略
 
+> ✅ **Phase 1.4 落地**: `NoReplacementPolicy` + `LRUPolicy` 接口契约（详见 `ip/cache/policies/`）。其他策略（PLRU/Random/FIFO/RRIP）推迟到 Phase 1.5 L2CachePlugin。
+>
+> **当前实现**: L1CachePlugin 是 256 sets × 1 way × 64B = **16KB** direct-mapped（256 × 1 × 64 = 16384 字节 = 16KB）。8-way 不在 Phase 1 范围，8-way 设计目标是 32KB（即 `4 sets × 8 way × 64B` × 16 = 256 × 8 × 64 = 128KB，等等 — 此处 "32KB" 仅作为 8-way L1 设计目标参考，**非当前实现**）。
+
 | 策略类型 | 可选实现 | 默认值 | 说明 |
 |---------|---------|--------|------|
-| 替换策略 | LRU, PLRU, Random, FIFO | LRU | 缓存行淘汰算法 |
-| 写策略 | WriteBack, WriteThrough | WriteBack | 写命中处理方式 |
-| 分配策略 | WriteAllocate, NoWriteAllocate | WriteAllocate | 写缺失处理方式 |
-| 预取策略 | None, NextLine, Stride, Stream | None | 硬件预取算法 |
+| 替换策略 | None, LRU (reference impl) | None | Phase 1.4: NoReplacementPolicy；Phase 1.5+: 扩展 PLRU/Random/FIFO/RRIP |
+| 写策略 | WriteBack, WriteThrough | WriteBack | 写命中处理方式（推迟实施） |
+| 分配策略 | WriteAllocate, NoWriteAllocate | WriteAllocate | 写缺失处理方式（推迟实施） |
+| 预取策略 | None, NextLine, Stride, Stream | None | 硬件预取算法（推迟实施） |
 
 ## 5. 配置参数
 
 | 参数 | 类型 | 默认值 | 范围 | 说明 |
 |------|------|--------|------|------|
-| capacity_kb | int | 32 | 1-4096 | 容量 (KB) |
-| associativity | int | 4 | 1-16 | 关联度（路数） |
+| capacity_kb | int | 16 | 1-4096 | 容量 (KB)（实际 16KB = 256 sets × 1 way × 64B；可调至其他值需同步调整 num_sets） |
+| associativity | int | 1 | 1-16 | 关联度（路数）（当前固定 1-way，Phase 1.5 L2CachePlugin 支持 8-way） |
 | line_size_bytes | int | 64 | 16-256 | 缓存行大小 |
 | num_mshr | int | 4 | 1-16 | MSHR 条目数 |
 | hit_latency | int | 1 | 1-10 | 命中延迟（周期） |
-| replacement_policy | string | "lru" | 见策略表 | 替换算法 |
-| write_policy | string | "write_back" | 见策略表 | 写策略 |
-| prefetch_policy | string | "none" | 见策略表 | 预取策略 |
+| replacement_policy | string | "none" | "none" / "lru" | 替换算法（Phase 1.4 落地；其他策略推迟到 Phase 1.5） |
+| write_policy | string | "write_back" | 见策略表 | 写策略（推迟实施） |
+| prefetch_policy | string | "none" | 见策略表 | 预取策略（推迟实施） |
 
 ## 6. DSE 参数化
 

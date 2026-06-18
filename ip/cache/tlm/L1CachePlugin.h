@@ -15,7 +15,8 @@
 //   - bundles/mem_bundles.h (CacheReq / CacheResp / MemResp 输入)
 //
 // 架构:
-//   - 256 sets × 64-byte cache line = 32KB L1 (8-way 不在 Phase 1 范围, 简化为 direct-mapped)
+//   - 256 sets × 1 way × 64-byte cache line = 16KB L1 (direct-mapped)
+//   - 8-way 不在 Phase 1 范围, 推迟到 Phase 1.5 L2CachePlugin
 //   - 地址位宽: 64-bit 物理
 //     - bit[11:4]   -> idx (8-bit, 256 sets)
 //     - bit[31:12]  -> tag (20-bit)

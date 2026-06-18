@@ -20,7 +20,7 @@
           "minimum": 1,
           "maximum": 65536,
           "default": 256,
-          "description": "缓存 set 数 (典型 32KB 8-way L1 = 256 sets)"
+          "description": "缓存 set 数 (典型 16KB 1-way L1 = 256 sets；256 × 1 way × 64B = 16KB. 8-way 设计目标 32KB 推迟到 Phase 1.5 L2CachePlugin)"
         },
         "tag_bits": {
           "type": "integer",

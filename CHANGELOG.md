@@ -5,6 +5,51 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.0.4 (2026-06-18) - cache-policy-foundation (DRAFT, archive 等待重写后落地)
+
+> **OpenSpec change**: `cache-policy-foundation`（详见 `openspec/changes/cache-policy-foundation/`）
+> **状态**: 本条目为 v0.0.4 占位，描述 cache-policy-foundation v2 重写后的预期落地内容
+> **目的**: 落地 A7 架构债务（`ip/cache/policies/` 子目录缺失 + L1CachePlugin 不可插拔替换策略）+ 修正 L1Cache 容量注释错误（32KB→16KB）
+
+### Changed（L1Cache 容量注释修正）
+- `ip/cache/tlm/L1CachePlugin.h` L18 注释：`256 sets × 64-byte = 32KB L1` → `256 × 1 way × 64B = 16KB L1 (direct-mapped)`（原 32KB 是 8-way 误算；实际 RAM = 16384 字节 = 16KB）
+
+### Added（落地可插拔替换策略接口）
+- `ip/cache/policies/replacement_policy.h` — `cf::ip::cache::policies::ReplacementPolicy` 抽象基类（4 虚方法 + 1 工厂方法）
+- `ip/cache/policies/no_replacement_policy.h` — 默认 no-op 实现，保持 Phase 1.3 行为零变化
+- `ip/cache/policies/lru_policy.h` — LRU reference implementation（1-way 简化，Phase 1.5 L2CachePlugin 整体替换）
+- `tests/cache/test_replacement_policy.cpp` — 5 单元测试（factory-create-LRU / factory-create-None / factory-unknown-throws / LRU-on-access-increments / NoReplacement-victim-returns-zero）
+
+### Changed（L1CachePlugin 集成注入点）
+- `ip/cache/tlm/L1CachePlugin.h/.cpp` — 构造函数签名扩展：`explicit L1CachePlugin(std::unique_ptr<ReplacementPolicy> policy = nullptr)`；`lookup` 阶段 `at_stage` 回调内调用 `policy_->on_access(set, way)`
+
+### Impact
+- **向后兼容**: 默认 `nullptr` policy → `NoReplacementPolicy` 行为等价于 hard-coded
+- **基线**: 16/16 ctest PASS（v0.0.5 后）+ 5 新增 = 21/21 PASS
+- **与 v0.0.5 协作**: 测试放 `tests/cache/`（v0.0.5 约定）；不重建 `ip/cache/test/`
+- **修复 v1 已知问题**: 详见 `openspec/changes/archive/2026-06-18-cache-policy-foundation-v1-original/` 的 9 项问题
+
+## v0.0.3 (2026-06-18) - ip-catalog-status-correct (DRAFT, archive 等待重写后落地)
+
+> **OpenSpec change**: `ip-catalog-status-correct`（详见 `openspec/changes/ip-catalog-status-correct/`）
+> **状态**: 本条目为 v0.0.3 占位，描述 ip-catalog-status-correct v2 重写后的预期落地内容
+> **目的**: 修正 `docs/architecture/ip-catalog.md` IP 状态表与实际代码对齐；L1Cache 状态从 `Phase 1.2 L1D` 修正为 `Phase 1.3 unified 16KB`
+
+### Changed（L1Cache 状态修正）
+- `docs/architecture/ip-catalog.md` L1Cache 行：状态从 `🟡 TLM 实现中 (Phase 1.2 L1D)` → `🟡 TLM 实现中 (Phase 1.3, L1 unified direct-mapped 16KB, L1I/L1D/L2 未拆分)`
+- `ip/cache/README.md §4` "可插拔策略"表格：`256 sets × 64-byte cache line = 32KB L1` → `256 × 1 way × 64B = 16KB L1 (direct-mapped)`
+- `ip/cache/README.md §5` "配置参数"表格：`capacity_kb` 默认值 32 → 16
+
+### Added（IP 状态表补全 2 列）
+- `docs/architecture/ip-catalog.md` IP 索引表新增"实现范围"列（8 个 IP 全部填写）
+- `docs/architecture/ip-catalog.md` IP 索引表新增"实施预计"列（5 个零代码 IP 指向 v0.0.5 STATUS.md + roadmap 路径）
+
+### Impact
+- **无运行时影响**：仅文档同步
+- **与 v0.0.5 协作**: 零代码 IP 实施预计引用 v0.0.5 STATUS.md，不重复声明；不修改 `ip/README.md`（v0.0.5 STATUS 约定段已含 7 IP 状态表）
+- **不新建** `docs/templates/IP_README_TEMPLATE.md`（v0.0.5 `IP_STATUS_TEMPLATE.md` 已覆盖零代码 IP）
+- **修复 v1 已知问题**: 详见 `openspec/changes/archive/2026-06-18-ip-catalog-status-correct-v1-original/` 的 4 项问题
+
 ## v0.0.5 (2026-06-17) - empty-directory-cleanup
 
 > **OpenSpec change**: `empty-directory-cleanup`（详见 `openspec/changes/empty-directory-cleanup/`）
