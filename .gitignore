@@ -108,3 +108,4 @@ openspec/
 /3rdparty/riscv-arch-test/.mise.toml
 /3rdparty/riscv-arch-test/.pre-commit-config.yaml
 /3rdparty/riscv-arch-test/.python-version
+Testing/

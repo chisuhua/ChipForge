@@ -16,35 +16,35 @@
 
 ### 计算核心 (Compute)
 
-| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 主页 |
-| --- | --- | --- | --- | --- | --- |
-| `cpu` | 🟡 设计中 | RISC-V CPU (Plugin + Stageable) | `isa`, `pipeline_stages`, `branch_predictor` | 是 | [ip/cpu/](../../../ip/cpu/README.md) |
-| `tilecore` | 🟡 初始设计 | 双层脉动矩阵乘 (类 NVIDIA Tensor Core) | Tile 大小, dtype 集合, CNU 配置 | 否 (依赖 `tilecopy`) | [ip/tilecore/](../../../ip/tilecore/README.md) |
+| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 实现范围 | 实施预计 | 主页 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `cpu` | 🟡 设计中 | RISC-V CPU (Plugin + Stageable) | `isa`, `pipeline_stages`, `branch_predictor` | 是 | Plugin + Stageable 架构设计 + 5-stage RISC-V 指令子集 (35 子测试 PASS in 5.28s) | Phase 1.4+ (CPU Plugin 实施推迟到 Phase 1.4, 等 L1CachePlugin 稳定) | [ip/cpu/](../../../ip/cpu/README.md) |
+| `tilecore` | 🟡 初始设计 | 双层脉动矩阵乘 (类 NVIDIA Tensor Core) | Tile 大小, dtype 集合, CNU 配置 | 否 (依赖 `tilecopy`) | 0 LOC, 仅 `STATUS.md` (INITIAL DESIGN) + `docs/architecture.md` (27KB 设计文档) | Phase 5+ (见 [`ip/tilecore/STATUS.md`](../../../ip/tilecore/STATUS.md) + `docs/roadmap/phases/phase-5-rtl.md`, GPU 形态) | [ip/tilecore/](../../../ip/tilecore/README.md) |
 
 ### 数据搬运 (Data Movement)
 
-| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 主页 |
-| --- | --- | --- | --- | --- | --- |
-| `tilecopy` | 🟡 初始设计 | Tile 级异步数据搬运 (类 TMA) | Tile 形状, scope (cta/cluster) | 是 | [ip/tilecopy/](../../../ip/tilecopy/README.md) |
+| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 实现范围 | 实施预计 | 主页 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `tilecopy` | 🟡 初始设计 | Tile 级异步数据搬运 (类 TMA) | Tile 形状, scope (cta/cluster) | 是 | 0 LOC, 仅 `STATUS.md` (INITIAL DESIGN) + `docs/architecture.md` (5KB 设计文档) | Phase 5+ (见 [`ip/tilecopy/STATUS.md`](../../../ip/tilecopy/STATUS.md) + `docs/roadmap/phases/phase-5-rtl.md`) | [ip/tilecopy/](../../../ip/tilecopy/README.md) |
 
 ### 存储 (Memory)
 
-| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 主页 |
-| --- | --- | --- | --- | --- | --- |
-| `cache` | 🟡 TLM 实现中 (Phase 1.2 L1D) | 多级缓存 (L1I/L1D/L2) | `size_kb`, `associativity`, `replacement_policy` | 是 | [ip/cache/](../../../ip/cache/README.md) |
-| `memory` | 🔴 规划中 | 主存 (SRAM/DRAM 模型) | `size_mb`, `latency_cycles` | 是 | [ip/memory/](../../../ip/memory/README.md) |
+| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 实现范围 | 实施预计 | 主页 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `cache` | 🟡 TLM 实现中 (Phase 1.3, L1 unified direct-mapped 16KB, L1I/L1D/L2 未拆分) | 多级缓存 (L1I/L1D/L2) | `size_kb`, `associativity`, `replacement_policy` | 是 | `L1CachePlugin` (256 sets × 1 way × 64B = 16KB direct-mapped) + `L1CacheTLMBridge` + `L1CacheTLMBridgeAdapter` (cpptlm ModuleFactory 兼容层 + ch_stream 注册) + `ReplacementPolicy` 抽象接口 (Phase 1.4 落地: NoReplacementPolicy + LRUPolicy reference impl). 5 个 unit tests + bridge/e2e/instantiate 测试 PASS. Phase 1.5 待实施: L2CachePlugin (8-way) + JSON 配置驱动策略选择 | Phase 1.4+ (ReplacementPolicy 接口已落地; L2CachePlugin 推迟到 Phase 1.5) | [ip/cache/](../../../ip/cache/README.md) |
+| `memory` | 🔴 规划中 | 主存 (SRAM/DRAM 模型) | `size_mb`, `latency_cycles` | 是 | 0 LOC, 仅 `STATUS.md` (PLANNED) | Phase 2+ (见 [`ip/memory/STATUS.md`](../../../ip/memory/STATUS.md) + `docs/roadmap/phases/phase-2-baremetal.md`) | [ip/memory/](../../../ip/memory/README.md) |
 
 ### 互连 (Interconnect)
 
-| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 主页 |
-| --- | --- | --- | --- | --- | --- |
-| `interconnect` | 🔴 规划中 | 总线 / NoC | `topology`, `data_width` | 是 | [ip/interconnect/](../../../ip/interconnect/README.md) |
+| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 实现范围 | 实施预计 | 主页 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `interconnect` | 🔴 规划中 | 总线 / NoC | `topology`, `data_width` | 是 | 0 LOC, 仅 `STATUS.md` (PLANNED) | Phase 2+ (见 [`ip/interconnect/STATUS.md`](../../../ip/interconnect/STATUS.md) + `docs/roadmap/phases/phase-2-baremetal.md`) | [ip/interconnect/](../../../ip/interconnect/README.md) |
 
 ### 外设 (Peripheral)
 
-| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 主页 |
-| --- | --- | --- | --- | --- | --- |
-| `peripheral` | 🔴 规划中 | PLIC / CLINT / UART / Timer | 子模块清单, 中断路由 | 是 | [ip/peripheral/](../../../ip/peripheral/README.md) |
+| IP | 状态 | 类型 | 关键参数 | 可独立使用 | 实现范围 | 实施预计 | 主页 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `peripheral` | 🔴 规划中 | PLIC / CLINT / UART / Timer | 子模块清单, 中断路由 | 是 | 0 LOC, 仅 `STATUS.md` (PLANNED) | Phase 3+ (见 [`ip/peripheral/STATUS.md`](../../../ip/peripheral/STATUS.md) + `docs/roadmap/phases/phase-3-rtos.md`) | [ip/peripheral/](../../../ip/peripheral/README.md) |
 
 ## IP 间依赖图
 
