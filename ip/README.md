@@ -1,5 +1,20 @@
 # ChipForge IP 库
 
+## STATUS 约定
+
+每个 IP 根目录应有 `STATUS.md` 标明当前状态。零代码 IP 使用模板：
+`docs/templates/IP_STATUS_TEMPLATE.md`（由 CHANGE-005 在 task 5.2 创建）。
+
+| IP | 状态 | 实施预计 |
+|----|------|----------|
+| cpu | 🟡 设计中 (实装中) | Phase 1.4+ |
+| cache | 🟡 TLM 实现中 (Phase 1.3, L1 unified) | Phase 1.4+ L2 |
+| memory | 🔴 规划中 (0 LOC) | Phase 2+ |
+| interconnect | 🔴 规划中 (0 LOC) | Phase 2+ |
+| peripheral | 🔴 规划中 (0 LOC) | Phase 3+ |
+| tilecore | 🟡 初始设计 (有 docs/architecture.md) | Phase 5+ |
+| tilecopy | 🟡 初始设计 (有 docs/architecture.md) | Phase 5+ |
+
 ## 概述
 本目录包含 ChipForge 平台的所有硬件 IP 核心，每个 IP 遵循统一的目录结构和接口规范。
 
