@@ -29,6 +29,13 @@ set(CF_PLUGIN_PUBLIC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 # 退出标准中"质量标准"与"集成标准"待 Phase 0 收尾时验证.
 add_library(cf_plugin INTERFACE)
 
+# ----------------------------------------------------------------------------
+# 注意: cf_plugin 的单元测试不在 src/cf_plugin/tests/ 下
+#   实际位置: tests/framework/test_*.cpp
+#   src/cf_plugin/tests/ 目录已删除 (CHANGE-005 empty-directory-cleanup)
+#   CMake 注册在下方"单元测试"段（约 L80+）
+# ----------------------------------------------------------------------------
+
 target_include_directories(cf_plugin
   INTERFACE
     $<BUILD_INTERFACE:${CF_PLUGIN_PUBLIC_INCLUDE_DIR}>

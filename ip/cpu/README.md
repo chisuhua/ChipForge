@@ -1,5 +1,14 @@
 # RISC-V CPU IP
 
+## 测试位置
+
+CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），实际位置：
+
+- **单元测试**: `../tests/cpu/test_*.cpp`（14 个 GoogleTest 文件）
+  - 详见 [tests/cpu/README.md](../tests/cpu/README.md)
+- **集成测试**: `../tests/cpu/integration/test_*.cpp`（3 阶段 RISC-V 验证）
+- **验证规范**: [./docs/verification.md](./docs/verification.md)（前 `ip/cpu/test/README.md`，描述 Level A/B/C 测试层级）
+
 ## 概述
 基于 CppTLM 的 RISC-V CPU IP 核，采用 Plugin + Stageable 架构设计，支持 RV32I/RV64GC 指令集。
 
