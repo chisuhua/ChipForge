@@ -31,6 +31,7 @@
 
 #include "cf/plugin/payload.h"
 #include "cf/plugin/pipe_node.h"
+#include "ip/cache/policies/no_replacement_policy.h"  // default policy (Phase 1.4)
 
 namespace cf {
 namespace ip {
@@ -95,7 +96,16 @@ cf::plugin::uint_t<L1CachePlugin::kTagBits> L1CachePlugin::extract_tag(
 // L1CachePlugin 实现
 // ============================================================================
 
-L1CachePlugin::L1CachePlugin() {
+L1CachePlugin::L1CachePlugin(
+    std::unique_ptr<cf::ip::cache::policies::ReplacementPolicy> policy) {
+  // Phase 1.4: 替换策略注入
+  // 默认 nullptr → 自动创建 NoReplacementPolicy (向后兼容 Phase 1.3 行为)
+  // 显式传入 → 使用调用方提供的策略 (LRUPolicy 或未来扩展)
+  if (!policy) {
+    policy = std::unique_ptr<cf::ip::cache::policies::ReplacementPolicy>(
+        new cf::ip::cache::policies::NoReplacementPolicy());
+  }
+  policy_ = std::move(policy);
   invalidate_all_sets();
 }
 
@@ -153,6 +163,14 @@ void L1CachePlugin::build(cf::plugin::PipeBuilder& pb) {
       n->put(g_data, cf::plugin::uint_t<L1CachePlugin::kLineDataBits>{0});
     }
     n->put(g_error, false);
+
+    // 4. Phase 1.4: 通知替换策略本次访问 (D4 合规: at_stage 闭包内执行)
+    //    L1CachePlugin 当前 1-way direct-mapped, way 固定为 0
+    //    NoReplacementPolicy on_access 是 no-op (等价 Phase 1.3 行为, 字节级兼容)
+    //    LRUPolicy on_access 增全局 counter (Phase 1.5 L2CachePlugin 升级)
+    if (policy_) {  // 防御性: ctor 已保证非空, 但保留 guard 便于测试桩
+      policy_->on_access(static_cast<uint32_t>(idx), 0u);
+    }
   });
 
   // refill 阶段 (Phase::LATE) — 仅 miss 时执行

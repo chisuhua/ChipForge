@@ -50,6 +50,7 @@
 #include "cf/plugin/storage.h"
 #include "cf/plugin/uint_t.h"
 #include "bundles/mem_bundles.h"
+#include "ip/cache/policies/replacement_policy.h"
 
 namespace cf {
 namespace ip {
@@ -75,7 +76,23 @@ class L1CachePlugin : public cf::plugin::PluginBase {
   static constexpr unsigned kLineDataBits = 512;   // 64-byte line (Phase 0 退化为 uint64)
   static constexpr unsigned kAddrBitsRaw = 64;     // 物理地址位宽 (helper 用)
 
-  L1CachePlugin();
+  // ------------------------------------------------------------------------
+  // 构造函数 (Phase 1.4: 替换策略注入点)
+  //
+  // 参数 policy 可选:
+  //   - 默认 nullptr (向后兼容 Phase 1.3 行为零变化)
+  //     内部自动创建 NoReplacementPolicy (1-way direct-mapped 等价 no-op)
+  //   - 显式传入 std::make_unique<NoReplacementPolicy>() 或
+  //     std::make_unique<LRUPolicy>() (Phase 1.4 reference impl)
+  //     或未来 Phase 1.5 L2CachePlugin 的其他策略
+  //
+  // 设计理由 (D4 Plugin-style):
+  //   - 构造参数注入而非全局静态 set_policy(), 支持多实例独立策略
+  //   - 默认 nullptr → 内部 NoReplacementPolicy, 调用方零感知
+  //   - 与 overview.md §"可插拔策略模式" 表格契约一致
+  // ------------------------------------------------------------------------
+  explicit L1CachePlugin(
+      std::unique_ptr<cf::ip::cache::policies::ReplacementPolicy> policy = nullptr);
   ~L1CachePlugin() override = default;
 
   L1CachePlugin(const L1CachePlugin&) = delete;
@@ -177,6 +194,12 @@ class L1CachePlugin : public cf::plugin::PluginBase {
   TagStore   tags_{};
   DataStore  data_{};
   ValidStore valid_{};
+
+  // ------------------------------------------------------------------------
+  // 替换策略 (Phase 1.4 注入点)
+  // 构造函数保证: ctor 返回后 policy_ 必定非空 (nullptr → NoReplacementPolicy)
+  // ------------------------------------------------------------------------
+  std::unique_ptr<cf::ip::cache::policies::ReplacementPolicy> policy_;
 
   // 重置所有 set 为 invalid (构造时和 reset_storage() 调用)
   void invalidate_all_sets();

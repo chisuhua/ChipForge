@@ -155,11 +155,14 @@ endif()
 #   - bundles/ (Phase 1.1) - 需 CMAKE_SOURCE_DIR include 路径
 #   - ip/cache/tlm/L1CachePlugin.h (Phase 1.2 主实现) - 需 ip/ include 路径
 #   - ip/cache/tlm/L1CachePlugin.cpp - 直接编译进测试可执行 (Phase 1.2 单文件 lib)
+#   - ip/cache/policies/replacement_policy.cpp (Phase 1.4) - L1CachePlugin
+#     ctor 默认创建 NoReplacementPolicy, 需要工厂方法 create() 的链接符号
 # TDD: 测试无条件注册, RED 时编译失败暴露缺失实现 (D4 §2.2)
 if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_plugin_unit.cpp)
   add_executable(test_l1_cache_plugin_unit
     ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_plugin_unit.cpp
     ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
   )
   target_link_libraries(test_l1_cache_plugin_unit PRIVATE cf_plugin)
   target_include_directories(test_l1_cache_plugin_unit
@@ -188,6 +191,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_bridge.cpp)
   add_executable(test_l1_cache_bridge
     ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_bridge.cpp
     ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
   )
   target_link_libraries(test_l1_cache_bridge PRIVATE cf_plugin)
@@ -198,6 +202,27 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_bridge.cpp)
       ${CMAKE_SOURCE_DIR}/src  # for bridge/ subdir
   )
   add_test(NAME test_l1_cache_bridge COMMAND test_l1_cache_bridge)
+endif()
+
+# Phase 1.4: ReplacementPolicy 抽象接口 + 2 个具体策略 + 工厂方法单元测试
+# (cache-policy-foundation change §4)
+# 依赖:
+#   - ip/cache/policies/replacement_policy.{h,cpp} (抽象接口 + 工厂方法实现)
+#   - ip/cache/policies/no_replacement_policy.h (NoReplacement impl, header-only)
+#   - ip/cache/policies/lru_policy.h (LRU reference impl, header-only)
+#   - tests/cache/test_replacement_policy.cpp (5 tests: factory-LRU/None/Unknown/LRU-on-access/NoReplacement-victim)
+#   - 与 L1CachePlugin 集成测试由 test_l1_cache_plugin_unit 的 4 个测试保证字节级兼容
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cache/test_replacement_policy.cpp)
+  add_executable(test_replacement_policy
+    ${CMAKE_SOURCE_DIR}/tests/cache/test_replacement_policy.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
+  )
+  target_link_libraries(test_replacement_policy PRIVATE cf_plugin)
+  target_include_directories(test_replacement_policy
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_replacement_policy COMMAND test_replacement_policy)
 endif()
 
 # Phase 1.3b: soc/l1_cache_minimal.json 结构验证 (v2 决策 §4 拓扑)
@@ -245,6 +270,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_plugin_e2e.cpp)
   add_executable(test_l1_cache_plugin_e2e
     ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_plugin_e2e.cpp
     ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
   )
@@ -269,6 +295,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_json_instantiate.cpp)
   add_executable(test_l1_cache_json_instantiate
     ${CMAKE_SOURCE_DIR}/tests/cache/test_l1_cache_json_instantiate.cpp
     ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
   )
