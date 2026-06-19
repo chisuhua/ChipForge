@@ -29,6 +29,7 @@
 #ifndef CF_IP_CPU_PLUGINS_REG_FILE_H
 #define CF_IP_CPU_PLUGINS_REG_FILE_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -58,15 +59,27 @@ namespace plugins {
 //     读 RS1/RS2 索引, 从 storage 取出数据写入 RS1/RS2 Payload
 //   - 写: "writeback" 阶段
 //     读 RD_IDX + RD_DATA, 写入 storage (x0 屏蔽)
+//
+// M4G D.2 (G.2) 模板参数化扩展:
+//   N_REGS    寄存器数量 (默认 32, 范围 [1, 128], 推荐 2 的幂)
+//   N_THREADS 线程数量 (默认 1, 范围 [1, 4], SMT 前瞻锁定)
+//   所有 read_reg/write_reg/reset 接受 tid 默认参数 (默认 0, 保持 ABI 兼容)
 // ----------------------------------------------------------------------------
-template <typename T>
+template <typename T, std::size_t N_REGS = 32, std::size_t N_THREADS = 1>
 class RegFilePlugin : public cf::plugin::PluginBase {
   static_assert(std::is_unsigned<T>::value,
                 "RegFilePlugin<T>: T must be unsigned (uint32_t or uint64_t)");
+  static_assert(N_REGS >= 1 && N_REGS <= 128,
+                "RegFilePlugin: N_REGS must be in [1, 128]");
+  static_assert(N_THREADS >= 1 && N_THREADS <= 4,
+                "RegFilePlugin: N_THREADS must be in [1, 4]");
+  static_assert((N_REGS & (N_REGS - 1)) == 0 || N_REGS == 1,
+                "RegFilePlugin: N_REGS should be power of 2 (or 1)");
 
  public:
   // 编译期常量
-  static constexpr std::size_t kNumRegs = 32;
+  static constexpr std::size_t kNumRegs = N_REGS;
+  static constexpr std::size_t kNumThreads = N_THREADS;
 
   explicit RegFilePlugin(T default_value = T{0}) : default_value_(default_value) {
     reset();
@@ -86,31 +99,35 @@ class RegFilePlugin : public cf::plugin::PluginBase {
   // 单元测试辅助 API (直接操作 storage, 不通过 Payload)
   // ------------------------------------------------------------------------
 
-  // 读寄存器 (直接访问 storage, 测试用)
-  T read_reg(std::size_t idx) const {
+  // 读寄存器 (直接访问 storage, 测试用, tid 默认 0)
+  T read_reg(std::size_t idx, std::uint8_t tid = 0) const {
     T result = T{0};
-    if (idx != 0 && idx < kNumRegs) {
-      result = regs_[idx];
+    if (tid < N_THREADS && idx != 0 && idx < kNumRegs) {
+      result = regs_[tid][idx];
     }
     return result;
   }
 
-  // 写寄存器 (直接访问 storage, 测试用; x0 屏蔽)
-  void write_reg(std::size_t idx, T value) {
-    if (idx != 0 && idx < kNumRegs) {
-      regs_[idx] = value;
+  // 写寄存器 (直接访问 storage, 测试用; x0 屏蔽, tid 默认 0)
+  void write_reg(std::size_t idx, T value, std::uint8_t tid = 0) {
+    if (tid < N_THREADS && idx != 0 && idx < kNumRegs) {
+      regs_[tid][idx] = value;
     }
   }
 
-  // 全部置 0 (测试间隔离)
+  // 全部置 0 (测试间隔离, 默认清空所有线程)
   void reset() {
-    for (std::size_t i = 0; i < kNumRegs; ++i) {
-      regs_[i] = (i == 0) ? T{0} : default_value_;
+    for (std::size_t t = 0; t < N_THREADS; ++t) {
+      for (std::size_t i = 0; i < kNumRegs; ++i) {
+        regs_[t][i] = (i == 0) ? T{0} : default_value_;
+      }
     }
   }
 
-  // 检查 x0 是否始终为 0 (不变式验证)
-  bool check_x0_zero() const { return regs_[0] == T{0}; }
+  // 检查 x0 是否始终为 0 (不变式验证, 默认检查 tid=0)
+  bool check_x0_zero(std::uint8_t tid = 0) const {
+    return tid < N_THREADS && regs_[tid][0] == T{0};
+  }
 
   // ------------------------------------------------------------------------
   // build() — 注册 decode (读) 和 writeback (写) 阶段
@@ -121,18 +138,20 @@ class RegFilePlugin : public cf::plugin::PluginBase {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
 
     // 读阶段: "decode" 阶段读取 RS1/RS2 数据
+    // M4G D.2: Phase 1 硬编码 tid=0 (THREAD_ID Payload 默认为 0)
     pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("decode").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
+        const std::uint8_t tid = 0;  // Phase 1: 单线程
 
         if (dec.reads_rs1) {
-          auto rs1_data = this->read_reg(dec.rs1_idx);
+          auto rs1_data = this->read_reg(dec.rs1_idx, tid);
           n->put(KeyType::RS1, rs1_data);
         }
 
         if (dec.reads_rs2) {
-          auto rs2_data = this->read_reg(dec.rs2_idx);
+          auto rs2_data = this->read_reg(dec.rs2_idx, tid);
           n->put(KeyType::RS2, rs2_data);
         }
       }
@@ -143,10 +162,11 @@ class RegFilePlugin : public cf::plugin::PluginBase {
       auto* n = pb.node_of_logic_stage("writeback").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
+        const std::uint8_t tid = 0;  // Phase 1: 单线程
 
         if (dec.writes_rd) {
           auto rd_data = n->operator()(KeyType::RD_DATA);
-          this->write_reg(dec.rd_idx, rd_data);
+          this->write_reg(dec.rd_idx, rd_data, tid);
         }
       }
     });
@@ -156,9 +176,10 @@ class RegFilePlugin : public cf::plugin::PluginBase {
   // 存储类型 (供外部访问, 如测试验证 storage 布局)
   // ------------------------------------------------------------------------
   using RegStore = cf::plugin::storage::array_store<T, kNumRegs>;
+  using PerThreadStore = std::array<RegStore, N_THREADS>;
 
  private:
-  RegStore regs_{};
+  PerThreadStore regs_{};
   T default_value_;
 };
 

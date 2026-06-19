@@ -76,6 +76,35 @@ static void test_rv64_rw() {
   printf("  [PASS] test_rv64_rw\n");
 }
 
+// M4G D.2 (G.2): 自定义 N_REGS 编译 + 行为正确
+static void test_custom_n_regs() {
+  // N_REGS=8 (非标准 RISC-V, 验证模板参数生效)
+  RegFilePlugin<T32, 8> rf8;
+  assert(rf8.read_reg(0) == 0);  // x0 屏蔽
+  rf8.write_reg(3, 42);
+  assert(rf8.read_reg(3) == 42u);
+  rf8.write_reg(7, 0xFF);
+  assert(rf8.read_reg(7) == 0xFFu);
+  printf("  [PASS] test_custom_n_regs\n");
+}
+
+// M4G D.2 (G.2): 多线程模板参数 — per-thread 寄存器隔离
+static void test_multi_thread_isolation() {
+  // N_THREADS=2: 每个线程独立 32 寄存器
+  RegFilePlugin<T32, 32, 2> rf_mt;
+  // 默认 tid=0
+  rf_mt.write_reg(5, 100);
+  assert(rf_mt.read_reg(5) == 100u);
+  // 显式 tid=1
+  rf_mt.write_reg(5, 200, /*tid*/ 1);
+  assert(rf_mt.read_reg(5, /*tid*/ 0) == 100u);
+  assert(rf_mt.read_reg(5, /*tid*/ 1) == 200u);
+  // 写 x0 在 tid=1 上也屏蔽
+  rf_mt.write_reg(0, 0xDEAD, /*tid*/ 1);
+  assert(rf_mt.read_reg(0, /*tid*/ 1) == 0u);
+  printf("  [PASS] test_multi_thread_isolation\n");
+}
+
 int main() {
   printf("test_reg_file:\n");
   test_rv32_initial();
@@ -83,6 +112,8 @@ int main() {
   test_x0_write_mask();
   test_rv32_rw();
   test_rv64_rw();
+  test_custom_n_regs();
+  test_multi_thread_isolation();
   printf("[PASS] all RegFilePlugin tests\n");
   return 0;
 }
