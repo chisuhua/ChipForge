@@ -203,6 +203,20 @@ static void test_template_sanity() {
   // RV64 同样 (类型不同, Key 名字相同)
   assert(payload::keys_rv64::PC.name()          == "cpu.pc");
   assert(payload::keys_rv64::RD_DATA.name()     == "cpu.rd_data");
+  // M4G D.1 (G.1): 新增 UID / THREAD_ID / IID_PC 三个 Payload Key
+  assert(payload::keys_rv32::UID.name()         == "cpu.uid");
+  assert(payload::keys_rv32::THREAD_ID.name()   == "cpu.tid");
+  assert(payload::keys_rv32::IID_PC.name()      == "cpu.iid_pc");
+  // 类型检查: UID 是 uint_t<8>, THREAD_ID 是 uint_t<2>, IID_PC 是 T
+  static_assert(sizeof(decltype(payload::keys_rv32::UID)) ==
+                    sizeof(cf::plugin::Payload<cf::plugin::uint_t<8>>),
+                "UID must be uint_t<8>");
+  static_assert(sizeof(decltype(payload::keys_rv32::THREAD_ID)) ==
+                    sizeof(cf::plugin::Payload<cf::plugin::uint_t<2>>),
+                "THREAD_ID must be uint_t<2>");
+  static_assert(sizeof(decltype(payload::keys_rv32::IID_PC)) ==
+                    sizeof(cf::plugin::Payload<std::uint32_t>),
+                "IID_PC must be T (uint32_t for RV32)");
   printf("  [PASS] test_template_sanity\n");
 }
 

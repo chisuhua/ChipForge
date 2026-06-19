@@ -153,6 +153,16 @@ struct keys {
 
   // 11. MEM_SIZE —— 内存访问大小 (字节数, 1/2/4/8)
   static inline cf::plugin::Payload<cf::plugin::uint_t<3>> MEM_SIZE{"cpu.mem_size"};
+
+  // M4G D.1 (G.1): 新增 OoO / SMT / superscalar 前瞻锁定 Payload Key
+  // 12. UID —— 指令唯一标识 (OoO ROB index, 0..255)
+  static inline cf::plugin::Payload<cf::plugin::uint_t<8>> UID{"cpu.uid"};
+
+  // 13. THREAD_ID —— 线程标识 (SMT, 0..3)
+  static inline cf::plugin::Payload<cf::plugin::uint_t<2>> THREAD_ID{"cpu.tid"};
+
+  // 14. IID_PC —— PC tagged to IID (superscalar 区分多条指令的 PC)
+  static inline cf::plugin::Payload<T> IID_PC{"cpu.iid_pc"};
 };
 
 // ----------------------------------------------------------------------------
