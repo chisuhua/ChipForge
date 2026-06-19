@@ -36,6 +36,19 @@ namespace cf {
 namespace cpu {
 namespace plugins {
 
+// M4G D.3 (G.5): HazardKind enum — 区分 4 种冒险状态
+//   - NONE: 无冒险
+//   - RAW_RS1: 读 RS1 时遇到 RAW 冒险 (Phase 5+ 发射端口 1)
+//   - RAW_RS2: 读 RS2 时遇到 RAW 冒险 (Phase 5+ 发射端口 2)
+//   - WAW: 写 RD 时遇到 WAW 冒险 (Phase 5+ 提交端口)
+// 检测顺序 RAW_RS1 > RAW_RS2 > WAW (第一个匹配即返回)
+enum class HazardKind : std::uint8_t {
+  NONE = 0,
+  RAW_RS1,
+  RAW_RS2,
+  WAW,
+};
+
 // ----------------------------------------------------------------------------
 // HazardPlugin — 数据冒险检测
 //
@@ -95,13 +108,13 @@ class HazardPlugin : public cf::plugin::PluginBase {
     return tid < N_THREADS && rd_idx < kNumRegs && scoreboard_[tid][rd_idx];
   }
 
-  // 检测完整指令冒险 (默认 tid=0, 返回 bool — D.3 改 HazardKind 推迟 G.5)
-  bool has_hazard(const cf::cpu::core::payload::DecodePayload& dec,
-                  std::uint8_t tid = 0) const {
-    if (dec.reads_rs1 && has_raw(dec.rs1_idx, tid)) return true;
-    if (dec.reads_rs2 && has_raw(dec.rs2_idx, tid)) return true;
-    if (dec.writes_rd && has_waw(dec.rd_idx, tid)) return true;
-    return false;
+  // 检测完整指令冒险 (默认 tid=0, M4G D.3 返回 HazardKind 区分冒险源)
+  HazardKind has_hazard(const cf::cpu::core::payload::DecodePayload& dec,
+                        std::uint8_t tid = 0) const {
+    if (dec.reads_rs1 && has_raw(dec.rs1_idx, tid)) return HazardKind::RAW_RS1;
+    if (dec.reads_rs2 && has_raw(dec.rs2_idx, tid)) return HazardKind::RAW_RS2;
+    if (dec.writes_rd && has_waw(dec.rd_idx, tid)) return HazardKind::WAW;
+    return HazardKind::NONE;
   }
 
   // 标记寄存器为飞行中 (默认 tid=0)
@@ -142,9 +155,9 @@ class HazardPlugin : public cf::plugin::PluginBase {
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
 
-        // 检测 RAW / WAW 冒险
-        bool hazard = this->has_hazard(dec, tid);
-        if (hazard) {
+        // 检测 RAW / WAW 冒险 (M4G D.3: has_hazard 返回 HazardKind)
+        HazardKind hazard = this->has_hazard(dec, tid);
+        if (hazard != HazardKind::NONE) {
           // M2 阶段: 仅记录冒险, 不实际阻塞 (M4 集成后通过 CtrlLink 阻塞)
           // 当前仅设置 Payload 标志供测试验证
           // 不 mark_in_flight (阻塞时该指令不进入执行)

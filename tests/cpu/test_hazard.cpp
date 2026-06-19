@@ -22,6 +22,7 @@
 #include "ip/cpu/core/payload_common.h"
 
 using cf::cpu::plugins::HazardPlugin;
+using cf::cpu::plugins::HazardKind;  // M4G D.3 (G.5)
 using cf::cpu::core::payload::DecodePayload;
 using T = std::uint32_t;
 
@@ -31,7 +32,8 @@ static void test_no_hazard_initially() {
   DecodePayload dec{};
   dec.reads_rs1 = true;
   dec.rs1_idx = 1;
-  assert(!hz.has_hazard(dec));
+  // M4G D.3 (G.5.6): has_hazard 返回 HazardKind, 不再用 bool 隐式转换
+  assert(hz.has_hazard(dec) == HazardKind::NONE);
   printf("  [PASS] test_no_hazard_initially\n");
 }
 
@@ -41,7 +43,7 @@ static void test_raw_hazard_rs1() {
   DecodePayload dec{};
   dec.reads_rs1 = true;
   dec.rs1_idx = 5;
-  assert(hz.has_hazard(dec));
+  assert(hz.has_hazard(dec) == HazardKind::RAW_RS1);
   printf("  [PASS] test_raw_hazard_rs1\n");
 }
 
@@ -52,7 +54,7 @@ static void test_raw_hazard_rs2() {
   dec.reads_rs1 = false;
   dec.reads_rs2 = true;
   dec.rs2_idx = 7;
-  assert(hz.has_hazard(dec));
+  assert(hz.has_hazard(dec) == HazardKind::RAW_RS2);
   printf("  [PASS] test_raw_hazard_rs2\n");
 }
 
@@ -62,7 +64,7 @@ static void test_waw_hazard() {
   DecodePayload dec{};
   dec.writes_rd = true;
   dec.rd_idx = 10;
-  assert(hz.has_hazard(dec));
+  assert(hz.has_hazard(dec) == HazardKind::WAW);
   printf("  [PASS] test_waw_hazard\n");
 }
 
