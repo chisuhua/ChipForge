@@ -341,7 +341,7 @@ endif()
 # Phase 2: M2.9 5/5 P0 Plugin 单元测试
 # 路径: tests/cpu/ (CPU 业务家族)
 # ----------------------------------------------------------------------------
-foreach(test_name IN ITEMS test_reg_file test_hazard test_branch_predictor test_ibus test_dbus)
+foreach(test_name IN ITEMS test_reg_file test_hazard test_branch_predictor test_ibus test_dbus test_forward_compat)
   if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/${test_name}.cpp)
     add_executable(${test_name} ${CMAKE_SOURCE_DIR}/tests/cpu/${test_name}.cpp)
     target_link_libraries(${test_name} PRIVATE cf_plugin)
