@@ -43,22 +43,35 @@ namespace plugins {
 // 寄存器数量: 32 (x0-x31)
 //
 // Scoreboard 模型:
-//   - scoreboard_[i] = true: 寄存器 i 正在被某条指令写入 (飞行中)
-//   - scoreboard_[i] = false: 寄存器 i 可用
+//   - scoreboard_[tid][i] = true: 寄存器 i 正在被某条指令写入 (飞行中, 线程 tid)
+//   - scoreboard_[tid][i] = false: 寄存器 i 可用
 //
 // 检测逻辑:
-//   RAW: reads_rs1 && scoreboard_[rs1_idx] → 冒险
-//   RAW: reads_rs2 && scoreboard_[rs2_idx] → 冒险
-//   WAW: writes_rd && scoreboard_[rd_idx] → 冒险
+//   RAW: reads_rs1 && scoreboard_[tid][rs1_idx] → 冒险
+//   RAW: reads_rs2 && scoreboard_[tid][rs2_idx] → 冒险
+//   WAW: writes_rd && scoreboard_[tid][rd_idx] → 冒险
 //   WAR: 不阻塞 (读在写之前, 不冲突)
+//
+// M4G D.2 (G.3) 模板参数化扩展:
+//   N_REGS    寄存器数量 (默认 32, 范围 [1, 128], 推荐 2 的幂)
+//   N_THREADS 线程数量 (默认 1, 范围 [1, 4], SMT 前瞻锁定)
+//   所有 scoreboard API 接受 tid 默认参数 (默认 0, 保持 ABI 兼容)
+//   has_hazard 仍返回 bool (D.3 改 HazardKind, 推迟到 G.5)
 // ----------------------------------------------------------------------------
-template <typename T>
+template <typename T, std::size_t N_REGS = 32, std::size_t N_THREADS = 1>
 class HazardPlugin : public cf::plugin::PluginBase {
   static_assert(std::is_unsigned<T>::value,
                 "HazardPlugin<T>: T must be unsigned");
+  static_assert(N_REGS >= 1 && N_REGS <= 128,
+                "HazardPlugin: N_REGS must be in [1, 128]");
+  static_assert(N_THREADS >= 1 && N_THREADS <= 4,
+                "HazardPlugin: N_THREADS must be in [1, 4]");
+  static_assert((N_REGS & (N_REGS - 1)) == 0 || N_REGS == 1,
+                "HazardPlugin: N_REGS should be power of 2 (or 1)");
 
  public:
-  static constexpr std::size_t kNumRegs = 32;
+  static constexpr std::size_t kNumRegs = N_REGS;
+  static constexpr std::size_t kNumThreads = N_THREADS;
 
   HazardPlugin() { reset(); }
   ~HazardPlugin() override = default;
@@ -72,41 +85,47 @@ class HazardPlugin : public cf::plugin::PluginBase {
   // 单元测试辅助 API
   // ------------------------------------------------------------------------
 
-  // 检测 RAW 冒险 (指定寄存器索引)
-  bool has_raw(std::uint8_t rs_idx) const {
-    return rs_idx < kNumRegs && scoreboard_[rs_idx];
+  // 检测 RAW 冒险 (指定寄存器索引, 默认 tid=0)
+  bool has_raw(std::uint8_t rs_idx, std::uint8_t tid = 0) const {
+    return tid < N_THREADS && rs_idx < kNumRegs && scoreboard_[tid][rs_idx];
   }
 
-  // 检测 WAW 冒险
-  bool has_waw(std::uint8_t rd_idx) const {
-    return rd_idx < kNumRegs && scoreboard_[rd_idx];
+  // 检测 WAW 冒险 (默认 tid=0)
+  bool has_waw(std::uint8_t rd_idx, std::uint8_t tid = 0) const {
+    return tid < N_THREADS && rd_idx < kNumRegs && scoreboard_[tid][rd_idx];
   }
 
-  // 检测完整指令冒险
-  bool has_hazard(const cf::cpu::core::payload::DecodePayload& dec) const {
-    if (dec.reads_rs1 && has_raw(dec.rs1_idx)) return true;
-    if (dec.reads_rs2 && has_raw(dec.rs2_idx)) return true;
-    if (dec.writes_rd && has_waw(dec.rd_idx)) return true;
+  // 检测完整指令冒险 (默认 tid=0, 返回 bool — D.3 改 HazardKind 推迟 G.5)
+  bool has_hazard(const cf::cpu::core::payload::DecodePayload& dec,
+                  std::uint8_t tid = 0) const {
+    if (dec.reads_rs1 && has_raw(dec.rs1_idx, tid)) return true;
+    if (dec.reads_rs2 && has_raw(dec.rs2_idx, tid)) return true;
+    if (dec.writes_rd && has_waw(dec.rd_idx, tid)) return true;
     return false;
   }
 
-  // 标记寄存器为飞行中
-  void mark_in_flight(std::uint8_t rd_idx) {
-    if (rd_idx < kNumRegs) scoreboard_[rd_idx] = true;
+  // 标记寄存器为飞行中 (默认 tid=0)
+  void mark_in_flight(std::uint8_t rd_idx, std::uint8_t tid = 0) {
+    if (tid < N_THREADS && rd_idx < kNumRegs) scoreboard_[tid][rd_idx] = true;
   }
 
-  // 清除飞行标记
-  void clear_in_flight(std::uint8_t rd_idx) {
-    if (rd_idx < kNumRegs) scoreboard_[rd_idx] = false;
+  // 清除飞行标记 (默认 tid=0)
+  void clear_in_flight(std::uint8_t rd_idx, std::uint8_t tid = 0) {
+    if (tid < N_THREADS && rd_idx < kNumRegs) scoreboard_[tid][rd_idx] = false;
   }
 
-  // 全部清除
-  void reset() { scoreboard_.fill(false); }
+  // 全部清除 (默认清空所有线程, 保持向后兼容)
+  void reset() {
+    for (std::size_t t = 0; t < N_THREADS; ++t) {
+      scoreboard_[t].fill(false);
+    }
+  }
 
-  // 当前飞行中寄存器数量
-  std::size_t in_flight_count() const {
+  // 当前飞行中寄存器数量 (默认 tid=0, 行为不变)
+  std::size_t in_flight_count(std::uint8_t tid = 0) const {
+    if (tid >= N_THREADS) return 0;
     std::size_t count = 0;
-    for (auto b : scoreboard_) if (b) ++count;
+    for (auto b : scoreboard_[tid]) if (b) ++count;
     return count;
   }
 
@@ -115,15 +134,16 @@ class HazardPlugin : public cf::plugin::PluginBase {
   // ------------------------------------------------------------------------
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
+    const std::uint8_t tid = 0;  // Phase 1: 单线程硬编码
 
     // decode 阶段: 检测冒险并标记新的飞行中寄存器
-    pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
+    pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb, tid]() {
       auto* n = pb.node_of_logic_stage("decode").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
 
         // 检测 RAW / WAW 冒险
-        bool hazard = this->has_hazard(dec);
+        bool hazard = this->has_hazard(dec, tid);
         if (hazard) {
           // M2 阶段: 仅记录冒险, 不实际阻塞 (M4 集成后通过 CtrlLink 阻塞)
           // 当前仅设置 Payload 标志供测试验证
@@ -131,26 +151,26 @@ class HazardPlugin : public cf::plugin::PluginBase {
         } else {
           // 无冒险: 标记目标寄存器为飞行中
           if (dec.writes_rd) {
-            this->mark_in_flight(dec.rd_idx);
+            this->mark_in_flight(dec.rd_idx, tid);
           }
         }
       }
     });
 
     // writeback 阶段: 清除飞行标记
-    pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb]() {
+    pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb, tid]() {
       auto* n = pb.node_of_logic_stage("writeback").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
         if (dec.writes_rd) {
-          this->clear_in_flight(dec.rd_idx);
+          this->clear_in_flight(dec.rd_idx, tid);
         }
       }
     });
   }
 
  private:
-  std::array<bool, kNumRegs> scoreboard_{};
+  std::array<std::array<bool, kNumRegs>, N_THREADS> scoreboard_{};
 };
 
 }  // namespace plugins

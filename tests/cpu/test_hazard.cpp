@@ -76,6 +76,37 @@ static void test_reset_clears_scoreboard() {
   printf("  [PASS] test_reset_clears_scoreboard\n");
 }
 
+// M4G D.2 (G.3): per-thread scoreboard 隔离
+static void test_multi_thread_scoreboard() {
+  HazardPlugin<T, 32, 2> hz_mt;  // 2 线程
+  // tid=0 mark_in_flight 不影响 tid=1
+  hz_mt.mark_in_flight(3, /*tid*/ 0);
+  assert(hz_mt.has_raw(3, /*tid*/ 0));
+  assert(!hz_mt.has_raw(3, /*tid*/ 1));
+  // tid=1 独立 mark
+  hz_mt.mark_in_flight(3, /*tid*/ 1);
+  assert(hz_mt.has_raw(3, /*tid*/ 1));
+  // in_flight_count 默认 tid=0
+  assert(hz_mt.in_flight_count(/*tid*/ 0) == 1);
+  assert(hz_mt.in_flight_count(/*tid*/ 1) == 1);
+  // 总和: 2
+  assert(hz_mt.in_flight_count(/*tid*/ 0) + hz_mt.in_flight_count(/*tid*/ 1) == 2);
+  // reset 默认清空所有线程
+  hz_mt.reset();
+  assert(hz_mt.in_flight_count(/*tid*/ 0) == 0);
+  assert(hz_mt.in_flight_count(/*tid*/ 1) == 0);
+  printf("  [PASS] test_multi_thread_scoreboard\n");
+}
+
+// M4G D.2 (G.3): 自定义 N_REGS 编译 + 行为正确
+static void test_custom_n_regs() {
+  HazardPlugin<T, 8> hz8;  // 8 寄存器 (非标准 RISC-V)
+  hz8.mark_in_flight(5);
+  assert(hz8.has_raw(5));
+  assert(!hz8.has_raw(7));  // 边界外不飞
+  printf("  [PASS] test_custom_n_regs\n");
+}
+
 int main() {
   printf("test_hazard:\n");
   test_no_hazard_initially();
@@ -83,6 +114,8 @@ int main() {
   test_raw_hazard_rs2();
   test_waw_hazard();
   test_reset_clears_scoreboard();
+  test_multi_thread_scoreboard();
+  test_custom_n_regs();
   printf("[PASS] all HazardPlugin tests\n");
   return 0;
 }
