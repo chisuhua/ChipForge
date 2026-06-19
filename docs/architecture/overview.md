@@ -243,7 +243,7 @@ class RRIPPolicy   : public ReplacementPolicy { /* Re-reference Interval Predict
 
 | 组件 | 策略维度 | 可选实现 |
 |------|---------|---------|
-| **L1/L2 Cache** | 替换策略 | LRU, PLRU, Random, FIFO, RRIP, NRU |
+| **L1/L2 Cache** | 替换策略 | LRU, PLRU, Random, FIFO, RRIP, NRU — **✅ Phase 1.4 落地 (NoReplacementPolicy + LRUPolicy 接口契约，详见 `ip/cache/policies/`)** |
 | **L1/L2 Cache** | 预取策略 | None, Stride, NextLine, Indirect, AMPM |
 | **L1/L2 Cache** | 写策略 | WriteThrough, WriteBack, WriteAllocate |
 | **BusMatrix** | 仲裁策略 | RoundRobin, Priority, WeightedFair |
