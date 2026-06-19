@@ -52,16 +52,32 @@ namespace plugins {
 //   - fetch 阶段: predict(pc) → 预测目标地址或 0 (不跳转)
 //   - execute 阶段: update(pc, actual_taken, actual_target) → 更新 BTB/计数器
 // ----------------------------------------------------------------------------
-template <typename T>
+template <typename T,
+          std::size_t BTB_SIZE = 16,
+          std::size_t BIMODAL_SZ = 16,
+          std::size_t GSHARE_SZ = 16,
+          std::uint8_t GHR_BITS = 8,
+          std::size_t N_THREADS = 1>
 class BranchPredictorPlugin : public cf::plugin::PluginBase {
   static_assert(std::is_unsigned<T>::value,
                 "BranchPredictorPlugin<T>: T must be unsigned");
+  static_assert(N_THREADS >= 1 && N_THREADS <= 4,
+                "BranchPredictorPlugin: N_THREADS must be in [1, 4]");
+  static_assert(BTB_SIZE >= 1 && (BTB_SIZE & (BTB_SIZE - 1)) == 0,
+                "BranchPredictorPlugin: BTB_SIZE must be power of 2 (>= 1)");
+  static_assert(BIMODAL_SZ >= 1 && (BIMODAL_SZ & (BIMODAL_SZ - 1)) == 0,
+                "BranchPredictorPlugin: BIMODAL_SZ must be power of 2 (>= 1)");
+  static_assert(GSHARE_SZ >= 1 && (GSHARE_SZ & (GSHARE_SZ - 1)) == 0,
+                "BranchPredictorPlugin: GSHARE_SZ must be power of 2 (>= 1)");
+  static_assert(GHR_BITS >= 1 && GHR_BITS <= 16,
+                "BranchPredictorPlugin: GHR_BITS must be in [1, 16]");
 
  public:
-  static constexpr std::size_t kBtbSize = 16;       // BTB 条目数
-  static constexpr std::size_t kBimodalSize = 16;   // Bimodal 计数器数量
-  static constexpr std::size_t kGshareSize = 16;    // GShare 计数器数量
-  static constexpr std::size_t kHistoryBits = 8;    // 全局历史位数
+  static constexpr std::size_t kBtbSize = BTB_SIZE;
+  static constexpr std::size_t kBimodalSize = BIMODAL_SZ;
+  static constexpr std::size_t kGshareSize = GSHARE_SZ;
+  static constexpr std::size_t kHistoryBits = GHR_BITS;
+  static constexpr std::size_t kNumThreads = N_THREADS;    // 全局历史位数
 
   // 2-bit 饱和计数器状态
   enum class Counter : std::uint8_t {
@@ -91,14 +107,15 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
     using DecodePayload = cf::cpu::core::payload::DecodePayload;
+    const std::uint8_t tid = 0;  // Phase 1: 单线程硬编码
 
     // fetch 阶段: 预测分支 (基于当前 PC)
-    pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
+    pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb, tid]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
       if (n) {
         T pc = n->operator()(KeyType::PC);
 
-        T predicted = this->predict(pc);
+        T predicted = this->predict(pc, tid);
         if (predicted != 0) {
           // 预测跳转: 设置 next_pc 为预测目标
           // M2 阶段: 仅存储预测结果, M4 集成后通过 CtrlLink 修改 PC
@@ -107,13 +124,13 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     });
 
     // execute 阶段: 验证预测并更新
-    pb.at_stage("execute", cf::plugin::Phase::LATE, [this, &pb]() {
+    pb.at_stage("execute", cf::plugin::Phase::LATE, [this, &pb, tid]() {
       auto* n = pb.node_of_logic_stage("execute").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
         if (dec.op_class == DecodePayload::OpClass::BRANCH) {
           T pc = n->operator()(KeyType::PC);
-          this->update(pc, dec.branch_taken, static_cast<T>(dec.branch_target));
+          this->update(pc, dec.branch_taken, static_cast<T>(dec.branch_target), tid);
         }
       }
     });
@@ -123,17 +140,17 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   // 预测 API
   // ------------------------------------------------------------------------
 
-  // 预测分支目标地址
+  // 预测分支目标地址 (默认 tid=0, 行为不变)
   // 返回 0: 不跳转 (顺序执行)
   // 返回非 0: 预测跳转目标
-  T predict(T pc) const {
+  T predict(T pc, std::uint8_t tid = 0) const {
     std::size_t idx = pc & (kBtbSize - 1);
     const auto& entry = btb_[idx];
     if (!entry.valid || entry.tag != pc) return T{0};
 
     // 使用 GShare > Bimodal > 默认不跳转 的优先级
-    bool gshare_taken = gshare_predict(pc);
-    bool bimodal_taken = bimodal_predict(pc);
+    bool gshare_taken = gshare_predict(pc, tid);
+    bool bimodal_taken = bimodal_predict(pc, tid);
 
     // 简单策略: GShare 优先
     if (gshare_taken || bimodal_taken) {
@@ -142,17 +159,17 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     return T{0};
   }
 
-  // 单独预测是否跳转 (用于测试)
-  bool predict_taken(T pc) const {
-    return gshare_predict(pc) || bimodal_predict(pc);
+  // 单独预测是否跳转 (用于测试, 默认 tid=0)
+  bool predict_taken(T pc, std::uint8_t tid = 0) const {
+    return gshare_predict(pc, tid) || bimodal_predict(pc, tid);
   }
 
   // ------------------------------------------------------------------------
   // 更新 API
   // ------------------------------------------------------------------------
 
-  // 更新预测器 (execute 阶段调用)
-  void update(T pc, bool taken, T target) {
+  // 更新预测器 (execute 阶段调用, 默认 tid=0)
+  void update(T pc, bool taken, T target, std::uint8_t tid = 0) {
     std::size_t idx = pc & (kBtbSize - 1);
 
     // 更新 BTB
@@ -161,10 +178,10 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     btb_[idx].valid = true;
 
     // 更新 Bimodal
-    bimodal_update(pc, taken);
+    bimodal_update(pc, taken, tid);
 
-    // 更新 GShare
-    gshare_update(pc, taken);
+    // 更新 GShare (内部更新 global_history_[tid])
+    gshare_update(pc, taken, tid);
   }
 
   // ------------------------------------------------------------------------
@@ -186,15 +203,17 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     return gshare_[idx % kGshareSize];
   }
 
-  // 当前全局历史
-  std::uint8_t global_history() const { return global_history_; }
+  // 当前全局历史 (默认 tid=0, 行为不变)
+  std::uint8_t global_history(std::uint8_t tid = 0) const {
+    return tid < N_THREADS ? global_history_[tid] : 0;
+  }
 
-  // 重置所有状态
+  // 重置所有状态 (清空所有线程)
   void reset() {
     for (auto& e : btb_) { e = BtbEntry{T{0}, T{0}, false}; }
     bimodal_.fill(Counter::WEAK_NOT_TAKEN);
     gshare_.fill(Counter::WEAK_NOT_TAKEN);
-    global_history_ = 0;
+    global_history_.fill(0);
   }
 
   // 预测准确率统计 (M4 后完善)
@@ -211,22 +230,25 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   // GShare 计数器
   std::array<Counter, kGshareSize> gshare_{};
 
-  // 全局历史寄存器 (8-bit)
-  std::uint8_t global_history_ = 0;
+  // 全局历史寄存器: per-thread (M4G D.4)
+  std::array<std::uint8_t, N_THREADS> global_history_{};
 
   // 统计
   std::size_t total_branches_ = 0;
   std::size_t correct_predictions_ = 0;
 
-  // Bimodal 预测
-  bool bimodal_predict(T pc) const {
+  // Bimodal 预测 (per-tid, tid 验证范围内)
+  bool bimodal_predict(T pc, std::uint8_t tid) const {
+    if (tid >= N_THREADS) return false;
     std::size_t idx = pc & (kBimodalSize - 1);
     auto c = bimodal_[idx];
     return c == Counter::WEAK_TAKEN || c == Counter::STRONG_TAKEN;
   }
 
-  // Bimodal 更新
-  void bimodal_update(T pc, bool taken) {
+  // Bimodal 更新 (per-tid, BTB/Bimodal 共享)
+  void bimodal_update(T pc, bool taken, std::uint8_t tid) {
+    if (tid >= N_THREADS) return;
+    (void)tid;  // Bimodal 表本身是共享的
     std::size_t idx = pc & (kBimodalSize - 1);
     auto& c = bimodal_[idx];
     auto val = static_cast<std::uint8_t>(c);
@@ -238,16 +260,18 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     c = static_cast<Counter>(val);
   }
 
-  // GShare 预测
-  bool gshare_predict(T pc) const {
-    std::size_t idx = (pc ^ global_history_) & (kGshareSize - 1);
+  // GShare 预测 (per-tid: 使用 global_history_[tid])
+  bool gshare_predict(T pc, std::uint8_t tid) const {
+    if (tid >= N_THREADS) return false;
+    std::size_t idx = (pc ^ global_history_[tid]) & (kGshareSize - 1);
     auto c = gshare_[idx];
     return c == Counter::WEAK_TAKEN || c == Counter::STRONG_TAKEN;
   }
 
-  // GShare 更新
-  void gshare_update(T pc, bool taken) {
-    std::size_t idx = (pc ^ global_history_) & (kGshareSize - 1);
+  // GShare 更新 (per-tid: 更新 global_history_[tid])
+  void gshare_update(T pc, bool taken, std::uint8_t tid) {
+    if (tid >= N_THREADS) return;
+    std::size_t idx = (pc ^ global_history_[tid]) & (kGshareSize - 1);
     auto& c = gshare_[idx];
     auto val = static_cast<std::uint8_t>(c);
     if (taken) {
@@ -257,8 +281,9 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     }
     c = static_cast<Counter>(val);
 
-    // 更新全局历史 (左移, 最低位为 taken)
-    global_history_ = ((global_history_ << 1) | (taken ? 1 : 0)) & ((1 << kHistoryBits) - 1);
+    // 更新 per-thread 全局历史 (左移, 最低位为 taken)
+    global_history_[tid] = ((global_history_[tid] << 1) | (taken ? 1 : 0))
+                           & ((1 << kHistoryBits) - 1);
   }
 };
 
