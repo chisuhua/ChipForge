@@ -21,7 +21,7 @@
 | [implementation-plan/M2-core-plugins.md](implementation-plan/M2-core-plugins.md) | M2 详细任务清单 (9 个子任务) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M3-riscv-plugins.md](implementation-plan/M3-riscv-plugins.md) | M3 详细任务清单 (12 个子任务) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M4-integration.md](implementation-plan/M4-integration.md) | M4 详细任务清单 (**19 个子任务**, 含 M4.12-M4.19 DSE 接线) | 实施者 | 任务粒度变化时 |
-| [implementation-plan/M4G-forward-compat-locks.md](implementation-plan/M4G-forward-compat-locks.md) | **M4G 详细任务清单 (8 个子任务, 2026-06-17 新增)** — Phase 1 Forward-Compatibility Locks (D.1-D.4, Oracle 评审通过) | 实施者 | 任务粒度变化时 |
+| [implementation-plan/M4G-forward-compat-locks.md](implementation-plan/M4G-forward-compat-locks.md) | **M4G 详细任务清单 (8 个子任务, 2026-06-17 新增, 2026-06-19 🟢 实施完成)** — Phase 1 Forward-Compatibility Locks (D.1-D.4, Oracle 评审通过, 43/43 ctest PASS) | 实施者 | 任务粒度变化时 |
 | [implementation-plan/M5-verification.md](implementation-plan/M5-verification.md) | M5 详细任务清单 (**19 个子任务**, 含 M5.10-M5.19 DSE 验证) | 实施者 | 任务粒度变化时 |
 
 > **拆分说明**: 原 `cpu_implementation_guide_v2.0.md` 1220 行混杂 4 类内容, 已拆分为 4 类文档。 详细迁移表见 v2.0 §3。

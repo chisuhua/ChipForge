@@ -137,29 +137,43 @@
 
 > **本节为 [dse_architecture_v2_locks.md](dse_architecture_v2_locks.md) 的任务拆分 (Oracle 评审通过, 2026-06-17)**。
 > **详细设计**: 见 [dse_architecture_v2_locks.md](dse_architecture_v2_locks.md) 和 [implementation-plan/M4G-forward-compat-locks.md](implementation-plan/M4G-forward-compat-locks.md)
-> **状态**: 🔵 **Ready to Start** (依赖 M4 完成 ✅)
-> **必须先于 M4-DSE 实施**: M4G 完成后, M4-DSE 的 `build_cpu` 实现才能安全触及 3 个模板化插件
+> **状态**: 🟢 **完成** (依赖 M4 完成 ✅, M4G 8/8 PASS, ctest 43/43 全绿)
+> **前置**: M4-DSE 启动需 M4G 完成 ✅
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| G.1 | D.1: 添加 `UID` / `THREAD_ID` / `IID_PC` Payloads | 🔵 Ready | 0% | 编译通过 + 18/18 ctest 不退化 | 3 行 header |
-| G.2 | D.2: 模板化 `RegFilePlugin<T, N_REGS, N_THREADS>` | 🔵 Ready | 0% | 默认参数兼容 + 新增多线程测试 | ~30 行 header |
-| G.3 | D.2: 模板化 `HazardPlugin<T, N_REGS, N_THREADS>` | 🔵 Ready | 0% | 默认参数兼容 + per-thread scoreboard 隔离 | ~30 行 header |
-| G.4 | D.2 + D.4: 模板化 `BranchPredictorPlugin<T, ..., N_THREADS>` + `predict`/`update` 接受 `tid` | 🔵 Ready | 0% | 默认参数兼容 + per-thread GHR 隔离 | ~40 行 header |
-| G.5 | D.3: `HazardPlugin::has_hazard` 返回 `HazardKind` enum | 🔵 Ready | 0% | 0 个外部调用者 break + 4 个 enum 值正确 | ~5 行 |
-| G.6 | D.4: `BranchPredictorPlugin::predict`/`update` 接受 `tid` | 🔵 Ready | 0% | (G.4 已覆盖) | 0h (G.4 合并) |
-| G.7 | 单元测试: D.1-D.4 所有锁的验证 (`test_forward_compat.cpp` 新建) | 🔵 Ready | 0% | 8+ 个 ctest PASS | ~150 行测试 |
-| G.8 | 文档同步: `blueprint.md` / `README.md` | 🔵 Ready | 0% | 文档完整且一致 | ~1h |
-| **M4G 累计** | | 🔵 Ready | **0/8** | — | Oracle 评审: D.1-D.4 是 sound, 总成本 ~108 行 header churn, 防止 ~2000 行 Phase 5+ 重构 |
+| G.1 | D.1: 添加 `UID` / `THREAD_ID` / `IID_PC` Payloads (#12/#13/#14) | 🟢 PASS | 100% | 编译通过 + 35/35 ctest 不退化 + 3 个新 static_assert | 3 行 header, commit bb6e0e5 |
+| G.2 | D.2: 模板化 `RegFilePlugin<T, N_REGS=32, N_THREADS=1>` + CpuFactory smoke test | 🟢 PASS | 100% | 默认参数兼容 + per-thread 隔离 + 7/7 test_reg_file + CpuFactory 编译 | ~30 行 header + smoke test, commit 01a810a |
+| G.3 | D.2: 模板化 `HazardPlugin<T, N_REGS=32, N_THREADS=1>` | 🟢 PASS | 100% | 默认参数兼容 + per-thread scoreboard 隔离 + 7/7 test_hazard | ~30 行 header, commit 6b4b208 |
+| G.4 | D.2 + D.4: 模板化 `BranchPredictorPlugin<T, BTB_SIZE, BIMODAL_SZ, GSHARE_SZ, GHR_BITS, N_THREADS>` + `predict`/`update` 接受 `tid` | 🟢 PASS | 100% | 默认参数兼容 + per-thread GHR 隔离 + 8/8 test_branch_predictor | ~40 行 header, commit 91007b6 |
+| G.5 | D.3: `HazardPlugin::has_hazard` 返回 `HazardKind` enum (NONE/RAW_RS1/RAW_RS2/WAW) | 🟢 PASS | 100% | 1 in-tree 业务 + 4 测试断言更新 + 4 enum 值正确 + 7/7 test_hazard | ~10 行, commit bd69755 |
+| G.6 | D.4: `BranchPredictorPlugin::predict`/`update` 接受 `tid` | 🟢 PASS | 100% | (G.4 已覆盖) | 0h (G.4 合并) |
+| G.7 | 单元测试: D.1-D.4 所有锁的验证 (`test_forward_compat.cpp` 新建) | 🟢 PASS | 100% | 10/10 test_forward_compat ctest PASS | 215 行测试, commit 4bc742d |
+| G.8 | 文档同步: `blueprint.md` / `status.md` / `README.md` | 🟢 PASS | 100% | 文档完整且一致 | 本 commit |
+| **M4G 累计** | | 🟢 完成 | **8/8** | **43/43 ctest PASS** | Oracle 评审: D.1-D.4 是 sound, 总成本 ~108 行 header churn, 防止 ~2000 行 Phase 5+ 重构 |
 
-**M4G 关键约束**:
-- ✅ 默认参数保持向后兼容 (N_REGS=32, N_THREADS=1, BTB_SIZE=16 等)
-- ✅ 零行为改变 (单线程 in-order 行为不变)
-- ✅ Header-only 实施 (无 .cpp 修改, 除 BranchPredictor 的 10 个显式实例化外)
-- ✅ 编译时间增加 ~10% (acceptable)
-- ❌ 不引入 `BranchPredictorFactory` (Oracle: 破坏插件模型一致性)
-- ❌ 不引入 `ThreadContext` / `Cpu<T, MAX_THREADS>` (Oracle: 投机性死代码)
-- ❌ 不修改 `D.5` stage-name 成员 (Oracle: 错误抽象)
+**M4G 实际代码变更 (vs 估时 2 天 ~108 行)**:
+- `ip/cpu/core/payload_common.h`: +12 行 (3 个新 Payload + 注释)
+- `ip/cpu/plugins/reg_file.h`: +30 行 (N_REGS/N_THREADS 模板参数 + static_assert + per-thread storage)
+- `ip/cpu/plugins/hazard.h`: +50 行 (模板参数 + HazardKind enum + has_hazard 重构)
+- `ip/cpu/plugins/branch_predictor.h`: +70 行 (5 个模板参数 + 5 static_assert + per-thread GHR)
+- `ip/cpu/cpu_factory.h`: +5 行 (G.2.10 smoke test)
+- `tests/cpu/test_reg_file.cpp`: +20 行 (2 个新用例)
+- `tests/cpu/test_hazard.cpp`: +30 行 (2 个新用例 + 4 处 HazardKind 断言)
+- `tests/cpu/test_branch_predictor.cpp`: +30 行 (2 个新用例)
+- `tests/cpu/test_forward_compat.cpp`: 新建 215 行 (10 个用例)
+- **总计**: ~462 行 (含文档), 核心 header churn ~250 行
+
+**M4G 关键约束验证**:
+- ✅ 默认参数保持向后兼容 (N_REGS=32, N_THREADS=1, BTB_SIZE=16 等) — 现有 35/35 ctest 全绿
+- ✅ 零行为改变 (单线程 in-order 行为不变) — phase 1 路径不变
+- ✅ Header-only 实施 (无 .cpp 修改) — 实际 3 个 .cpp 保持原状
+- ✅ 编译时间增加 ~10% (acceptable) — 实测符合预期
+- ✅ reg_file.cpp 死代码未触碰 (M2 stub 残留, 未来启用时遵循 design.md Decision 1 策略)
+- ❌ 未引入 `BranchPredictorFactory` (Oracle: 破坏插件模型一致性)
+- ❌ 未引入 `ThreadContext` / `Cpu<T, MAX_THREADS>` (Oracle: 投机性死代码)
+- ❌ 未修改 `D.5` stage-name 成员 (Oracle: 错误抽象)
+- ❌ 未修改 `cf::plugin::*` 框架脊柱 (PipeBuilder/PluginBase/PipeNode/Payload/PayloadStore/CtrlLink/PipeArbitration)
 
 ---
 
