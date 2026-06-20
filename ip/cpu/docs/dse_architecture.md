@@ -822,6 +822,8 @@ def compute_pareto(results, maximize, minimize):
 
 ### Phase A — 骨架 (M4-DSE, 1 周)
 
+> ⚠️ **Oracle 评审裁剪提示 (2026-06-17)**: 本表 6 任务（A.1-A.6）须经 [`dse_architecture_v2_locks.md §7`](dse_architecture_v2_locks.md#7-9-任务与-oracle-评审对齐表) 裁剪后再实施。按 v1.0 §9 直接开工会违反 Oracle 评审（A.1 被 D.7 推迟否决；A.2 需重设计）。裁剪结果：✅ 4 允许 / ❌ 1 删除 / 🟡 1 需重设计。
+
 | # | 任务 | 文件 | 验收 |
 |---|------|------|------|
 | A.1 | `PluginBase::setup_with_config(pb, const void*)` 加 3 行 | `include/cf/plugin/plugin_base.h` | 编译通过 |
@@ -832,6 +834,8 @@ def compute_pareto(results, maximize, minimize):
 | A.6 | test_cpu_factory 升级 (断言 plugin_count / stage_names / 拓扑) | `tests/cpu/test_cpu_factory.cpp` | 8 个用例 PASS |
 
 ### Phase B — 配置真正生效 (M4-DSE, 1 周)
+
+> ⚠️ **Oracle 评审裁剪提示 (2026-06-17)**: 本表 5 任务（B.1-B.5）须经 [`dse_architecture_v2_locks.md §7`](dse_architecture_v2_locks.md#7-9-任务与-oracle-评审对齐表) 裁剪后再实施。按 v1.0 §9 直接开工会违反 Oracle 评审（B.2 = BranchPredictorFactory 显式删除；B.3 = D.7 推迟）。裁剪结果：✅ 1 允许 / 🟡 2 需重设计 / ❌ 2 删除。
 
 | # | 任务 | 文件 | 验收 |
 |---|------|------|------|

@@ -296,6 +296,54 @@ Payload 系统**保持不变**。这是使当前架构 OoO-friendly 的设计点
 
 ---
 
+## 7. §9 任务与 Oracle 评审对齐表
+
+> **本表是 [`dse_architecture.md` v1.0 §9](dse_architecture.md) Phase A + Phase B 共 11 任务的裁剪源。**
+> **任何 v1.0 §9 任务在实施前必须先对照本表，按 ✅/🟡/❌ 状态决定下一步。**
+> **v1.0 §9 段头已加 ⚠️ 提示指向本表 (见 `dse_architecture.md` §9)。**
+
+**统计**: 11 任务 → ✅ 5 允许 / 🟡 3 需重设计 / ❌ 3 删除
+
+| v1.0 任务 | 内容摘要 | v2.0-locks §6.3 引用 | 状态 | 备注 |
+|-----------|---------|----------------------|------|------|
+| **A.1** | `PluginBase::setup_with_config(pb, const void*)` 加 3 行 | §6.3 "D.7 = 推迟 Phase 5" | ❌ 删除 | D.7 明确推迟，`setup_with_config` 钩子不在 Phase 1 范围 |
+| **A.2** | `PipeBuilder::merge_stage(name, parent)` 新增方法 | 超出 D.1-D.4 范围，§3/§5/§6/§7/§8 全部推迟 | 🟡 需重设计 | 3 级 vs 5 级拓扑合并是 M5-DSE 范围，需先做 ADR |
+| **A.3** | `CpuFactory::build_cpu` 替换 stub,真实 register 11 个 plugin | E.6 "M4-DSE 将填充它" | ✅ 允许 | E.6 显式说"按 v1.0 §7 实施"，是本表唯一可立即执行的工厂真实化 |
+| **A.4** | 修复 `reg_file.cpp:40` 双重定义 bug | §1.2 隐含未禁止（Bug 修复） | ✅ 允许 | v2.0-locks §1.2 提到 `reg_file.h:158-161` 是模板化点；.cpp 双重定义是 M2 遗留 Bug |
+| **A.5** | `parse_config(json_text)` + `validate_config(cfg)` | D.1-D.4 不涉及（纯工厂配置解析） | ✅ 允许 | 不动框架脊柱，仅 CPUFactory::build_cpu 接 JSON 输入 |
+| **A.6** | test_cpu_factory 升级（断言 plugin_count / stage_names / 拓扑） | 文档未禁止 | ✅ 允许 | 测试驱动 A.3 实施；与 M4G 测试升级模式一致 |
+| **B.1** | `BranchPredictorPlugin` 模板参数化 + 10 个显式实例化 | D.2 已完成默认参数化；§6.3 拆分：默认参数化 ✅，10 显式实例化属 sweep 范围 | 🟡 需重设计 | M4G commit `91007b6` 已完成 `<T, BTB_SIZE, BIMODAL_SZ, GSHARE_SZ, GHR_BITS, N_THREADS>` 默认参数化；10 显式实例化是 M5-DSE sweep_driver.py 范围，不是 Phase 1 |
+| **B.2** | `BranchPredictorPlugin::create(cfg)` 工厂方法 | §6.3 显式删除 BranchPredictorFactory | ❌ 删除 | §6.3 "BranchPredictorFactory 应删除 — 破坏插件模型一致性"；用 D.2 模板化替代 |
+| **B.3** | `HazardPlugin` `setup_with_config` 接受 `use_strict_scoreboard` | §6.3 "D.7 = 推迟 Phase 5" | ❌ 删除 | `setup_with_config` 钩子被 D.7 推迟；`use_strict_scoreboard` 字段推迟到 Phase 5+ |
+| **B.4** | `IBusPlugin` / `DBusPlugin` 接受 `icache/dcache_latency` | §1.3 #6 未列入 Phase 1；§6.3 IBus/DBus 推迟 | 🟡 需重设计 | IBus/DBus 当前是 stub（`dse_architecture.md` §1.2）；latency 字段可保留 cfg 接口，但行为推迟到 M5 |
+| **B.5** | 测试: `btb_entries = 16/64/256` 跑出不同 BTB 命中分布 | 文档未禁止（测试驱动开发） | ✅ 允许 | 与 A.6 同类：测试可先行；依赖 B.1 的 10 显式实例化作为输入 |
+
+### 7.1 状态判定规则
+
+- **✅ 允许**: v2.0-locks §6.3 或 §1-§5 显式允许 / 未禁止；可作为 M4-DSE 子任务直接开工
+- **🟡 需重设计**: v1.0 §9 任务意图有价值，但 v2.0-locks §6.3 要求重新设计（推迟到 Phase 5+ / 拆分 / 简化）；实施前需开 ADR
+- **❌ 删除**: v2.0-locks §6.3 显式否决；v1.0 §9 中该任务**不再实施**，保留为 v1.0 历史记录
+
+### 7.2 权威性声明
+
+本表是 v1.0 §9 任务的**裁剪源**。任何实施 v1.0 §9 任务的 change 必须：
+
+1. 在 `openspec/changes/<name>/proposal.md` 引用本表，对每个相关任务标注 ✅/🟡/❌ 状态
+2. 仅在 ✅ 状态任务上开工；🟡 状态任务须先开 ADR；❌ 状态任务**不实施**
+3. 在 commit message 引用本表（`dse_architecture_v2_locks.md §7`）作为前置
+
+`status.md` §4.1 的 M4.12-M4.19 任务编号保留作为 M4-DSE 实施计划占位；具体任务内容须在实施 change 中按本表 ✅ 状态重新映射。
+
+### 7.3 演化规则
+
+本表与 v2.0-locks §6.3 同步演化：
+
+- 若 §6.3 新增/删除/修改条目，须同步更新本表对应行
+- 若 v1.0 §9 表格新增任务，须在本表新增对应行
+- 历史归档：已归档到 `openspec/changes/archive/` 的 change 不受本表演化影响
+
+---
+
 *文档结束。如需修改，走 v2.0 拆分维护约定 (见 [cpu_implementation_guide_v2.0.md §3.5](cpu_implementation_guide_v2.0.md#35-后续维护约定))。*
 
 *Oracle 评审记录: 2026-06-17，bg_df09c224，ses_12b79fdb9ffe8ZzxHifTroJecD*

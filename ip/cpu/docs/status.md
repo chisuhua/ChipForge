@@ -118,6 +118,7 @@
 
 ### 4.1 M4-DSE 子阶段 — CpuFactory stub 真实化 + DSE 旋钮接入
 
+> **前置**: v1.0 §9 任务（A.1-A.6 + B.1-B.5）须先经 [`dse_architecture_v2_locks.md` §7](../../dse_architecture_v2_locks.md#7-9-任务与-oracle-评审对齐表) 裁剪后再实施（Oracle 2026-06-17 评审）。本表 M4.12-M4.19 编号保留作为 M4-DSE 实施计划占位；具体任务内容须在实施 change 中按 §7 裁剪表的 ✅/🟡/❌ 状态重新映射。
 > **本节为 dse_architecture.md Phase A + B 的任务拆分**。详细设计见 [dse_architecture.md §9](dse_architecture.md)。
 > **状态**: 🔵 待启动 (M5 收官后或并行启动)
 
