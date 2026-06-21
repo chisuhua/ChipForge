@@ -107,15 +107,14 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
     using DecodePayload = cf::cpu::core::payload::DecodePayload;
-    const std::uint8_t tid = 0;  // Phase 1: 单线程硬编码
+    // M4G-extend: tid 从 this->tid_ 读取, factory 端 dispatch 注入
 
     // fetch 阶段: 预测分支 (基于当前 PC)
-    pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb, tid]() {
+    pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
       if (n) {
         T pc = n->operator()(KeyType::PC);
-
-        T predicted = this->predict(pc, tid);
+        T predicted = this->predict(pc, this->tid_);
         if (predicted != 0) {
           // 预测跳转: 设置 next_pc 为预测目标
           // M2 阶段: 仅存储预测结果, M4 集成后通过 CtrlLink 修改 PC
@@ -124,13 +123,14 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     });
 
     // execute 阶段: 验证预测并更新
-    pb.at_stage("execute", cf::plugin::Phase::LATE, [this, &pb, tid]() {
+    pb.at_stage("execute", cf::plugin::Phase::LATE, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("execute").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
         if (dec.op_class == DecodePayload::OpClass::BRANCH) {
           T pc = n->operator()(KeyType::PC);
-          this->update(pc, dec.branch_taken, static_cast<T>(dec.branch_target), tid);
+          this->update(pc, dec.branch_taken, static_cast<T>(dec.branch_target),
+                       this->tid_);
         }
       }
     });
@@ -216,6 +216,12 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     global_history_.fill(0);
   }
 
+  // set_tid —— per-thread dispatch (M4G-extend G.X)
+  void set_tid(std::uint8_t tid) override { tid_ = tid; }
+
+  // current_tid —— 测试/调试访问器
+  std::uint8_t current_tid() const { return tid_; }
+
   // 预测准确率统计 (M4 后完善)
   std::size_t total_branches() const { return total_branches_; }
   std::size_t correct_predictions() const { return correct_predictions_; }
@@ -236,6 +242,7 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   // 统计
   std::size_t total_branches_ = 0;
   std::size_t correct_predictions_ = 0;
+  std::uint8_t tid_ = 0;
 
   // Bimodal 预测 (per-tid, tid 验证范围内)
   bool bimodal_predict(T pc, std::uint8_t tid) const {

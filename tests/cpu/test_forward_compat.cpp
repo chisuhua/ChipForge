@@ -194,11 +194,131 @@ static void test_existing_reg_file_default() {
 }
 
 // =====================================================================
+// M4G-extend (G.X): tid plumbing via set_tid virtual method
+// =====================================================================
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "cf/plugin/pipe_builder.h"
+
+// Stub plugin: records set_tid() calls so we can verify PipeBuilder dispatches
+// the per-thread loop correctly. No stages are registered; this only validates
+// set_tid dispatch.
+struct TidRecorderPlugin : public cf::plugin::PluginBase {
+  std::vector<std::uint8_t> tid_log;
+
+  void build(cf::plugin::PipeBuilder& /*pb*/) override {}
+  void set_tid(std::uint8_t tid) override { tid_log.push_back(tid); }
+};
+
+// Minimal plugin: does NOT override set_tid. Used to verify PluginBase default
+// is a no-op (no crash, no required derived override).
+struct MinimalPlugin : cf::plugin::PluginBase {
+  void build(cf::plugin::PipeBuilder& /*pb*/) override {}
+  // No set_tid override → inherits base default no-op
+};
+
+// Stage-counting plugin: registers one stage that increments a counter on run.
+struct StageCounterPlugin : public cf::plugin::PluginBase {
+  int stage_run_count = 0;
+  void build(cf::plugin::PipeBuilder& pb) override {
+    pb.at_stage("test_stage", cf::plugin::Phase::NORMAL,
+                [this]() { ++stage_run_count; });
+  }
+};
+
+static void test_plugin_base_set_tid_default_noop() {
+  MinimalPlugin p;
+  p.set_tid(7);  // Should compile (PluginBase has virtual) and not crash
+  printf("  [PASS] PluginBaseSetTidDefaultNoop\n");
+}
+
+static void test_plugin_base_set_tid_overridable() {
+  TidRecorderPlugin r;
+  r.set_tid(3);
+  assert(r.tid_log.size() == 1);
+  assert(r.tid_log[0] == 3);
+  printf("  [PASS] PluginBaseSetTidOverridable\n");
+}
+
+static void test_reg_file_set_tid_stores_tid() {
+  RegFilePlugin<T> rf;
+  assert(rf.current_tid() == 0);
+  rf.set_tid(2);
+  assert(rf.current_tid() == 2);
+  rf.set_tid(0);
+  assert(rf.current_tid() == 0);
+  printf("  [PASS] RegFileSetTidStoresTid\n");
+}
+
+static void test_hazard_set_tid_stores_tid() {
+  HazardPlugin<T> h;
+  assert(h.current_tid() == 0);
+  h.set_tid(3);
+  assert(h.current_tid() == 3);
+  printf("  [PASS] HazardSetTidStoresTid\n");
+}
+
+static void test_branch_predictor_set_tid_stores_tid() {
+  BranchPredictorPlugin<T> bp;
+  assert(bp.current_tid() == 0);
+  bp.set_tid(2);
+  assert(bp.current_tid() == 2);
+  printf("  [PASS] BranchPredictorSetTidStoresTid\n");
+}
+
+static void test_pipe_builder_run_calls_set_tid_default() {
+  // n_threads=1 (default): pb.run() calls set_tid(0) on each plugin before
+  // dispatching stages, byte-identical to M4G baseline.
+  cf::plugin::PipeBuilder pb;
+  auto recorder = std::make_unique<TidRecorderPlugin>();
+  TidRecorderPlugin* recorder_ptr = recorder.get();
+  pb.register_plugin(std::move(recorder));
+  pb.build();
+  pb.run();
+  assert(recorder_ptr->tid_log.size() == 1);
+  assert(recorder_ptr->tid_log[0] == 0);
+  printf("  [PASS] PipeBuilderRunCallsSetTidDefaultOnce\n");
+}
+
+static void test_pipe_builder_run_calls_set_tid_per_thread() {
+  // n_threads=4: pb.run() iterates set_tid(0..3) on each plugin.
+  cf::plugin::PipeBuilder pb;
+  auto recorder = std::make_unique<TidRecorderPlugin>();
+  TidRecorderPlugin* recorder_ptr = recorder.get();
+  pb.register_plugin(std::move(recorder));
+  pb.build();
+  pb.set_n_threads(4);
+  pb.run();
+  assert(recorder_ptr->tid_log.size() == 4);
+  assert(recorder_ptr->tid_log[0] == 0);
+  assert(recorder_ptr->tid_log[1] == 1);
+  assert(recorder_ptr->tid_log[2] == 2);
+  assert(recorder_ptr->tid_log[3] == 3);
+  printf("  [PASS] PipeBuilderRunCallsSetTidPerThread\n");
+}
+
+static void test_pipe_builder_run_dispatches_stages_per_tid() {
+  // Stages fire on every per-tid sub-cycle: n_threads=3 → 3 stage invocations.
+  cf::plugin::PipeBuilder pb;
+  auto counter = std::make_unique<StageCounterPlugin>();
+  StageCounterPlugin* counter_ptr = counter.get();
+  pb.register_plugin(std::move(counter));
+  pb.build();
+  pb.set_n_threads(3);
+  pb.run();
+  assert(counter_ptr->stage_run_count == 3);
+  printf("  [PASS] PipeBuilderRunDispatchesStagesPerTid\n");
+}
+
+// =====================================================================
 // 主入口
 // =====================================================================
 
 int main() {
-  printf("=== test_forward_compat (M4G G.7) ===\n");
+  printf("=== test_forward_compat (M4G G.7 + M4G-extend G.X) ===\n");
   test_d1_uid_payload_exists();
   test_d1_thread_id_payload_exists();
   test_d1_iid_pc_payload_exists();
@@ -209,6 +329,15 @@ int main() {
   test_d3_hazard_kind_enum();
   test_d4_branch_predictor_tid_param();
   test_existing_reg_file_default();
-  printf("=== ALL 10 FORWARD-COMPAT TESTS PASSED ===\n");
+  // M4G-extend (G.X) — set_tid plumbing
+  test_plugin_base_set_tid_default_noop();
+  test_plugin_base_set_tid_overridable();
+  test_reg_file_set_tid_stores_tid();
+  test_hazard_set_tid_stores_tid();
+  test_branch_predictor_set_tid_stores_tid();
+  test_pipe_builder_run_calls_set_tid_default();
+  test_pipe_builder_run_calls_set_tid_per_thread();
+  test_pipe_builder_run_dispatches_stages_per_tid();
+  printf("=== ALL 18 FORWARD-COMPAT TESTS PASSED ===\n");
   return 0;
 }

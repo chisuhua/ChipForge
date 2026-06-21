@@ -292,13 +292,16 @@ private:
 
 **逻辑阶段名 → 物理 PipeNode 映射**：
 
-| 逻辑阶段名 | 物理 Node（5 级） | 物理 Node（3 级） | 物理 Node（7 级超标量） |
-|------------|-------------------|-------------------|--------------------------|
-| `fetch`    | `IF`              | `IF`              | `IF1` → `IF2`            |
-| `decode`   | `ID`              | `IF`              | `ID` → `RENAME`          |
-| `execute`  | `EX`              | `EXMEM`           | `ISSUE` → `EX1` → `EX2`  |
-| `memory`   | `MEM`             | `EXMEM`           | `MEM`                    |
-| `writeback`| `WB`              | `WB`              | `RETIRE`                 |
+| 逻辑阶段名 | 物理 Node（5 级） | 物理 Node（3 级） | 物理 Node（7 级超标量） | 说明 |
+|------------|-------------------|-------------------|--------------------------|------|
+| `fetch`    | `IF`              | `IF`              | `IF1` → `IF2`            | 取指 |
+| `decode`   | `ID`              | `IF`              | `ID` → `RENAME`          | 译码 |
+| `execute`  | `EX`              | `EXMEM`           | `ISSUE` → `EX1` → `EX2`  | 执行 |
+| `memory`   | `MEM`             | `EXMEM`           | `MEM`                    | 访存 |
+| `writeback`| `WB`              | `WB`              | `RETIRE`                 | 写回 |
+| `commit`   | `WB`（隐含）       | `WB`（隐含）       | `RETIRE`                | (无) — M4G-extend 命名约定: in-order 隐含; OoO 显式阶段, 用 `commit_hook` 原语 (见 `include/cf/plugin/pipe_builder.h:138-143`) |
+
+> **M4G-extend G.X Gap C (M4G-extend-tid-and-hooks, 2026-06-21)**: 新增第 6 行 `commit` 阶段, 命名锁定以避免 Phase 5+ 在 `at_stage("retire")` vs `at_stage("commit")` 之间碎片化. 当前 in-order 代码不应注册 `at_stage("commit", ...)` 回调 — 仅 OoO (Phase 5+) 显式使用. 推迟的 7 个 OoO 缺口 (ROB / IQ / PRF / LSQ / Rename / MUL-latency / Cache-latency) 留给 Phase 5+.
 
 映射由 JSON 配置 `pipeline_stages` 字段决定（见 §6）。
 

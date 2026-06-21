@@ -129,6 +129,14 @@ class RegFilePlugin : public cf::plugin::PluginBase {
     return tid < N_THREADS && regs_[tid][0] == T{0};
   }
 
+  // set_tid —— per-thread dispatch (M4G-extend G.X)
+  // PluginBase 默认 no-op, 此处 override 存储 tid_ 供 build() 闭包读取.
+  // 调用时机: PipeBuilder::run() 每个 per-tid sub-cycle 在 stages_ 之前.
+  void set_tid(std::uint8_t tid) override { tid_ = tid; }
+
+  // current_tid —— 测试/调试访问器, 读取当前 tid_
+  std::uint8_t current_tid() const { return tid_; }
+
   // ------------------------------------------------------------------------
   // build() — 注册 decode (读) 和 writeback (写) 阶段
   //   模板方法在头文件中实现, 编译单元内隐式实例化
@@ -138,12 +146,12 @@ class RegFilePlugin : public cf::plugin::PluginBase {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
 
     // 读阶段: "decode" 阶段读取 RS1/RS2 数据
-    // M4G D.2: Phase 1 硬编码 tid=0 (THREAD_ID Payload 默认为 0)
+    // M4G-extend: tid 来源从局部常量改为 this->tid_ (factory 端 dispatch)
     pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("decode").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
-        const std::uint8_t tid = 0;  // Phase 1: 单线程
+        const std::uint8_t tid = this->tid_;
 
         if (dec.reads_rs1) {
           auto rs1_data = this->read_reg(dec.rs1_idx, tid);
@@ -162,7 +170,7 @@ class RegFilePlugin : public cf::plugin::PluginBase {
       auto* n = pb.node_of_logic_stage("writeback").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
-        const std::uint8_t tid = 0;  // Phase 1: 单线程
+        const std::uint8_t tid = this->tid_;
 
         if (dec.writes_rd) {
           auto rd_data = n->operator()(KeyType::RD_DATA);
@@ -181,6 +189,7 @@ class RegFilePlugin : public cf::plugin::PluginBase {
  private:
   PerThreadStore regs_{};
   T default_value_;
+  std::uint8_t tid_ = 0;  // 当前 per-tid dispatch 目标, 默认 0 保持 ABI
 };
 
 }  // namespace plugins

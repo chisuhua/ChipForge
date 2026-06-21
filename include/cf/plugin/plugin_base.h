@@ -21,6 +21,8 @@
 #ifndef CF_PLUGIN_PLUGIN_BASE_H
 #define CF_PLUGIN_PLUGIN_BASE_H
 
+#include <cstdint>
+
 // 前向声明 PipeBuilder (避免循环包含)
 // PluginBase 引用 PipeBuilder& 类型, 但只作为虚函数参数;
 // PipeBuilder 完整定义在 pipe_builder.h 中.
@@ -63,6 +65,15 @@ class PluginBase {
   // 派生类必须实现
   // 调用时机: PipeBuilder::build() 期间, 在所有 Plugin 的 setup() 之后
   virtual void build(PipeBuilder& /*pb*/) = 0;
+
+  // set_tid —— per-thread tid 派发入口 (M4G-extend G.X)
+  // 默认空实现: 多数 Plugin (IBus/DBus/Decoder/RALU/...) 是 ISA-无关且无
+  // per-thread 状态, 无需 override. 仅 RegFile/Hazard/BranchPredictor 等
+  // 有 per-thread storage 的 Plugin 必须 override.
+  // 调用时机: PipeBuilder::run() 每个 per-tid sub-cycle, 在 stages_ 之前.
+  // 设计动机: Plugin 是静态单例, factory 端 dispatch 是最小爆炸半径变更
+  // (替代 per-call tid 参数方案, 后者会破坏 11 个 Plugin 的 build() 签名).
+  virtual void set_tid(std::uint8_t /*tid*/) {}
 
   // tick —— 显式禁用
   // D4 决策: Plugin-style 禁止业务 tick() 模式 (调度由框架决定)

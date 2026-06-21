@@ -20,6 +20,7 @@
 #define CF_PLUGIN_PIPE_BUILDER_H
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -97,9 +98,20 @@ class PipeBuilder {
   }
 
   void run() {
-    for (auto& s : stages_) s.callback();
+    // M4G-extend G.X: per-tid dispatch — for each tid in [0, n_threads),
+    // dispatch set_tid(tid) to every plugin then run stages.
+    // n_threads_ = 1 (default) preserves M4G baseline byte-identical behavior.
+    for (std::uint8_t tid = 0; tid < n_threads_; ++tid) {
+      for (auto& p : plugins_) p->set_tid(tid);
+      for (auto& s : stages_) s.callback();
+    }
     commit_storages();
   }
+
+  // set_n_threads —— 配置 per-cycle dispatch 的 tid 数量 (M4G-extend G.X)
+  // 默认 1: 单线程 byte-identical. SMT/超标的扩展通过 config.n_threads 注入.
+  void set_n_threads(std::uint8_t n) { n_threads_ = n; }
+  std::uint8_t n_threads() const noexcept { return n_threads_; }
 
   // ------------------------------------------------------------------------
   // 存储 commit 钩子注册 (Phase 1.3+)
@@ -122,6 +134,13 @@ class PipeBuilder {
   //   - 必须从 Plugin::build() 内调用 (不在 at_stage 回调内)
   //   - 钩子按注册顺序执行 (保证依赖顺序: tags_ 在 data_ 之前)
   //   - 多次注册同一 storage 会被多次 commit (幂等性由 storage 自己负责)
+  // ------------------------------------------------------------------------
+  // M4G-extend G.X Gap B (M4G-extend-tid-and-hooks):
+  //   - register_commit_hook() + commit_storages() = OoO 提交原语 (Phase 5+ ROB 设计)
+  //   - cf::plugin::CtrlLink::flush_when(cond) = mispredict-squash 原语 (分支恢复)
+  //   - 两者成对使用: commit_hook 在每拍提交指令, flush_when 在 mispredict 时清空
+  //   - 参考: ip/cpu/docs/dse_architecture_v2_design_research.md §3 E.1 (ROB 设计)
+  //   - 推迟到 Phase 5+ 的完整 OoO: ROB / IQ / PRF / LSQ / Rename / MUL-latency / Cache-latency
   // ------------------------------------------------------------------------
   using CommitHook = std::function<void()>;
 
@@ -169,6 +188,7 @@ class PipeBuilder {
   std::unordered_map<std::string, std::shared_ptr<PipeNode>> nodes_;
   std::map<std::string, std::string> substage_parent_;
   std::vector<CommitHook> commit_hooks_;
+  std::uint8_t n_threads_ = 1;  // M4G-extend: 默认 1, factory 端注入
 };
 
 }  // namespace plugin

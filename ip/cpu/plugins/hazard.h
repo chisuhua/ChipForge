@@ -142,27 +142,30 @@ class HazardPlugin : public cf::plugin::PluginBase {
     return count;
   }
 
+  // set_tid —— per-thread dispatch (M4G-extend G.X)
+  void set_tid(std::uint8_t tid) override { tid_ = tid; }
+
+  // current_tid —— 测试/调试访问器
+  std::uint8_t current_tid() const { return tid_; }
+
   // ------------------------------------------------------------------------
   // build() — 注册 decode (检测冒险) 和 writeback (清除飞行标记)
   // ------------------------------------------------------------------------
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
-    const std::uint8_t tid = 0;  // Phase 1: 单线程硬编码
+    // M4G-extend: tid 从 this->tid_ 读取, factory 端 dispatch 注入
 
     // decode 阶段: 检测冒险并标记新的飞行中寄存器
-    pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb, tid]() {
+    pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("decode").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
+        const std::uint8_t tid = this->tid_;
 
-        // 检测 RAW / WAW 冒险 (M4G D.3: has_hazard 返回 HazardKind)
         HazardKind hazard = this->has_hazard(dec, tid);
         if (hazard != HazardKind::NONE) {
           // M2 阶段: 仅记录冒险, 不实际阻塞 (M4 集成后通过 CtrlLink 阻塞)
-          // 当前仅设置 Payload 标志供测试验证
-          // 不 mark_in_flight (阻塞时该指令不进入执行)
         } else {
-          // 无冒险: 标记目标寄存器为飞行中
           if (dec.writes_rd) {
             this->mark_in_flight(dec.rd_idx, tid);
           }
@@ -171,12 +174,12 @@ class HazardPlugin : public cf::plugin::PluginBase {
     });
 
     // writeback 阶段: 清除飞行标记
-    pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb, tid]() {
+    pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("writeback").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
         if (dec.writes_rd) {
-          this->clear_in_flight(dec.rd_idx, tid);
+          this->clear_in_flight(dec.rd_idx, this->tid_);
         }
       }
     });
@@ -184,6 +187,7 @@ class HazardPlugin : public cf::plugin::PluginBase {
 
  private:
   std::array<std::array<bool, kNumRegs>, N_THREADS> scoreboard_{};
+  std::uint8_t tid_ = 0;
 };
 
 }  // namespace plugins

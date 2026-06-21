@@ -44,6 +44,9 @@ struct CPUConfig {
   std::uint8_t pipeline_stages = 5; // 1-12, 默认 5 级
   std::uint32_t clock_freq_mhz = 100;
 
+  // M4G-extend G.X: SMT 线程数 (1-4, 默认 1 = 单线程 byte-identical)
+  std::uint8_t n_threads = 1;
+
   // 功能开关
   bool enable_pmp = true;
   bool enable_mmu = true;
@@ -88,6 +91,10 @@ class CpuFactory {
 
     // 3. LATE 阶段: writeback
     register_late_plugins<T>(*pb, config);
+
+    // M4G-extend G.X: 注入 per-cycle dispatch 线程数
+    // n_threads=1 默认 byte-identical; >1 走 SMT/超标量路径
+    pb->set_n_threads(config.n_threads);
 
     return pb;
   }
