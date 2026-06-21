@@ -21,6 +21,7 @@ This directory contains research reports and surveys that inform the CPU Design 
 | [dse-open-source-riscv-survey.md](../../../docs/research/dse-open-source-riscv-survey.md) | Open-source RISC-V CPU DSE survey (BOOM, XiangShan, etc.) | 2026-06-17 | Background agent bg_2d204563 |
 | [smt-interface-design-survey.md](./smt-interface-design-survey.md) | SMT (Simultaneous Multithreading) interface design survey | 2026-06-17 | Background agent bg_41470f52 |
 | [dse-framework-survey.md](./dse-framework-survey.md) | CPU DSE frameworks and methodology survey | 2026-06-17 | Background agent bg_a592c1cb |
+| [post-m4g-strategic-decision-2026-06-20.md](./post-m4g-strategic-decision-2026-06-20.md) | Post-M4G strategic decision: should architecture lock more forward-compatibility hooks for OoO/Superscalar/SMT, or defer to Phase 5+? Synthesizes 4 background research agents (D.1-D.4 audit, gap audit, oracle cost analysis, open-source evidence) and recommends 3 zero-/low-cost locks. | 2026-06-20 | Background agent team (ses_11a632554 + ses_11a63b494 + ses_11a63770b + ses_11a62a155) |
 
 ## Research Coverage
 
@@ -31,6 +32,7 @@ These documents were produced by 5 parallel research agents investigating:
 3. **SMT Interface Design** — Intel HT, AMD Zen, IBM POWER, and SPARC T-series
 4. **OoO Forward Compatibility** — Gap analysis for current ChipForge architecture
 5. **DSE Frameworks** — Academic tools (Mishra/EXPRESSION, OpenDSE, ESESC, Sniper) and industrial tools (SiFive, Cadence Tensilica, Synopsys ARC)
+6. **2026-06-20**: M4G post-merge strategic decision (D.1-D.4 verification + 10-gap audit + cost analysis + open-source smoking guns) → 3 zero-/low-cost forward-compat locks recommended
 
 ## Key Insights
 
