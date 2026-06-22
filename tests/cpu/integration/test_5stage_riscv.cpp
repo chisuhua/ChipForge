@@ -1,11 +1,11 @@
 // tests/cpu/integration/test_5stage_riscv.cpp
 //
-// 功能描述: 5 级流水线 RV32I 集成测试 (M4.5)
+// 功能描述: 5 级流水线 RV32I 集成测试 (M4.5, M5-DSE M5.11)
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-16
+// 最后修改日期: 2026-06-22
 //
 // 测试覆盖 (5 用例):
-//   1. CpuFactory build_cpu() 5 级配置
+//   1. CpuFactory build_cpu() 5 级配置 + 拓扑断言 (M5.11, byte-identical baseline)
 //   2. PicolibcHostMemory 初始化
 //   3. 加载 add.elf 到内存
 //   4. tohost 机制 (写 1 → 检测到)
@@ -14,6 +14,7 @@
 // 约束:
 //   - 纯 main() + assert
 //   - M4 阶段: 端到端跑通框架, 详细指令执行验证推迟 M5
+//   - M5.11: TopologyBuilder<5> 必须 byte-identical (5 节点: fetch/decode/execute/memory/writeback)
 
 #include <cassert>
 #include <cstdint>
@@ -36,6 +37,21 @@ static void test_build_5stage() {
   cfg.branch_predictor = "static";
   auto pb = CpuFactory<T>::build_cpu(cfg);
   assert(pb != nullptr);
+  // M5.11 拓扑断言: TopologyBuilder<5> 必须 byte-identical (5 节点)
+  // 顺序: fetch → decode → execute → memory → writeback
+  assert(pb->node_count() == 5);
+  assert(pb->stage_count() == 5);
+  assert(pb->has_stage("fetch"));
+  assert(pb->has_stage("decode"));
+  assert(pb->has_stage("execute"));
+  assert(pb->has_stage("memory"));
+  assert(pb->has_stage("writeback"));
+  // node_of_logic_stage 必须为每阶段返回非空节点
+  assert(pb->node_of_logic_stage("fetch") != nullptr);
+  assert(pb->node_of_logic_stage("decode") != nullptr);
+  assert(pb->node_of_logic_stage("execute") != nullptr);
+  assert(pb->node_of_logic_stage("memory") != nullptr);
+  assert(pb->node_of_logic_stage("writeback") != nullptr);
   printf("  [PASS] test_build_5stage\n");
 }
 

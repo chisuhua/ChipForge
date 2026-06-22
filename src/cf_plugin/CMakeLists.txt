@@ -459,6 +459,30 @@ foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv test_demo_soc)
 endforeach()
 
 # ----------------------------------------------------------------------------
+# M5-DSE: 7-stage + 10-stage 集成测试 (Section 7 / M5.12-M5.13)
+# 验证 TopologyBuilder<7/10> 展开 + superscalar lane dispatch + 拓扑断言
+# add.elf 执行待 M4-DSE 完成回填 (部分 PASS, topology only)
+# 路径: tests/cpu/integration/
+# 依赖: nlohmann/json (CppTLM bundled, 通过 cf_plugin_link_cpptlm 提供)
+# WORKING_DIRECTORY: 项目根, 以便 ip/cpu/configs/cpu_superscalar.json 加载
+# ----------------------------------------------------------------------------
+foreach(test_name IN ITEMS test_7stage_riscv test_10stage_riscv)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/integration/${test_name}.cpp)
+    add_executable(${test_name} ${CMAKE_SOURCE_DIR}/tests/cpu/integration/${test_name}.cpp)
+    target_link_libraries(${test_name} PRIVATE cf_plugin)
+    cf_plugin_link_cpptlm(${test_name})  # nlohmann/json via CppTLM bundled
+    target_include_directories(${test_name}
+      PRIVATE
+        ${CMAKE_SOURCE_DIR}
+    )
+    add_test(NAME ${test_name}
+      COMMAND ${test_name}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}  # so ip/cpu/configs/*.json is found
+    )
+  endif()
+endforeach()
+
+# ----------------------------------------------------------------------------
 # 配置摘要
 # ----------------------------------------------------------------------------
 message(STATUS "  cf_plugin:        Phase 0 (5/5 P0 components) ✅ + M1 框架扩展 (PipeArbitration + arb_ + payload_common)")

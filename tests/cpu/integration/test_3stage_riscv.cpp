@@ -1,11 +1,11 @@
 // tests/cpu/integration/test_3stage_riscv.cpp
 //
-// 功能描述: 3 级流水线 RV32I 集成测试 (M4.6)
+// 功能描述: 3 级流水线 RV32I 集成测试 (M4.6, M5-DSE M5.11)
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-16
+// 最后修改日期: 2026-06-22
 //
 // 测试覆盖 (4 用例):
-//   1. CpuFactory build_cpu() 3 级配置
+//   1. CpuFactory build_cpu() 3 级配置 + 拓扑断言 (M5.11)
 //   2. 3 级配置 vs 5 级配置对比
 //   3. PicolibcHostMemory 在 3 级 CPU 下的 tohost
 //   4. 多个 CPU 实例共存
@@ -13,6 +13,7 @@
 // 约束:
 //   - 纯 main() + assert
 //   - 3 级流水线用于嵌入式 (embedded) 配置
+//   - M5.11: TopologyBuilder<3> 展开: 3 节点 (if/exmem/wb)
 
 #include <cassert>
 #include <cstdint>
@@ -36,6 +37,11 @@ static void test_build_3stage() {
   cfg.btb_entries = 16;
   auto pb = CpuFactory<T>::build_cpu(cfg);
   assert(pb != nullptr);
+  // M5.11 拓扑断言: TopologyBuilder<3> 展开为 3 节点 (if/exmem/wb)
+  assert(pb->node_count() == 3);
+  assert(pb->has_stage("if"));
+  assert(pb->has_stage("exmem"));
+  assert(pb->has_stage("wb"));
   printf("  [PASS] test_build_3stage\n");
 }
 
