@@ -1,14 +1,18 @@
 // ip/cpu/arch/riscv/mul.h
 //
-// 功能描述: RiscvMulPlugin — M 扩展乘除法 (M3.6, P1)
+// 功能描述: RiscvMulPlugin — M 扩展乘除法 (M3.6, P1) + 多周期 LATENCY (M5.14, P2)
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-16
+// 最后修改日期: 2026-06-22
 //
 // 设计:
 //   - M 扩展: MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU (8 条)
 //   - execute 阶段: 读取 RS1/RS2, 写 RESULT
 //   - 当前实现: 单周期组合逻辑 (M2 框架简化), M4 集成 3 级子流水
-//   - 模板参数化 <typename T>: T = xlen 类型
+//   - 模板参数化 <typename T, std::size_t LATENCY = 1>: T = xlen 类型,
+//     LATENCY ∈ {1, 3, 5} (默认 1 = 单周期, 与 baseline byte-identical)
+//   - 多周期 LATENCY: setup() 中通过 declare_substage("execute", "mul_sN")
+//     声明 mul_s1..mul_s(LATENCY-1) 子阶段 (M5-DSE M5.14 §3.2)
+//   - 5-stage baseline byte-identical: LATENCY=1 不声明任何 substage
 //
 // 约束:
 //   - 头文件为主 (无 .cpp)
@@ -17,8 +21,10 @@
 #ifndef CF_IP_CPU_ARCH_RISCV_MUL_H
 #define CF_IP_CPU_ARCH_RISCV_MUL_H
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <type_traits>
 
 #include "cf/plugin/plugin_base.h"
@@ -32,19 +38,40 @@ namespace cpu {
 namespace arch {
 namespace riscv {
 
-template <typename T>
+template <typename T, std::size_t LATENCY = 1>
 class RiscvMulPlugin : public cf::plugin::PluginBase {
   static_assert(std::is_unsigned<T>::value,
                 "RiscvMulPlugin<T>: T must be unsigned");
+  static_assert(LATENCY >= 1 && LATENCY <= 5,
+                "RiscvMulPlugin: LATENCY must be in {1, 3, 5}");
 
  public:
+  static constexpr std::size_t LAT = LATENCY;
+
   RiscvMulPlugin() = default;
   ~RiscvMulPlugin() override = default;
 
   RiscvMulPlugin(const RiscvMulPlugin&) = delete;
   RiscvMulPlugin& operator=(const RiscvMulPlugin&) = delete;
 
-  void setup(cf::plugin::PipeBuilder& /*pb*/) override {}
+  void setup(cf::plugin::PipeBuilder& pb) override {
+    if constexpr (LATENCY == 1) {
+      // 单周期: 无 substage, byte-identical to baseline
+    } else {
+      // 多周期: 声明 mul_s1..mul_s(LATENCY-1) 作为 execute 的子阶段
+      for (std::size_t i = 1; i < LATENCY; ++i) {
+        pb.declare_substage(
+            "execute",
+            std::string("mul_s") + std::to_string(i),
+            1);
+      }
+    }
+  }
+
+  std::size_t expected_latency() const noexcept { return LATENCY; }
+  std::size_t substage_count() const noexcept {
+    return LATENCY > 0 ? LATENCY - 1 : 0;
+  }
 
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;

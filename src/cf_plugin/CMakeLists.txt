@@ -386,6 +386,24 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_topology_builder.cpp)
 endif()
 
 # ----------------------------------------------------------------------------
+# M5-DSE: RiscvMulPlugin 多周期 LATENCY 模板验证 (Section 3 / M5.14)
+# 验证 RiscvMulPlugin<T, LATENCY> 3 个特化 (<T,1> / <T,3> / <T,5>) 编译通过
+# 且 setup() 正确声明 mul_s1..mul_s(LATENCY-1) 子阶段
+# 路径: tests/cpu/ (与 test_topology_builder 同家族)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_mul_latency.cpp)
+  add_executable(test_mul_latency
+    ${CMAKE_SOURCE_DIR}/tests/cpu/test_mul_latency.cpp
+  )
+  target_link_libraries(test_mul_latency PRIVATE cf_plugin)
+  target_include_directories(test_mul_latency
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_mul_latency COMMAND test_mul_latency)
+endif()
+
+# ----------------------------------------------------------------------------
 # M5-DSE: Schema 扩展验证 (Section 5 / M5.19)
 # 验证 cpu_params_schema.json 9 新字段 + 3 重命名对齐 CpuConfig struct
 # 路径: tests/cpu/configs/ (M5.19 新增)
