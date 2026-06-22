@@ -4,8 +4,9 @@
 > **创建日期**: 2026-06-13
 > **关联路线图**: `docs/roadmap/phases/phase-2-baremetal.md` (Phase 2 bare-metal 测试套件)
 > **关联里程碑**: M2 - ISA 全覆盖
+> **关联决策草案 (权威)**: `.omo/drafts/decision-phase-2-baremetal-v1.1-toolchain-guide-2026-06-15.md` (🟢 Accepted 2026-06-21, F1-F8 全 8 决议批准)
 > **依赖**: Phase 1 (Plugin-style TLM Foundation) — **✅ 100% 完成** (Phase 1.4 ORCHESTRATION COMPLETE 2026-06-13)
-> **状态**: 🟡 **WAITING FOR USER DECISION** (boulder active, 任务 1-8 全部 [~] BLOCKED by 工具链缺失, 等待 3 个用户选项)
+> **状态**: 🟢 **UNBLOCKED** (2026-06-21 F1-F8 批准, 仅 ACT4 clone + elfio apt install 待 P0)
 
 ---
 

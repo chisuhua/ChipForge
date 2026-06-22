@@ -6,7 +6,8 @@
 > **关联决策草案**: `decision-phase-2-baremetal-riscv-tests-2026-06-13.md` (DECISION-2026-06-13-03 v1) → 本版合并
 > **关联计划**: `.omo/plans/phase-2-baremetal-riscv-tests.md`
 > **关联路线图**: `docs/roadmap/phases/phase-2-baremetal.md` (M2 里程碑)
-> **状态**: 🟡 Proposed v1.1 — 待 1-2 项关键问题定夺后改 Accepted
+> **状态**: 🟢 **Accepted v1.1** (2026-06-21, 用户批准 F1-F8 全 8 决议)
+> **取代关系**: 全面取代 v1.0 通用 RISC-V TLM 指南 (v1.0 假设的"完整 RISC-V Core + SystemC TLM 2.0"在 ChipForge 中不成立)
 > **取代关系**: 全面取代 v1.0 通用 RISC-V TLM 指南 (v1.0 假设的"完整 RISC-V Core + SystemC TLM 2.0"在 ChipForge 中不成立)
 
 ---
@@ -517,15 +518,17 @@ diff <(awk '{print $1,$2,$3}' spike_trace.log) <(awk '{print $1,$2,$3}' l1_trace
 
 | # | 决议 | 状态 |
 |---|------|------|
-| **F1** | 平台范围 = ChipForge 现状 (L1CachePlugin as memory model, 无 CPU Core) | **Proposed** |
-| **F2** | TLM 框架 = CppTLM 2.0.3 (commit c6079357), 非 SystemC TLM 2.0 | **Proposed** |
-| **F3** | Python 集成 = C++ shim + ctypes + 子进程, 非 pybind11 | **Proposed** |
-| **F4** | arch-test 流程 = ACT4 自检 ELF + tohost 监测, 非 ACT3.x 外部 signature dump | **Proposed** |
-| **F5** | 主存访问 = 通过 L1CachePlugin (2KB 限制), MemoryTLM 推迟到 Phase 2.5+ | **Proposed** |
-| **F6** | 工具链锁定 = 实测版本号 (apt + commit hash), 不使用 Docker digest 假设 | **Proposed** |
-| **F7** | Spike HTIF 集成 = 4 件套 (PROGBITS + KEEP + --no-gc-sections + auipc) | **Proposed** |
-| **F8** | 里程碑 = 重映射到 ChipForge Phase 2-5 (riscv-dv/Verilator 推迟) | **Proposed** |
+| **F1** | 平台范围 = ChipForge 现状 (L1CachePlugin as memory model, 无 CPU Core) | 🟢 **Accepted** (2026-06-21) |
+| **F2** | TLM 框架 = CppTLM 2.0.3 (commit c6079357), 非 SystemC TLM 2.0 | 🟢 **Accepted** (2026-06-21) |
+| **F3** | Python 集成 = C++ shim + ctypes + 子进程, 非 pybind11 | 🟢 **Accepted** (2026-06-21) |
+| **F4** | arch-test 流程 = ACT4 自检 ELF + tohost 监测, 非 ACT3.x 外部 signature dump | 🟢 **Accepted** (2026-06-21) |
+| **F5** | 主存访问 = 通过 L1CachePlugin (2KB 限制), MemoryTLM 推迟到 Phase 2.5+ | 🟢 **Accepted** (2026-06-21) |
+| **F6** | 工具链锁定 = 实测版本号 (apt + commit hash), 不使用 Docker digest 假设 | 🟢 **Accepted** (2026-06-21) |
+| **F7** | Spike HTIF 集成 = 4 件套 (PROGBITS + KEEP + --no-gc-sections + auipc) | 🟢 **Accepted** (2026-06-21) |
+| **F8** | 里程碑 = 重映射到 ChipForge Phase 2-5 (riscv-dv/Verilator 推迟) | 🟢 **Accepted** (2026-06-21) |
 
 ---
 
 *本指南基于评审反馈 + 4 项并行调研结果 (riscv-arch-test 可行性 / CppTLM API / L1CachePlugin API / 测试套件对比) 起草。修订完成后 v1.0 通用 RISC-V TLM 指南即作废, ChipForge 后续裸机验证工作严格按此 v1.1 执行。*
+
+*2026-06-21 状态更新*: 用户批准 F1-F8, v1.1 升 Accepted。Phase 2 plan 现已 unblocked (除工具链 P0 缺失项 ACT4 clone + elfio install 外)。Plan 文件位置 `.omo/plans/phase-2-baremetal-riscv-tests.md` (723 行, Prometheus 起草 2026-06-13)。

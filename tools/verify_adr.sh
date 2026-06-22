@@ -720,7 +720,11 @@ verify_adr_033() {
     log_expected_missing "ADR-033" "CtrlLink 四种控制 API" \
       "CtrlLink 方法不存在（注意：CppHDL chlib 已有 stream_halt_when / stream_throw_when 自由函数，但非 CtrlLink 对象方法）"
   else
-    log_stale "ADR-033" "CtrlLink 控制 API" "方法已实现但 ADR 仍 🚧"
+    if adr_status_is_done "ADR-033"; then
+      log_pass "ADR-033" "CtrlLink 四种控制 API"
+    else
+      log_stale "ADR-033" "CtrlLink 控制 API" "已实现但 ADR 仍 🚧"
+    fi
   fi
 }
 

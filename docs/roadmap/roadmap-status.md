@@ -1,10 +1,17 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-13 (本次会话十: Phase 1.4 L1CachePlugin 设计方法学复盘 v1 落地, PA-7 + PA-9 + R7 闭环, 18/18 ctest PASS)
-> **当前可启动**: ① **Phase 2 bare-metal 测试套件** (PA-1 ~ PA-5 + PA-6 + PA-7 + PA-8 + PA-9 全部 ✅, Phase 1 退出标准全部就绪) ② Phase 5 RTL 协同验证 (Phase 6 框架升级任务清单已生成)
+> **最后更新**: 2026-06-21 (本次会话: M4G-extend 落地, M5-DSE OpenSpec 启动, Phase 2 工具链 v1.1 Accepted; 8 天间隔)
+> **当前可启动**: ① **M5-DSE 2-wide superscalar** (硬前置 m4g-extend 已就位, `openspec/changes/m5-dse-superscalar/` 4/4 artifacts ready) ② **Phase 2 bare-metal 测试套件** (`.omo/plans/phase-2-baremetal-riscv-tests.md` 723 行 plan 完整, F1-F8 Accepted 2026-06-21, 仅 ACT4 clone + elfio apt install 待 P0)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
+
+> **8 天进展摘要 (2026-06-13 → 2026-06-21)**:
+> - **M4G-extend-tid-and-hooks** 落地 (commit `ec6ee4f`, 2026-06-21): PluginBase::set_tid + 3 plugin override + PipeBuilder n_threads + OoO commit_hook 文档 + COMMIT 阶段名。8 文件 +217/-27 LOC, 18/18 ctest PASS, 0 行为变化。
+> - **M5-DSE OpenSpec change** 启动 (`openspec/changes/m5-dse-superscalar/`): 4/4 artifacts ready (proposal + design + 3 specs + tasks 46 项)。覆盖 M5.10-M5.19 (3/5/7/10 拓扑 + 2-wide superscalar + MUL 多周期 + DSE sweep 工具链)。
+> - **Phase 2 工具链 v1.1** Accepted: F1-F8 全 8 决议批准 (2026-06-21), `openspec/changes/m5-dse-superscalar` 解锁。
+> - **验证门**: verify_adr 30→31 PASS / STALE 1→0 (ADR-033 fix), verify_no_ghost_refs PASS, openspec validate 1 passed.
+> - **清理**: 2 个 git stash dropped (1 month old, redundant/obsolete), empty-directory-cleanup 归档异常 7/20 → 20/20 闭合。
 
 > **⚠️ Phase 1.4 范围修正 (2026-06-13)**: roadmap §1.4 + §2.1 描述的 "cpptlm::CacheTLM baseline 对比" 经用户对话澄清 + Metis 验证为**错误解读**(`cpptlm::CacheTLM` 是 stub, `std::map` 全关联无淘汰, 无法配置为 256×64B direct-mapped)。Phase 1.4 真实目的 = **L1CachePlugin 设计方法学复盘** (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`, DECISION-2026-06-13-02, F1.A + 6 维度 + 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务)。性能基线对比推迟到 Phase 2+ (需 `HybridCacheWrapper` + BUILD_RTL=ON)。
 
@@ -15,7 +22,7 @@
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
 | Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
-| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~85% (1.1+1.2+1.3全部子任务+1.4方法学复盘完成) | 无 | Phase 1 退出标准全部达成, Phase 2 启动门槛就绪 |
+| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~88% (1.1+1.2+1.3全部子任务+1.4方法学复盘+**M4G-extend 2026-06-21**完成) | 无 | Phase 1 退出标准全部达成, M5-DSE 硬前置已就位 |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | CLINT/PLIC IP 完善 |

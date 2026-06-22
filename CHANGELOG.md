@@ -5,6 +5,36 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.0.6 (2026-06-21) - m4g-extend-tid-and-hooks
+
+> **OpenSpec change**: `m4g-extend-tid-and-hooks` (详见 `openspec/changes/archive/2026-06-21-m4g-extend-tid-and-hooks/`)
+> **目的**: M4G 二阶前向兼容锁 (硬前置解锁 M5-DSE 2-wide superscalar, 节省 ~200 LOC Phase 5+ 重构)
+> **战略依据**: `ip/cpu/docs/research/post-m4g-strategic-decision-2026-06-20.md` (Option B 战略决策)
+
+### Added (Gap A: tid plumbing via `set_tid`)
+- `include/cf/plugin/plugin_base.h` — `PluginBase::set_tid(std::uint8_t)` 虚函数 (默认 no-op, 避免 3rd-party plugin break)
+- `ip/cpu/plugins/reg_file.h` — `RegFilePlugin::set_tid` override + `tid_` 成员 + `current_tid()` 访问器
+- `ip/cpu/plugins/hazard.h` — `HazardPlugin::set_tid` override + `tid_` 成员
+- `ip/cpu/plugins/branch_predictor.h` — `BranchPredictorPlugin::set_tid` override + `tid_` 成员
+- `include/cf/plugin/pipe_builder.h` — `n_threads_` 成员 + `set_n_threads()` setter + `run()` per-tid 循环
+- `ip/cpu/cpu_factory.h` — `CPUConfig::n_threads` 字段 (默认 1) + `build_cpu()` 注入 `set_n_threads`
+
+### Added (Gap B: OoO commit primitive documentation)
+- `include/cf/plugin/pipe_builder.h:104-138` — 6 行注释块: `register_commit_hook` + `commit_storages` = OoO 提交原语; `CtrlLink::flush_when` = mispredict-squash 原语; 引用 `dse_architecture_v2_design_research.md §3 E.1` (ROB 设计) 作为 Phase 5+ consumer
+
+### Added (Gap C: COMMIT stage naming)
+- `ip/cpu/docs/multi_isa_architecture.md §2.4` — 5-stage 表新增 6th `commit` 行 (COMMIT 阶段名锁定, 避免 Phase 5+ 在 `at_stage("retire")` vs `at_stage("commit")` 碎片化)
+
+### Added (Tests: 8 RED→GREEN cases)
+- `tests/cpu/test_forward_compat.cpp` — `PluginBase::set_tid_default_noop` + `set_tid_overridable` + `RegFileSetTidStoresTid` + `HazardSetTidStoresTid` + `BranchPredictorSetTidStoresTid` + `PipeBuilderRunCallsSetTidDefaultOnce` + `PipeBuilderRunCallsSetTidPerThread` + `PipeBuilderRunDispatchesStagesPerTid`
+
+### Impact
+- **0 行为变化**: n_threads=1 默认 byte-identical, M4G baseline 不退化
+- **基线**: 36/36 ctest PASS (10 已有 + 8 新增 = 18/18 in test_forward_compat)
+- **变更规模**: 8 文件 +217/-27 LOC (生产 ~84 LOC + 测试 133 LOC)
+- **breaking 变更**: 0 (set_tid 默认 no-op 兼容)
+- **下一里程碑**: 启动 M5-DSE 2-wide superscalar (`openspec/changes/m5-dse-superscalar/` 4/4 artifacts ready)
+
 ## v0.0.4 (2026-06-18) - cache-policy-foundation (DRAFT, archive 等待重写后落地)
 
 > **OpenSpec change**: `cache-policy-foundation`（详见 `openspec/changes/cache-policy-foundation/`）
