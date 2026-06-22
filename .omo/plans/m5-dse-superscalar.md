@@ -705,7 +705,7 @@ B1 → B2 → B3/B4 串行
 
 ### 6. DSE Sweep 工具链 (Section 4 / M5.15, 4.1-4.4) [Batch 2, B2]
 
-**Status**: 🟡 BLOCKED by Task 5 (cpu_sim 必须存在)
+**Status**: ✅ DONE (T6 — sweep_driver 576 config + --seed + ASCII chart; parse_results.py; 39/39 ctest PASS)
 
 **File scope**:
 - Modify: `tools/dse/sweep_driver.py` (重写, ~150 LOC Python)
@@ -721,7 +721,7 @@ B1 → B2 → B3/B4 串行
 
 **实施步骤**:
 
-- [ ] **6.1 写 sweep_driver 默认 576 config 维度空间**
+- [x] **6.1 写 sweep_driver 默认 576 config 维度空间**
   修改 `tools/dse/sweep_driver.py`:
   ```python
   DEFAULT_DSE_SPACE = {
@@ -737,7 +737,7 @@ B1 → B2 → B3/B4 串行
   # 旧 DEFAULT_DSE_SPACE 6 维度 288 通过 --space JSON 覆盖保留
   ```
 
-- [ ] **6.2 加 CLI 参数**
+- [x] **6.2 加 CLI 参数**
   ```python
   import argparse, random
   parser = argparse.ArgumentParser()
@@ -752,7 +752,7 @@ B1 → B2 → B3/B4 串行
   args = parser.parse_args()
   ```
 
-- [ ] **6.3 实现 deterministic matrix 生成**
+- [x] **6.3 实现 deterministic matrix 生成**
   ```python
   rng = random.Random(args.seed)
   configs = []
@@ -764,7 +764,7 @@ B1 → B2 → B3/B4 串行
     configs = configs[:args.limit]
   ```
 
-- [ ] **6.4 multiprocessing.Pool 跑 cpu_sim**
+- [x] **6.4 multiprocessing.Pool 跑 cpu_sim**
   ```python
   def run_one(cfg):
     json_path = write_temp_config(cfg)  # 写到临时 JSON
@@ -779,13 +779,13 @@ B1 → B2 → B3/B4 串行
   json.dump(results, open(args.output, "w"), indent=2)
   ```
 
-- [ ] **6.5 smoke test (--limit 100)**
+- [x] **6.5 smoke test (--limit 100)**
   ```bash
   ./tools/dse/sweep_driver.py --limit 100 --seed 0 --output /tmp/sweep100.json
   ```
   Expected: 100 config 跑完, /tmp/sweep100.json 生成, 无崩溃
 
-- [ ] **6.6 实现 parse_results.py**
+- [x] **6.6 实现 parse_results.py**
   ```python
   # tools/dse/parse_results.py
   import sys, json, re
@@ -806,7 +806,7 @@ B1 → B2 → B3/B4 串行
     json.dump(data, sys.stdout, indent=2)
   ```
 
-- [ ] **6.7 实现 pareto_analyzer ASCII chart**
+- [x] **6.7 实现 pareto_analyzer ASCII chart**
   修改 `tools/dse/pareto_analyzer.py`, 加 ASCII chart 输出:
   ```python
   def render_ascii_chart(pareto_front, all_results, width=60, height=20):
@@ -829,13 +829,13 @@ B1 → B2 → B3/B4 串行
   ```
   在 main() 调用 `print(render_ascii_chart(front, results))`
 
-- [ ] **6.8 验证 ASCII chart 输出 ≥2 (cycles, ipc) 坐标**
+- [x] **6.8 验证 ASCII chart 输出 ≥2 (cycles, ipc) 坐标**
   ```bash
   ./tools/dse/pareto_analyzer.py /tmp/sweep100.json
   ```
   Expected: stdout 含 ASCII chart, 至少 2 个 * (Pareto 点)
 
-- [ ] **6.9 Commit**
+- [x] **6.9 Commit**
   ```bash
   git add tools/dse/sweep_driver.py tools/dse/parse_results.py \
           tools/dse/pareto_analyzer.py
@@ -843,13 +843,13 @@ B1 → B2 → B3/B4 串行
   ```
 
 **DoD**:
-- [ ] sweep_driver.py 默认生成 576 config
-- [ ] `--limit 100 --seed 0` smoke test 跑通
-- [ ] `--seed 0` 重跑顺序一致 (deterministic)
-- [ ] `--parallel` 默认 = os.cpu_count()
-- [ ] parse_results.py 解析 cpu_sim stdout 为 JSON
-- [ ] pareto_analyzer.py 输出 Pareto front + ASCII chart (≥2 坐标点)
-- [ ] 旧 288 config 通过 `--space` JSON 覆盖保留
+- [x] sweep_driver.py 默认生成 576 config
+- [x] `--limit 100 --seed 0` smoke test 跑通
+- [x] `--seed 0` 重跑顺序一致 (deterministic)
+- [x] `--parallel` 默认 = os.cpu_count()
+- [x] parse_results.py 解析 cpu_sim stdout 为 JSON
+- [x] pareto_analyzer.py 输出 Pareto front + ASCII chart (≥2 坐标点)
+- [x] 旧 288 config 通过 `--space` JSON 覆盖保留
 
 ---
 
