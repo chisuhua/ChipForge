@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "RISC-V CPU IP Configuration Schema (v2.0 + DSE 扩展)",
-  "description": "v2.0 字段 + M4-DSE/M5-DSE 新增 12 个字段 (2026-06-17). 见 ip/cpu/docs/dse_architecture.md §4",
+  "description": "v2.0 字段 + M4-DSE/M5-DSE 新增字段 (2026-06-17) + M5-DSE superscalar 9 新字段 + 3 字段重命名 (2026-06-22, M5.19). 见 ip/cpu/docs/dse_architecture.md §4",
   "type": "object",
   "properties": {
     "name": {"type": "string", "description": "实例名称"},
@@ -62,19 +62,19 @@
           "default": 64,
           "description": "BTB 条目数"
         },
-        "icache_latency_cycles": {
+        "icache_latency": {
           "type": "integer",
           "minimum": 0,
           "maximum": 32,
           "default": 1,
-          "description": "ICache 命中延迟"
+          "description": "ICache 命中延迟 (cycle)"
         },
-        "dcache_latency_cycles": {
+        "dcache_latency": {
           "type": "integer",
           "minimum": 0,
           "maximum": 32,
           "default": 1,
-          "description": "DCache 命中延迟"
+          "description": "DCache 命中延迟 (cycle)"
         },
         "enable_branch_predictor": {
           "type": "boolean",
@@ -142,6 +142,60 @@
           "type": "boolean",
           "default": false,
           "description": "[M5-DSE 新增] 是否收集运行统计 (IPC/branch_miss/cache_hit)"
+        },
+        "n_lanes": {
+          "type": "integer",
+          "enum": [1, 2, 4, 8],
+          "default": 1,
+          "description": "[M5-DSE 新增] 执行 lane 数 (与 dispatch_width 等价, 1=byte-identical baseline)"
+        },
+        "dispatch_width": {
+          "type": "integer",
+          "enum": [1, 2, 4],
+          "default": 1,
+          "description": "[M5-DSE 新增] 单 cycle dispatch lane 数 (2-wide superscalar 场景设为 2)"
+        },
+        "issue_queue_size": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "[M5-DSE 新增] Issue Queue entries 数 (0=关闭 OoO issue, 1=byte-identical baseline)"
+        },
+        "rob_size": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "[M5-DSE 新增] Reorder Buffer entries 数 (0=关闭 OoO commit)"
+        },
+        "lsq_size": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "[M5-DSE 新增] Load/Store Queue entries 数 (0=顺序访存)"
+        },
+        "rename_table_size": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "[M5-DSE 新增] 重命名表项数 (0=不启用寄存器重命名)"
+        },
+        "retire_width": {
+          "type": "integer",
+          "enum": [1, 2, 4],
+          "default": 1,
+          "description": "[M5-DSE 新增] 单 cycle retire lane 数"
+        },
+        "fetch_width": {
+          "type": "integer",
+          "enum": [1, 2, 4],
+          "default": 1,
+          "description": "[M5-DSE 新增] 单 cycle fetch 指令数"
+        },
+        "commit_width": {
+          "type": "integer",
+          "enum": [1, 2, 4],
+          "default": 1,
+          "description": "[M5-DSE 新增] 单 cycle commit 指令数"
         }
       },
       "required": ["isa"],

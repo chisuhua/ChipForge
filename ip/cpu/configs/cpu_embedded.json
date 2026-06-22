@@ -9,8 +9,8 @@
     "enable_mmu": false,
     "branch_predictor": "static",
     "btb_entries": 16,
-    "icache_latency_cycles": 1,
-    "dcache_latency_cycles": 1
+    "icache_latency": 1,
+    "dcache_latency": 1
   },
   "ports": {
     "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},

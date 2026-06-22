@@ -369,6 +369,28 @@ foreach(test_name IN ITEMS test_decode test_int_alu test_branch test_mul test_ls
 endforeach()
 
 # ----------------------------------------------------------------------------
+# M5-DSE: Schema 扩展验证 (Section 5 / M5.19)
+# 验证 cpu_params_schema.json 9 新字段 + 3 重命名对齐 CpuConfig struct
+# 路径: tests/cpu/configs/ (M5.19 新增)
+# 依赖: nlohmann/json (CppTLM bundled, 通过 cf_plugin_link_cpptlm 提供)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/configs/test_schema_m5_19.cpp)
+  add_executable(test_schema_m5_19
+    ${CMAKE_SOURCE_DIR}/tests/cpu/configs/test_schema_m5_19.cpp
+  )
+  target_link_libraries(test_schema_m5_19 PRIVATE cf_plugin)
+  cf_plugin_link_cpptlm(test_schema_m5_19)
+  target_include_directories(test_schema_m5_19
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_schema_m5_19
+    COMMAND test_schema_m5_19
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}  # so ip/cpu/configs/*.json is found
+  )
+endif()
+
+# ----------------------------------------------------------------------------
 # Phase 2: M4 集成测试 (tests/cpu/integration/)
 # ----------------------------------------------------------------------------
 foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv test_demo_soc)

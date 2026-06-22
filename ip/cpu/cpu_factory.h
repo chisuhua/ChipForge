@@ -59,6 +59,18 @@ struct CPUConfig {
   // Cache 延迟 (cycle)
   std::uint8_t icache_latency = 1;
   std::uint8_t dcache_latency = 1;
+
+  // M5-DSE Superscalar 字段 (M5.19, schema +9 fields)
+  // 默认值与 cpu_params_schema.json 一致; 详见 design.md Decision 5
+  std::uint8_t n_lanes = 1;
+  std::uint8_t dispatch_width = 1;
+  std::uint16_t issue_queue_size = 0;
+  std::uint16_t rob_size = 0;
+  std::uint16_t lsq_size = 0;
+  std::uint16_t rename_table_size = 0;
+  std::uint8_t retire_width = 1;
+  std::uint8_t fetch_width = 1;
+  std::uint8_t commit_width = 1;
 };
 
 // ----------------------------------------------------------------------------

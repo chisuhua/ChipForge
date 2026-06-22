@@ -18,8 +18,8 @@
     "enable_mmu": true,
     "mmu_mode": "sv48",
     "enable_pmp": true,
-    "icache_latency_cycles": 2,
-    "dcache_latency_cycles": 2,
+    "icache_latency": 2,
+    "dcache_latency": 2,
     "use_strict_scoreboard": true,
     "collect_stats": true
   },
