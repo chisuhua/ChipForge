@@ -224,7 +224,7 @@ B1 → B2 → B3/B4 串行
 
 **实施步骤 (TDD 风格)**:
 
-- [ ] **1.1 写失败的 schema 校验测试**
+- [x] **1.1 写失败的 schema 校验测试**
   在 `tests/cpu/configs/test_schema_m5_19.cpp` 新增:
   ```cpp
   #include <nlohmann/json.hpp>
@@ -241,7 +241,7 @@ B1 → B2 → B3/B4 串行
   Run: `ctest -R M5Schema --output-on-failure`
   Expected: FAIL (字段尚未定义)
 
-- [ ] **1.2 加 9 个新 optional 字段到 cpu_params_schema.json**
+- [x] **1.2 加 9 个新 optional 字段到 cpu_params_schema.json**
   在 `"properties"` 块后追加 9 个字段, 每个都设 `"minimum": 0` 或 `"enum": [1,2,4]`, 默认 `"default": 0` 或 `"default": 1`:
   - `n_lanes` (default 1, enum [1,2,4,8])
   - `dispatch_width` (default 1, enum [1,2,4])
@@ -253,19 +253,19 @@ B1 → B2 → B3/B4 串行
   - `fetch_width` (default 1, enum [1,2,4])
   - `commit_width` (default 1, enum [1,2,4])
 
-- [ ] **1.3 重命名 3 个字段对齐 CpuConfig struct**
+- [x] **1.3 重命名 3 个字段对齐 CpuConfig struct**
   - `icache_latency_cycles` → `icache_latency`
   - `dcache_latency_cycles` → `dcache_latency`
   - `mul_latency` 保持不变 (已与 struct 一致)
   在 schema 用 `"$ref"` 或 alias, 或直接 rename property key
   同步更新 4 个 JSON 实例 (cpu_default / cpu_embedded / cpu_superscalar / cpu_deep_pipeline)
 
-- [ ] **1.4 同步 CPUConfig struct 字段名**
+- [x] **1.4 同步 CPUConfig struct 字段名**
   在 `ip/cpu/cpu_factory.h` 中:
   - 已有 `icache_latency` / `dcache_latency` (无 `_cycles` 后缀) — 验证一致
   - 加 9 个新字段 (n_lanes, dispatch_width, issue_queue_size, rob_size, lsq_size, rename_table_size, retire_width, fetch_width, commit_width), 默认值与 schema 一致
 
-- [ ] **1.5 运行 schema 测试 + ajv 校验**
+- [x] **1.5 运行 schema 测试 + ajv 校验**
   Run:
   ```bash
   ctest -R M5Schema --output-on-failure
@@ -277,11 +277,11 @@ B1 → B2 → B3/B4 串行
   ```
   Expected: PASS (全部 5 个 JSON 校验通过)
 
-- [ ] **1.6 验证 baseline 不退化**
+- [x] **1.6 验证 baseline 不退化**
   Run: `ctest --output-on-failure`
   Expected: 36/36 PASS (新增 1 个 M5Schema test = 37/37)
 
-- [ ] **1.7 Commit**
+- [x] **1.7 Commit**
   ```bash
   git add ip/cpu/configs/cpu_params_schema.json \
           ip/cpu/configs/cpu_default.json \
@@ -294,10 +294,10 @@ B1 → B2 → B3/B4 串行
   ```
 
 **DoD**:
-- [ ] cpu_params_schema.json 加 9 optional 字段
-- [ ] 3 字段重命名 (`icache_latency_cycles` → `icache_latency`, `dcache_latency_cycles` → `dcache_latency`, `mul_latency` 保留)
-- [ ] 5 个 JSON (含 cpu_superscalar / cpu_deep_pipeline) ajv 校验全 PASS
-- [ ] 36/36 ctest baseline 不退化
+- [x] cpu_params_schema.json 加 9 optional 字段
+- [x] 3 字段重命名 (`icache_latency_cycles` → `icache_latency`, `dcache_latency_cycles` → `dcache_latency`, `mul_latency` 保留)
+- [x] 5 个 JSON (含 cpu_superscalar / cpu_deep_pipeline) ajv 校验全 PASS
+- [x] 36/36 ctest baseline 不退化
 - [ ] commit 干净, 无遗留代码
 
 ---
