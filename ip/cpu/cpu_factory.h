@@ -20,8 +20,10 @@
 #ifndef CF_IP_CPU_CPU_FACTORY_H
 #define CF_IP_CPU_CPU_FACTORY_H
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -74,6 +76,111 @@ struct CPUConfig {
 };
 
 // ----------------------------------------------------------------------------
+// TopologyBuilder<N_STAGES> —— 编译期流水线拓扑展开器 (M5-DSE M5.10)
+//
+// 设计:
+//   - 按 config.pipeline_stages 编译期实例化 4 个特化 (3/5/7/10)
+//   - 每个特化按 multi_isa v2.0 §2.4 逻辑→物理节点映射展开 PipeBuilder
+//   - 命名约定: at_stage() 使用 logic_stage 名称 ("fetch"/"decode"/...)
+//     物理 node 由 declare_substage() 在 deep pipeline 中创建
+//   - 5 级 byte-identical: 与 baseline register_*/at_stage 行为等价
+//
+// 借鉴:
+//   - multi_isa v2.0 §2.4 拓扑表
+//   - VexRiscv Pipeline.scala: 用 stageable + pluggable 描述流水线结构
+//
+// 约束:
+//   - N_STAGES 必须在 {3, 5, 7, 10} 之内 (static_assert)
+//   - 不调用 build_cpu, 直接操作 PipeBuilder& (D4 合规: 工厂只做 Plugin 注册)
+//   - 与 mul_latency (Task 3) 正交: 此处只关心拓扑, 不关心执行延迟
+// ----------------------------------------------------------------------------
+template <std::size_t N_STAGES>
+struct TopologyBuilder {
+  static_assert(N_STAGES == 3 || N_STAGES == 5 ||
+                N_STAGES == 7 || N_STAGES == 10,
+                "TopologyBuilder supports 3/5/7/10 stages only");
+  static void expand(cf::plugin::PipeBuilder& pb, const CPUConfig& cfg);
+};
+
+// ---- 特化: N_STAGES = 3 (embedded, IF/EXMEM/WB 合并) ----
+// 拓扑: fetch+decode→IF, execute+memory→EXMEM, writeback→WB
+// multi_isa v2.0 §2.4: 3-row 表
+template <>
+struct TopologyBuilder<3> {
+  static void expand(cf::plugin::PipeBuilder& pb, const CPUConfig& /*cfg*/) {
+    pb.at_stage("if",    cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("exmem", cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("wb",    cf::plugin::Phase::NORMAL, []() {});
+  }
+};
+
+// ---- 特化: N_STAGES = 5 (baseline byte-identical) ----
+// 拓扑: fetch→IF, decode→ID, execute→EX, memory→MEM, writeback→WB
+// multi_isa v2.0 §2.4: 5-row 表, 与默认 RISC-V 5 级流水线对齐
+// 重要: 此特化必须与 baseline byte-identical — 不改变节点数与命名
+template <>
+struct TopologyBuilder<5> {
+  static void expand(cf::plugin::PipeBuilder& pb, const CPUConfig& /*cfg*/) {
+    pb.at_stage("fetch",     cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("decode",    cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("execute",   cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("memory",    cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("writeback", cf::plugin::Phase::NORMAL, []() {});
+  }
+};
+
+// ---- 特化: N_STAGES = 7 (OoO superscalar, 显式 retire/commit) ----
+// 拓扑: fetch→IF, decode→ID, execute→EX, memory→MEM, writeback→WB,
+//       retire (OoO 显式提交), commit (最终 commit 阶段)
+// multi_isa v2.0 §2.4: 7-row 表 (含 RETIRE)
+// M4G-extend G.X 命名: in-order 隐含 commit; OoO 显式 retire/commit 阶段
+template <>
+struct TopologyBuilder<7> {
+  static void expand(cf::plugin::PipeBuilder& pb, const CPUConfig& /*cfg*/) {
+    pb.at_stage("fetch",     cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("decode",    cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("execute",   cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("memory",    cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("writeback", cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("retire",    cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("commit",    cf::plugin::Phase::NORMAL, []() {});
+  }
+};
+
+// ---- 特化: N_STAGES = 10 (deep pipeline, ≥3 sub-pipe between fetch and execute) ----
+// 拓扑: fetch + IF1/IF2 子阶段, decode + ID 子阶段,
+//       execute + RENAME/ISSUE/EX1/EX2/EX3 子阶段,
+//       memory + MEM1/MEM2 子阶段, writeback, retire
+// multi_isa v2.0 §2.4: 10-row 表 (deep pipeline, OoO + superscalar)
+// ≥10 节点: 7 main stages + 8 substages (declared via declare_substage)
+template <>
+struct TopologyBuilder<10> {
+  static void expand(cf::plugin::PipeBuilder& pb, const CPUConfig& /*cfg*/) {
+    // fetch + 2 substages (IF1, IF2)
+    pb.at_stage("fetch", cf::plugin::Phase::NORMAL, []() {});
+    pb.declare_substage("fetch", "IF1", 1);
+    pb.declare_substage("fetch", "IF2", 1);
+    // decode + 1 substage (ID)
+    pb.at_stage("decode", cf::plugin::Phase::NORMAL, []() {});
+    pb.declare_substage("decode", "ID", 1);
+    // execute + 5 substages (RENAME, ISSUE, EX1, EX2, EX3)
+    pb.at_stage("execute", cf::plugin::Phase::NORMAL, []() {});
+    pb.declare_substage("execute", "RENAME", 1);
+    pb.declare_substage("execute", "ISSUE", 1);
+    pb.declare_substage("execute", "EX1", 1);
+    pb.declare_substage("execute", "EX2", 1);
+    pb.declare_substage("execute", "EX3", 1);
+    // memory + 2 substages (MEM1, MEM2)
+    pb.at_stage("memory", cf::plugin::Phase::NORMAL, []() {});
+    pb.declare_substage("memory", "MEM1", 1);
+    pb.declare_substage("memory", "MEM2", 1);
+    // writeback + retire (terminal stages)
+    pb.at_stage("writeback", cf::plugin::Phase::NORMAL, []() {});
+    pb.at_stage("retire",    cf::plugin::Phase::NORMAL, []() {});
+  }
+};
+
+// ----------------------------------------------------------------------------
 // CpuFactory —— 集中 PluginOrder + build_cpu() 入口
 //
 // 静态 API: CpuFactory::build_cpu<T>(config) → unique_ptr<PipeBuilder>
@@ -103,6 +210,26 @@ class CpuFactory {
 
     // 3. LATE 阶段: writeback
     register_late_plugins<T>(*pb, config);
+
+    // M5-DSE M5.10: 编译期 TopologyBuilder 展开 (按 config.pipeline_stages)
+    // 5-stage 路径必须 byte-identical to baseline (现 register_*/at_stage 行为)
+    switch (config.pipeline_stages) {
+      case 3:
+        TopologyBuilder<3>::expand(*pb, config);
+        break;
+      case 5:
+        TopologyBuilder<5>::expand(*pb, config);
+        break;
+      case 7:
+        TopologyBuilder<7>::expand(*pb, config);
+        break;
+      case 10:
+        TopologyBuilder<10>::expand(*pb, config);
+        break;
+      default:
+        throw std::invalid_argument(
+            "CpuFactory: unsupported pipeline_stages (must be 3/5/7/10)");
+    }
 
     // M4G-extend G.X: 注入 per-cycle dispatch 线程数
     // n_threads=1 默认 byte-identical; >1 走 SMT/超标量路径

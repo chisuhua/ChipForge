@@ -369,6 +369,23 @@ foreach(test_name IN ITEMS test_decode test_int_alu test_branch test_mul test_ls
 endforeach()
 
 # ----------------------------------------------------------------------------
+# M5-DSE: TopologyBuilder 编译期展开验证 (Section 2 / M5.10)
+# 验证 TopologyBuilder<3/5/7/10> 4 个特化编译通过 + 行为正确
+# 路径: tests/cpu/ (M5.10 新增)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_topology_builder.cpp)
+  add_executable(test_topology_builder
+    ${CMAKE_SOURCE_DIR}/tests/cpu/test_topology_builder.cpp
+  )
+  target_link_libraries(test_topology_builder PRIVATE cf_plugin)
+  target_include_directories(test_topology_builder
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_topology_builder COMMAND test_topology_builder)
+endif()
+
+# ----------------------------------------------------------------------------
 # M5-DSE: Schema 扩展验证 (Section 5 / M5.19)
 # 验证 cpu_params_schema.json 9 新字段 + 3 重命名对齐 CpuConfig struct
 # 路径: tests/cpu/configs/ (M5.19 新增)
