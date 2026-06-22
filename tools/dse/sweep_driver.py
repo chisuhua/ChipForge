@@ -16,7 +16,6 @@ import json
 import os
 import random
 import subprocess
-import sys
 import tempfile
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
