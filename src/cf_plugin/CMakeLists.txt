@@ -426,6 +426,24 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/configs/test_schema_m5_19.cpp)
 endif()
 
 # ----------------------------------------------------------------------------
+# M5-DSE: cpu_sim CLI 二进制 (Section 7 / M5.16)
+# DSE 工具链入口 — 解析 JSON 配置, 构建 CPU, 运行 N cycles, 输出 KEY=VALUE
+# 不接入 ctest (CLI 工具, 非测试); nlohmann/json 来自 cf_plugin_link_cpptlm
+# 依赖 cf_plugin (含 pipe_builder.h / cpu_factory.h 的传递 include 路径)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
+  add_executable(cpu_sim
+    ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp
+  )
+  target_link_libraries(cpu_sim PRIVATE cf_plugin)
+  target_include_directories(cpu_sim
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  cf_plugin_link_cpptlm(cpu_sim)  # nlohmann/json via CppTLM bundled
+endif()
+
+# ----------------------------------------------------------------------------
 # Phase 2: M4 集成测试 (tests/cpu/integration/)
 # ----------------------------------------------------------------------------
 foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv test_demo_soc)
