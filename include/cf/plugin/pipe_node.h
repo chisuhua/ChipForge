@@ -20,6 +20,7 @@
 #ifndef CF_PLUGIN_PIPE_NODE_H
 #define CF_PLUGIN_PIPE_NODE_H
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
@@ -130,6 +131,23 @@ class PipeNode {
   // arb_ 直接访问 (兼容老代码别名, 等价 arb_mut())
   PipeArbitration& arbitration() noexcept { return arb_; }
 
+  // ------------------------------------------------------------------------
+  // M5-DSE M5.18: lane 派发字段 (2-wide superscalar, decision.md Decision 3)
+  //
+  // 语义:
+  //   - lane 标识本 node 当前 cycle 所属的 dispatch lane (0..n_lanes-1)
+  //   - 单发射路径 (n_lanes=1) lane_ 永远 = 0, byte-identical to baseline
+  //   - 2-wide 路径: factory 端在 at_stage 闭包内 fetch_add(1) % n_lanes 决定 lane
+  //   - 仅是 factory 端调度状态, plugin 不需要感知 (与 m4g-extend tid 模式同形)
+  //
+  // 设计:
+  //   - 字段: lane_ 初始 0, set_lane 不抛异常, get_lane 返回当前值
+  //   - 与 arb_ 字段并存, 不委托 (5 态方法 + arb_ + lane_ 三者独立)
+  //   - 不暴露到 Node 外部, 仅供 set_lane 触发; 业务 Plugin 可读
+  // ------------------------------------------------------------------------
+  void set_lane(std::uint8_t lane) noexcept { lane_ = lane; }
+  std::uint8_t lane() const noexcept { return lane_; }
+
   static const char* state_name(State s) noexcept {
     switch (s) {
       case State::IDLE:      return "IDLE";
@@ -148,6 +166,8 @@ class PipeNode {
   // Phase 1.5+: 仲裁字段 (M1.6, 蓝图 §6.2.3)。 默认构造: 全 false (idle)。
   // 与 state_ 字段并存, 不委托; 业务 Plugin 自选用法。
   PipeArbitration arb_;
+  // M5-DSE M5.18: lane 派发字段 (2-wide superscalar). 默认 0 = 单发射 baseline.
+  std::uint8_t lane_ = 0;
 };
 
 }  // namespace plugin

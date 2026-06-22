@@ -20,6 +20,7 @@
 #ifndef CF_IP_CPU_CPU_FACTORY_H
 #define CF_IP_CPU_CPU_FACTORY_H
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -186,6 +187,20 @@ struct TopologyBuilder<10> {
 };
 
 // ----------------------------------------------------------------------------
+// stage_name_at_7 —— 7-stage superscalar 阶段名查找 (M5-DSE M5.18)
+//
+// 用途: lane 派发按 stage name 重新注册 at_stage 闭包.
+// 7 阶段: fetch → decode → execute → memory → writeback → retire → commit
+// 与 TopologyBuilder<7>::expand 顺序一致 (multi_isa v2.0 §2.4).
+// 仅在 7-stage superscalar 路径 (dispatch_width > 1) 触发时使用.
+// ----------------------------------------------------------------------------
+inline const char* stage_name_at_7(std::size_t i) {
+  static constexpr const char* kNames[7] = {
+      "fetch", "decode", "execute", "memory", "writeback", "retire", "commit"};
+  return kNames[i];
+}
+
+// ----------------------------------------------------------------------------
 // CpuFactory —— 集中 PluginOrder + build_cpu() 入口
 //
 // 静态 API: CpuFactory::build_cpu<T>(config) → unique_ptr<PipeBuilder>
@@ -261,6 +276,33 @@ class CpuFactory {
     // M4G-extend G.X: 注入 per-cycle dispatch 线程数
     // n_threads=1 默认 byte-identical; >1 走 SMT/超标量路径
     pb->set_n_threads(config.n_threads);
+
+    // M5-DSE M5.18: 2-wide superscalar lane 派发 (design.md Decision 3)
+    //   触发条件: dispatch_width > 1 AND pipeline_stages == 7
+    //   - 单发射 (dispatch_width=1): 完全 no-op, 5-stage baseline byte-identical
+    //   - 非 7-stage (3/5/10): 当前 scope 不实现, 留待 Phase 2 扩展
+    // 闭包: 每个 stage 注入一个 std::atomic<uint8_t> 计数器, 闭包内
+    //   fetch_add(1) % n_lanes 决定 lane 0/1, 写到 node_of_logic_stage
+    //   的 set_lane() 字段. per-build_cpu 栈帧, 闭包持有指针.
+    if (config.dispatch_width > 1 && config.pipeline_stages == 7) {
+      std::vector<std::atomic<std::uint8_t>> lane_counters(
+          config.pipeline_stages);
+      for (std::size_t s = 0; s < config.pipeline_stages; ++s) {
+        lane_counters[s].store(0);
+      }
+      for (std::size_t s = 0; s < 7; ++s) {
+        const char* stage_name = stage_name_at_7(s);
+        pb->at_stage(stage_name, cf::plugin::Phase::NORMAL,
+                     [pb_ptr = pb.get(), lane_ptr = &lane_counters[s],
+                      n = config.n_lanes, stage_name]() {
+                       const std::uint8_t my_lane =
+                           static_cast<std::uint8_t>(
+                               lane_ptr->fetch_add(1) % n);
+                       pb_ptr->node_of_logic_stage(stage_name)
+                           ->set_lane(my_lane);
+                     });
+      }
+    }
 
     return pb;
   }

@@ -19,7 +19,12 @@
     "icache_latency": 1,
     "dcache_latency": 2,
     "use_strict_scoreboard": true,
-    "collect_stats": true
+    "collect_stats": true,
+    "dispatch_width": 2,
+    "n_lanes": 2,
+    "fetch_width": 2,
+    "commit_width": 2,
+    "retire_width": 2
   },
   "ports": {
     "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},
