@@ -101,12 +101,15 @@ def parse_metrics(stdout, cfg):
     return metrics
 
 
-def run_simulation(cfg, cpu_sim_bin, cycles, timeout_sec=300):
+def run_simulation(cfg, cpu_sim_bin, cycles, elf_path=None, timeout_sec=300):
     """调用 cpu_sim 二进制跑一个 config
 
     cpu_sim (M5.16 / tools/cpu_sim/main.cpp) 期望 --config 是 JSON 文件路径,
     不是 inline JSON string (load_config 用 std::ifstream 打开).
     故: 写到 /tmp 临时 JSON, 跑完 unlink.
+
+    elf_path: 可选, 加载到 PicolibcHostMemory 驱动 RV32I 解释器
+             (M4.15+); 缺省时走无 --elf 路径, tohost=0 占位.
     """
     cfg_json_str = json.dumps({"name": cfg["name"], "type": "cpu", "params": cfg})
     cfg_path = None
@@ -117,9 +120,11 @@ def run_simulation(cfg, cpu_sim_bin, cycles, timeout_sec=300):
         ) as f:
             cfg_path = f.name
             f.write(cfg_json_str)
+        cmd = [cpu_sim_bin, "--config", cfg_path, "--cycles", str(cycles)]
+        if elf_path:
+            cmd += ["--elf", elf_path]
         result = subprocess.run(
-            [cpu_sim_bin, "--config", cfg_path, "--cycles", str(cycles)],
-            capture_output=True, text=True, check=True, timeout=timeout_sec,
+            cmd, capture_output=True, text=True, check=True, timeout=timeout_sec,
         )
         elapsed = time.time() - start
         metrics = parse_metrics(result.stdout, cfg)
@@ -151,6 +156,10 @@ def main():
     ap.add_argument("--parallel", type=int, default=os.cpu_count() or 1,
                     help=f"parallel workers (默认 = os.cpu_count() = {os.cpu_count() or 1}; 设 1 串行)")
     ap.add_argument("--limit", type=int, default=0, help="limit total configs (0 = no limit)")
+    # M4.15: --elf 加载 ELF 程序到 PicolibcHostMemory 驱动 RV32I 解释器
+    ap.add_argument("--elf", default=None,
+                    help="ELF program to load into PicolibcHostMemory (M4.15+; "
+                         "缺省 = 无 --elf, tohost=0 占位)")
     # M5.15: --seed 用于 deterministic matrix (同 seed → 同顺序)
     ap.add_argument("--seed", type=int, default=0,
                     help="random seed for deterministic matrix shuffle (回归验证用, 默认 0)")
@@ -170,7 +179,7 @@ def main():
         configs = configs[:args.limit]
     print(f"[SWEEP] Total configs: {len(configs)} (seed={args.seed}, limit={args.limit or 'none'})")
     print(f"[SWEEP] Sweep space: {json.dumps(space, indent=2)}")
-    print(f"[SWEEP] cpu_sim: {args.cpu_sim}, cycles: {args.cycles}, parallel: {args.parallel}")
+    print(f"[SWEEP] cpu_sim: {args.cpu_sim}, cycles: {args.cycles}, parallel: {args.parallel}, elf: {args.elf or '(none)'}")
 
     # 跑 sweep
     results = []
@@ -180,7 +189,7 @@ def main():
         # 否则 as_completed 按完成顺序 yield, 顺序会因 OS 调度非确定
         with ProcessPoolExecutor(max_workers=args.parallel) as executor:
             future_to_idx = {
-                executor.submit(run_simulation, cfg, args.cpu_sim, args.cycles): i
+                executor.submit(run_simulation, cfg, args.cpu_sim, args.cycles, args.elf): i
                 for i, cfg in enumerate(configs)
             }
             results_by_idx = {}
@@ -195,7 +204,7 @@ def main():
     else:
         for i, cfg in enumerate(configs):
             print(f"[SWEEP] [{i+1}/{len(configs)}] {cfg['name']}")
-            metrics = run_simulation(cfg, args.cpu_sim, args.cycles)
+            metrics = run_simulation(cfg, args.cpu_sim, args.cycles, args.elf)
             results.append(metrics)
             if args.verbose or "error" not in metrics:
                 print(f"  → IPC={metrics.get('ipc', 'N/A')}, "
