@@ -118,11 +118,35 @@ static void test_10stage_mul_latency_5() {
   printf("  [PASS] test_10stage_mul_latency_5\n");
 }
 
+static std::string exec_cmd(const std::string& cmd) {
+  std::string result;
+  FILE* pipe = popen(cmd.c_str(), "r");
+  if (!pipe) return result;
+  char buf[256];
+  while (fgets(buf, sizeof(buf), pipe) != nullptr) result += buf;
+  pclose(pipe);
+  return result;
+}
+
+static void test_10stage_add_elf_end_to_end() {
+  // M4.16: add.elf end-to-end on 10-stage. RV32I interpreter is pipeline-agnostic
+  // (M4.15) so tohost=1 across 3/5/7/10-stage.
+  std::string output = exec_cmd(
+      "./build/src/cf_plugin/cpu_sim "
+      "--config ip/cpu/configs/cpu_deep_pipeline.json "
+      "--elf build/add.elf --cycles 300 2>&1");
+  assert(output.find("tohost=1") != std::string::npos);
+  assert(output.find("pipeline_stages=10") != std::string::npos);
+  assert(output.find("tohost=0") == std::string::npos);
+  printf("  [PASS] test_10stage_add_elf_end_to_end\n");
+}
+
 int main() {
   printf("test_10stage_riscv (集成, M4-DSE partial):\n");
   test_build_10stage_deep();
   test_10stage_topology_from_config();
   test_10stage_mul_latency_5();
+  test_10stage_add_elf_end_to_end();
   printf("[PASS] all 10-stage integration tests (topology only — add.elf DEFERRED to M4-DSE)\n");
   return 0;
 }
