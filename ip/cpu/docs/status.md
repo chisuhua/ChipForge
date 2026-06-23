@@ -189,10 +189,10 @@
 | M5.3 | `tests/integration/test_demo_soc.cpp` | 🟢 PASS | 100% | 6/6 tohost=1 PASS | M5.3 commit |
 | M5.4 | 修订 `ip/cpu/README.md` | 🟢 PASS | 100% | 文档完整 | M5.4 commit (实施后状态) |
 | M5.5 | 修订 `ip/cpu/docs/README.md` | 🟢 PASS | 100% | 索引完整 | M5.5 commit |
-| M5.6 | 起草 ADR-040 (Plugin 推迟决策) | 🟢 PASS | 100% | ADR Accepted | M5.6 commit |
+| M5.6 | 起草 ADR-042 (Plugin 推迟决策) | 🟢 PASS | 100% | ADR Accepted | M5.6 commit |
 | M5.7 | 起草 `docs/lessons/m1-m5-cpu-implementation.md` | 🟢 PASS | 100% | lessons 文档存在 | M5.7 commit |
 | M5.8 | `git commit` + `git tag` | 🟢 PASS | 100% | tag `phase-1.5-cpu-v2.0-2026-06-16` | M5.8 commit |
-| M5.9 | 4-6 ELF + 16/16 ctest + D4 + ADR-040 | 🟢 PASS | 100% | 全部通过 | 9/9 验收 ✅ |
+| M5.9 | 4-6 ELF + 16/16 ctest + D4 + ADR-042 | 🟢 PASS | 100% | 全部通过 | 9/9 验收 ✅ |
 | **M5 累计 (v2.0)** | | 🟢 完成 | **8/9 (89%)** | M5.1 L1 推迟到 M5.1 stub | M1-M5 全部完成 |
 
 ### 5.1 M5-DSE 子阶段 — 流水线深度真实展开 + MUL 子流水 + Sweep 脚本

@@ -87,7 +87,7 @@ D4 要求: CPU Plugin 全部用 cf_plugin 框架 (PluginBase/PipeBuilder/at_stag
 
 D4 PASS。
 
-## 5. ADR-040 推迟决策
+## 5. ADR-042 推迟决策
 
 FPU/MMU/Exception 三个 Plugin 推迟到 Phase 5+, 理由:
 - FPU: 需要 RTL 实现浮点运算, 仿真精度要求高
@@ -99,7 +99,7 @@ FPU/MMU/Exception 三个 Plugin 推迟到 Phase 5+, 理由:
 - 直接物理地址 (enable_mmu: false)
 - tohost 机制 (替代 trap)
 
-详细见 `docs/architecture/adr/ADR-040-plugin-deferral.md`。
+详细见 `docs/architecture/adr/ADR-042-plugin-deferral.md`。
 
 ## 6. 下一步
 
@@ -135,7 +135,7 @@ Phase 1.5 v2.0 实施完成 (M1-M5 100%)。
   - 4 类拆分文档 (决策/蓝图/状态/计划)
   - 5 个 M 详细计划
   - 1 个 lessons 复盘 (本文档)
-  - 1 个 ADR-040
+  - 1 个 ADR-042
 
 ## 8. 致谢
 
@@ -152,4 +152,4 @@ Phase 1.5 v2.0 实施完成 (M1-M5 100%)。
 - **M4 详细**: `ip/cpu/docs/implementation-plan/M4-integration.md`
 - **M5 详细**: `ip/cpu/docs/implementation-plan/M5-verification.md`
 - **status.md**: 任务状态看板
-- **ADR-040**: Plugin 推迟决策
+- **ADR-042**: Plugin 推迟决策

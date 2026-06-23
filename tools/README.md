@@ -2,7 +2,7 @@
 
 > **状态**: Phase 0+ 持续维护 (2026-06-12 起)
 > **集成**: 3 个验证脚本接入 GitHub Actions (`.github/workflows/architecture-gates.yml` PR 阻塞 + `.github/workflows/doc_check.yml` smoke)
-> **决策**: `docs/architecture/adr.md` ADR-041 "CI 强制架构门禁"
+> **决策**: `docs/architecture/adr.md` ADR-043 "CI 强制架构门禁"
 
 ## 1. 验证脚本 (Architecture Gates)
 
@@ -77,7 +77,7 @@ bash tools/doc_link_check.sh --quiet  # 仅断链, 无进度输出
 
 ## 6. 相关文档
 
-- `docs/architecture/adr.md` ADR-041 (CI 集成决策, 2026-06-12)
+- `docs/architecture/adr.md` ADR-043 (CI 集成决策, 2026-06-12)
 - `docs/architecture/adr.md` ADR-024 (Bundle 三层分层, ⚠️ Mapper 推迟)
 - `docs/architecture/adr.md` ADR-033 (CtrlLink 4-control-API)
 - `docs/architecture/adr.md` ADR-040 (TLM→HDL 移植性约束)
