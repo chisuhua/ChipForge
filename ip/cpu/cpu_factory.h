@@ -300,10 +300,9 @@ class CpuFactory {
                                      const CPUConfig& config) {
     pb.register_plugin(std::make_unique<cf::cpu::plugins::IBusPlugin<U> >());
     pb.register_plugin(
-        std::make_unique<cf::cpu::plugins::BranchPredictorPlugin<U,
-                                                                  16, 16, 16, 8, 1> >());
+        std::make_unique<cf::cpu::plugins::BranchPredictorPlugin<U>>(
+            config.btb_entries));
     (void)sizeof(U);
-    (void)config;
   }
 
   // NORMAL 阶段: decode + execute

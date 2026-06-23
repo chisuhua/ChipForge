@@ -104,7 +104,7 @@ static void test_d2_hazard_plugin_multi_thread() {
 
 static void test_d2_branch_predictor_multi_thread() {
   // N_THREADS=2 per-thread GHR 隔离
-  BranchPredictorPlugin<T, 16, 16, 16, 8, 2> bp_mt;
+  BranchPredictorPlugin<T, 16, 16, 8, 2> bp_mt(16);
   // tid=0 训练
   bp_mt.update(0x1000, true, 0x2000, /*tid*/ 0);
   // tid=1 独立训练
@@ -166,7 +166,7 @@ static void test_d3_hazard_kind_enum() {
 // =====================================================================
 
 static void test_d4_branch_predictor_tid_param() {
-  BranchPredictorPlugin<T, 16, 16, 16, 8, 2> bp;
+  BranchPredictorPlugin<T, 16, 16, 8, 2> bp(16);
   // 默认 tid=0, 选不同 BTB 索引 (0x1010 & 15 = 0)
   bp.update(0x1010, true, 0x2010);
   // 显式 tid=1, 不同 BTB 索引 (0x2020 & 15 = 0, 仍冲突)
@@ -262,7 +262,7 @@ static void test_hazard_set_tid_stores_tid() {
 }
 
 static void test_branch_predictor_set_tid_stores_tid() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   assert(bp.current_tid() == 0);
   bp.set_tid(2);
   assert(bp.current_tid() == 2);
