@@ -11,7 +11,7 @@
 
 把 `ip/cpu/cpu_factory.h` CpuFactory stub 转化为真实工厂，**注册 11 个 RISC-V plugin** 在 EARLY/NORMAL/LATE 三阶段。集成 `cpu_sim` 与真实 `CpuFactory::build_cpu`，**端到端验证 add.elf 在 3/5/7/10-stage 流水线全部通过 tohost=1**。完成 576-config DSE sweep 并产出 honest performance baseline 文档。
 
-**Phase 1.5 完整收官**：M1-M5 (47/49 = 96%, 含 M5.1 stub) + M4G (8/8) + M4-DSE (8/8 = 100%)。
+**Phase 1.5 完整收官**：M1-M5 (47/49 = 96%, 含 M5.1 stub) + M4G (8/8) + M4-DSE (7/8 PASS + 1 absorbed, M4.13 reg_file writeback→retire refactor 推迟 Phase 5+)。
 
 ---
 
@@ -25,8 +25,10 @@
 |------|---------|------|
 | **EARLY** | `IBusPlugin<U>`, `BranchPredictorPlugin<U>` | 2 |
 | **NORMAL** | `RiscvDecodePlugin`, `HazardPlugin`, `RiscvIntAluPlugin`, `RiscvMulPlugin<U, 1\|3\|5>`, `RiscvBranchPlugin`, `RiscvLsuPlugin`, `RiscvCsrPlugin` | 7 |
-| **LATE** | `DBusPlugin`, `RegFilePlugin`, `RetirePlugin` | 3 |
-| **Total** | | **11 + 1 retire = 12** |
+| **LATE** | `DBusPlugin`, `RegFilePlugin` | 2 |
+| **Total** | | **11** |
+
+**注意**: `RetirePlugin` 在 OpenSpec spec 中列为第 11 个 plugin，但 `ip/cpu/plugins/` 暂无此 class 文件 (commit `6ecd264` BLOCKED 标记)。按 [ADR-042](../architecture/adr/ADR-042-plugin-deferral.md) 推迟到 Phase 5+。当前实际注册 11 plugins (不含 Retire)。
 
 ### 2. M4.14 — BranchPredictor Template Convergence (2 commits)
 

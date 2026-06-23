@@ -14,7 +14,7 @@
 |------|------|----------|
 | **Binary correctness** (cpu_sim 真实执行 add.elf + 触发 tohost=1) | ✅ **576/576 configs** | 真实二进制执行证据 |
 | **Integration tests** (3/5/7/10-stage add.elf 端到端) | ✅ **4/4 PASS** | ctest 通过 |
-| **ctest 全局** (43 既有 + 0 新增) | ✅ **43/43 PASS** | 不退化 |
+| **ctest 全局** (16 既有 + 27 M4 阶段新增, M4-DSE 未新增) | ✅ **43/43 PASS** | 不退化 |
 | **openspec validate** | ✅ **13/13 PASS** | spec 完整 |
 | **Performance measurement** (IPC 测量) | ⚠️ **576/576 `ipc=0.0`** | **Phase 1.5 known limitation** |
 | **Pareto front** (`results/pareto.json`) | 🔴 **空集 `[]`** (degenerate-by-design) | **Phase 1.5 known limitation** |

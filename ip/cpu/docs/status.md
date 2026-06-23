@@ -130,14 +130,14 @@
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
 | M4.12 | Real Plugin Registration (CpuFactory stub → 11 plugins in EARLY/NORMAL/LATE) | 🟢 PASS | 100% | register_early/normal/late 5 commits, test_cpu_factory 升级 PASS | commits `4cc077d` / `3f9543d` / `6ecd264` / `c95ac4e` + `da8f4ff` |
-| M4.13 | reg_file writeback → retire single-direction flow fix | 🟢 PASS | 100% | 含在 M4.15 PicolibcHostMemory 提交中 | commit `211c9ce` |
+| M4.13 | reg_file writeback → retire single-direction flow fix | 🟡 部分 (absorbed) | 100% | 仅完成 RegFilePlugin **注册** (M4.12 `6ecd264`); writeback→retire 单向流重构 **未实施** (plugin pipeline 是 stub, 此 refactor 仅在 plugin 真执行时有意义) | 实施合并至 M4.12 `6ecd264`; 完整 refactor 推迟 Phase 5+ plugin stub → real |
 | M4.14 | BranchPredictor BTB_SIZE template→runtime | 🟢 PASS | 100% | 编译时间 -50%, 二进制大小 -50% | commits `01d9cab` + `07c0745` |
 | M4.15 | cpu_sim PicolibcHostMemory + minimal RV32I interpreter | 🟢 PASS | 100% | `--elf` flag + tohost 机制 + 4 集成测试 PASS | commits `211c9ce` + `86903f8` (Note: `ipc=0.0` 占位, retire counting 推迟 Phase 5+) |
 | M4.16 | add.elf end-to-end on 3/5/7/10-stage | 🟢 PASS | 100% | 4/4 集成测试 PASS, M5.11 byte-identical 保留 | commits `85230ac` / `6367a6a` / `d99a057` / `87e3374` |
 | M4.17 | 576-config sweep + Pareto frontier | 🟢 PASS | 100% | 576/576 `tohost=1`; Pareto `[]` degenerate-by-design | commits `be1814d` + `76a3581` |
-| M4.18 | Integration test coverage for all pipeline depths | 🟢 PASS | 100% | append-only 4 个集成测试, 不修改 M5.11 baseline | 包含在 M4.16 commits |
+| M4.18 | Integration test coverage for all pipeline depths | 🟢 PASS | 100% | append-only 4 个集成测试, 不修改 M5.11 baseline | 包含在 M4.16 commits (`85230ac`/`6367a6a`/`d99a057`/`87e3374`) |
 | M4.19 | Performance baseline documentation | 🟢 PASS | 100% | 317 行 honest baseline doc, 5 章节完整 | commit `b46b7a9` |
-| **M4-DSE 累计** | | 🟢 **完成** | **8/8 (100%)** | **43/43 ctest + 4/4 add.elf + 576/576 sweep tohost** | OpenSpec change archived 2026-06-23, PR 待 push |
+| **M4-DSE 累计** | | 🟡 **7/8 PASS + 1 absorbed** | **8/8 (88%)** | **43/43 ctest + 4/4 add.elf + 576/576 sweep tohost** | M4.13 reg_file writeback→retire refactor 推迟 Phase 5+ plugin stub → real |
 
 **M4-DSE 关键交付**:
 - ✅ 11 个 RISC-V plugin 在 CpuFactory 中真实注册 (EARLY×2 + NORMAL×7 + LATE×3)
