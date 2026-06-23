@@ -231,8 +231,6 @@ class CpuFactory {
       const CPUConfig& config) {
     auto pb = std::make_unique<cf::plugin::PipeBuilder>();
 
-    // 1. EARLY 阶段: fetch 相关 Plugin
-    // (M2 stub, 实际由 CpuFactory 调度)
     register_early_plugins<T>(*pb, config);
 
     // 2. NORMAL 阶段: decode + execute
