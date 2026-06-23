@@ -1,9 +1,9 @@
 # M4-DSE CpuFactory Real — Pull Request Description
 
-> **OpenSpec change**: [`m4-dse-cpufactory-real`](../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/) (已归档)
-> **Spec**: [`openspec/specs/cpu-cpufactory-real/spec.md`](../../openspec/specs/cpu-cpufactory-real/spec.md) (6 requirements)
+> **OpenSpec change**: `m4-dse-cpufactory-real` (本地归档于 `openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/`, 含 proposal.md + design.md + tasks.md)
+> **Spec**: `cpu-cpufactory-real` (本地 `openspec/specs/cpu-cpufactory-real/spec.md`, 6 requirements)
 > **Branch**: `m4-dse-cpufactory-real-M4.12` → `main`
-> **Commits**: 17 (14 implementation + 3 docs)
+> **Commits**: 19 (14 implementation + 3 docs + 2 review/CI fixes)
 
 ---
 
@@ -246,13 +246,12 @@ docs(performance): M4-DSE honest performance baseline (576 configs, ipc=0.0 know
 
 ## Related Links
 
-- OpenSpec change: [m4-dse-cpufactory-real (archived)](../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/)
-- OpenSpec spec: [cpu-cpufactory-real](../../openspec/specs/cpu-cpufactory-real/spec.md)
+- OpenSpec change: `m4-dse-cpufactory-real` (本地归档)
+- OpenSpec spec: `cpu-cpufactory-real` (本地 spec)
 - ADR-042: [Plugin 推迟决策](../architecture/adr/ADR-042-plugin-deferral.md)
 - ADR-037: [Plugin 作为设计范式](../architecture/adr.md#k-范式决策)
 - ADR-043: [CI 强制架构门禁](../architecture/adr.md#j-目录与组织)
 - Baseline: [M4-DSE Honest Performance Baseline](../performance/m4-cpufactory-real-baseline.md)
-- Plan: [.omo/plans/m4-dse-cpufactory-real.md](../../.omo/plans/m4-dse-cpufactory-real.md)
 - IP Status: [ip/cpu/docs/status.md](../../ip/cpu/docs/status.md)
 
 ---

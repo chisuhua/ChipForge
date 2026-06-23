@@ -120,11 +120,9 @@
 
 ### 4.1 M4-DSE 子阶段 — CpuFactory stub 真实化 + DSE 旋钮接入
 
-> **来源**: OpenSpec change [`m4-dse-cpufactory-real`](../../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/) (已归档 2026-06-23)
-> **分支**: `m4-dse-cpufactory-real-M4.12` (17 commits ahead of main, 含 14 implementation + 3 docs)
-> **本节为 OpenSpec change 的任务拆分**。详细设计见 [`design.md`](../../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/design.md) + [`tasks.md`](../../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/tasks.md)。
-> **状态**: 🟢 **完成** (8/8 PASS, ctest 43/43 不退化, 4 集成测试 add.elf 端到端 PASS, 576/576 sweep `tohost=1`)
-> **实施计划**: [`.omo/plans/m4-dse-cpufactory-real.md`](../../../.omo/plans/m4-dse-cpufactory-real.md)
+> **来源**: OpenSpec change `m4-dse-cpufactory-real` (本地归档 2026-06-23, 含 proposal.md + design.md + tasks.md + specs/)
+> **分支**: `m4-dse-cpufactory-real-M4.12` (19 commits ahead of main, 含 14 implementation + 3 docs + 2 review/CI fixes)
+> **状态**: 🟡 **完成** (7/8 PASS + 1 absorbed, ctest 43/43 不退化, 4 集成测试 add.elf 端到端 PASS, 576/576 sweep `tohost=1`)
 > **Honest baseline**: [`docs/performance/m4-cpufactory-real-baseline.md`](../../../docs/performance/m4-cpufactory-real-baseline.md) — `ipc=0.0` 是 Phase 1.5 known limitation (ADR-042), 非 regression
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |

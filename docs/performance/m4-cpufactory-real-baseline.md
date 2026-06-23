@@ -2,7 +2,7 @@
 
 > **状态**: 📊 Phase 1.5 Baseline (M4.19)
 > **作者**: ChipForge Plugin Team
-> **关联**: [openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real](../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/design.md), [ADR-042 Plugin 推迟决策](../architecture/adr/ADR-042-plugin-deferral.md), [dse_architecture_v2_locks.md](../../ip/cpu/docs/dse_architecture_v2_locks.md)
+> **关联**: OpenSpec change `m4-dse-cpufactory-real` (本地归档), [ADR-042 Plugin 推迟决策](../architecture/adr/ADR-042-plugin-deferral.md), [dse_architecture_v2_locks.md](../../ip/cpu/docs/dse_architecture_v2_locks.md)
 > **数据来源**: `results/sweep.json` (576 rows), `results/pareto.json`, 4 integration tests
 > **最后更新**: 2026-06-24
 
@@ -307,10 +307,9 @@ Pareto 前沿计算依赖两个维度：
 - **ADR-042 Plugin 推迟决策**: [docs/architecture/adr/ADR-042-plugin-deferral.md](../architecture/adr/ADR-042-plugin-deferral.md)
 - **DSE Phase 1 锁定**: [ip/cpu/docs/dse_architecture_v2_locks.md](../../ip/cpu/docs/dse_architecture_v2_locks.md)
 - **DSE v1.0 完整方案**: [ip/cpu/docs/dse_architecture.md](../../ip/cpu/docs/dse_architecture.md)
-- **M4-DSE 实施归档**: [openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/](../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/)
-- **M4-DSE 实施计划**: [.omo/plans/m4-dse-cpufactory-real.md](../../.omo/plans/m4-dse-cpufactory-real.md)
 - **CPU 任务状态**: [ip/cpu/docs/status.md](../../ip/cpu/docs/status.md)
-- **OpenSpec Specs**: [openspec/specs/cpu-cpufactory-real/](../../openspec/specs/cpu-cpufactory-real/spec.md)
+- **M4-DSE 实施归档**: OpenSpec change `m4-dse-cpufactory-real` (本地归档)
+- **M4-DSE Spec**: `openspec/specs/cpu-cpufactory-real/spec.md` (本地)
 
 ---
 
