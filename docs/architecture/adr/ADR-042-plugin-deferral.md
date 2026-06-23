@@ -1,4 +1,4 @@
-# ADR-040: Plugin 推迟决策 (FPU/MMU/Exception → Phase 5+)
+# ADR-042: Plugin 推迟决策 (FPU/MMU/Exception → Phase 5+)
 
 > **状态**: Accepted (2026-06-16)
 > **作者**: ChipForge Plugin Team
