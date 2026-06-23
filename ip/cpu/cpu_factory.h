@@ -29,7 +29,17 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
-#include "ip/cpu/plugins/reg_file.h"  // M4G D.2 (G.2.10): smoke test 需要
+#include "ip/cpu/plugins/reg_file.h"
+#include "ip/cpu/plugins/ibus.h"
+#include "ip/cpu/plugins/branch_predictor.h"
+#include "ip/cpu/plugins/hazard.h"
+#include "ip/cpu/plugins/dbus.h"
+#include "ip/cpu/arch/riscv/decode.h"
+#include "ip/cpu/arch/riscv/int_alu.h"
+#include "ip/cpu/arch/riscv/mul.h"
+#include "ip/cpu/arch/riscv/branch.h"
+#include "ip/cpu/arch/riscv/lsu.h"
+#include "ip/cpu/arch/riscv/csr.h"
 
 namespace cf {
 namespace cpu {
@@ -311,13 +321,13 @@ class CpuFactory {
   // EARLY 阶段: fetch
   template <typename U>
   static void register_early_plugins(cf::plugin::PipeBuilder& pb,
-                                     const CPUConfig& /*config*/) {
-    // IBusPlugin: fetch 阶段读指令
-    // BranchPredictorPlugin: fetch 阶段预测分支
-    // 注: 实际 Plugin 实例化由 build_cpu 调用方持有, 工厂只调度
-    // M4 stub: 当前仅注册阶段, 不实例化 Plugin
-    (void)pb;
+                                     const CPUConfig& config) {
+    pb.register_plugin(std::make_unique<cf::cpu::plugins::IBusPlugin<U> >());
+    pb.register_plugin(
+        std::make_unique<cf::cpu::plugins::BranchPredictorPlugin<U,
+                                                                  16, 16, 16, 8, 1> >());
     (void)sizeof(U);
+    (void)config;
   }
 
   // NORMAL 阶段: decode + execute
