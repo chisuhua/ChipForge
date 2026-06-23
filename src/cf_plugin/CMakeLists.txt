@@ -494,7 +494,12 @@ foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv test_demo_soc)
       PRIVATE
         ${CMAKE_SOURCE_DIR}
     )
-    add_test(NAME ${test_name} COMMAND ${test_name})
+    # M4.16: WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} enables new add.elf end-to-end
+    # sub-tests that invoke ./build/src/cf_plugin/cpu_sim + ip/cpu/configs/*.json
+    add_test(NAME ${test_name}
+      COMMAND ${test_name}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
   endif()
 endforeach()
 
