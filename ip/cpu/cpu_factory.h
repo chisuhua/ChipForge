@@ -241,28 +241,6 @@ class CpuFactory {
     // 3. LATE 阶段: writeback
     register_late_plugins<T>(*pb, config);
 
-    // M5-DSE M5.14: RiscvMulPlugin 多周期延迟路由 (mul_latency ∈ {1, 3, 5})
-    //   case 1: 单周期, byte-identical to baseline (default path)
-    //   case 3: 3 级子流水, declare_substage("execute", "mul_s1"/"mul_s2")
-    //   case 5: 5 级子流水, declare_substage("execute", "mul_s1".."mul_s4")
-    // 注: 当前 register_normal_plugins 是 M4 stub, 仅验证 mul_latency 合法值;
-    //   实际 pb.register_plugin(std::make_unique<RiscvMulPlugin<T, LATENCY>>())
-    //   的实例化挂载将在 M4-DSE (register_normal_plugins 实施时) 一并接入.
-    switch (config.mul_latency) {
-      case 1:
-        // RiscvMulPlugin<T, 1> — default, byte-identical to baseline
-        break;
-      case 3:
-        // RiscvMulPlugin<T, 3> — mul_s1, mul_s2 substages
-        break;
-      case 5:
-        // RiscvMulPlugin<T, 5> — mul_s1..mul_s4 substages
-        break;
-      default:
-        throw std::invalid_argument(
-            "CpuFactory: unsupported mul_latency (must be 1/3/5)");
-    }
-
     // M5-DSE M5.10: 编译期 TopologyBuilder 展开 (按 config.pipeline_stages)
     // 5-stage 路径必须 byte-identical to baseline (现 register_*/at_stage 行为)
     switch (config.pipeline_stages) {
@@ -333,11 +311,34 @@ class CpuFactory {
   // NORMAL 阶段: decode + execute
   template <typename U>
   static void register_normal_plugins(cf::plugin::PipeBuilder& pb,
-                                      const CPUConfig& /*config*/) {
-    // decode: RiscvDecodePlugin, HazardPlugin
-    // execute: RiscvIntAluPlugin, RiscvBranchPlugin, RiscvMulPlugin,
-    //          RiscvLsuPlugin, RiscvCsrPlugin
-    (void)pb;
+                                      const CPUConfig& config) {
+    pb.register_plugin(
+        std::make_unique<cf::cpu::arch::riscv::RiscvDecodePlugin<U> >());
+    pb.register_plugin(std::make_unique<cf::cpu::plugins::HazardPlugin<U> >());
+    pb.register_plugin(
+        std::make_unique<cf::cpu::arch::riscv::RiscvIntAluPlugin<U> >());
+    switch (config.mul_latency) {
+      case 1:
+        pb.register_plugin(
+            std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 1> >());
+        break;
+      case 3:
+        pb.register_plugin(
+            std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 3> >());
+        break;
+      case 5:
+        pb.register_plugin(
+            std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 5> >());
+        break;
+      default:
+        throw std::invalid_argument(
+            "CpuFactory: unsupported mul_latency (must be 1/3/5)");
+    }
+    pb.register_plugin(
+        std::make_unique<cf::cpu::arch::riscv::RiscvBranchPlugin<U> >());
+    pb.register_plugin(
+        std::make_unique<cf::cpu::arch::riscv::RiscvLsuPlugin<U> >());
+    pb.register_plugin(std::make_unique<cf::cpu::arch::riscv::RiscvCsrPlugin>());
     (void)sizeof(U);
   }
 
