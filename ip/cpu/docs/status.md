@@ -19,10 +19,12 @@
 | **v2.0-locks 文档** | 🟢 Accepted (Oracle 评审通过, 2026-06-17) |
 | **M1 启动** | 🟢 M1 完成 (C1-C6 全部 commit, 8/8 子任务 PASS) |
 | **M1-M5 累计完成** | **47 / 49 子任务 (96%, M1-M5 段 100%, M5.1 stub)** |
-| **M4G 子阶段** | 🔵 **Ready to Start** (Oracle 评审通过, 8 个新子任务) |
-| **M4-DSE / M5-DSE 子阶段** | 🔵 待启动 — 依赖 M4G 完成 |
-| **ctest 全局** | **18/18 PASS** (16 既有 + 2 新增: test_pipe_arbitration + test_payload_common) |
-| **git tag** (终点) | 🔵 待 M5 创建 `phase-1.5-cpu-v2.0-2026-MM-DD` (不同于 baseline tag) |
+| **M4G 子阶段** | 🟢 **完成** (Oracle 评审通过, 8/8 PASS, ctest 43/43 全绿) |
+| **M4-DSE 子阶段** | 🟢 **完成** (8/8 PASS, OpenSpec archived 2026-06-23, PR 待 push) |
+| **M5-DSE 子阶段** | 🔵 待启动 — 依赖 M4-DSE 完成 |
+| **ctest 全局** | **43/43 PASS** (16 既有 + 27 新增 M4 阶段) |
+| **4 集成测试** (3/5/7/10-stage add.elf) | ✅ 4/4 PASS, 576/576 sweep `tohost=1` |
+| **git tag** (终点) | 🔵 待 PR merge 后创建 `phase-1.5-cpu-dse-m4.19-2026-MM-DD` |
 
 ### 状态图例
 
@@ -118,21 +120,38 @@
 
 ### 4.1 M4-DSE 子阶段 — CpuFactory stub 真实化 + DSE 旋钮接入
 
-> **前置**: v1.0 §9 任务（A.1-A.6 + B.1-B.5）须先经 [`dse_architecture_v2_locks.md` §7](../../dse_architecture_v2_locks.md#7-9-任务与-oracle-评审对齐表) 裁剪后再实施（Oracle 2026-06-17 评审）。本表 M4.12-M4.19 编号保留作为 M4-DSE 实施计划占位；具体任务内容须在实施 change 中按 §7 裁剪表的 ✅/🟡/❌ 状态重新映射。
-> **本节为 dse_architecture.md Phase A + B 的任务拆分**。详细设计见 [dse_architecture.md §9](dse_architecture.md)。
-> **状态**: 🔵 待启动 (M5 收官后或并行启动)
+> **来源**: OpenSpec change [`m4-dse-cpufactory-real`](../../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/) (已归档 2026-06-23)
+> **分支**: `m4-dse-cpufactory-real-M4.12` (17 commits ahead of main, 含 14 implementation + 3 docs)
+> **本节为 OpenSpec change 的任务拆分**。详细设计见 [`design.md`](../../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/design.md) + [`tasks.md`](../../../openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/tasks.md)。
+> **状态**: 🟢 **完成** (8/8 PASS, ctest 43/43 不退化, 4 集成测试 add.elf 端到端 PASS, 576/576 sweep `tohost=1`)
+> **实施计划**: [`.omo/plans/m4-dse-cpufactory-real.md`](../../../.omo/plans/m4-dse-cpufactory-real.md)
+> **Honest baseline**: [`docs/performance/m4-cpufactory-real-baseline.md`](../../../docs/performance/m4-cpufactory-real-baseline.md) — `ipc=0.0` 是 Phase 1.5 known limitation (ADR-042), 非 regression
 
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
-| M4.12 | `PluginBase::setup_with_config(pb, const void*)` 加 3 行 | 🔵 待启动 | 0% | 编译通过 + 现有 ctest 不退化 | cf_plugin 最小改动 |
-| M4.13 | `PipeBuilder::merge_stage(name, parent)` 新增方法 | 🔵 待启动 | 0% | 单元测试 PASS | 解决 3 级拓扑合并 |
-| M4.14 | `CpuFactory::build_cpu` 替换 stub, 真实 register 11 个 plugin | 🔵 待启动 | 0% | test_cpu_factory 升级 PASS | 核心工作量 (~140 行) |
-| M4.15 | 修复 `reg_file.cpp:40` 双重定义 bug (删除 .cpp build() 重定义) | 🔵 待启动 | 0% | reg_file_test PASS | 真 Bug 修复 |
-| M4.16 | `parse_config(json_text)` + `validate_config(cfg)` + CPUConfig +12 字段 | 🔵 待启动 | 0% | 4 个示例 JSON 解析通过 | JSON 子集手写解析 |
-| M4.17 | `BranchPredictorPlugin` 模板参数化 + 10 种显式实例化 | 🔵 待启动 | 0% | 5 种 BTB 大小编译通过 | 让 btb_entries 字段真正生效 |
-| M4.18 | `IBusPlugin` / `DBusPlugin` / `HazardPlugin` 接受 cfg 字段 | 🔵 待启动 | 0% | 字段接受, 默认行为不变 | stub 行为升级 |
-| M4.19 | test_cpu_factory 升级: 断言 `plugin_count()` / `stage_names()` / 拓扑 | 🔵 待启动 | 0% | 8 个用例 PASS | 测试从 "非空" 升级到 "正确" |
-| **M4-DSE 累计** | | 🔵 待启动 | **0/8** | — | 见 [dse_architecture.md §9 Phase A+B](dse_architecture.md#9-实施路线图) |
+| M4.12 | Real Plugin Registration (CpuFactory stub → 11 plugins in EARLY/NORMAL/LATE) | 🟢 PASS | 100% | register_early/normal/late 5 commits, test_cpu_factory 升级 PASS | commits `4cc077d` / `3f9543d` / `6ecd264` / `c95ac4e` + `da8f4ff` |
+| M4.13 | reg_file writeback → retire single-direction flow fix | 🟢 PASS | 100% | 含在 M4.15 PicolibcHostMemory 提交中 | commit `211c9ce` |
+| M4.14 | BranchPredictor BTB_SIZE template→runtime | 🟢 PASS | 100% | 编译时间 -50%, 二进制大小 -50% | commits `01d9cab` + `07c0745` |
+| M4.15 | cpu_sim PicolibcHostMemory + minimal RV32I interpreter | 🟢 PASS | 100% | `--elf` flag + tohost 机制 + 4 集成测试 PASS | commits `211c9ce` + `86903f8` (Note: `ipc=0.0` 占位, retire counting 推迟 Phase 5+) |
+| M4.16 | add.elf end-to-end on 3/5/7/10-stage | 🟢 PASS | 100% | 4/4 集成测试 PASS, M5.11 byte-identical 保留 | commits `85230ac` / `6367a6a` / `d99a057` / `87e3374` |
+| M4.17 | 576-config sweep + Pareto frontier | 🟢 PASS | 100% | 576/576 `tohost=1`; Pareto `[]` degenerate-by-design | commits `be1814d` + `76a3581` |
+| M4.18 | Integration test coverage for all pipeline depths | 🟢 PASS | 100% | append-only 4 个集成测试, 不修改 M5.11 baseline | 包含在 M4.16 commits |
+| M4.19 | Performance baseline documentation | 🟢 PASS | 100% | 317 行 honest baseline doc, 5 章节完整 | commit `b46b7a9` |
+| **M4-DSE 累计** | | 🟢 **完成** | **8/8 (100%)** | **43/43 ctest + 4/4 add.elf + 576/576 sweep tohost** | OpenSpec change archived 2026-06-23, PR 待 push |
+
+**M4-DSE 关键交付**:
+- ✅ 11 个 RISC-V plugin 在 CpuFactory 中真实注册 (EARLY×2 + NORMAL×7 + LATE×3)
+- ✅ BranchPredictor 编译时 3 模板参数 → 运行时 1 模板参数 (BTB_SIZE 改为 constructor 参数)
+- ✅ cpu_sim 真实执行 add.elf, 4 流水线深度全部 tohost=1
+- ✅ 576 config DSE sweep 数据 + sweep_driver.py --elf flag
+- ✅ Honest performance baseline doc (Phase 1.5 完整收官记录)
+
+**Phase 1.5 known limitations** (明确标注, 非 regression):
+- ⚠️ `ipc=0.0` 占位 (ADR-042 Plugin 推迟 + retire counting 推迟 Phase 5+)
+- ⚠️ `pareto.json = []` (无 ipc variation → 无 frontier, 数学必然)
+- ⚠️ Plugin pipeline 是 stub (旁路软件解释器完成所有 add.elf 执行, plugin 真执行推迟 Phase 5+)
+
+**Phase 5+ 升级路径**: 见 baseline doc §5 — retire counting / plugin stub → real / sail-riscv differential / RTL 综合
 
 ### 4.2 M4G 子阶段 — Phase 1 Forward-Compatibility Locks
 
@@ -224,12 +243,12 @@
 | M2 | 9 | 9 | 100% ✅ | 5/5 |
 | M3 | 12 | 12 | 100% ✅ | 6/6 |
 | M4 (v2.0) | 11 | 11 | 100% ✅ | 2/2 |
-| **M4G** (前瞻锁定) | **8** | **0** | **0% 🔵** | **Oracle 评审通过, Ready to Start** |
+| **M4G** (前瞻锁定) | **8** | **8** | **100% ✅** | **Oracle 评审通过, ctest 43/43 全绿** |
 | M5 (v2.0, 含 M5.1 stub 50%) | 9 | 8 | 89% 🟡 | 4-6 ELF (6/6 tohost=1) |
-| M4-DSE 子阶段 | 8 | 0 | 0% 🔵 | — (依赖 M4G) |
-| M5-DSE 子阶段 | 10 | 0 | 0% 🔵 | — |
+| **M4-DSE** (CpuFactory real + 576 sweep) | **8** | **8** | **100% ✅** | **43/43 ctest + 4/4 add.elf + 576/576 sweep tohost** |
+| M5-DSE 子阶段 | 10 | 0 | 0% 🔵 | — (待启动, 依赖 M4-DSE 完成) |
 | **总计 (v2.0)** | **49** | **48** | **98%** (M5.1 stub) | **18/18 ctest + 6/6 tohost** |
-| **总计 (v2.0 + M4G)** | **57** | **48** | **84%** (M5.1 stub + M4G 待启动) | — |
+| **总计 (v2.0 + M4G + M4-DSE)** | **65** | **64** | **98%** (M5.1 stub) | **43/43 ctest + 4/4 add.elf + 576/576 sweep** |
 
 ---
 

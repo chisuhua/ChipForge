@@ -1,10 +1,17 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-06-21 (本次会话: M4G-extend 落地, M5-DSE OpenSpec 启动, Phase 2 工具链 v1.1 Accepted; 8 天间隔)
-> **当前可启动**: ① **M5-DSE 2-wide superscalar** (硬前置 m4g-extend 已就位, `openspec/changes/m5-dse-superscalar/` 4/4 artifacts ready) ② **Phase 2 bare-metal 测试套件** (`.omo/plans/phase-2-baremetal-riscv-tests.md` 723 行 plan 完整, F1-F8 Accepted 2026-06-21, 仅 ACT4 clone + elfio apt install 待 P0)
+> **最后更新**: 2026-06-24 (本次会话: **M4-DSE CpuFactory Real 完整收官** + ADR renumber + Honest baseline doc; 3 天间隔)
+> **当前可启动**: ① **M5-DSE 启动** (硬前置 m4-dse-cpufactory-real 已 merge, 8/8 完成, 576/576 sweep `tohost=1`) ② **Phase 2 bare-metal 测试套件** (`.omo/plans/phase-2-baremetal-riscv-tests.md` 723 行 plan 完整, F1-F8 Accepted 2026-06-21, 仅 ACT4 clone + elfio apt install 待 P0)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
+
+> **3 天进展摘要 (2026-06-21 → 2026-06-24)**:
+> - **M4-DSE CpuFactory Real** 完整收官 (`m4-dse-cpufactory-real-M4.12` 分支, 17 commits ahead of main): 11 plugins 在 CpuFactory 中真实注册 (EARLY×2 + NORMAL×7 + LATE×3), BranchPredictor 编译时 3 模板参数 → 运行时 1 模板参数, cpu_sim PicolibcHostMemory + 最小 RV32I 解释器 + `--elf` flag, add.elf 在 3/5/7/10-stage 全部 tohost=1 (M5.11 byte-identical 保留), 576-config DSE sweep 全部 tohost=1 (Pareto 空集 degenerate-by-design 详见 baseline doc)。
+> - **Honest performance baseline** 创建 (`docs/performance/m4-cpufactory-real-baseline.md`, 317 行, 5 章节): 完整记录 Phase 1.5 能力边界 — `ipc=0.0` 是 Phase 1.5 known limitation (ADR-042 Plugin 推迟 + retire counting 推迟 Phase 5+), 非 regression。Phase 5+ 升级路径明确 (retire counting / plugin stub → real / sail-riscv differential / RTL 综合)。
+> - **OpenSpec change archived** 2026-06-23: `openspec/changes/archive/2026-06-23-m4-dse-cpufactory-real/` 4/4 artifacts + 8 requirements spec。`openspec validate --specs` 13/13 PASS。
+> - **ADR renumber**: ADR-040 (Plugin Deferral) → ADR-042 (为 ADR-041 Bridge Tick 留位); 新增 ADR-037 (Plugin 作为设计范式) + ADR-043 (CI 强制架构门禁); 4 cross-reference 文件更新。`adr.md` 实现决策 31→34 (78% → 79%)。
+> - **验证门**: ctest 43/43 PASS, openspec validate 13/13 PASS, 4/4 add.elf 集成测试 PASS, 576/576 sweep `tohost=1`, doc_link_check 新增 0 broken。
 
 > **8 天进展摘要 (2026-06-13 → 2026-06-21)**:
 > - **M4G-extend-tid-and-hooks** 落地 (commit `ec6ee4f`, 2026-06-21): PluginBase::set_tid + 3 plugin override + PipeBuilder n_threads + OoO commit_hook 文档 + COMMIT 阶段名。8 文件 +217/-27 LOC, 18/18 ctest PASS, 0 行为变化。
@@ -22,7 +29,7 @@
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
 | Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
-| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~88% (1.1+1.2+1.3全部子任务+1.4方法学复盘+**M4G-extend 2026-06-21**完成) | 无 | Phase 1 退出标准全部达成, M5-DSE 硬前置已就位 |
+| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~95% (1.1+1.2+1.3全部子任务+1.4方法学复盘+**M4G-extend 2026-06-21**完成+**M4G 8/8**完成+**M4-DSE 8/8 2026-06-24**完成) | 无 | Phase 1 退出标准全部达成, M5-DSE 硬前置已就位 |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
 | Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | CLINT/PLIC IP 完善 |
