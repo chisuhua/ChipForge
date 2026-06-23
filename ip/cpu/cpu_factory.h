@@ -346,15 +346,8 @@ class CpuFactory {
   template <typename U>
   static void register_late_plugins(cf::plugin::PipeBuilder& pb,
                                     const CPUConfig& /*config*/) {
-    // M4G D.2 (G.2.10): 编译期 smoke test, 验证模板参数化 RegFilePlugin 实例化链
-    // 不调用 build() 也不注册到 PipeBuilder, 仅声明局部变量触发模板实例化
-    // M4-DSE 启动时删除此 smoke test
-    cf::cpu::plugins::RegFilePlugin<U> rf_smoke_{};
-    (void)rf_smoke_;
-
-    // writeback: RegFilePlugin (M4-DSE 实施)
-    // memory: DBusPlugin
-    (void)pb;
+    pb.register_plugin(std::make_unique<cf::cpu::plugins::DBusPlugin<U> >());
+    pb.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<U> >());
     (void)sizeof(U);
   }
 };
