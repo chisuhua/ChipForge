@@ -124,11 +124,35 @@ static void test_7stage_dispatch_width_2() {
   printf("  [PASS] test_7stage_dispatch_width_2\n");
 }
 
+static std::string exec_cmd(const std::string& cmd) {
+  std::string result;
+  FILE* pipe = popen(cmd.c_str(), "r");
+  if (!pipe) return result;
+  char buf[256];
+  while (fgets(buf, sizeof(buf), pipe) != nullptr) result += buf;
+  pclose(pipe);
+  return result;
+}
+
+static void test_7stage_add_elf_end_to_end() {
+  // M4.16: add.elf end-to-end on 7-stage. RV32I interpreter is pipeline-agnostic
+  // (M4.15) so tohost=1 across 3/5/7/10-stage.
+  std::string output = exec_cmd(
+      "./build/src/cf_plugin/cpu_sim "
+      "--config ip/cpu/configs/cpu_superscalar.json "
+      "--elf build/add.elf --cycles 200 2>&1");
+  assert(output.find("tohost=1") != std::string::npos);
+  assert(output.find("pipeline_stages=7") != std::string::npos);
+  assert(output.find("tohost=0") == std::string::npos);
+  printf("  [PASS] test_7stage_add_elf_end_to_end\n");
+}
+
 int main() {
   printf("test_7stage_riscv (集成, M4-DSE partial):\n");
   test_build_7stage_superscalar();
   test_7stage_topology_from_config();
   test_7stage_dispatch_width_2();
+  test_7stage_add_elf_end_to_end();
   printf("[PASS] all 7-stage integration tests (topology only — add.elf DEFERRED to M4-DSE)\n");
   return 0;
 }
