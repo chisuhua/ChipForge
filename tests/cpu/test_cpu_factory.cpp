@@ -87,6 +87,22 @@ static void test_default_json_config() {
   printf("  [PASS] test_default_json_config\n");
 }
 
+// M4.12: spec 要求 11 plugins 含 RetirePlugin, 但 ip/cpu/plugins/ 中
+//        不存在 RetirePlugin 类 — 此为 BLOCKED 项待 orchestrator 决策
+//        实际可注册: 10 plugins
+static void test_build_cpu_registers_10_real_plugins() {
+  CPUConfig cfg;
+  cfg.branch_predictor = "gshare";
+  cfg.btb_entries = 64;
+  cfg.mul_latency = 3;
+  auto pb = cf::cpu::CpuFactory<std::uint64_t>::build_cpu(cfg);
+  assert(pb != nullptr);
+  const auto& plugins = pb->plugins();
+  assert(plugins.size() == 10);
+  printf("  [PASS] test_build_cpu_registers_10_real_plugins (count=%zu)\n",
+         plugins.size());
+}
+
 int main() {
   printf("test_cpu_factory:\n");
   test_default_config();
@@ -94,6 +110,7 @@ int main() {
   test_build_cpu_rv64();
   test_embedded_config();
   test_default_json_config();
+  test_build_cpu_registers_10_real_plugins();
   printf("[PASS] all CpuFactory tests\n");
   return 0;
 }
