@@ -445,6 +445,27 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/configs/test_schema_m5_19.cpp)
 endif()
 
 # ----------------------------------------------------------------------------
+# M4-DSE: cpu_sim PicolibcHostMemory 集成测试 (M4.15)
+# 验证 cpu_sim --elf <add.elf> 输出真实 tohost 值 (非占位 0)
+# 路径: tests/cpu/ (与 test_topology_builder / test_branch_predictor_runtime_btb 同家族)
+# 不需要 nlohmann/json 依赖 (测试本身只 exec cpu_sim 并 parse 输出)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_cpu_sim_real_tohost.cpp)
+  add_executable(test_cpu_sim_real_tohost
+    ${CMAKE_SOURCE_DIR}/tests/cpu/test_cpu_sim_real_tohost.cpp
+  )
+  target_link_libraries(test_cpu_sim_real_tohost PRIVATE cf_plugin)
+  target_include_directories(test_cpu_sim_real_tohost
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_cpu_sim_real_tohost
+    COMMAND test_cpu_sim_real_tohost
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}  # so tests/cpu/manual_elf/add.S is found
+  )
+endif()
+
+# ----------------------------------------------------------------------------
 # M5-DSE: cpu_sim CLI 二进制 (Section 7 / M5.16)
 # DSE 工具链入口 — 解析 JSON 配置, 构建 CPU, 运行 N cycles, 输出 KEY=VALUE
 # 不接入 ctest (CLI 工具, 非测试); nlohmann/json 来自 cf_plugin_link_cpptlm
