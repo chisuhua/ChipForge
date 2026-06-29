@@ -50,6 +50,10 @@ state/
 inst.log
 commits.log
 
+# Git worktrees (isolated development workspaces)
+.worktrees/
+worktrees/
+
 # AI agent / IDE config (single source-of-truth: ./AGENTS.md)
 .claude/
 .cursorrules
