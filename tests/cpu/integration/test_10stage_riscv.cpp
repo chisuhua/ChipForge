@@ -13,12 +13,10 @@
 //                  (requires CpuFactory 真实 11 plugin 注册, 推迟到 m4-dse-cpufactory-real)
 //
 // 约束:
-//   - 纯 main() + assert (项目约定, 不用 gtest)
 //   - 10-stage deep pipeline: ≥10 节点 (7 main + 8 substages IF1/IF2/ID/RENAME/ISSUE/EX1-3/MEM1-2)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 #include <fstream>
 #include <memory>
 
@@ -33,7 +31,7 @@ using T = std::uint32_t;
 //    TopologyBuilder<10>: 7 main + 8 substages (IF1, IF2, ID, RENAME, ISSUE,
 //    EX1, EX2, EX3, MEM1, MEM2 — declared via declare_substage)
 //    注: 10-stage 当前 scope 不触发 lane 派发 (dispatch_width 默认 1)
-static void test_build_10stage_deep() {
+TEST_CASE("build_10stage_deep", "[cpu]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_deep";
   cfg.isa = "rv64gc";
@@ -46,31 +44,30 @@ static void test_build_10stage_deep() {
   cfg.enable_mmu = true;
   cfg.mmu_mode = "sv48";
   auto pb = CpuFactory<T>::build_cpu(cfg);
-  assert(pb != nullptr);
+  REQUIRE(pb != nullptr);
   // Plan DoD: ≥10 nodes with deep-pipeline splits
-  assert(pb->node_count() >= 10);
+  REQUIRE(pb->node_count() >= 10);
   // 验证 main stages 存在
-  assert(pb->has_stage("fetch"));
-  assert(pb->has_stage("decode"));
-  assert(pb->has_stage("execute"));
-  assert(pb->has_stage("memory"));
-  assert(pb->has_stage("writeback"));
-  assert(pb->has_stage("retire"));
+  REQUIRE(pb->has_stage("fetch"));
+  REQUIRE(pb->has_stage("decode"));
+  REQUIRE(pb->has_stage("execute"));
+  REQUIRE(pb->has_stage("memory"));
+  REQUIRE(pb->has_stage("writeback"));
+  REQUIRE(pb->has_stage("retire"));
   // 验证 deep-pipeline substages (declare_substage 创建的物理 node)
-  assert(pb->node_of_logic_stage("RENAME") != nullptr);
-  assert(pb->node_of_logic_stage("ISSUE") != nullptr);
-  assert(pb->node_of_logic_stage("EX1") != nullptr);
-  assert(pb->node_of_logic_stage("EX2") != nullptr);
-  assert(pb->node_of_logic_stage("IF1") != nullptr);
-  assert(pb->node_of_logic_stage("MEM1") != nullptr);
-  printf("  [PASS] test_build_10stage_deep\n");
+  REQUIRE(pb->node_of_logic_stage("RENAME") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("ISSUE") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("EX1") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("EX2") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("IF1") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("MEM1") != nullptr);
 }
 
 // 2. 10-stage 拓扑从 cpu_deep_pipeline.json 配置加载
 //    验证 JSON → CPUConfig 字段映射 + TopologyBuilder<10> 路由
-static void test_10stage_topology_from_config() {
+TEST_CASE("10stage_topology_from_config", "[cpu]") {
   std::ifstream ifs("ip/cpu/configs/cpu_deep_pipeline.json");
-  assert(ifs.is_open());
+  REQUIRE(ifs.is_open());
   nlohmann::json j;
   ifs >> j;
   const auto& p = j["params"];
@@ -87,22 +84,21 @@ static void test_10stage_topology_from_config() {
   cfg.mmu_mode = p.value("mmu_mode", "sv39");
 
   auto pb = CpuFactory<T>::build_cpu(cfg);
-  assert(pb != nullptr);
+  REQUIRE(pb != nullptr);
   // 10-stage deep pipeline ≥ 10 nodes
-  assert(pb->node_count() >= 10);
+  REQUIRE(pb->node_count() >= 10);
   // 验证 deep-pipeline substages
-  assert(pb->node_of_logic_stage("RENAME") != nullptr);
-  assert(pb->node_of_logic_stage("EX1") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("RENAME") != nullptr);
+  REQUIRE(pb->node_of_logic_stage("EX1") != nullptr);
   // JSON 字段已正确加载 (cpu_deep_pipeline.json: mul_latency=5, dispatch_width=1)
-  assert(cfg.mul_latency == 5);
-  assert(cfg.pipeline_stages == 10);
-  printf("  [PASS] test_10stage_topology_from_config\n");
+  REQUIRE(cfg.mul_latency == 5);
+  REQUIRE(cfg.pipeline_stages == 10);
 }
 
 // 3. 10-stage + mul_latency=5 组合 (M5.14 多周期延迟)
 //    当前 CpuFactory mul_latency 路由仅验证合法值 (1/3/5), 不实例化 plugin,
 //    所以此测试仅验证 CPUConfig 字段被路由 + 拓扑正确展开
-static void test_10stage_mul_latency_5() {
+TEST_CASE("10stage_mul_latency_5", "[cpu]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_mul5";
   cfg.isa = "rv64gc";
@@ -111,11 +107,10 @@ static void test_10stage_mul_latency_5() {
   cfg.branch_predictor = "tournament";
   cfg.btb_entries = 256;
   auto pb = CpuFactory<T>::build_cpu(cfg);
-  assert(pb != nullptr);
+  REQUIRE(pb != nullptr);
   // 10-stage deep pipeline 拓扑不变 (mul substage 由 RiscvMulPlugin 注册, 不在 TopologyBuilder 中)
-  assert(pb->node_count() >= 10);
-  assert(cfg.mul_latency == 5);
-  printf("  [PASS] test_10stage_mul_latency_5\n");
+  REQUIRE(pb->node_count() >= 10);
+  REQUIRE(cfg.mul_latency == 5);
 }
 
 static std::string exec_cmd(const std::string& cmd) {
@@ -128,25 +123,15 @@ static std::string exec_cmd(const std::string& cmd) {
   return result;
 }
 
-static void test_10stage_add_elf_end_to_end() {
+TEST_CASE("10stage_add_elf_end_to_end", "[cpu]") {
   // M4.16: add.elf end-to-end on 10-stage. RV32I interpreter is pipeline-agnostic
   // (M4.15) so tohost=1 across 3/5/7/10-stage.
   std::string output = exec_cmd(
       "./build/src/cf_plugin/cpu_sim "
       "--config ip/cpu/configs/cpu_deep_pipeline.json "
       "--elf build/add.elf --cycles 300 2>&1");
-  assert(output.find("tohost=1") != std::string::npos);
-  assert(output.find("pipeline_stages=10") != std::string::npos);
-  assert(output.find("tohost=0") == std::string::npos);
-  printf("  [PASS] test_10stage_add_elf_end_to_end\n");
+  REQUIRE(output.find("tohost=1") != std::string::npos);
+  REQUIRE(output.find("pipeline_stages=10") != std::string::npos);
+  REQUIRE(output.find("tohost=0") == std::string::npos);
 }
 
-int main() {
-  printf("test_10stage_riscv (集成, M4-DSE partial):\n");
-  test_build_10stage_deep();
-  test_10stage_topology_from_config();
-  test_10stage_mul_latency_5();
-  test_10stage_add_elf_end_to_end();
-  printf("[PASS] all 10-stage integration tests (topology only — add.elf DEFERRED to M4-DSE)\n");
-  return 0;
-}

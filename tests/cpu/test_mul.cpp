@@ -12,61 +12,45 @@
 //   5. 边界条件 (M 扩展除法溢出)
 //
 // 约束:
-//   - 纯 main() + assert
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/arch/riscv/mul.h"
 
 using namespace cf::cpu::arch::riscv;
 using T = std::uint32_t;
 
-static void test_mul() {
-  assert(RiscvMulPlugin<T>::compute(0b000, 0, 3, 4) == 12);
-  assert(RiscvMulPlugin<T>::compute(0b000, 0, 100, 200) == 20000);
-  assert(RiscvMulPlugin<T>::compute(0b000, 0, 0, 12345) == 0);
-  printf("  [PASS] test_mul\n");
+TEST_CASE("mul", "[cpu]") {
+  REQUIRE(RiscvMulPlugin<T>::compute(0b000, 0, 3, 4) == 12);
+  REQUIRE(RiscvMulPlugin<T>::compute(0b000, 0, 100, 200) == 20000);
+  REQUIRE(RiscvMulPlugin<T>::compute(0b000, 0, 0, 12345) == 0);
 }
 
-static void test_div() {
-  assert(RiscvMulPlugin<T>::compute(0b100, 0, 20, 6) == 3);   // DIV
-  assert(RiscvMulPlugin<T>::compute(0b101, 0, 20, 6) == 3);   // DIVU
-  assert(RiscvMulPlugin<T>::compute(0b100, 0, 7, 2) == 3);
-  printf("  [PASS] test_div\n");
+TEST_CASE("div", "[cpu]") {
+  REQUIRE(RiscvMulPlugin<T>::compute(0b100, 0, 20, 6) == 3);   // DIV
+  REQUIRE(RiscvMulPlugin<T>::compute(0b101, 0, 20, 6) == 3);   // DIVU
+  REQUIRE(RiscvMulPlugin<T>::compute(0b100, 0, 7, 2) == 3);
 }
 
-static void test_rem() {
-  assert(RiscvMulPlugin<T>::compute(0b110, 0, 20, 6) == 2);   // REM
-  assert(RiscvMulPlugin<T>::compute(0b111, 0, 20, 6) == 2);   // REMU
-  assert(RiscvMulPlugin<T>::compute(0b110, 0, 7, 2) == 1);
-  printf("  [PASS] test_rem\n");
+TEST_CASE("rem", "[cpu]") {
+  REQUIRE(RiscvMulPlugin<T>::compute(0b110, 0, 20, 6) == 2);   // REM
+  REQUIRE(RiscvMulPlugin<T>::compute(0b111, 0, 20, 6) == 2);   // REMU
+  REQUIRE(RiscvMulPlugin<T>::compute(0b110, 0, 7, 2) == 1);
 }
 
-static void test_div_by_zero() {
+TEST_CASE("div_by_zero", "[cpu]") {
   // DIV by zero: return -1
-  assert(RiscvMulPlugin<T>::compute(0b100, 0, 10, 0) == 0xFFFFFFFF);
+  REQUIRE(RiscvMulPlugin<T>::compute(0b100, 0, 10, 0) == 0xFFFFFFFF);
   // REM by zero: return dividend
-  assert(RiscvMulPlugin<T>::compute(0b110, 0, 10, 0) == 10);
-  printf("  [PASS] test_div_by_zero\n");
+  REQUIRE(RiscvMulPlugin<T>::compute(0b110, 0, 10, 0) == 10);
 }
 
-static void test_boundary() {
+TEST_CASE("boundary", "[cpu]") {
   // 有符号除法边界: INT_MIN / -1 应该返回 INT_MIN
   T int_min = 0x80000000;
   T neg_one = 0xFFFFFFFF;
-  assert(RiscvMulPlugin<T>::compute(0b100, 0, int_min, neg_one) == int_min);
-  printf("  [PASS] test_boundary\n");
+  REQUIRE(RiscvMulPlugin<T>::compute(0b100, 0, int_min, neg_one) == int_min);
 }
 
-int main() {
-  printf("test_mul:\n");
-  test_mul();
-  test_div();
-  test_rem();
-  test_div_by_zero();
-  test_boundary();
-  printf("[PASS] all RiscvMulPlugin tests\n");
-  return 0;
-}
+

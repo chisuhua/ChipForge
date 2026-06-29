@@ -11,11 +11,9 @@
 //   4. 销毁安全
 //
 // 约束:
-//   - 纯 main() + assert
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/arch/riscv/lsu.h"
 
@@ -23,39 +21,27 @@ using namespace cf::cpu::arch::riscv;
 using T32 = std::uint32_t;
 using T64 = std::uint64_t;
 
-static void test_rv32_instantiate() {
+TEST_CASE("rv32_instantiate", "[cpu]") {
   RiscvLsuPlugin<T32> lsu;
   (void)lsu;
-  printf("  [PASS] test_rv32_instantiate\n");
 }
 
-static void test_rv64_instantiate() {
+TEST_CASE("rv64_instantiate", "[cpu]") {
   RiscvLsuPlugin<T64> lsu;
   (void)lsu;
-  printf("  [PASS] test_rv64_instantiate\n");
 }
 
-static void test_build_compiles() {
+TEST_CASE("build_compiles", "[cpu]") {
   RiscvLsuPlugin<T32> lsu;
   cf::plugin::PipeBuilder pb;
   lsu.build(pb);
-  printf("  [PASS] test_build_compiles\n");
 }
 
-static void test_destruction_safe() {
+TEST_CASE("destruction_safe", "[cpu]") {
   {
     RiscvLsuPlugin<T32> lsu;
     (void)lsu;
   }
-  printf("  [PASS] test_destruction_safe\n");
 }
 
-int main() {
-  printf("test_lsu:\n");
-  test_rv32_instantiate();
-  test_rv64_instantiate();
-  test_build_compiles();
-  test_destruction_safe();
-  printf("[PASS] all RiscvLsuPlugin tests\n");
-  return 0;
-}
+

@@ -12,11 +12,9 @@
 //   5. 销毁安全
 //
 // 约束:
-//   - 纯 main() + assert (与 cf_plugin 现有测试一致)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/plugins/dbus.h"
 
@@ -24,49 +22,35 @@ using cf::cpu::plugins::DBusPlugin;
 using T32 = std::uint32_t;
 using T64 = std::uint64_t;
 
-static void test_rv32_instantiate() {
+TEST_CASE("rv32_instantiate", "[cpu]") {
   DBusPlugin<T32> dbus;
   (void)dbus;
-  printf("  [PASS] test_rv32_instantiate\n");
 }
 
-static void test_rv64_instantiate() {
+TEST_CASE("rv64_instantiate", "[cpu]") {
   DBusPlugin<T64> dbus;
   (void)dbus;
-  printf("  [PASS] test_rv64_instantiate\n");
 }
 
-static void test_build_compiles() {
+TEST_CASE("build_compiles", "[cpu]") {
   DBusPlugin<T32> dbus;
   cf::plugin::PipeBuilder pb;
   dbus.build(pb);
-  printf("  [PASS] test_build_compiles\n");
 }
 
-static void test_multiple_build_calls() {
+TEST_CASE("multiple_build_calls", "[cpu]") {
   DBusPlugin<T32> dbus;
   cf::plugin::PipeBuilder pb;
   dbus.build(pb);
   dbus.build(pb);
   (void)dbus;
-  printf("  [PASS] test_multiple_build_calls\n");
 }
 
-static void test_destruction_safe() {
+TEST_CASE("destruction_safe", "[cpu]") {
   {
     DBusPlugin<T32> dbus;
     (void)dbus;
   }
-  printf("  [PASS] test_destruction_safe\n");
 }
 
-int main() {
-  printf("test_dbus:\n");
-  test_rv32_instantiate();
-  test_rv64_instantiate();
-  test_build_compiles();
-  test_multiple_build_calls();
-  test_destruction_safe();
-  printf("[PASS] all DBusPlugin tests\n");
-  return 0;
-}
+

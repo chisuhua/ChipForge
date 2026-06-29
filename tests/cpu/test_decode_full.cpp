@@ -15,27 +15,16 @@
 //   - ECALL/EBREAK (funct12 区分, 归入 SYSTEM)
 //
 // 约束:
-//   - 纯 main() + assert
 //   - 每条指令验证: decode_rv32() == 期望 OpCode + 关键字段 (rd/rs1/rs2/imm)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/arch/riscv/decoder_table.h"
 
 using namespace cf::cpu::arch::riscv;
 
-static int total_cases = 0;
-static int passed_cases = 0;
-
-#define CHECK(cond) do { \
-  ++total_cases; \
-  if (cond) { ++passed_cases; } \
-  else { printf("  [FAIL] line %d: %s\n", __LINE__, #cond); } \
-} while(0)
-
-static void test_u_type() {
+TEST_CASE("u_type", "[cpu]") {
   // LUI: lui x1, 0x12345
   std::uint32_t inst = 0x123450B7;
   CHECK(decode_rv32(inst) == OpCode::LUI);
@@ -46,28 +35,25 @@ static void test_u_type() {
   inst = 0x00001117;
   CHECK(decode_rv32(inst) == OpCode::AUIPC);
   CHECK(get_rd(inst) == 2);
-  printf("  [PASS] test_u_type (LUI + AUIPC)\n");
 }
 
-static void test_j_type() {
+TEST_CASE("j_type", "[cpu]") {
   // JAL: jal x1, +0x100
   std::uint32_t inst = 0x100000EF;
   CHECK(decode_rv32(inst) == OpCode::JAL);
   CHECK(get_rd(inst) == 1);
-  printf("  [PASS] test_j_type (JAL)\n");
 }
 
-static void test_i_type_branch() {
+TEST_CASE("i_type_branch", "[cpu]") {
   // JALR: jalr x1, x2, 4
   std::uint32_t inst = 0x004100E7;
   CHECK(decode_rv32(inst) == OpCode::JALR);
   CHECK(get_rd(inst) == 1);
   CHECK(get_rs1(inst) == 2);
   CHECK(get_imm(OpCode::JALR, inst) == 4);
-  printf("  [PASS] test_i_type_branch (JALR)\n");
 }
 
-static void test_i_type_alu() {
+TEST_CASE("i_type_alu", "[cpu]") {
   // ADDI: addi x1, x0, 5
   std::uint32_t inst = 0x00500093;
   CHECK(decode_rv32(inst) == OpCode::ADDI);
@@ -108,10 +94,9 @@ static void test_i_type_alu() {
   inst = 0x40415093;
   CHECK(decode_rv32(inst) == OpCode::SRAI);
   CHECK(get_funct7(inst) == 0x20);
-  printf("  [PASS] test_i_type_alu (ADDI/SLTI/SLTIU/XORI/ORI/ANDI/SLLI/SRLI/SRAI = 9)\n");
 }
 
-static void test_misc() {
+TEST_CASE("misc", "[cpu]") {
   // FENCE: fence iorw, iorw
   std::uint32_t inst = 0x0FF0000F;
   CHECK(decode_rv32(inst) == OpCode::FENCE);
@@ -130,10 +115,9 @@ static void test_misc() {
   inst = 0x30200073;
   CHECK(decode_rv32(inst) == OpCode::SYSTEM);
   CHECK(get_funct12(inst) == 0x302);
-  printf("  [PASS] test_misc (FENCE + ECALL/EBREAK/MRET = 4)\n");
 }
 
-static void test_b_type() {
+TEST_CASE("b_type", "[cpu]") {
   // BEQ: beq x1, x2, +4
   std::uint32_t inst = 0x00208163;
   CHECK(decode_rv32(inst) == OpCode::BEQ);
@@ -157,10 +141,9 @@ static void test_b_type() {
   // BGEU: bgeu x1, x2, +4
   inst = 0x0020F163;
   CHECK(decode_rv32(inst) == OpCode::BGEU);
-  printf("  [PASS] test_b_type (BEQ/BNE/BLT/BGE/BLTU/BGEU = 6)\n");
 }
 
-static void test_l_type() {
+TEST_CASE("l_type", "[cpu]") {
   // LB: lb x1, 0(x2)
   std::uint32_t inst = 0x00010083;
   CHECK(decode_rv32(inst) == OpCode::LB);
@@ -180,10 +163,9 @@ static void test_l_type() {
   // LHU: lhu x1, 0(x2)
   inst = 0x00015083;
   CHECK(decode_rv32(inst) == OpCode::LHU);
-  printf("  [PASS] test_l_type (LB/LH/LW/LBU/LHU = 5)\n");
 }
 
-static void test_s_type() {
+TEST_CASE("s_type", "[cpu]") {
   // SB: sb x1, 0(x2)
   std::uint32_t inst = 0x00110023;
   CHECK(decode_rv32(inst) == OpCode::SB);
@@ -195,10 +177,9 @@ static void test_s_type() {
   // SW: sw x1, 0(x2)
   inst = 0x00112023;
   CHECK(decode_rv32(inst) == OpCode::SW);
-  printf("  [PASS] test_s_type (SB/SH/SW = 3)\n");
 }
 
-static void test_r_type() {
+TEST_CASE("r_type", "[cpu]") {
   // ADD: add x1, x2, x3
   std::uint32_t inst = 0x003100B3;
   CHECK(decode_rv32(inst) == OpCode::ADD);
@@ -242,22 +223,6 @@ static void test_r_type() {
   // AND: and x1, x2, x3
   inst = 0x003170B3;
   CHECK(decode_rv32(inst) == OpCode::AND);
-  printf("  [PASS] test_r_type (ADD/SUB/SLL/SLT/SLTU/XOR/SRL/SRA/OR/AND = 10)\n");
 }
 
-int main() {
-  printf("test_decode_full (RV32I 全指令覆盖):\n");
-  test_u_type();          // 2
-  test_j_type();          // 1
-  test_i_type_branch();   // 1
-  test_i_type_alu();      // 9
-  test_misc();            // 4
-  test_b_type();          // 6
-  test_l_type();          // 5
-  test_s_type();          // 3
-  test_r_type();          // 10
-  // 总计: 41 个独立 CHECK (40 条指令 + 部分字段验证)
-  printf("[PASS] %d/%d RV32I decode checks\n", passed_cases, total_cases);
-  if (passed_cases != total_cases) return 1;
-  return 0;
-}
+
