@@ -98,6 +98,18 @@ class L1CacheTLMBridgeAdapter : public ::ChStreamModuleBase {
   ::cpptlm::OutputStreamAdapter<::bundles::CacheRespBundle>& resp_out() {
     return resp_out_;
   }
+  // P0-5b 兼容: 被动响应模块 (L1CacheTLMBridgeAdapter 包装 L1CacheTLMBridge,
+  //   自身不发起请求/接收响应)。StreamAdapter<>::tick 与 process_request_input
+  //   仍会调用 req_out()/resp_in(), 返回静态 dummy (valid=false) 即可 ——
+  //   与 cpp-tlm CacheTLM/MemoryTLM 官方模式一致 (cache_tlm.hh:133-141)。
+  ::cpptlm::OutputStreamAdapter<::bundles::CacheReqBundle>& req_out() {
+    static ::cpptlm::OutputStreamAdapter<::bundles::CacheReqBundle> dummy;
+    return dummy;
+  }
+  ::cpptlm::InputStreamAdapter<::bundles::CacheRespBundle>& resp_in() {
+    static ::cpptlm::InputStreamAdapter<::bundles::CacheRespBundle> dummy;
+    return dummy;
+  }
 
   // ──────────────────────────────────────────────────────────────────
   // 单元测试 API (供 e2e test 验证 Bridge 真的存在)

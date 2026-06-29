@@ -623,9 +623,9 @@ class DocChecker:
     # 辅助方法
     # --------------------------------------------------------
     def _find_md_files(self) -> List[Path]:
-        """查找项目中所有 .md 文件（排除 attic/、.git/、符号链接目录中的文件）"""
+        """查找项目中所有 .md 文件（排除 attic/、.git/、符号链接目录、外部 submodule 等中的文件）"""
         md_files: List[Path] = []
-        exclude_dirs = {"attic", ".git", ".omo", "node_modules", "__pycache__"}
+        exclude_dirs = {"attic", ".git", ".omo", "node_modules", "__pycache__", "CppHDL", "CppTLM"}
 
         for root, dirs, files in os.walk(self.root, followlinks=False):
             root_path = Path(root)
@@ -643,9 +643,9 @@ class DocChecker:
         return sorted(md_files)
 
     def _find_project_files(self) -> List[Path]:
-        """查找项目中所有文件（排除 attic/、.git/、符号链接目录）"""
+        """查找项目中所有文件（排除 attic/、.git/、符号链接目录、外部 submodule）"""
         project_files: List[Path] = []
-        exclude_dirs = {"attic", ".git", ".omo", "node_modules", "__pycache__"}
+        exclude_dirs = {"attic", ".git", ".omo", "node_modules", "__pycache__", "CppHDL", "CppTLM"}
 
         for root, dirs, files in os.walk(self.root, followlinks=False):
             root_path = Path(root)

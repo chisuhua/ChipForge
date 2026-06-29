@@ -164,6 +164,11 @@ class PipeBuilder {
   std::size_t stage_count() const noexcept { return stages_.size(); }
   std::size_t node_count() const noexcept { return nodes_.size(); }
 
+  // plugins() —— 返回 plugin 列表只读引用 (M4.12, 供 CpuFactory 测试断言)
+  const std::vector<std::unique_ptr<PluginBase>>& plugins() const noexcept {
+    return plugins_;
+  }
+
   bool has_stage(const std::string& name) const {
     return std::any_of(stages_.begin(), stages_.end(),
                        [&](const StageEntry& s) { return s.name == name; });

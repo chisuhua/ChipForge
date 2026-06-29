@@ -8,14 +8,6 @@
 | 关联决策 | [decision-plugin-framework-2026-06-08](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) |
 | 适用范围 | ChipForge 插件架构（独立于 CppTLM/CppHDL 框架层） |
 
-> (内容由 Task 4/5 填充)
-
----
-
-## 目录
-
-> (内容由 Task 4/5 填充)
-
 ---
 
 ## 1. 设计动机

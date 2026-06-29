@@ -25,14 +25,14 @@ using cf::cpu::plugins::BranchPredictorPlugin;
 using T = std::uint32_t;
 
 static void test_no_predict_initially() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   assert(bp.predict(0x1000) == 0);
   assert(!bp.predict_taken(0x1000));
   printf("  [PASS] test_no_predict_initially\n");
 }
 
 static void test_predict_after_update() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, true, 0x2000);
   assert(bp.predict(0x1000) == 0x2000);
   assert(bp.predict_taken(0x1000));
@@ -40,7 +40,7 @@ static void test_predict_after_update() {
 }
 
 static void test_btb_entry() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, true, 0x2000);
   auto entry = bp.btb_entry(0);
   assert(entry.valid);
@@ -50,7 +50,7 @@ static void test_btb_entry() {
 }
 
 static void test_not_taken_returns_zero() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, false, 0);
   assert(bp.predict(0x1000) == 0);
   assert(!bp.predict_taken(0x1000));
@@ -58,7 +58,7 @@ static void test_not_taken_returns_zero() {
 }
 
 static void test_multiple_addresses() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   bp.update(0x1004, true, 0x3000);
   bp.update(0x1008, true, 0x4000);
   assert(bp.predict(0x1004) == 0x3000);
@@ -67,7 +67,7 @@ static void test_multiple_addresses() {
 }
 
 static void test_reset() {
-  BranchPredictorPlugin<T> bp;
+  BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, true, 0x2000);
   bp.reset();
   assert(bp.predict(0x1000) == 0);
@@ -78,7 +78,7 @@ static void test_reset() {
 // M4G D.4 (G.4): predict/update 接受 tid 参数, per-thread GHR 隔离
 static void test_per_thread_ghr_isolation() {
   // N_THREADS=2: 每个线程独立 GHR
-  BranchPredictorPlugin<T, 16, 16, 16, 8, 2> bp_mt;
+  BranchPredictorPlugin<T, 16, 16, 8, 2> bp_mt(16);
   // tid=0 多次 update, GHR 应累积
   bp_mt.update(0x1000, true,  0x2000, /*tid*/ 0);
   bp_mt.update(0x1004, true,  0x2004, /*tid*/ 0);
@@ -98,8 +98,9 @@ static void test_per_thread_ghr_isolation() {
 
 // M4G D.2 (G.4): 自定义 BTB_SIZE 编译 + 行为正确
 static void test_custom_btb_size() {
+  // M4G D.2 (G.4): 自定义 BTB_SIZE 编译 + 行为正确
   // BTB_SIZE=4 (非常小, 验证模板参数生效)
-  BranchPredictorPlugin<T, 4, 4, 4, 4> bp_small;
+  BranchPredictorPlugin<T, 4, 4, 4, 4> bp_small(4);
   bp_small.update(0x1000, true, 0x2000);
   assert(bp_small.predict(0x1000) == 0x2000);
   bp_small.update(0x1004, true, 0x2004);

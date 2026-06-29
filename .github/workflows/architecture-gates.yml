@@ -1,7 +1,7 @@
 name: Architecture Gates (ADR / D4 / Portability)
 
 # 本 workflow 是 PR 强制门禁: 3 个架构验证脚本任一失败 → exit 1 → 阻止 PR merge
-# 引用文档: docs/architecture/adr.md ADR-041
+# 引用文档: docs/architecture/adr.md ADR-043
 # 设计来源: .omo/drafts/fix-plan-2026-06-12-design.md §3 Change 4
 
 on:
@@ -25,14 +25,34 @@ jobs:
     runs-on: ubuntu-latest
     name: Architecture Compliance Gates (3 scripts)
 
+    env:
+      # CHIPFORGE_ROOT 覆盖脚本默认值 (本地 dev 路径) 为 CI workspace 路径
+      CHIPFORGE_ROOT: ${{ github.workspace }}
+      CPPTLM_REPO: ${{ vars.CPPTLM_REPO || 'chisuhua/CppTLM' }}
+      CPPHDL_REPO: ${{ vars.CPPHDL_REPO || 'chisuhua/CppHDL' }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Checkout CppTLM (for verify_adr.sh framework path validation)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CPPTLM_REPO }}
+          path: ${{ github.workspace }}/CppTLM
+
+      - name: Checkout CppHDL (for verify_adr.sh framework path validation)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CPPHDL_REPO }}
+          path: ${{ github.workspace }}/CppHDL
 
       - name: Run ADR verification (verify_adr.sh)
         id: verify_adr
         run: |
           echo "=== Running verify_adr.sh ==="
+          echo "CHIPFORGE_ROOT=$CHIPFORGE_ROOT"
+          ls -la "$CHIPFORGE_ROOT/CppTLM" "$CHIPFORGE_ROOT/CppHDL" 2>&1 | head -10
           bash tools/verify_adr.sh
         continue-on-error: false
 

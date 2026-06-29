@@ -1,26 +1,30 @@
 // tests/cpu/integration/test_5stage_riscv.cpp
 //
-// 功能描述: 5 级流水线 RV32I 集成测试 (M4.5, M5-DSE M5.11)
+// 功能描述: 5 级流水线 RV32I 集成测试 (M4.5, M5-DSE M5.11, M4-DSE M4.16)
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-22
+// 最后修改日期: 2026-06-23
 //
-// 测试覆盖 (5 用例):
+// 测试覆盖 (6 用例):
 //   1. CpuFactory build_cpu() 5 级配置 + 拓扑断言 (M5.11, byte-identical baseline)
 //   2. PicolibcHostMemory 初始化
 //   3. 加载 add.elf 到内存
 //   4. tohost 机制 (写 1 → 检测到)
-//   5. 端到端: build_cpu + load_elf + 检查 tohost
+//   5. tohost 失败码 (写 2 → exit_code=1)
+//   6. add.elf 端到端: cpu_sim --elf → tohost=1 (M4.16, M4-DSE, append-only)
 //
 // 约束:
 //   - 纯 main() + assert
 //   - M4 阶段: 端到端跑通框架, 详细指令执行验证推迟 M5
 //   - M5.11: TopologyBuilder<5> 必须 byte-identical (5 节点: fetch/decode/execute/memory/writeback)
+//   - M4.16: 仅追加 sub-tests, 不修改 1-5 (preserves M5.11 byte-identical)
 
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <string>
 
 #include "ip/cpu/cpu_factory.h"
 #include "ip/cpu/picolibc_host_memory.h"
@@ -99,6 +103,29 @@ static void test_tohost_fail() {
   printf("  [PASS] test_tohost_fail\n");
 }
 
+static std::string exec_cmd(const std::string& cmd) {
+  std::string result;
+  FILE* pipe = popen(cmd.c_str(), "r");
+  if (pipe == nullptr) return result;
+  char buf[256];
+  while (fgets(buf, sizeof(buf), pipe) != nullptr) {
+    result += buf;
+  }
+  pclose(pipe);
+  return result;
+}
+
+static void test_5stage_add_elf_end_to_end() {
+  std::string output = exec_cmd(
+      "./build/src/cf_plugin/cpu_sim "
+      "--config ip/cpu/configs/cpu_default.json "
+      "--elf build/add.elf --cycles 100 2>&1");
+  assert(output.find("tohost=1") != std::string::npos);
+  assert(output.find("pipeline_stages=5") != std::string::npos);
+  assert(output.find("tohost=0") == std::string::npos);
+  printf("  [PASS] test_5stage_add_elf_end_to_end\n");
+}
+
 int main() {
   printf("test_5stage_riscv (集成):\n");
   test_build_5stage();
@@ -106,6 +133,7 @@ int main() {
   test_load_binary();
   test_tohost_mechanism();
   test_tohost_fail();
+  test_5stage_add_elf_end_to_end();
   printf("[PASS] all 5-stage integration tests\n");
   return 0;
 }

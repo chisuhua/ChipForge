@@ -386,6 +386,25 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_topology_builder.cpp)
 endif()
 
 # ----------------------------------------------------------------------------
+# M4-DSE: BranchPredictorPlugin 运行时 BTB_ENTRIES 验证 (M4.14)
+# 验证 BTB_SIZE 已从模板参数列表移除, 改由 ctor 接受 std::size_t btb_entries
+# 路径: tests/cpu/ (与 test_topology_builder 同家族)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_branch_predictor_runtime_btb.cpp)
+  add_executable(test_branch_predictor_runtime_btb
+    ${CMAKE_SOURCE_DIR}/tests/cpu/test_branch_predictor_runtime_btb.cpp
+  )
+  target_link_libraries(test_branch_predictor_runtime_btb PRIVATE cf_plugin)
+  target_include_directories(test_branch_predictor_runtime_btb
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_branch_predictor_runtime_btb
+    COMMAND test_branch_predictor_runtime_btb
+  )
+endif()
+
+# ----------------------------------------------------------------------------
 # M5-DSE: RiscvMulPlugin 多周期 LATENCY 模板验证 (Section 3 / M5.14)
 # 验证 RiscvMulPlugin<T, LATENCY> 3 个特化 (<T,1> / <T,3> / <T,5>) 编译通过
 # 且 setup() 正确声明 mul_s1..mul_s(LATENCY-1) 子阶段
@@ -426,6 +445,27 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/configs/test_schema_m5_19.cpp)
 endif()
 
 # ----------------------------------------------------------------------------
+# M4-DSE: cpu_sim PicolibcHostMemory 集成测试 (M4.15)
+# 验证 cpu_sim --elf <add.elf> 输出真实 tohost 值 (非占位 0)
+# 路径: tests/cpu/ (与 test_topology_builder / test_branch_predictor_runtime_btb 同家族)
+# 不需要 nlohmann/json 依赖 (测试本身只 exec cpu_sim 并 parse 输出)
+# ----------------------------------------------------------------------------
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/test_cpu_sim_real_tohost.cpp)
+  add_executable(test_cpu_sim_real_tohost
+    ${CMAKE_SOURCE_DIR}/tests/cpu/test_cpu_sim_real_tohost.cpp
+  )
+  target_link_libraries(test_cpu_sim_real_tohost PRIVATE cf_plugin)
+  target_include_directories(test_cpu_sim_real_tohost
+    PRIVATE
+      ${CMAKE_SOURCE_DIR}
+  )
+  add_test(NAME test_cpu_sim_real_tohost
+    COMMAND test_cpu_sim_real_tohost
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}  # so tests/cpu/manual_elf/add.S is found
+  )
+endif()
+
+# ----------------------------------------------------------------------------
 # M5-DSE: cpu_sim CLI 二进制 (Section 7 / M5.16)
 # DSE 工具链入口 — 解析 JSON 配置, 构建 CPU, 运行 N cycles, 输出 KEY=VALUE
 # 不接入 ctest (CLI 工具, 非测试); nlohmann/json 来自 cf_plugin_link_cpptlm
@@ -454,7 +494,12 @@ foreach(test_name IN ITEMS test_5stage_riscv test_3stage_riscv test_demo_soc)
       PRIVATE
         ${CMAKE_SOURCE_DIR}
     )
-    add_test(NAME ${test_name} COMMAND ${test_name})
+    # M4.16: WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} enables new add.elf end-to-end
+    # sub-tests that invoke ./build/src/cf_plugin/cpu_sim + ip/cpu/configs/*.json
+    add_test(NAME ${test_name}
+      COMMAND ${test_name}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
   endif()
 endforeach()
 

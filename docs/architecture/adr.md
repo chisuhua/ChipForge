@@ -39,7 +39,7 @@
   - [G. 声明式 Plugin 模型（Phase 1）](#g-声明式-plugin-模型phase-1-5-条)
   - [H. 流水线抽象（Phase 1）](#h-流水线抽象phase-1-4-条)
   - [I. 验证框架（Phase 1）](#i-验证框架phase-1-3-条)
-  - [J. 目录与组织](#j-目录与组织-2-条)
+  - [J. 目录与组织](#j-目录与组织-3-条)
   - [K. 范式决策](#k-范式决策-1-条)
   - [L. 可移植性约束](#l-可移植性约束-1-条)
 - [4. 漂移检测规则](#4-漂移检测规则)
@@ -75,7 +75,7 @@
 
 > **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 31 条
+### 2.1 已实现决策（✅）— 34 条
 
 | ID | 标题 | 类别 | 验证路径 |
 |----|------|------|----------|
@@ -108,8 +108,11 @@
 | ADR-030 | PipeNode 三态握手 | Plugin | `include/cf/plugin/pipe_node.h` |
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
+| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制） |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
+| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
+| ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -140,14 +143,15 @@
 | 注册与发现 (D) | 3 | 0 | 0 | 3 |
 | 端口与信号 (E) | 3 | 0 | 0 | 3 |
 | Bundle 与协议 (F) | 3 | 1 | 0 | 4 |
-| 声明式 Plugin (G) | 5 | 0 | 1 | 6 |
+| 声明式 Plugin (G) | 6 | 0 | 1 | 7 |
 | 流水线抽象 (H) | 3 | 0 | 1 | 4 |
 | 验证框架 (I) | 0 | 0 | 3 | 3 |
-| 目录与组织 (J) | 1 | 0 | 1 | 2 |
+| 目录与组织 (J) | 2 | 0 | 1 | 3 |
+| 范式决策 (K) | 1 | 0 | 0 | 1 |
 | 可移植性约束 (L) | 0 | 0 | 1 | 1 |
-| **合计** | **31** | **1** | **8** | **40** |
+| **合计** | **34** | **1** | **8** | **43** |
 
-**实现率**：31/40 = **78%**（含部分实现）
+**实现率**：34/43 ≈ **79%**（含部分实现）
 
 ---
 
@@ -780,7 +784,7 @@ Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/in
 
 ---
 
-### G. 声明式 Plugin 模型（Phase 1）— 6 条
+### G. 声明式 Plugin 模型（Phase 1）— 7 条
 
 ---
 
@@ -894,6 +898,43 @@ grep -nE "void\s+declare_substage\s*\(" /workspace/project/ChipForge/include/cf/
 **完整内容见** [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md)
 
 **代码锚点**：`src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}`、`src/cf_plugin/bridge/L1CacheTLMBridgeAdapter.{h,cpp}`（Phase 1.3 落地）
+
+---
+
+#### ADR-042：Plugin 推迟决策（FPU/MMU/Exception → Phase 5+）
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | ✅ Accepted (2026-06-16, 推迟期间决策持续生效) |
+| 来源 | `multi_isa_architecture.md` v2.0 §1.1, `cpu_implementation_guide_v2.0.md` §3 议题 1-8 |
+| 决策 | FPU/MMU/Exception 三个 Plugin 在 Phase 1.5 v2.0 收官后推迟到 Phase 5+（RTL 阶段）；M2 阶段保留 `.h` 占位 + `.cpp` 写 `// TODO: M3+`，Factory 不注册 |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式） |
+
+**推迟的 Plugin**：
+
+| Plugin | ISA 扩展 | 推迟原因 |
+|--------|----------|----------|
+| `RiscvFpuPlugin` | F（单精度）/ D（双精度）| 单精度/双精度浮点，需要 FPU 寄存器堆（f0-f31）+ 浮点 ALU |
+| `MMUPlugin` | Sv32/Sv39/Sv48 | 虚拟内存 + TLB + 页表遍历，需要 OS 联调 |
+| `ExceptionPlugin` | — | mcause/mepc/mtvec CSR + trap handler，依赖完整 CSR + MMU |
+
+**Phase 5+ 触发条件**：
+- FPU：用户请求 F/D 扩展支持 + RTL 阶段
+- MMU：OS 联调（Linux/RTOS）需求 + 虚拟内存测试
+- Exception：完整 CSR 需求 + 中断/异常处理测试
+
+**推迟期间替代方案**：
+- 浮点运算：软件仿真（compiler-rt/libgcc 软浮点）
+- 虚拟内存：直接物理地址（M5 配置 `enable_mmu: false`）
+- 异常：简化处理（tohost 机制替代 trap）
+
+**完整内容见** [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md)（含占位代码片段与 CpuFactory 注册决策）
+
+**代码锚点**：
+- `ip/cpu/plugins/fpu.h`（`.h` 占位文件存在）
+- `ip/cpu/plugins/mmu.h`（`.h` 占位文件存在）
+- `ip/cpu/plugins/exception.h`（`.h` 占位文件存在）
+- `ip/cpu/cpu_factory.h`（`build_cpu()` 不注册 FPU/MMU/Exception，保持 11 个核心 Plugin）
 
 ---
 
@@ -1107,50 +1148,7 @@ grep -nE "CtrlLink&\s+(halt_when|throw_when|flush_when|bypass)\s*\(" \
 
 ---
 
-### K. 范式决策（1 条）
-
----
-
-#### ADR-037：Plugin 作为设计范式（不是工具）
-
-**状态**: Accepted (2026-06-08)
-**决策者**: User + Prometheus
-**背景**: 见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`
-**关联**: 重塑路线图（Phase 0/1/6 重新定位）
-
-**决策内容**:
-- **D1**: 路线图前插入 Phase 0 = Plugin 最小**脚手架**（2-3 周）
-- **D2**: Phase 1 Hello World = L1CachePlugin（真实 Plugin，不是占位）
-- **D4**: 业务逻辑强制采用 **Plugin-style** 设计（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）
-- **D5**: Phase 6 = 完整 PipeBuilder 框架 + RTL 生成（12-20 周）
-- **D6-D9**: 4 项命名冲突解决方案
-
-**影响**:
-- 重塑 Phase 1-5 实施路径（业务逻辑必须 Plugin-style）
-- 推迟 v2.0.1 §12.2 的 Phase 1a/1b/1c 到 Phase 6
-- 路线图新增 Phase 0（在 Phase 1 前）和 Phase 6（在 Phase 5 后）
-
-**影响 ADR**:
-- ADR-025~036 状态从 "🚧 未实施" → "Phase 0/6 范围"
-- ADR-026 (`at_stage()` 逻辑阶段名) → Phase 0 P0 #4
-- ADR-027 (`Phase {EARLY,NORMAL,LATE}`) → Phase 0 P0 #4
-- ADR-028 (`declare_substage()`) → Phase 0 P0 #4 (最小实现) + Phase 6 (完整)
-- ADR-029 (模块级 `ImplMode`) → Phase 6
-- ADR-030 (`PipeNode` 三态握手) → Phase 0 P0 #3
-- ADR-031 (`StageLink/CtrlLink/DirectLink`) → Phase 0 P0 #5
-- ADR-032 (`PipeBuilder` 统一编译器) → Phase 0 P0 #4
-- ADR-033 (`CtrlLink` 四种控制 API) → Phase 0 P0 #5
-- ADR-034 (`ScoreBoard`) → Phase 6
-- ADR-035 (`CompareDriver`) → Phase 6
-- ADR-036 (三级测试金字塔) → Phase 1+ (随业务展开)
-
-**不可逆性**: D4（Plugin-style 强制）不可逆 —— 一旦 Phase 1 业务逻辑用 Plugin-style，事后改回 tick() 几乎全重写
-
-**重新审视指引**: 见决策记录 §8（每季度或在 Phase 0/1/6 关键节点）
-
----
-
-### J. 目录与组织（2 条）
+### J. 目录与组织（3 条）
 
 ---
 
@@ -1193,6 +1191,75 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 ```
 
 **代码锚点（当前）**：`ip/cache/{tlm,rtl,configs,test}/`, `ip/cpu/{tlm,rtl,configs,test}/`, `ip/interconnect/...`, `ip/memory/...`, `ip/peripheral/...`
+
+---
+
+#### ADR-043：CI 强制架构门禁（3 验证脚本 + GitHub Actions 集成）
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | ✅ 已实现（2026-06-12）|
+| 来源 | `.omo/drafts/fix-plan-2026-06-12-design.md` §3 Change 4 |
+| 决策 | PR 必须通过 3 个架构验证脚本（`verify_adr.sh` + `verify_plugin_decision.sh` + `check_plugin_portability.sh`），任一失败 → exit 1 → 阻止 merge；CI 集成在 `.github/workflows/architecture-gates.yml`（PR 阻塞）+ `.github/workflows/doc_check.yml` 末尾 smoke（`--only=ADR-024`, `continue-on-error: true` 不阻塞）|
+| 理由 | 防止未来 PR 引入 ADR 漂移 / D4 违规 / 移植性约束违反；3 脚本已就位（Phase 0/1 实施期）但未集成 CI，本 ADR 强制集成 |
+| 后果 | ✅ PR 自动化守门，ADR/D4/移植性问题早发现；⚠️ 3 脚本任一回归 → 阻塞所有 PR，需立即修复 |
+| 验证命令 | `bash tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` 全部 exit 0 |
+| 代码锚点 | `.github/workflows/architecture-gates.yml` + `.github/workflows/doc_check.yml` + `tools/README.md`（3 脚本文档）|
+
+**脚本-Workflow 映射**：
+- `verify_adr.sh` → `architecture-gates.yml` step "Run ADR verification"（PR 阻塞, `continue-on-error: false`）
+- `verify_plugin_decision.sh` → `architecture-gates.yml` step "Run D4 Plugin-style check"（PR 阻塞）
+- `check_plugin_portability.sh` → `architecture-gates.yml` step "Run ADR-040 Portability check"（PR 阻塞）
+- `verify_adr.sh --only=ADR-024` → `doc_check.yml` step "Smoke-test ADR-024"（smoke, `continue-on-error: true`）
+
+**触发器**（`architecture-gates.yml`）：
+- `on.pull_request.branches`: `[main, develop]`
+- `on.pull_request.paths`: `**/*.{h,cpp,cu,cuh,cc,cxx,hpp}` + `**/*.md` + `**/*.json` + `**/*.sh` + 关键目录（bundles/ip/src/soc/tools/docs）
+
+**§2.4 编号修正 (2026-06-23)**: 本 ADR 原登记编号 ADR-041（2026-06-12 首次入档），与 `openspec/specs/arch-doc-consistency-baseline/spec.md` 强约束的"ADR-041 = Bridge 适配层允许 tick()"冲突。今日重编号为 ADR-043（分类目录与组织 J，与 ADR-038/039 同类），消除 §3 重复编号。openspec spec 无需更新（其 ADR-041 引用保持原 Bridge 含义）。
+
+---
+
+### K. 范式决策（1 条）
+
+---
+
+#### ADR-037：Plugin 作为设计范式（不是工具）
+
+**状态**: Accepted (2026-06-08)
+**决策者**: User + Prometheus
+**背景**: 见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`
+**关联**: 重塑路线图（Phase 0/1/6 重新定位）
+
+**决策内容**:
+- **D1**: 路线图前插入 Phase 0 = Plugin 最小**脚手架**（2-3 周）
+- **D2**: Phase 1 Hello World = L1CachePlugin（真实 Plugin，不是占位）
+- **D4**: 业务逻辑强制采用 **Plugin-style** 设计（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）
+- **D5**: Phase 6 = 完整 PipeBuilder 框架 + RTL 生成（12-20 周）
+- **D6-D9**: 4 项命名冲突解决方案
+
+**影响**:
+- 重塑 Phase 1-5 实施路径（业务逻辑必须 Plugin-style）
+- 推迟 v2.0.1 §12.2 的 Phase 1a/1b/1c 到 Phase 6
+- 路线图新增 Phase 0（在 Phase 1 前）和 Phase 6（在 Phase 5 后）
+
+**影响 ADR**:
+- ADR-025~036 状态从 "🚧 未实施" → "Phase 0/6 范围"
+- ADR-026 (`at_stage()` 逻辑阶段名) → Phase 0 P0 #4
+- ADR-027 (`Phase {EARLY,NORMAL,LATE}`) → Phase 0 P0 #4
+- ADR-028 (`declare_substage()`) → Phase 0 P0 #4 (最小实现) + Phase 6 (完整)
+- ADR-029 (模块级 `ImplMode`) → Phase 6
+- ADR-030 (`PipeNode` 三态握手) → Phase 0 P0 #3
+- ADR-031 (`StageLink/CtrlLink/DirectLink`) → Phase 0 P0 #5
+- ADR-032 (`PipeBuilder` 统一编译器) → Phase 0 P0 #4
+- ADR-033 (`CtrlLink` 四种控制 API) → Phase 0 P0 #5
+- ADR-034 (`ScoreBoard`) → Phase 6
+- ADR-035 (`CompareDriver`) → Phase 6
+- ADR-036 (三级测试金字塔) → Phase 1+ (随业务展开)
+
+**不可逆性**: D4（Plugin-style 强制）不可逆 —— 一旦 Phase 1 业务逻辑用 Plugin-style，事后改回 tick() 几乎全重写
+
+**重新审视指引**: 见决策记录 §8（每季度或在 Phase 0/1/6 关键节点）
 
 ---
 
@@ -1244,30 +1311,6 @@ bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
 - `tools/check_plugin_portability.sh` — 4 项 Tier-1/Tier-2 检查
 
 **§2.1/§2.3 分类调整 (2026-06-12)**: 此 ADR 实质为 Phase 1 提案 (`array_store` 已实现但迁移手册待 Phase 5),不应在 §2.1 (✅ 已实现) 出现。已从 §2.1 移除,仅保留在 §2.3 (🚧 Phase 1 提案)。参见 `docs/roadmap/roadmap-status.md` §6 活动日志 2026-06-10 条目。
-
----
-
-#### ADR-041：CI 强制架构门禁 (3 验证脚本 + GitHub Actions 集成)
-
-| 字段 | 值 |
-|------|-----|
-| 状态 | ✅ 已实现 (2026-06-12) |
-| 来源 | `.omo/drafts/fix-plan-2026-06-12-design.md` §3 Change 4 |
-| 决策 | PR 必须通过 3 个架构验证脚本 (`verify_adr.sh` + `verify_plugin_decision.sh` + `check_plugin_portability.sh`),任一失败 → exit 1 → 阻止 merge;CI 集成在 `.github/workflows/architecture-gates.yml` (PR 阻塞) + `.github/workflows/doc_check.yml` 末尾 smoke (`--only=ADR-024`, `continue-on-error: true` 不阻塞) |
-| 理由 | 防止未来 PR 引入 ADR 漂移 / D4 违规 / 移植性约束违反;3 脚本已就位 (Phase 0/1 实施期) 但未集成 CI,本 ADR 强制集成 |
-| 后果 | ✅ PR 自动化守门, ADR/D4/移植性问题早发现;⚠️ 3 脚本任一回归 → 阻塞所有 PR,需立即修复 |
-| 验证命令 | `bash tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` 全部 exit 0 |
-| 代码锚点 | `.github/workflows/architecture-gates.yml` + `.github/workflows/doc_check.yml` + `tools/README.md` (3 脚本文档) |
-
-**脚本-Workflow 映射**:
-- `verify_adr.sh` → `architecture-gates.yml` step "Run ADR verification" (PR 阻塞, `continue-on-error: false`)
-- `verify_plugin_decision.sh` → `architecture-gates.yml` step "Run D4 Plugin-style check" (PR 阻塞)
-- `check_plugin_portability.sh` → `architecture-gates.yml` step "Run ADR-040 Portability check" (PR 阻塞)
-- `verify_adr.sh --only=ADR-024` → `doc_check.yml` step "Smoke-test ADR-024" (smoke, `continue-on-error: true`)
-
-**触发器** (`architecture-gates.yml`):
-- `on.pull_request.branches`: `[main, develop]`
-- `on.pull_request.paths`: `**/*.{h,cpp,cu,cuh,cc,cxx,hpp}` + `**/*.md` + `**/*.json` + `**/*.sh` + 关键目录 (bundles/ip/src/soc/tools/docs)
 
 ---
 
@@ -1408,6 +1451,10 @@ Summary:
 | | | 与 `code-framework-mapping.md` v2.0 / `declarative-hybrid-framework.md` v2.0 对齐 |
 | 2026-06-08 | 1.1 | 新增 ADR-037（Plugin 作为设计范式）；ADR-025~036 状态映射到 Phase 0/1+/6；原 ADR-037 编号顺延为 ADR-039 |
 | 2026-06-10 | 1.2 | 新增 ADR-040（TLM→HDL 移植性约束）；新增分类 L；`array_store` 抽象 + commit 钩子已落地；新增 `tools/check_plugin_portability.sh` |
+| 2026-06-12 | 1.2.1 | 新增 ADR-041（CI 强制门禁，初版编号 ADR-041）；`.github/workflows/architecture-gates.yml` 启用 PR 阻塞 |
+| 2026-06-17 | 1.2.2 | 新增 ADR-041-bridge-tick-pattern.md（Bridge 适配层允许 tick，编号与 CI 门禁 ADR-041 冲突；本版本未发现） |
+| 2026-06-23 | 1.3 | **冲突修复**：ADR-040 → ADR-042（Plugin 推迟决策，消除 §3 重复编号）；ADR-041 → ADR-043（CI 强制门禁，消除与 openspec spec 强约束的"ADR-041=Bridge"冲突，移至 J 目录与组织）；Plugin (G) 6→7、目录 (J) 1→2、合计 40→42 |
+| 2026-06-23 | 1.3.1 | **组织修复**：§3 章节顺序 K/J → J/K（按字母序）；§2.1 主表新增 ADR-037 行（33→34 条）；§2.4 统计表新增 K 范式决策行（合计 42→43 条，Plugin 类别数 5→6 不变）；TOC J 锚点 2-条→3-条 同步 |
 
 ---
 

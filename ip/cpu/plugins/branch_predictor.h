@@ -26,6 +26,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <vector>
 
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
@@ -41,19 +42,19 @@ namespace plugins {
 // 模板参数 T: uint32_t (RV32) / uint64_t (RV64)
 //
 // 组件:
-//   1. BTB (Branch Target Buffer): 直接映射, 16 条目
+//   1. BTB (Branch Target Buffer): 直接映射, 大小由 ctor 参数 btb_entries 决定
+//      (M4.14: BTB_SIZE 从模板参数移至运行时构造参数, 由 CPUConfig::btb_entries 注入)
 //      - tag: PC 高位, target: 跳转目标地址
-//   2. Bimodal: 2-bit 饱和计数器, 16 条目
+//   2. Bimodal: 2-bit 饱和计数器, BIMODAL_SZ 条目
 //      - 00=强不跳转, 01=弱不跳转, 10=弱跳转, 11=强跳转
-//   3. GShare: 全局历史寄存器 (8-bit) XOR PC 低位索引
-//      - 2-bit 计数器, 16 条目
+//   3. GShare: 全局历史寄存器 (GHR_BITS-bit) XOR PC 低位索引
+//      - 2-bit 计数器, GSHARE_SZ 条目
 //
 // 使用方式:
 //   - fetch 阶段: predict(pc) → 预测目标地址或 0 (不跳转)
 //   - execute 阶段: update(pc, actual_taken, actual_target) → 更新 BTB/计数器
 // ----------------------------------------------------------------------------
 template <typename T,
-          std::size_t BTB_SIZE = 16,
           std::size_t BIMODAL_SZ = 16,
           std::size_t GSHARE_SZ = 16,
           std::uint8_t GHR_BITS = 8,
@@ -63,8 +64,8 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
                 "BranchPredictorPlugin<T>: T must be unsigned");
   static_assert(N_THREADS >= 1 && N_THREADS <= 4,
                 "BranchPredictorPlugin: N_THREADS must be in [1, 4]");
-  static_assert(BTB_SIZE >= 1 && (BTB_SIZE & (BTB_SIZE - 1)) == 0,
-                "BranchPredictorPlugin: BTB_SIZE must be power of 2 (>= 1)");
+  // M4.14: BTB_SIZE 从模板参数移至运行时构造参数 btb_entries
+  // (CPUConfig::btb_entries enum 保证为 16/32/64/128/256 之一的 2 的幂)
   static_assert(BIMODAL_SZ >= 1 && (BIMODAL_SZ & (BIMODAL_SZ - 1)) == 0,
                 "BranchPredictorPlugin: BIMODAL_SZ must be power of 2 (>= 1)");
   static_assert(GSHARE_SZ >= 1 && (GSHARE_SZ & (GSHARE_SZ - 1)) == 0,
@@ -73,10 +74,10 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
                 "BranchPredictorPlugin: GHR_BITS must be in [1, 16]");
 
  public:
-  static constexpr std::size_t kBtbSize = BTB_SIZE;
+  // M4.14: BTB 大小从 constexpr 改为运行时访问器 (ctor 注入)
   static constexpr std::size_t kBimodalSize = BIMODAL_SZ;
   static constexpr std::size_t kGshareSize = GSHARE_SZ;
-  static constexpr std::size_t kHistoryBits = GHR_BITS;
+  static constexpr std::uint8_t kHistoryBits = GHR_BITS;
   static constexpr std::size_t kNumThreads = N_THREADS;    // 全局历史位数
 
   // 2-bit 饱和计数器状态
@@ -93,7 +94,12 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
     bool valid;  // 有效位
   };
 
-  BranchPredictorPlugin() { reset(); }
+  // M4.14: ctor 接受 btb_entries 运行时参数 (从 CPUConfig::btb_entries 注入)
+  // btb_entries 必须为 2 的幂 (CPUConfig::btb_entries enum 限定 16/32/64/128/256)
+  explicit BranchPredictorPlugin(std::size_t btb_entries)
+      : btb_(btb_entries), btb_entries_(btb_entries) {
+    reset();
+  }
   ~BranchPredictorPlugin() override = default;
 
   BranchPredictorPlugin(const BranchPredictorPlugin&) = delete;
@@ -144,7 +150,7 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   // 返回 0: 不跳转 (顺序执行)
   // 返回非 0: 预测跳转目标
   T predict(T pc, std::uint8_t tid = 0) const {
-    std::size_t idx = pc & (kBtbSize - 1);
+    std::size_t idx = pc & (btb_size() - 1);
     const auto& entry = btb_[idx];
     if (!entry.valid || entry.tag != pc) return T{0};
 
@@ -170,7 +176,7 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
 
   // 更新预测器 (execute 阶段调用, 默认 tid=0)
   void update(T pc, bool taken, T target, std::uint8_t tid = 0) {
-    std::size_t idx = pc & (kBtbSize - 1);
+    std::size_t idx = pc & (btb_size() - 1);
 
     // 更新 BTB
     btb_[idx].tag = pc;
@@ -190,8 +196,10 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
 
   // 查询 BTB 条目
   const BtbEntry& btb_entry(std::size_t idx) const {
-    return btb_[idx % kBtbSize];
+    return btb_[idx % btb_size()];
   }
+
+  std::size_t btb_size() const { return btb_entries_; }
 
   // 查询 Bimodal 计数器
   Counter bimodal_counter(std::size_t idx) const {
@@ -227,8 +235,9 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
   std::size_t correct_predictions() const { return correct_predictions_; }
 
  private:
-  // BTB
-  std::array<BtbEntry, kBtbSize> btb_{};
+  // BTB (M4.14: std::vector, 大小由 ctor 运行时参数 btb_entries 决定)
+  std::vector<BtbEntry> btb_;
+  std::size_t btb_entries_;
 
   // Bimodal 计数器
   std::array<Counter, kBimodalSize> bimodal_{};
