@@ -22,10 +22,6 @@ STATIC_TEST_FN = re.compile(
     r'^static\s+void\s+(test_\w+)\s*\(\s*\)\s*\{',
     re.MULTILINE
 )
-MAIN_BLOCK = re.compile(
-    r'^(int\s+main\s*\(\s*\)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})\s*$',
-    re.MULTILINE
-)
 # 简化: 匹配到 main { 开始, 然后贪婪找匹配的 }
 MAIN_SIMPLE = re.compile(r'^int\s+main\s*\(\s*\)\s*\{', re.MULTILINE)
 

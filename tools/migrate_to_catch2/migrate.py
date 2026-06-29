@@ -36,8 +36,15 @@ FAMILY_BY_DIR = {
 def detect_family(path: Path) -> str:
     p = str(path)
     for prefix, family in FAMILY_BY_DIR.items():
-        if p.startswith(prefix):
+        if p.startswith(prefix) or p.endswith('/' + prefix):
             return family
+    try:
+        rel = str(path.relative_to(Path.cwd()))
+        for prefix, family in FAMILY_BY_DIR.items():
+            if rel.startswith(prefix):
+                return family
+    except ValueError:
+        pass
     return 'unknown'
 
 def migrate_file(path: Path) -> bool:

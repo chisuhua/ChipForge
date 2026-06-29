@@ -25,11 +25,10 @@ from pathlib import Path
 CHECK_DEFINE_START = re.compile(r'^\s*#\s*define\s+CHECK\s*\([^)]*\)\s+', re.MULTILINE)
 
 def find_macro_end(src: str, start: int) -> int:
-    """从 start (宏体第一个字符) 找到宏体的结束位置.
-    
+    r"""从 start (宏体第一个字符) 找到宏体的结束位置.
+
     策略: 跨过整个 do { ... } while(0) 或 单个 { ... } 块,
-          或找到行尾 (\) 续行符链的末尾.
-    """
+          或找到行尾 (\) 续行符链的末尾."""
     # 跳过前导空白
     i = start
     while i < len(src) and src[i] in ' \t':
@@ -60,8 +59,8 @@ def find_macro_end(src: str, start: int) -> int:
             while i < len(src) and src[i] in ' \t':
                 i += 1
             # 期望 'while(0)'
-            if src[i:i+6] == 'while':
-                i += 6
+            if src[i:i+5] == 'while':
+                i += 5
                 # 找 ')'
                 while i < len(src) and src[i] != ')':
                     i += 1
