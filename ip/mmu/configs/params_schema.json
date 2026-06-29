@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MMU IP Configuration Schema",
+  "description": "MMU IP with multi-level TLB + Page Table Walker. Supports CPU (RISC-V) and GPU profiles. All params JSON-driven (no hardcoding).",
+  "type": "object",
+  "properties": {
+    "name": {"type": "string", "description": "实例名称"},
+    "type": {"type": "string", "const": "mmu"},
+    "impl_mode": {
+      "type": "string",
+      "enum": ["TLM_ONLY", "RTL_ONLY", "COMPARE", "SHADOW"],
+      "default": "TLM_ONLY"
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "topology": {
+          "type": "string",
+          "enum": ["unified", "split_id"],
+          "default": "unified",
+          "description": "TLB topology. Phase 1 skeleton only unified; split_id postponed to mmu-tlb-ptw-impl"
+        },
+        "asid_bits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16,
+          "default": 9,
+          "description": "ASID/VMID bits. 0=no ASID, 9=RISC-V sv39, 12-16=GPU"
+        },
+        "sv_mode": {
+          "type": "string",
+          "enum": ["Bare", "Sv32", "Sv39", "Sv48"],
+          "default": "sv39"
+        },
+        "supported_page_sizes": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 4096, "maximum": 1073741824},
+          "default": [4096, 2097152, 1073741824],
+          "uniqueItems": true
+        },
+        "ptw_max_inflight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 2
+        },
+        "shadow_fill_from_next": {
+          "type": "boolean",
+          "default": true
+        },
+        "levels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "entries": {"type": "integer", "minimum": 1, "maximum": 4096},
+              "associativity": {"type": "integer", "minimum": 1, "maximum": 64},
+              "num_lookup_ports": {"type": "integer", "minimum": 1, "maximum": 8, "default": 1},
+              "lookup_latency_cycles": {"type": "integer", "minimum": 0, "maximum": 16, "default": 1},
+              "replacement_policy": {
+                "type": "string",
+                "enum": ["None", "FIFO", "LRU", "RRIP"],
+                "default": "LRU"
+              }
+            },
+            "required": ["name", "entries", "associativity"]
+          }
+        }
+      },
+      "required": ["topology", "levels", "sv_mode"]
+    }
+  },
+  "required": ["name", "type", "params"],
+  "additionalProperties": false
+}
