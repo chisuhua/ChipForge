@@ -1,6 +1,5 @@
 // tests/framework/test_coexistence.cpp
 //
-// 功能描述: cf_plugin 与 CppTLM/CppHDL 共存测试 (Phase 0 §2.3)
 // 作者: ChipForge Plugin Team
 // 最后修改日期: 2026-06-08
 //
@@ -10,8 +9,7 @@
 //   3. cf::plugin::PipeBuilder 可与 cpptlm::ChStreamModuleBase 实例共存
 //   4. cf::plugin::Payload 与 CppHDL ch_uint<N> 命名空间不冲突
 
-#include <cassert>
-#include <cstdio>
+#include "catch_amalgamated.hpp"
 #include <memory>
 #include <string>
 
@@ -30,36 +28,33 @@ using cf::plugin::Phase;
 using cf::plugin::PipeBuilder;
 using cf::plugin::PluginBase;
 
-static void test_namespace_isolation() {
+TEST_CASE("namespace_isolation", "[framework]") {
   cf::plugin::PluginBase* p = nullptr;
   (void)p;  // 类型可寻址即可
-  printf("  [PASS] test_namespace_isolation\n");
 }
 
-static void test_can_include_all_three_headers() {
+TEST_CASE("can_include_all_three_headers", "[framework]") {
   // ChStreamModuleBase 实例化需要 EventQueue
   // 这里仅验证类型可见性 (不实际构造,避免 EventQueue 依赖)
   static_assert(std::is_class<ChStreamModuleBase>::value,
                 "ChStreamModuleBase must be a class");
   static_assert(std::is_class<ch::Component>::value,
                 "ch::Component must be a class");
-  printf("  [PASS] test_can_include_all_three_headers\n");
 }
 
-static void test_payload_coexists_with_chuint() {
+TEST_CASE("payload_coexists_with_chuint", "[framework]") {
   // cf::plugin::uint_t<64> 与 ch::ch_uint<64> 命名空间独立
   cf::plugin::uint_t<64> a = 0xDEAD;
   cf::plugin::uint_t<64> b = 0xBEEF;
-  assert(a == 0xDEAD);
-  assert(b == 0xBEEF);
-  assert(a != b);
+  REQUIRE(a == 0xDEAD);
+  REQUIRE(b == 0xBEEF);
+  REQUIRE(a != b);
   // 同一类型别名工作
   cf::plugin::Payload<cf::plugin::uint_t<32>> p32{"p32"};
   p32.type();
-  printf("  [PASS] test_payload_coexists_with_chuint\n");
 }
 
-static void test_plugin_can_hold_cpp_namespace_member() {
+TEST_CASE("plugin_can_hold_cpp_namespace_member", "[framework]") {
   // 派生类可以同时使用 cf::plugin 和 cpptlm:: 命名空间成员
   // (不实际构造 ChStreamModuleBase 实例, 只需类型可组合)
   struct HybridPlugin : cf::plugin::PluginBase {
@@ -71,10 +66,9 @@ static void test_plugin_can_hold_cpp_namespace_member() {
   // 类型特征: cf::plugin::PluginBase 派生
   static_assert(std::is_base_of<cf::plugin::PluginBase, HybridPlugin>::value,
                 "HybridPlugin must derive from cf::plugin::PluginBase");
-  printf("  [PASS] test_plugin_can_hold_cpp_namespace_member\n");
 }
 
-static void test_pipe_builder_orchestrates_plugin_lifecycle() {
+TEST_CASE("pipe_builder_orchestrates_plugin_lifecycle", "[framework]") {
   // 验证 cf::plugin 自身的全链路 (与 CppTLM/CppHDL include 并存)
   struct CountPlugin : cf::plugin::PluginBase {
     int setup_count = 0;
@@ -90,20 +84,10 @@ static void test_pipe_builder_orchestrates_plugin_lifecycle() {
   cf::plugin::PipeBuilder pb;
   pb.register_plugin(std::make_unique<CountPlugin>());
   pb.build();
-  assert(pb.stage_count() == 1);
+  REQUIRE(pb.stage_count() == 1);
   pb.run();
   pb.run();
   pb.run();
-  printf("  [PASS] test_pipe_builder_orchestrates_plugin_lifecycle\n");
 }
 
-int main() {
-  printf("=== Coexistence Tests (Phase 0 §2.3) ===\n");
-  test_namespace_isolation();
-  test_can_include_all_three_headers();
-  test_payload_coexists_with_chuint();
-  test_plugin_can_hold_cpp_namespace_member();
-  test_pipe_builder_orchestrates_plugin_lifecycle();
-  printf("=== All coexistence tests passed ===\n");
-  return 0;
-}
+
