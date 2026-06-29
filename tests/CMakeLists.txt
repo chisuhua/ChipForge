@@ -37,14 +37,15 @@ target_include_directories(chipforge_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 
-# 链接 cf_plugin 框架 + CppTLM/CppHDL（按需）
+# 链接 cf_plugin 框架 (头文件 only INTERFACE 库)
 target_link_libraries(chipforge_tests PRIVATE
     cf_plugin
     cf_plugin_bridge
-    cpptlm_core
-    cpphdl
-    nlohmann_json::nlohmann_json
 )
+# 通过 helper 函数附加 CppTLM 和 CppHDL 依赖
+# (这些函数同时链接库和添加 include 路径, 避免与 target_link_libraries 重复)
+cf_plugin_link_cpptlm(chipforge_tests)
+cf_plugin_link_cpphdl(chipforge_tests)
 
 # 启用 ASan (可选, 跟随父选项)
 if(ENABLE_ASAN)
