@@ -224,6 +224,11 @@ add_subdirectory(src/cf_plugin)   # Phase 0  ✅ 已就位 (空占位)
 # (子目录 src/cf_plugin/CMakeLists.txt 自身有 enable_testing(), 此处冗余声明为安全)
 enable_testing()
 
+option(CHIPFORGE_BUILD_TESTS "Build Catch2 test suite" ON)
+if(CHIPFORGE_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
+
 # ----------------------------------------------------------------------------
 # 静态检查 (D4 决策强制): 无 test pass, exit code 反映合规
 # ----------------------------------------------------------------------------
