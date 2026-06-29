@@ -367,35 +367,160 @@ if __name__ == '__main__':
 ```python
 #!/usr/bin/env python3
 """
-transform_check_macro.py: 把项目内手写的 #define CHECK(cond) 宏转换为 Catch2 原生 CHECK() 宏。
+transform_check_macro.py: 把项目内手写的 #define CHECK(cond) 宏完整移除。
+catch_amalgamated.hpp 已提供同名 CHECK 宏。
 
-模式识别:
-- 1. 找到 #define CHECK(cond) ... 块
-- 2. 移除整个 #define（catch_amalgamated.hpp 已提供同名宏）
-- 3. 保留调用点不变（CHECK(x) 调用点完全兼容）
+实现说明:
+- 不能用纯正则, 因为宏体可能包含嵌套的 { } (如 do { if { } else { } } while(0))
+- 用 brace-matching 算法: 从 #define CHECK(...) 找到匹配的 结束 \n 或 ;
+- 匹配 #define 行后跳过整个宏体（含 do { ... } while(0) 或简单 { ... }）
+- 保守: 若未找到 #define 开头则不动文件
 
-特殊处理:
-- 部分文件可能有 #define CHECK(cond) { ... } 包含计数器逻辑
-- 转换后会丢失计数功能，但 Catch2 的测试报告本身就提供断言统计
+实际例子 (test_int_alu_full.cpp):
+    #define CHECK(cond) do { \\
+      ++total_cases; \\
+      if (cond) { ++passed_cases; } \\
+      else { printf("  [FAIL] line %d: %s\\n", __LINE__, #cond); } \\
+    } while(0)
+
+转换后: 整个 #define ... while(0) 块被删除, 调用点 CHECK(x) 不变 (Catch2 提供)。
 """
 import re
 import sys
 from pathlib import Path
 
-CHECK_MACRO = re.compile(
-    r'#\s*define\s+CHECK\s*\([^)]*\)\s+(?:do\s*\{[^}]*\}\s*while\s*\(\s*0\s*\)|\{[^{}]*\})',
-    re.DOTALL
-)
+CHECK_DEFINE_START = re.compile(r'^\s*#\s*define\s+CHECK\s*\([^)]*\)\s+', re.MULTILINE)
+
+def find_macro_end(src: str, start: int) -> int:
+    """从 start (宏体第一个字符) 找到宏体的结束位置.
+    
+    策略: 跨过整个 do { ... } while(0) 或 单个 { ... } 块,
+          或找到行尾 (\) 续行符链的末尾.
+    """
+    # 跳过前导空白
+    i = start
+    while i < len(src) and src[i] in ' \t':
+        i += 1
+    
+    # 处理行尾 \ 续行
+    if i < len(src) and src[i] == '\\':
+        i += 1
+        if i < len(src) and src[i] == '\n':
+            i += 1
+        # 继续找下一个有效字符
+    
+    # 检查 do { ... } while(0)
+    rest = src[i:].lstrip()
+    if rest.startswith('do'):
+        # 跳过 'do'
+        i = src.index('do', i) + 2
+        # 跳过空白
+        while i < len(src) and src[i] in ' \t':
+            i += 1
+        if i < len(src) and src[i] == '{':
+            # 找匹配的 '}'
+            brace_end = find_matching_brace(src, i)
+            if brace_end == -1:
+                return -1
+            i = brace_end + 1
+            # 跳过空白
+            while i < len(src) and src[i] in ' \t':
+                i += 1
+            # 期望 'while(0)'
+            if src[i:i+6] == 'while':
+                i += 6
+                # 找 ')'
+                while i < len(src) and src[i] != ')':
+                    i += 1
+                if i < len(src):
+                    i += 1
+                # 跳过到行尾
+                while i < len(src) and src[i] != '\n':
+                    i += 1
+                if i < len(src):
+                    i += 1  # 包含换行
+        return i
+    
+    # 检查简单 { ... } 块
+    if i < len(src) and src[i] == '{':
+        brace_end = find_matching_brace(src, i)
+        if brace_end == -1:
+            return -1
+        i = brace_end + 1
+        # 跳过到行尾
+        while i < len(src) and src[i] != '\n':
+            i += 1
+        if i < len(src):
+            i += 1
+        return i
+    
+    # 其他情况: 单行宏 (如 #define CHECK(x) printf(...))
+    while i < len(src) and src[i] != '\n':
+        i += 1
+    if i < len(src):
+        i += 1
+    return i
+
+def find_matching_brace(src: str, start: int) -> int:
+    """从 start 位置（'{'）找匹配的 '}'"""
+    assert src[start] == '{', f"Expected '{{' at position {start}, got '{src[start]}'"
+    depth = 0
+    i = start
+    in_string = False
+    in_char = False
+    while i < len(src):
+        c = src[i]
+        if c == '/' and i + 1 < len(src) and src[i+1] == '/':
+            # 行注释, 跳过到行尾
+            while i < len(src) and src[i] != '\n':
+                i += 1
+            continue
+        elif c == '/' and i + 1 < len(src) and src[i+1] == '*':
+            # 块注释
+            i += 2
+            while i + 1 < len(src) and not (src[i] == '*' and src[i+1] == '/'):
+                i += 1
+            i += 2
+            continue
+        elif c == '"' and not in_char:
+            in_string = not in_string
+        elif c == "'" and not in_string:
+            in_char = not in_char
+        elif not in_string and not in_char:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1
 
 def transform_file(path: Path) -> tuple[str, int]:
     src = path.read_text()
-    original = src
+    new_src = src
     count = 0
-    new_src = CHECK_MACRO.sub('', src)
-    if new_src != src:
-        count = 1
-        # 清理连续空行
+    
+    # 反复扫描直到没有 #define CHECK
+    while True:
+        m = CHECK_DEFINE_START.search(new_src)
+        if not m:
+            break
+        start = m.start()
+        body_start = m.end()  # 宏体第一个字符位置
+        end = find_macro_end(new_src, body_start)
+        if end == -1:
+            print(f"WARN: {path}: 未找到 #define CHECK 宏体结束 (line ~{new_src[:m.start()].count(chr(10))+1})")
+            break
+        # 删除从 start 到 end 的整个 #define 块
+        new_src = new_src[:start] + new_src[end:]
+        count += 1
+    
+    if count > 0:
+        # 清理连续空行（最多保留 1 个空行）
         new_src = re.sub(r'\n\n\n+', '\n\n', new_src)
+        path.write_text(new_src)
+    
     return new_src, count
 
 if __name__ == '__main__':
@@ -403,8 +528,7 @@ if __name__ == '__main__':
         p = Path(arg)
         new_src, n = transform_file(p)
         if n > 0:
-            p.write_text(new_src)
-            print(f"  removed CHECK macro in {p}")
+            print(f"  removed {n} CHECK macro(s) in {p}")
 ```
 
 - [ ] **Step A2.4: 写 migrate.py 统一调度脚本**
@@ -412,7 +536,7 @@ if __name__ == '__main__':
 ```python
 #!/usr/bin/env python3
 """
-migrate.py: 统一调度三个转换器，把单个测试文件从「纯 main+assert」模式迁移到 Catch2。
+migrate.py: 统一调度四个转换器，把单个测试文件从「纯 main+assert」或「GTest」模式迁移到 Catch2。
 
 用法:
     python3 migrate.py cache/test_replacement_policy.cpp --family cache
@@ -421,7 +545,8 @@ migrate.py: 统一调度三个转换器，把单个测试文件从「纯 main+as
 执行顺序（重要）:
     1. transform_assert.py    (先转 assert)
     2. transform_check_macro.py (移除手写 CHECK 宏)
-    3. transform_main.py      (最后转 main+static void 为 TEST_CASE)
+    3. transform_gtest.py     (GTest → Catch2 宏, 仅 mmu/ 用)
+    4. transform_main.py      (最后转 main+static void 为 TEST_CASE)
 
 输出:
     - 原地修改文件
@@ -455,23 +580,41 @@ def migrate_file(path: Path) -> bool:
     family = detect_family(path)
     print(f"\n=== Migrating {path} (family={family}) ===")
     
-    # Step 1: transform_assert
-    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_assert.py', str(path)])
+    # Step 1: transform_assert (assert 阵营)
+    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_assert.py', str(path)],
+                        capture_output=True)
     if r.returncode != 0:
-        print(f"  FAIL: assert transform")
+        print(f"  FAIL: assert transform: {r.stderr.decode()}")
         return False
+    if r.stdout:
+        print(f"  {r.stdout.decode().strip()}")
     
-    # Step 2: transform_check_macro
-    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_check_macro.py', str(path)])
+    # Step 2: transform_check_macro (手写 CHECK 宏)
+    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_check_macro.py', str(path)],
+                        capture_output=True)
     if r.returncode != 0:
-        print(f"  FAIL: check_macro transform")
+        print(f"  FAIL: check_macro transform: {r.stderr.decode()}")
         return False
+    if r.stdout:
+        print(f"  {r.stdout.decode().strip()}")
     
-    # Step 3: transform_main
-    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_main.py', family, str(path)])
+    # Step 3: transform_gtest (GTest → Catch2, 仅 mmu/ 用)
+    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_gtest.py', family, str(path)],
+                        capture_output=True)
     if r.returncode != 0:
-        print(f"  FAIL: main transform")
+        print(f"  FAIL: gtest transform: {r.stderr.decode()}")
         return False
+    if r.stdout:
+        print(f"  {r.stdout.decode().strip()}")
+    
+    # Step 4: transform_main (最后转 main+static void)
+    r = subprocess.run(['python3', 'tools/migrate_to_catch2/transform_main.py', family, str(path)],
+                        capture_output=True)
+    if r.returncode != 0:
+        print(f"  FAIL: main transform: {r.stderr.decode()}")
+        return False
+    if r.stdout:
+        print(f"  {r.stdout.decode().strip()}")
     
     return True
 
@@ -505,6 +648,171 @@ def main():
 
 if __name__ == '__main__':
     main()
+```
+
+- [ ] **Step A2.4b: 写 transform_gtest.py（GTest → Catch2 转换器）**
+
+```python
+#!/usr/bin/env python3
+"""
+transform_gtest.py: 把 GTest 风格的测试代码转换为 Catch2 等价模式。
+
+转换规则:
+  #include <gtest/gtest.h>                          → #include "catch_amalgamated.hpp"
+  TEST(SuiteName, TestName) { body }                → TEST_CASE("TestName", "[mmu][SuiteName]") { body }
+  TEST_F(FixtureClass, TestName) { body }           → TEST_CASE_METHOD(FixtureClass, "TestName", "[mmu]") { body }
+  EXPECT_TRUE(x)                                    → CHECK(x)
+  EXPECT_FALSE(x)                                   → CHECK_FALSE(x)
+  EXPECT_EQ(a, b)                                   → CHECK(a == b)
+  EXPECT_NE(a, b)                                   → CHECK(a != b)
+  EXPECT_LT(a, b) / EXPECT_LE / GT / GE             → CHECK(a < b) / etc.
+  ASSERT_TRUE(x)                                    → REQUIRE(x)
+  ASSERT_FALSE(x)                                   → REQUIRE_FALSE(x)
+  ASSERT_EQ(a, b)                                   → REQUIRE(a == b)
+
+边界情况:
+  - EXPECT_EQ 中的参数可能是 macro 或 template, 用括号强制
+  - TEST 宏可能跨多行 (有 trailing {), 用 brace-matching 找函数体
+  - TEST_F 转换时若原文件没有 fixture class 定义, 报 WARN 但不删除
+"""
+import re
+import sys
+from pathlib import Path
+
+INCLUDE_GTEST = re.compile(r'#\s*include\s+<gtest/gtest\.h>')
+TEST_MACRO = re.compile(r'\bTEST\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)\s*\{')
+TEST_F_MACRO = re.compile(r'\bTEST_F\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)\s*\{')
+
+# EXPECT_* / ASSERT_* 转换表
+MACRO_REPLACEMENTS = [
+    # (regex, replacement, require_args_count)
+    (re.compile(r'\bEXPECT_TRUE\s*\(\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)});', 1),
+    (re.compile(r'\bEXPECT_FALSE\s*\(\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK_FALSE({m.group(1)});', 1),
+    (re.compile(r'\bEXPECT_EQ\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)} == {m.group(2)});', 2),
+    (re.compile(r'\bEXPECT_NE\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)} != {m.group(2)});', 2),
+    (re.compile(r'\bEXPECT_LT\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)} < {m.group(2)});', 2),
+    (re.compile(r'\bEXPECT_LE\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)} <= {m.group(2)});', 2),
+    (re.compile(r'\bEXPECT_GT\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)} > {m.group(2)});', 2),
+    (re.compile(r'\bEXPECT_GE\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'CHECK({m.group(1)} >= {m.group(2)});', 2),
+    (re.compile(r'\bASSERT_TRUE\s*\(\s*(.+?)\s*\)\s*;'), lambda m: f'REQUIRE({m.group(1)});', 1),
+    (re.compile(r'\bASSERT_FALSE\s*\(\s*(.+?)\s*\)\s*;'), lambda m: f'REQUIRE_FALSE({m.group(1)});', 1),
+    (re.compile(r'\bASSERT_EQ\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'REQUIRE({m.group(1)} == {m.group(2)});', 2),
+    (re.compile(r'\bASSERT_NE\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;'), lambda m: f'REQUIRE({m.group(1)} != {m.group(2)});', 2),
+]
+
+def find_matching_brace(src: str, start: int) -> int:
+    """从 start 位置（'{'）找匹配的 '}', 跳过字符串/注释"""
+    assert src[start] == '{'
+    depth = 0
+    i = start
+    in_string = False
+    in_char = False
+    while i < len(src):
+        c = src[i]
+        if c == '/' and i + 1 < len(src) and src[i+1] == '/':
+            while i < len(src) and src[i] != '\n':
+                i += 1
+            continue
+        elif c == '/' and i + 1 < len(src) and src[i+1] == '*':
+            i += 2
+            while i + 1 < len(src) and not (src[i] == '*' and src[i+1] == '/'):
+                i += 1
+            i += 2
+            continue
+        elif c == '"' and not in_char:
+            in_string = not in_string
+        elif c == "'" and not in_string:
+            in_char = not in_char
+        elif not in_string and not in_char:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1
+
+def transform_test_macro(src: str, family: str) -> tuple[str, int]:
+    """转换 TEST(Suite, Name) { body } → TEST_CASE("Name", "[family][Suite]") { body }
+    
+    必须从后向前处理 (避免偏移错乱)
+    """
+    count = 0
+    matches = list(TEST_MACRO.finditer(src))
+    for m in reversed(matches):
+        suite, name = m.group(1), m.group(2)
+        brace_start = m.end() - 1
+        brace_end = find_matching_brace(src, brace_start)
+        if brace_end == -1:
+            print(f"WARN: TEST({suite}, {name}) 未匹配的 brace, 跳过")
+            continue
+        new_decl = f'TEST_CASE("{name}", "[{family}][{suite}]") {{'
+        src = src[:m.start()] + new_decl + src[brace_start+1:brace_end] + '}' + src[brace_end+1:]
+        count += 1
+    return src, count
+
+def transform_test_f_macro(src: str, family: str) -> tuple[str, int]:
+    """转换 TEST_F(Fixture, Name) { body } → TEST_CASE_METHOD(Fixture, "Name", "[family]") { body }"""
+    count = 0
+    matches = list(TEST_F_MACRO.finditer(src))
+    for m in reversed(matches):
+        fixture, name = m.group(1), m.group(2)
+        brace_start = m.end() - 1
+        brace_end = find_matching_brace(src, brace_start)
+        if brace_end == -1:
+            print(f"WARN: TEST_F({fixture}, {name}) 未匹配的 brace, 跳过")
+            continue
+        new_decl = f'TEST_CASE_METHOD({fixture}, "{name}", "[{family}]") {{'
+        src = src[:m.start()] + new_decl + src[brace_start+1:brace_end] + '}' + src[brace_end+1:]
+        count += 1
+    return src, count
+
+def transform_expect_assert(src: str) -> tuple[str, int]:
+    """转换所有 EXPECT_* 和 ASSERT_* 宏"""
+    count = 0
+    for regex, repl, nargs in MACRO_REPLACEMENTS:
+        new_src, n = regex.subn(repl, src)
+        if n > 0:
+            count += n
+            src = new_src
+    return src, count
+
+def transform_file(path: Path, family: str) -> tuple[str, int]:
+    src = path.read_text()
+    total = 0
+    
+    # 0. 替换 #include <gtest/gtest.h>
+    if INCLUDE_GTEST.search(src):
+        src = INCLUDE_GTEST.sub('#include "catch_amalgamated.hpp"', src)
+    
+    # 1. 转换 EXPECT_*/ASSERT_*
+    src, n = transform_expect_assert(src)
+    total += n
+    
+    # 2. 转换 TEST()
+    src, n = transform_test_macro(src, family)
+    total += n
+    
+    # 3. 转换 TEST_F()
+    src, n = transform_test_f_macro(src, family)
+    total += n
+    
+    if total > 0:
+        path.write_text(src)
+    
+    return src, total
+
+if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        print("Usage: transform_gtest.py <family> <file>...")
+        sys.exit(1)
+    family = sys.argv[1]
+    for arg in sys.argv[2:]:
+        p = Path(arg)
+        new_src, n = transform_file(p, family)
+        if n > 0:
+            print(f"  transformed {n} GTest macro(s) in {p}")
 ```
 
 - [ ] **Step A2.5: 写转换器 README**
@@ -600,16 +908,9 @@ git commit -m "test: add Catch2 migration toolchain (transform_assert/main/check
 # 单二进制 Catch2 测试套件（与 CppTLM 模式一致）
 # 设计原则: 测试自动发现, 新增 test_*.cpp 无需修改本文件
 
-# 收集所有测试源文件（含子目录）
+# 收集所有测试源文件（含子目录, RECURSE 处理 cpu/integration/ 和 cpu/configs/）
 file(GLOB_RECURSE TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/*/test_*.cpp"
-)
-list(REMOVE_ITEM TEST_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/catch2/catch_amalgamated.cpp"
-)
-# 排除 catch2/ 目录（避免 vendor 文件被当成测试）
-list(REMOVE_ITEM TEST_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/catch2/catch_amalgamated.hpp"
 )
 
 # 把 catch_amalgamated.cpp 加入编译（提供默认 main）
@@ -617,12 +918,25 @@ list(APPEND TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/catch2/catch_amalgamated.cpp"
 )
 
+# 关键: cache 测试需要的实现 .cpp 源文件
+# 这些 .cpp 之前在 src/cf_plugin/CMakeLists.txt 中被显式编译进独立 test target
+# 单二进制模式下, 必须显式列出以确保链接找到符号
+# (cf_plugin 是 INTERFACE 库, 不包含 .cpp 实现)
+set(CACHE_IMPL_SOURCES
+    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
+)
+list(APPEND TEST_SOURCES ${CACHE_IMPL_SOURCES})
+
 # 单二进制 chipforge_tests
 add_executable(chipforge_tests ${TEST_SOURCES})
 
 # tests/ 子目录加入 include 路径（让 #include "catch_amalgamated.hpp" 解析）
 target_include_directories(chipforge_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/bundles
     ${CMAKE_SOURCE_DIR}/ip
@@ -663,6 +977,12 @@ set_tests_properties(chipforge_tests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 ```
+
+**关于 CACHE_IMPL_SOURCES 的关键说明**:
+- `cf_plugin` 是 INTERFACE 库（仅头文件），不包含任何 .cpp 实现
+- cache 测试 (test_l1_cache_*) 在原 CMakeLists.txt 中显式将 `L1CachePlugin.cpp`/`replacement_policy.cpp`/`l1_cache_bridge.cpp`/`l1_cache_bridge_adapter.cpp` 编译进各自 test target
+- 单二进制模式下，这些 .cpp **必须**显式列入 `chipforge_tests` 的 sources，否则 `L1CachePlugin` 等符号无法解析
+- 替代方案：把这些 .cpp 编译为 STATIC 库再链接（更复杂，本计划采用显式列出方案）
 
 - [ ] **Step B1.2: 验证 tests/CMakeLists.txt 语法**
 
@@ -841,14 +1161,26 @@ Return summary:
 - Commit hash
 ```
 
-- [ ] **Step D1.2: 等待 D1.1 完成, 验证编译（仅 framework 部分）**
+- [ ] **Step D1.2: 等待 D1.1 完成, 静态检查（不编译）**
 
 ```bash
 cd /workspace/project/ChipForge/.worktrees/testing-catch2
-# 此时 src/cf_plugin/CMakeLists.txt 已删除 framework 测试注册,
-# 全部由 tests/CMakeLists.txt 接管
-cmake --build build-baseline --target chipforge_tests -j$(nproc) 2>&1 | tail -50
-# 预期: 编译成功, 无 framework 测试编译错误
+# ⚠️ 重要: 不在此步骤编译 chipforge_tests
+# 原因: tests/CMakeLists.txt 用 file(GLOB_RECURSE) 一次性发现所有 47 个测试源文件.
+# 如果此时其他 family (cache/cpu/soc/bundles/mmu) 还未迁移, 它们仍含 int main(),
+# 与 catch_amalgamated.cpp 的 main() 冲突 → multiple definition 错误.
+# 编译验证统一在 Phase E 做 (E1.2).
+#
+# 此步骤只做 grep 静态检查:
+echo "framework/ files with leftover int main:"
+grep -l "int main" tests/framework/test_*.cpp
+# 预期: 无输出 (D1.1 agent 已删除)
+echo "framework/ files with leftover assert:"
+grep -l "assert(" tests/framework/test_*.cpp
+# 预期: 无输出
+echo "framework/ files with TEST_CASE:"
+grep -l "TEST_CASE" tests/framework/test_*.cpp | wc -l
+# 预期: 9 (全部)
 ```
 
 #### Task D2: 并行迁移 cache/ (5 files)
@@ -1068,7 +1400,7 @@ REPORT:
 ```
 You are migrating 5 test files in tests/mmu/ from GTest to Catch2.
 
-⚠️ SPECIAL: mmu/ already uses GTest (TEST/EXPECT_*/ASSERT_*). Different transformation rules apply.
+⚠️ SPECIAL: mmu/ already uses GTest (TEST/EXPECT_*/ASSERT_*). Use a different tool.
 
 SCOPE:
 - Working directory: /workspace/project/ChipForge/.worktrees/testing-catch2
@@ -1080,37 +1412,22 @@ SCOPE:
   - tests/mmu/test_tlb_unit.cpp
 - Family tag for Catch2: [mmu]
 
-⚠️ GTest → Catch2 conversion rules (NOT in transform_main.py, do manually):
-- #include <gtest/gtest.h> → #include "catch_amalgamated.hpp"
-- TEST(SuiteName, TestName) { body } → TEST_CASE("TestName", "[mmu][SuiteName]") { body }
-- EXPECT_TRUE(x) → CHECK(x)
-- EXPECT_FALSE(x) → CHECK_FALSE(x)
-- EXPECT_EQ(a, b) → CHECK(a == b)
-- EXPECT_NE(a, b) → CHECK(a != b)
-- EXPECT_LT(a, b) → CHECK(a < b)
-- EXPECT_LE(a, b) → CHECK(a <= b)
-- EXPECT_GT(a, b) → CHECK(a > b)
-- EXPECT_GE(a, b) → CHECK(a >= b)
-- ASSERT_TRUE(x) → REQUIRE(x)
-- ASSERT_FALSE(x) → REQUIRE_FALSE(x)
-- ASSERT_EQ(a, b) → REQUIRE(a == b)
-- TEST_F(FixtureClass, TestName) → See below
+TOOL (use this, NOT transform_main.py):
+  python3 tools/migrate_to_catch2/transform_gtest.py mmu <file>
+  This tool handles: #include <gtest/gtest.h> → catch_amalgamated.hpp,
+                      TEST/EXPECT_*/ASSERT_* → TEST_CASE/CHECK/REQUIRE,
+                      TEST_F → TEST_CASE_METHOD
 
-⚠️ TEST_F handling:
-- If file uses TEST_F with a fixture class, convert to:
-  class FixtureClass : public Catch::TestEventListenerBase { ... };  // OR keep as plain class
-  TEST_CASE_METHOD(FixtureClass, "TestName", "[mmu]") { body }
-- Catch2 v3 supports TEST_CASE_METHOD
-- For simple fixtures (no setup/teardown logic), just convert to TEST_CASE
-- For complex fixtures, manual review may be needed
-
-DO NOT USE:
-- transform_main.py, transform_assert.py, transform_check_macro.py (these are for assert-based files, not GTest)
+⚠️ TEST_F handling (if any file uses it):
+- transform_gtest.py converts TEST_F(FixtureClass, TestName) to TEST_CASE_METHOD(FixtureClass, "TestName", "[mmu]")
+- If the original fixture class is already a plain class (not inheriting from ::testing::Test), no changes needed
+- If it inherits from ::testing::Test, manually change to inherit from Catch::TestEventListenerBase or remove inheritance
 
 POST-PROCESS (manual):
-1. For each file, manually apply the GTest → Catch2 conversion above
+1. Run transform_gtest.py first
 2. Remove any "Google Test" / "GTest" comments
-3. Verify file still compiles
+3. For files that originally had TEST_F: verify the fixture class compatibility
+4. Verify file still compiles (this will be checked in Phase E1.2)
 
 VERIFICATION:
     grep -c "gtest\|GTest" tests/mmu/test_*.cpp | grep -v ":0" && echo "FAIL: leftover GTest" || echo "OK: no GTest"
@@ -1119,7 +1436,7 @@ VERIFICATION:
 
 DO NOT MODIFY:
 - src/cf_plugin/CMakeLists.txt, tests/CMakeLists.txt, tests/catch2/
-- ⚠️ tests/mmu/CMakeLists.txt will be DELETED in Step D7.3, so don't bother modifying it.
+- ⚠️ tests/mmu/CMakeLists.txt will be DELETED in Step D7.1, so don't bother modifying it.
 
 COMMIT (single commit for entire family):
     git add tests/mmu/
@@ -1173,74 +1490,6 @@ git commit -m "chore(tests): remove mmu/CMakeLists.txt (merged into tests/CMakeL
 cd /workspace/project/ChipForge/.worktrees/testing-catch2
 git log --oneline -10
 # 预期: 看到 D1, D2, D3, D4, D5, D6, D7 各自的 commit
-```
-
-#### Task D7: mmu/ 特殊处理（GTest → Catch2）
-
-**Files:** `tests/mmu/test_*.cpp` (5 files), `tests/mmu/CMakeLists.txt`
-
-mmu/ 5 个测试已经用 GTest（TEST/EXPECT_TRUE/EXPECT_EQ）。转换策略不同于纯 assert 阵营：
-
-- [ ] **Step D7.1: GTest → Catch2 转换规则**
-
-| GTest 模式 | Catch2 等价 | 备注 |
-|-----------|------------|------|
-| `#include <gtest/gtest.h>` | `#include "catch_amalgamated.hpp"` | 唯一 include 替换 |
-| `TEST(SuiteName, TestName) { ... }` | `TEST_CASE("TestName", "[mmu][SuiteName]") { ... }` | 自动推断 family=mmu |
-| `EXPECT_TRUE(x)` | `CHECK(x)` | 失败继续 |
-| `EXPECT_FALSE(x)` | `CHECK_FALSE(x)` | |
-| `EXPECT_EQ(a, b)` | `CHECK(a == b)` | |
-| `EXPECT_NE(a, b)` | `CHECK(a != b)` | |
-| `ASSERT_TRUE(x)` | `REQUIRE(x)` | 失败中止 |
-| `TEST_F(Fixture, TestName) { ... }` | 用 Catch2 fixture 模式：class + TEST_CASE_METHOD | 复杂, 需人工 |
-
-- [ ] **Step D7.2: 删除 tests/mmu/CMakeLists.txt 中的 GTest 引用**
-
-```bash
-# 修改前:
-#   target_link_libraries(mmu_lib_tests PRIVATE GTest::gtest_main cf_plugin)
-#   target_link_libraries(mmu_plugin_tests PRIVATE GTest::gtest_main cf_plugin cf_plugin_bridge)
-# 修改后:
-#   (mmu 测试已并入 chipforge_tests 单二进制, 此 CMakeLists.txt 可删除或留空)
-```
-
-- [ ] **Step D7.3: 删除 tests/mmu/CMakeLists.txt（合并到 tests/CMakeLists.txt）**
-
-由于 mmu/ 测试已并入单二进制 `chipforge_tests`，`tests/mmu/CMakeLists.txt` 失去作用。删除它（其 file(GLOB) 范围已被根 `tests/CMakeLists.txt` 覆盖）。
-
-```bash
-cd /workspace/project/ChipForge/.worktrees/testing-catch2
-git rm tests/mmu/CMakeLists.txt
-# mmu/ 目录的 5 个 .cpp 仍保留, 由 file(GLOB_RECURSE "tests/*/test_*.cpp") 自动发现
-```
-
-- [ ] **Step D7.4: 写 GTest → Catch2 转换器（如必要）**
-
-如果 mmu/ 5 个文件的转换模式规整，可写一个 `transform_gtest.py` 自动转换。模板:
-
-```python
-#!/usr/bin/env python3
-"""transform_gtest.py: GTest TEST() / EXPECT_* 转换为 Catch2 等价模式"""
-import re
-import sys
-from pathlib import Path
-
-INCLUDE_GTEST = re.compile(r'#\s*include\s+<gtest/gtest\.h>')
-TEST_MACRO = re.compile(r'TEST\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)\s*\{')
-EXPECT_TRUE = re.compile(r'EXPECT_TRUE\s*\(\s*([^;]+)\s*\)\s*;')
-EXPECT_FALSE = re.compile(r'EXPECT_FALSE\s*\(\s*([^;]+)\s*\)\s*;')
-EXPECT_EQ = re.compile(r'EXPECT_EQ\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)\s*;')
-ASSERT_TRUE = re.compile(r'ASSERT_TRUE\s*\(\s*([^;]+)\s*\)\s*;')
-
-# ... 实际转换逻辑（参考 transform_main.py 模板）
-```
-
-- [ ] **Step D7.5: 转换完成后，验证 mmu/ 5 个文件无 GTest 残留**
-
-```bash
-cd /workspace/project/ChipForge/.worktrees/testing-catch2
-grep -l "gtest\|EXPECT_\|ASSERT_\|TEST_F\|TEST(" tests/mmu/*.cpp
-# 预期: 无输出（已全部转换）
 ```
 
 ### Phase E: 集成验证
