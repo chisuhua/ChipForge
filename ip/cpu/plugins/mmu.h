@@ -1,38 +1,43 @@
 // ip/cpu/plugins/mmu.h
 //
-// 功能描述: MMUPlugin — 内存管理单元 (M2.7, P3+ 占位)
+// 功能描述: RISC-V MMU 适配器 (mmu-ip-skeleton, 11.1-11.3)
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-16
+// 最后修改日期: 2026-06-29
 //
 // 设计:
-//   - P3+ 占位: MMU 推迟到 P3 阶段 (虚拟内存支持)
-//   - 当前仅为占位类, 不含实际分页逻辑
-//   - 接口预留: setup()/build() 与其他 Plugin 一致
-//   - 未来扩展: TLB + 页表遍历 (Sv32/Sv39/Sv48)
+//   - RiscvMMUPlugin 继承 cf::ip::mmu::MMUPlugin
+//   - 骨架阶段占位: RISC-V 特定 hook 推迟到 mmu-tlb-ptw-impl
+//   - 向后兼容: using MMUPlugin = RiscvMMUPlugin (旧名仍可用, 保 M3 阶段 cpu 测试 0 破坏)
+//
+// 未来 RISC-V 特定 hook (推迟到 mmu-tlb-ptw-impl):
+//   - satp CSR 写入拦截 → 更新 PTW 配置
+//   - SFENCE.VMA 指令拦截 → 触发 multi_tlb_->invalidate_vaddr/asid/all
+//   - exception code 12/13/15 (page fault / access fault) 映射
+//   - mstatus.MXR/SUM 位行为 (影响 permission check)
 //
 // 约束:
-//   - D4 合规: 无业务 tick(), 占位类不实现具体逻辑
+//   - 骨架阶段: 仅依赖基类接口, RISC-V 特定 hook 推迟
 
 #ifndef CF_IP_CPU_PLUGINS_MMU_H
 #define CF_IP_CPU_PLUGINS_MMU_H
 
-#include "cf/plugin/plugin_base.h"
+#include "ip/mmu/tlm/MMUPlugin.h"
 
 namespace cf {
 namespace cpu {
 namespace plugins {
 
-class MMUPlugin : public cf::plugin::PluginBase {
+class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
  public:
-  MMUPlugin() = default;
-  ~MMUPlugin() override = default;
+  using cf::ip::mmu::MMUPlugin::MMUPlugin;  // 继承构造
+  ~RiscvMMUPlugin() override = default;
 
-  MMUPlugin(const MMUPlugin&) = delete;
-  MMUPlugin& operator=(const MMUPlugin&) = delete;
-
-  void setup(cf::plugin::PipeBuilder& /*pb*/) override {}
-  void build(cf::plugin::PipeBuilder& /*pb*/) override {}
+  RiscvMMUPlugin(const RiscvMMUPlugin&) = delete;
+  RiscvMMUPlugin& operator=(const RiscvMMUPlugin&) = delete;
 };
+
+// 向后兼容类型别名 — 旧 cf::cpu::plugins::MMUPlugin 仍可用, 保 M3 阶段 cpu 测试 0 破坏
+using MMUPlugin = RiscvMMUPlugin;
 
 }  // namespace plugins
 }  // namespace cpu
