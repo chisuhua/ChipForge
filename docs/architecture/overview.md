@@ -210,6 +210,7 @@ chipforge/
 
 例如：
 L1Cache (Plugin 风格) = 缓存骨架 + 替换策略 + 预取策略
+MMU TLB (Plugin 风格, mmu-ip-skeleton 2026-06-29) = TLB 骨架 + 替换策略 + 各级配置
 CrossbarTLM = 总线骨架 + 仲裁策略
 NoC Router (Plugin 风格) = 路由器骨架 + 路由算法
 CPU Pipeline (Plugin 风格) = 流水线骨架 + 分支预测策略

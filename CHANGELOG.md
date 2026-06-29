@@ -5,6 +5,64 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.0.7 (2026-06-29) - mmu-ip-skeleton
+
+> **OpenSpec change**: `mmu-ip-skeleton` (详见 `openspec/changes/mmu-ip-skeleton/`)
+> **目的**: 建立 `ip/mmu/` IP 骨架（目录/STATUS/Plugin/Bundle/Config schema），落地 lib/tlm 双层切分，TLB/PTW 算法推迟到 `mmu-tlb-ptw-impl`
+
+### Added (IP 骨架)
+- `ip/mmu/README.md` + `STATUS.md` (PARTIAL 骨架阶段标记)
+- `ip/mmu/docs/{README,architecture,configuration,integration}.md` (4 文档)
+- `ip/mmu/rtl/.gitkeep` + `ip/mmu/test/.gitkeep` (Phase 5+ 沿用)
+- `tests/mmu/` 目录 + 5 个测试文件 + `CMakeLists.txt`
+
+### Added (lib/ 纯 C++ 算法层)
+- `ip/mmu/lib/tlb_entry.h` — 模板化 `TLBEntry<TAG_BITS, ASID_BITS>` (valid/tag/pfn/asid/perms/global)
+- `ip/mmu/lib/tlb_lookup.h` — `TLBLookup` 5 字段 (hit/paddr/perms/fault/fault_code)
+- `ip/mmu/lib/tlb_base.h` — `TLBBase` 抽象基类 (10 纯虚方法)
+- `ip/mmu/lib/tlb.h` — 模板化 `TLB<ENTRIES, WAYS, TAG_BITS, ASID_BITS, PORTS>` (std::array 存储)
+- `ip/mmu/lib/tlb_factory.h/.cpp` — `TLBFactory::create()` 按 JSON 选模板特化 (8 种支持组合)
+- `ip/mmu/lib/multi_level_tlb.h/.cpp` — `MultiLevelTLB` 编排器 (shadow fill + 反向失效)
+- `ip/mmu/lib/ptw.h/.cpp` — `PTW` Page Table Walker 接口 (回调驱动, 0 tick)
+
+### Added (policies/ 替换策略)
+- `ip/mmu/policies/tlb_replacement_policy.h` — 模板化抽象基类
+- `ip/mmu/policies/{no_replacement,fifo,lru,rrip}_policy.h` — 4 策略实装
+- `ip/mmu/policies/tlb_replacement_policy.cpp` — `create(name)` 工厂
+
+### Added (tlm/ 声明式 Plugin 层)
+- `ip/mmu/tlm/mmu_keys.h` — 10 个 `Payload<T>` Key 集合 (VADDR/PADDR/PERMS/PTW_ACTIVE/PTW_VADDR/PTW_ASID/PTW_L0/L1/L2_RAW/PTW_FAULT)
+- `ip/mmu/tlm/MMUPlugin.h/.cpp` — `MMUPlugin : public cf::plugin::PluginBase`, 用 `at_stage()` 注册 5 个 logical stage 闭包
+
+### Added (Config + RISC-V 适配)
+- `ip/mmu/configs/params_schema.json` — JSON Schema draft-07 (含 topology/asid_bits/sv_mode/supported_page_sizes/ptw_max_inflight/shadow_fill_from_next/levels)
+- `bundles/tlb_bundles_extension.h` — TlbReq / TlbResp Bundle (12 字节 POD)
+- `ip/cpu/plugins/mmu.h` 重构为 `RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin` + `using MMUPlugin = RiscvMMUPlugin` 向后兼容别名
+
+### Added (IP Catalog)
+- `ip/README.md` — STATUS 表 + IP 模块列表加 `mmu` 行
+
+### Design Decisions (9 Decisions in design.md)
+1. TLB 模板化 + 抽象基类 + 工厂三件套
+2. MultiLevelTLB 编排器 (coherence 协议集中)
+3. PTW 用 substage 不用 tick() (D4 强制)
+4. HDL 友好性通过 static_assert 编译期检查
+5. 配置 schema 用 topology 字段预留 split_id
+6. ASID bits 0-16 全支持
+7. **lib/ vs tlm/ 职责切分** (强制 Plugin 范式合规, lib/ 0 依赖 Plugin 框架)
+8. PTW 用 substage 不用 tick() 详细示例
+9. HDL 友好约束的边界 (lib/ 严格, tlm/ 宽松)
+
+### Notes
+- **D4 Plugin 范式合规**: 所有业务逻辑用 `at_stage()` 声明, 0 业务 tick() (编译期 `PluginBase::tick() = delete`)
+- **lib/ 0 Plugin 依赖**: `grep -rn "cf/plugin/plugin_base.h\|cf/plugin/pipe_builder.h\|cf/plugin/payload.h" ip/mmu/lib/` MUST 0 匹配
+- **Phase 0 logical stage 模型**: `pb.run()` 单 cycle 遍历所有闭包, PTW 3 级 sub-pipe 是逻辑拆分, 为 Phase 6 cycle-scheduling 预留
+- **测试位置**: 遵守 `test-location-discipline` spec, 全部在 `tests/mmu/`, 不在 `ip/mmu/test/`
+
+### Pending (下一阶段入口)
+
+> `mmu-tlb-ptw-impl` change —— TLB lookup/insert 算法实装 + PageTableWalker Sv32/Sv39/Sv48 解码 + CtrlLink halt_when PTW stall + cpptlm MMUTLMBridge + RISC-V 特定 hook (satp 拦截 / SFENCE.VMA / exception 12/13/15)
+
 ## v0.0.6 (2026-06-21) - m4g-extend-tid-and-hooks
 
 > **OpenSpec change**: `m4g-extend-tid-and-hooks` (详见 `openspec/changes/archive/2026-06-21-m4g-extend-tid-and-hooks/`)

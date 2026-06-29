@@ -9,6 +9,7 @@
 |----|------|----------|
 | cpu | 🟡 设计中 (实装中) | Phase 1.4+ |
 | cache | 🟡 TLM 实现中 (Phase 1.3, L1 unified) | Phase 1.4+ L2 |
+| mmu | 🟡 骨架阶段 (mmu-ip-skeleton, 2026-06-29) | mmu-tlb-ptw-impl+ |
 | memory | 🔴 规划中 (0 LOC) | Phase 2+ |
 | interconnect | 🔴 规划中 (0 LOC) | Phase 2+ |
 | peripheral | 🔴 规划中 (0 LOC) | Phase 3+ |
@@ -24,6 +25,7 @@
 |----|------|------|
 | [cpu/](cpu/) | 🟡 设计中 | RISC-V CPU（Plugin + Stageable 架构） |
 | [cache/](cache/) | 🟡 TLM 实现中 (Phase 1.2 L1D) | 多级缓存（L1I/L1D/L2） |
+| [mmu/](mmu/) | 🟡 骨架阶段 | 多级 TLB + Page Table Walker（lib/tlm 分层） |
 | [memory/](memory/) | 🔴 规划中 | 主存储器（SRAM/DRAM 模型） |
 | [interconnect/](interconnect/) | 🔴 规划中 | 总线/NoC 互连 |
 | [peripheral/](peripheral/) | 🔴 规划中 | 系统外设（PLIC/CLINT/UART/Timer） |
