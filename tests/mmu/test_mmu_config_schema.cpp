@@ -1,6 +1,6 @@
 // tests/mmu/test_mmu_config_schema.cpp (mmu-ip-skeleton, 13.3)
 
-#include <gtest/gtest.h>
+#include "catch_amalgamated.hpp"
 #include <nlohmann/json.hpp>
 
 #include <fstream>
@@ -18,7 +18,7 @@ class MMUConfigSchemaTest : public ::testing::Test {
   nlohmann::json schema_;
 };
 
-TEST_F(MMUConfigSchemaTest, TypicalCPUSv39) {
+TEST_CASE_METHOD(MMUConfigSchemaTest, "TypicalCPUSv39", "[mmu]") {
   nlohmann::json cfg = {
     {"name", "mmu_rv64"},
     {"type", "mmu"},
@@ -34,10 +34,10 @@ TEST_F(MMUConfigSchemaTest, TypicalCPUSv39) {
     }}
   };
   // Validation skipped (jsonschema lib not linked); just verify structure
-  EXPECT_EQ(cfg["params"]["levels"].size(), 2u);
+  CHECK(cfg["params"]["levels"].size() == 2u);
 }
 
-TEST_F(MMUConfigSchemaTest, TypicalGPUHighPorts) {
+TEST_CASE_METHOD(MMUConfigSchemaTest, "TypicalGPUHighPorts", "[mmu]") {
   nlohmann::json cfg = {
     {"name", "mmu_gpu"},
     {"type", "mmu"},
@@ -54,8 +54,8 @@ TEST_F(MMUConfigSchemaTest, TypicalGPUHighPorts) {
       }}
     }}
   };
-  EXPECT_EQ(cfg["params"]["asid_bits"], 16);
-  EXPECT_EQ(cfg["params"]["levels"][0]["num_lookup_ports"], 4);
+  CHECK(cfg["params"]["asid_bits"] == 16);
+  CHECK(cfg["params"]["levels"][0]["num_lookup_ports"] == 4);
 }
 
 }  // namespace mmu
