@@ -26,9 +26,9 @@ TEST_CASE("ModeSet", "[mmu][MMUPlugin]") {
 
 TEST_CASE("SetupDeclaresSubstages", "[mmu][MMUPlugin]") {
   std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
-  MMUPlugin mmu(SvMode::Sv39, levels, {});
   cf::plugin::PipeBuilder pb;
-  pb.register_plugin(std::make_unique<MMUPlugin>(std::move(mmu)));
+  // 直接用构造参数 make_unique, 避免 std::move (MMUPlugin 含 unique_ptr 不可拷贝)
+  pb.register_plugin(std::make_unique<MMUPlugin>(SvMode::Sv39, levels, MMUPlugin::PTWConfig{2}));
   pb.build();
   // 验证 5 个 substage 都被注册
   CHECK(pb.has_stage("tlb_lookup_ifetch"));

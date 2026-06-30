@@ -70,7 +70,7 @@ TEST_CASE("rv64_rw", "[cpu]") {
 }
 
 // M4G D.2 (G.2): 自定义 N_REGS 编译 + 行为正确
-TEST_CASE("custom_n_regs", "[cpu]") {
+TEST_CASE("reg_file_custom_n_regs", "[cpu]") {
   // N_REGS=8 (非标准 RISC-V, 验证模板参数生效)
   RegFilePlugin<T32, 8> rf8;
   REQUIRE(rf8.read_reg(0) == 0);  // x0 屏蔽

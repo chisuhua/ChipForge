@@ -63,8 +63,8 @@ TEST_CASE("InvalidateAll", "[mmu][TLBUnit]") {
   tlb.insert(0x1000ULL, 0x2000ULL, 0, 0xFF);
   tlb.insert(0x2000ULL, 0x3000ULL, 0, 0xFF);
   tlb.invalidate_all();
-  CHECK(tlb.lookup(0x1000ULL == 0).hit, false);
-  CHECK(tlb.lookup(0x2000ULL == 0).hit, false);
+  CHECK_FALSE(tlb.lookup(0x1000ULL, 0).hit);
+  CHECK_FALSE(tlb.lookup(0x2000ULL, 0).hit);
 }
 
 TEST_CASE("InsertFromNoStatsPollution", "[mmu][TLBUnit]") {

@@ -22,23 +22,23 @@ using cf::cpu::plugins::DBusPlugin;
 using T32 = std::uint32_t;
 using T64 = std::uint64_t;
 
-TEST_CASE("rv32_instantiate", "[cpu]") {
+TEST_CASE("dbus_rv32_instantiate", "[cpu]") {
   DBusPlugin<T32> dbus;
   (void)dbus;
 }
 
-TEST_CASE("rv64_instantiate", "[cpu]") {
+TEST_CASE("dbus_rv64_instantiate", "[cpu]") {
   DBusPlugin<T64> dbus;
   (void)dbus;
 }
 
-TEST_CASE("build_compiles", "[cpu]") {
+TEST_CASE("dbus_build_compiles", "[cpu]") {
   DBusPlugin<T32> dbus;
   cf::plugin::PipeBuilder pb;
   dbus.build(pb);
 }
 
-TEST_CASE("multiple_build_calls", "[cpu]") {
+TEST_CASE("dbus_multiple_build_calls", "[cpu]") {
   DBusPlugin<T32> dbus;
   cf::plugin::PipeBuilder pb;
   dbus.build(pb);
@@ -46,7 +46,7 @@ TEST_CASE("multiple_build_calls", "[cpu]") {
   (void)dbus;
 }
 
-TEST_CASE("destruction_safe", "[cpu]") {
+TEST_CASE("dbus_destruction_safe", "[cpu]") {
   {
     DBusPlugin<T32> dbus;
     (void)dbus;

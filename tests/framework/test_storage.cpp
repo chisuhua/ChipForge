@@ -64,7 +64,7 @@ TEST_CASE("basic_array_interface", "[framework]") {
   REQUIRE(array_store<uint_t<8>, 0>::empty());
 }
 
-TEST_CASE("reset", "[framework]") {
+TEST_CASE("storage_reset", "[framework]") {
   array_store<uint_t<8>, 4> store{};
   for (std::size_t i = 0; i < 4; ++i) store[i] = uint_t<8>{0xFF};
   store.reset();

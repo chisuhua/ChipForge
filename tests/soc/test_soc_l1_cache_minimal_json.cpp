@@ -90,5 +90,5 @@ TEST_CASE("soc_json_l1_bridge_params_match_plugin_geometry", "[soc]") {
       return;
     }
   }
-  REQUIRE(false && "L1CacheTLMBridge module not found");
+  INFO("L1CacheTLMBridge module not found"); REQUIRE(false);
 }

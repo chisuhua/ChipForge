@@ -81,7 +81,7 @@ TEST_CASE("cancel_from_idle_no_op", "[framework]") {
   REQUIRE(n.is_idle());
 }
 
-TEST_CASE("reset", "[framework]") {
+TEST_CASE("pipe_node_reset", "[framework]") {
   PipeNode n{"s"};
   n.assert_valid();
   n.assert_ready();

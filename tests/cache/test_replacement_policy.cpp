@@ -42,12 +42,12 @@ using cf::ip::cache::policies::ReplacementPolicy;
 // ----------------------------------------------------------------------------
 TEST_CASE("factory_create_lru", "[cache]") {
   std::unique_ptr<ReplacementPolicy> policy = ReplacementPolicy::create("LRU");
-  REQUIRE(policy != nullptr && "create('LRU') must return non-null");
-  REQUIRE(policy->name() == "LRU" && "LRU name() must be 'LRU'");
+  INFO("create('LRU') must return non-null"); REQUIRE(policy != nullptr);
+  INFO("LRU name() must be 'LRU'"); REQUIRE(policy->name() == "LRU");
 
   // 多态性验证: 实际类型是 LRUPolicy (有 access_counter() 辅助 API)
   LRUPolicy* lru = dynamic_cast<LRUPolicy*>(policy.get());
-  REQUIRE(lru != nullptr && "create('LRU') must return LRUPolicy instance");
+  INFO("create('LRU') must return LRUPolicy instance"); REQUIRE(lru != nullptr);
 }
 
 // ----------------------------------------------------------------------------
@@ -56,12 +56,12 @@ TEST_CASE("factory_create_lru", "[cache]") {
 // ----------------------------------------------------------------------------
 TEST_CASE("factory_create_none", "[cache]") {
   std::unique_ptr<ReplacementPolicy> policy = ReplacementPolicy::create("None");
-  REQUIRE(policy != nullptr && "create('None') must return non-null");
-  REQUIRE(policy->name() == "None" && "None name() must be 'None'");
+  INFO("create('None') must return non-null"); REQUIRE(policy != nullptr);
+  INFO("None name() must be 'None'"); REQUIRE(policy->name() == "None");
 
   // 多态性验证
   NoReplacementPolicy* none = dynamic_cast<NoReplacementPolicy*>(policy.get());
-  REQUIRE(none != nullptr && "create('None') must return NoReplacementPolicy instance");
+  INFO("create('None') must return NoReplacementPolicy instance"); REQUIRE(none != nullptr);
 }
 
 // ----------------------------------------------------------------------------
@@ -78,10 +78,10 @@ TEST_CASE("factory_unknown_throws", "[cache]") {
     caught = true;
     // 验证异常消息包含原始输入, 便于调试
     std::string msg = e.what();
-    REQUIRE(msg.find("UnknownBogusPolicyName") != std::string::npos &&
-           "exception message should contain original input name");
+    INFO("exception message should contain original input name");
+    REQUIRE(msg.find("UnknownBogusPolicyName") != std::string::npos);
   }
-  REQUIRE(caught && "create('Unknown...') must throw std::runtime_error");
+  INFO("create('Unknown...') must throw std::runtime_error"); REQUIRE(caught);
 }
 
 // ----------------------------------------------------------------------------
@@ -91,7 +91,7 @@ TEST_CASE("factory_unknown_throws", "[cache]") {
 TEST_CASE("lru_on_access_increments", "[cache]") {
   LRUPolicy lru;
   const uint64_t initial = lru.access_counter();
-  REQUIRE(initial == 0 && "fresh LRUPolicy must start with counter == 0");
+  INFO("fresh LRUPolicy must start with counter == 0"); REQUIRE(initial == 0);
 
   // 5 次 on_access (参数 set/way 对 1-way LRU 无影响, 但 API 必须支持任意输入)
   for (int i = 0; i < 5; ++i) {
@@ -99,10 +99,10 @@ TEST_CASE("lru_on_access_increments", "[cache]") {
   }
 
   const uint64_t after = lru.access_counter();
-  REQUIRE(after == 5 && "access_counter must be 5 after 5 on_access calls");
+  INFO("access_counter must be 5 after 5 on_access calls"); REQUIRE(after == 5);
 
   // 单调递增验证
-  REQUIRE(after > initial && "access_counter must monotonically increase");
+  INFO("access_counter must monotonically increase"); REQUIRE(after > initial);
 }
 
 // ----------------------------------------------------------------------------

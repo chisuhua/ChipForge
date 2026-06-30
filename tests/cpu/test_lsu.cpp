@@ -21,23 +21,23 @@ using namespace cf::cpu::arch::riscv;
 using T32 = std::uint32_t;
 using T64 = std::uint64_t;
 
-TEST_CASE("rv32_instantiate", "[cpu]") {
+TEST_CASE("lsu_rv32_instantiate", "[cpu]") {
   RiscvLsuPlugin<T32> lsu;
   (void)lsu;
 }
 
-TEST_CASE("rv64_instantiate", "[cpu]") {
+TEST_CASE("lsu_rv64_instantiate", "[cpu]") {
   RiscvLsuPlugin<T64> lsu;
   (void)lsu;
 }
 
-TEST_CASE("build_compiles", "[cpu]") {
+TEST_CASE("lsu_build_compiles", "[cpu]") {
   RiscvLsuPlugin<T32> lsu;
   cf::plugin::PipeBuilder pb;
   lsu.build(pb);
 }
 
-TEST_CASE("destruction_safe", "[cpu]") {
+TEST_CASE("lsu_destruction_safe", "[cpu]") {
   {
     RiscvLsuPlugin<T32> lsu;
     (void)lsu;

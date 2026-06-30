@@ -93,7 +93,7 @@ TEST_CASE("multi_thread_scoreboard", "[cpu]") {
 }
 
 // M4G D.2 (G.3): 自定义 N_REGS 编译 + 行为正确
-TEST_CASE("custom_n_regs", "[cpu]") {
+TEST_CASE("hazard_custom_n_regs", "[cpu]") {
   HazardPlugin<T, 8> hz8;  // 8 寄存器 (非标准 RISC-V)
   hz8.mark_in_flight(5);
   REQUIRE(hz8.has_raw(5));

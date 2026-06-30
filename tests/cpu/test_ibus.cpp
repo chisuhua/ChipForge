@@ -22,32 +22,32 @@ using cf::cpu::plugins::IBusPlugin;
 using T32 = std::uint32_t;
 using T64 = std::uint64_t;
 
-TEST_CASE("rv32_instantiate", "[cpu]") {
+TEST_CASE("ibus_rv32_instantiate", "[cpu]") {
   IBusPlugin<T32> ibus;
   ibus.set_instruction(0x00000013);  // NOP
   (void)ibus;
 }
 
-TEST_CASE("rv64_instantiate", "[cpu]") {
+TEST_CASE("ibus_rv64_instantiate", "[cpu]") {
   IBusPlugin<T64> ibus;
   ibus.set_instruction(0x00000013);
   (void)ibus;
 }
 
-TEST_CASE("set_instruction", "[cpu]") {
+TEST_CASE("ibus_set_instruction", "[cpu]") {
   IBusPlugin<T32> ibus;
   ibus.set_instruction(0xDEADBEEF);
   ibus.set_instruction(0xCAFEBABE);
   (void)ibus;
 }
 
-TEST_CASE("build_compiles", "[cpu]") {
+TEST_CASE("ibus_build_compiles", "[cpu]") {
   IBusPlugin<T32> ibus;
   cf::plugin::PipeBuilder pb;
   ibus.build(pb);
 }
 
-TEST_CASE("state_persistence", "[cpu]") {
+TEST_CASE("ibus_state_persistence", "[cpu]") {
   IBusPlugin<T32> ibus;
   for (int i = 0; i < 10; ++i) {
     ibus.set_instruction(0x00000013 + i);
