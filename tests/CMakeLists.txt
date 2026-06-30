@@ -28,8 +28,10 @@ list(APPEND TEST_SOURCES ${CACHE_IMPL_SOURCES})
 add_executable(chipforge_tests ${TEST_SOURCES})
 
 # tests/ 子目录加入 include 路径（让 #include "catch_amalgamated.hpp" 解析）
+# catch_amalgamated.hpp 在 tests/catch2/ 子目录, 必须显式加进去
 target_include_directories(chipforge_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/catch2
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/bundles
