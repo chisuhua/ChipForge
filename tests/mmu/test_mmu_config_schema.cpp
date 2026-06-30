@@ -9,16 +9,7 @@ namespace cf {
 namespace ip {
 namespace mmu {
 
-class MMUConfigSchemaTest : public ::testing::Test {
- protected:
-  void SetUp() override {
-    std::ifstream f("/workspace/project/ChipForge/ip/mmu/configs/params_schema.json");
-    schema_ = nlohmann::json::parse(f);
-  }
-  nlohmann::json schema_;
-};
-
-TEST_CASE_METHOD(MMUConfigSchemaTest, "TypicalCPUSv39", "[mmu]") {
+TEST_CASE("TypicalCPUSv39", "[mmu]") {
   nlohmann::json cfg = {
     {"name", "mmu_rv64"},
     {"type", "mmu"},
@@ -37,7 +28,7 @@ TEST_CASE_METHOD(MMUConfigSchemaTest, "TypicalCPUSv39", "[mmu]") {
   CHECK(cfg["params"]["levels"].size() == 2u);
 }
 
-TEST_CASE_METHOD(MMUConfigSchemaTest, "TypicalGPUHighPorts", "[mmu]") {
+TEST_CASE("TypicalGPUHighPorts", "[mmu]") {
   nlohmann::json cfg = {
     {"name", "mmu_gpu"},
     {"type", "mmu"},
