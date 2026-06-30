@@ -8,8 +8,7 @@
 //   - .omo/drafts/decision-phase-1.3-bridge-2026-06-10.md §3-7
 //   - docs/lessons/phase-1.2-l1cacheplugin.md (TDD 教训复用)
 
-#include <cassert>
-#include <cstdio>
+#include "catch_amalgamated.hpp"
 #include <memory>
 
 #include "bundles/mem_bundles.h"
@@ -22,11 +21,11 @@ using cf::bundles::CacheResp;
 using cf::ip::cache::tlm::L1CachePlugin;
 using cf::plugin::bridge::L1CacheTLMBridge;
 
-static void test_bridge_tick_triggers_plugin_run() {
+TEST_CASE("bridge_tick_triggers_plugin_run", "[cache]") {
   auto plugin = std::make_unique<L1CachePlugin>();
   cf::plugin::bridge::L1CacheTLMBridge bridge(std::move(plugin));
 
-  assert(bridge.pb_run_count() == 0);
+  REQUIRE(bridge.pb_run_count() == 0);
 
   CacheReq req{};
   req.address = 0x0;
@@ -35,15 +34,13 @@ static void test_bridge_tick_triggers_plugin_run() {
   bridge.issue_request(req);
 
   bridge.tick();
-  assert(bridge.pb_run_count() == 1);
+  REQUIRE(bridge.pb_run_count() == 1);
 
   bridge.tick();
-  assert(bridge.pb_run_count() == 2);
-
-  printf("  [PASS] test_bridge_tick_triggers_plugin_run\n");
+  REQUIRE(bridge.pb_run_count() == 2);
 }
 
-static void test_bridge_tick_forwards_4_fields() {
+TEST_CASE("bridge_tick_forwards_4_fields", "[cache]") {
   auto plugin = std::make_unique<L1CachePlugin>();
   cf::plugin::bridge::L1CacheTLMBridge bridge(std::move(plugin));
 
@@ -57,15 +54,6 @@ static void test_bridge_tick_forwards_4_fields() {
   bridge.tick();
 
   CacheResp resp = bridge.read_response();
-  assert(resp.id == 42);
-
-  printf("  [PASS] test_bridge_tick_forwards_4_fields\n");
+  REQUIRE(resp.id == 42);
 }
 
-int main() {
-  printf("=== L1CacheTLMBridge Unit Tests (Phase 1.3a TDD) ===\n");
-  test_bridge_tick_triggers_plugin_run();
-  test_bridge_tick_forwards_4_fields();
-  printf("=== All tests passed ===\n");
-  return 0;
-}

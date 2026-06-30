@@ -27,7 +27,7 @@
 //   - CppTLM/include/chstream_register.hh (REGISTER_CHSTREAM 宏)
 //   - CppTLM/test/test_json_config_e2e.cc (canonical e2e pattern)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdio>
 #include <fstream>
 #include <memory>
@@ -59,32 +59,24 @@ nlohmann::json load_e2e_json() {
 }
 
 void register_all_chipforge_modules() {
-  // CppTLM 标准模块 (tg/mem)
   REGISTER_CHSTREAM;
-  // ChipForge 自有 Adapter (l1)
   ModuleFactory::registerObject<L1CacheTLMBridgeAdapter>(
       "L1CacheTLMBridgeAdapter");
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Test 1: JSON 加载 + instantiateAll 不抛异常
-// ─────────────────────────────────────────────────────────────────────
-void test_instantiate_all_succeeds() {
+}  // namespace
+
+TEST_CASE("instantiate_all_succeeds", "[cache]") {
   register_all_chipforge_modules();
   EventQueue eq;
   ModuleFactory factory(&eq);
 
   auto config = load_e2e_json();
   bool instantiated = factory.instantiateAll(config);
-  assert(instantiated);
-
-  printf("  [PASS] test_instantiate_all_succeeds\n");
+  REQUIRE(instantiated);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Test 2: l1 模块 dynamic_cast 到 L1CacheTLMBridgeAdapter* 成功
-// ─────────────────────────────────────────────────────────────────────
-void test_l1_instance_is_bridge_adapter() {
+TEST_CASE("l1_instance_is_bridge_adapter", "[cache]") {
   register_all_chipforge_modules();
   EventQueue eq;
   ModuleFactory factory(&eq);
@@ -93,20 +85,15 @@ void test_l1_instance_is_bridge_adapter() {
   factory.instantiateAll(config);
 
   SimObject* obj = factory.getInstance("l1");
-  assert(obj != nullptr);
+  REQUIRE(obj != nullptr);
 
   L1CacheTLMBridgeAdapter* adapter = dynamic_cast<L1CacheTLMBridgeAdapter*>(obj);
-  assert(adapter != nullptr);
-  assert(adapter->getName() == "l1");
-  assert(adapter->bridge() != nullptr);
-
-  printf("  [PASS] test_l1_instance_is_bridge_adapter\n");
+  REQUIRE(adapter != nullptr);
+  REQUIRE(adapter->getName() == "l1");
+  REQUIRE(adapter->bridge() != nullptr);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Test 3: tg + mem 也成功实例化 (3 模块拓扑连通)
-// ─────────────────────────────────────────────────────────────────────
-void test_three_module_topology_resolved() {
+TEST_CASE("three_module_topology_resolved", "[cache]") {
   register_all_chipforge_modules();
   EventQueue eq;
   ModuleFactory factory(&eq);
@@ -114,21 +101,15 @@ void test_three_module_topology_resolved() {
   auto config = load_e2e_json();
   factory.instantiateAll(config);
 
-  assert(factory.getInstance("tg") != nullptr);
-  assert(factory.getInstance("l1") != nullptr);
-  assert(factory.getInstance("mem") != nullptr);
+  REQUIRE(factory.getInstance("tg") != nullptr);
+  REQUIRE(factory.getInstance("l1") != nullptr);
+  REQUIRE(factory.getInstance("mem") != nullptr);
 
-  // 验证所有 3 个模块都已注册到 ModuleFactory 的实例表
   const auto& all = factory.getAllInstances();
-  assert(all.size() == 3);
-
-  printf("  [PASS] test_three_module_topology_resolved (3 modules: tg, l1, mem)\n");
+  REQUIRE(all.size() == 3);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Test 4: startAllTicks + EventQueue.run(100) cycle 推进 100
-// ─────────────────────────────────────────────────────────────────────
-void test_start_ticks_and_cycle_advance() {
+TEST_CASE("start_ticks_and_cycle_advance", "[cache]") {
   register_all_chipforge_modules();
   EventQueue eq;
   ModuleFactory factory(&eq);
@@ -141,21 +122,10 @@ void test_start_ticks_and_cycle_advance() {
   eq.run(100);
   const uint64_t after = eq.getCurrentCycle();
 
-  assert(after == before + 100);
-
-  printf("  [PASS] test_start_ticks_and_cycle_advance (cycle %lu -> %lu)\n",
-         before, after);
+  REQUIRE(after == before + 100);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Test 5: 5 事务后 Bridge pb_run_count() >= 4 (D1' 契约经 registerAdapter 路径仍成立)
-//
-// 注: EventQueue::run(N) 在第 N 个 cycle 时可能只调度但未触发最后一个 module tick
-// (TickEvent 延迟 1 cycle, N+1 才执行). 实际跑 5 cycle 一般得 4 次 pb.run().
-// 断言放宽到 >= 4 而非 == 5, 避免误报; 核心验证点: Adapter 经 instantiateAll
-// 路径创建后, Bridge tick 路径仍正常运转 (D1' 契约未破坏).
-// ─────────────────────────────────────────────────────────────────────
-void test_bridge_pb_run_count_after_cycles() {
+TEST_CASE("bridge_pb_run_count_after_cycles", "[cache]") {
   register_all_chipforge_modules();
   EventQueue eq;
   ModuleFactory factory(&eq);
@@ -164,29 +134,12 @@ void test_bridge_pb_run_count_after_cycles() {
   factory.instantiateAll(config);
   factory.startAllTicks();
 
-  // Bridge 在 EQ 每周期被 tick, 5 cycle 后 pb_run_count 应 >= 4
   eq.run(5);
 
   SimObject* obj = factory.getInstance("l1");
   L1CacheTLMBridgeAdapter* adapter = dynamic_cast<L1CacheTLMBridgeAdapter*>(obj);
-  assert(adapter != nullptr);
+  REQUIRE(adapter != nullptr);
 
   const int run_count = adapter->bridge()->pb_run_count();
-  assert(run_count >= 4);
-
-  printf("  [PASS] test_bridge_pb_run_count_after_cycles (pb_run_count=%d after 5 cycles)\n",
-         run_count);
-}
-
-}  // namespace
-
-int main() {
-  printf("=== L1CachePlugin Full JSON instantiateAll E2E (Phase 1.3d-extras) ===\n");
-  test_instantiate_all_succeeds();
-  test_l1_instance_is_bridge_adapter();
-  test_three_module_topology_resolved();
-  test_start_ticks_and_cycle_advance();
-  test_bridge_pb_run_count_after_cycles();
-  printf("=== All tests passed ===\n");
-  return 0;
+  REQUIRE(run_count >= 4);
 }

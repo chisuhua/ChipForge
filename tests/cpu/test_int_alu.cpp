@@ -11,11 +11,9 @@
 //   4. SLT/SLTU 比较
 //
 // 约束:
-//   - 纯 main() + assert
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/arch/riscv/int_alu.h"
 #include "ip/cpu/arch/riscv/decoder_table.h"
@@ -23,42 +21,30 @@
 using namespace cf::cpu::arch::riscv;
 using T = std::uint32_t;
 
-static void test_add_sub() {
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::ADD, 3, 4) == 7);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SUB, 10, 3) == 7);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::ADD, 0, 0) == 0);
-  printf("  [PASS] test_add_sub\n");
+TEST_CASE("add_sub", "[cpu]") {
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::ADD, 3, 4) == 7);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SUB, 10, 3) == 7);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::ADD, 0, 0) == 0);
 }
 
-static void test_logic() {
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::AND, 0xFF, 0x0F) == 0x0F);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::OR, 0xF0, 0x0F) == 0xFF);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::XOR, 0xFF, 0x0F) == 0xF0);
-  printf("  [PASS] test_logic\n");
+TEST_CASE("logic", "[cpu]") {
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::AND, 0xFF, 0x0F) == 0x0F);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::OR, 0xF0, 0x0F) == 0xFF);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::XOR, 0xFF, 0x0F) == 0xF0);
 }
 
-static void test_shift() {
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SLL, 1, 4) == 16);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SRL, 0xF0, 4) == 0x0F);
+TEST_CASE("shift", "[cpu]") {
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SLL, 1, 4) == 16);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SRL, 0xF0, 4) == 0x0F);
   // SRA: 算术右移保留符号
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SRA, 0xFFFFFFF0, 2) == 0xFFFFFFFC);
-  printf("  [PASS] test_shift\n");
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SRA, 0xFFFFFFF0, 2) == 0xFFFFFFFC);
 }
 
-static void test_compare() {
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SLT, 3, 5) == 1);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SLT, 5, 3) == 0);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SLTU, 3, 5) == 1);
-  assert(RiscvIntAluPlugin<T>::compute(OpCode::SLTU, 0xFFFFFFFF, 5) == 0);
-  printf("  [PASS] test_compare\n");
+TEST_CASE("compare", "[cpu]") {
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SLT, 3, 5) == 1);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SLT, 5, 3) == 0);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SLTU, 3, 5) == 1);
+  REQUIRE(RiscvIntAluPlugin<T>::compute(OpCode::SLTU, 0xFFFFFFFF, 5) == 0);
 }
 
-int main() {
-  printf("test_int_alu:\n");
-  test_add_sub();
-  test_logic();
-  test_shift();
-  test_compare();
-  printf("[PASS] all RiscvIntAluPlugin tests\n");
-  return 0;
-}
+

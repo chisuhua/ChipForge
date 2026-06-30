@@ -18,12 +18,10 @@
 //   - 检测 tohost = 1 (PASS)
 //
 // 约束:
-//   - 纯 main() + assert
 //   - M5 阶段: 端到端框架跑通, 详细指令级验证推迟 Phase 5+
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 #include <memory>
 
 #include "ip/cpu/cpu_factory.h"
@@ -123,44 +121,28 @@ static bool run_elf(const std::uint8_t* code, std::size_t size) {
   return mem.exited() && mem.exit_code() == 0;
 }
 
-static void test_add_elf() {
-  assert(run_elf(kAddCode, sizeof(kAddCode)));
-  printf("  [PASS] test_add_elf\n");
+TEST_CASE("add_elf", "[cpu-integration]") {
+  REQUIRE(run_elf(kAddCode, sizeof(kAddCode)));
 }
 
-static void test_sub_elf() {
-  assert(run_elf(kSubCode, sizeof(kSubCode)));
-  printf("  [PASS] test_sub_elf\n");
+TEST_CASE("sub_elf", "[cpu-integration]") {
+  REQUIRE(run_elf(kSubCode, sizeof(kSubCode)));
 }
 
-static void test_and_elf() {
-  assert(run_elf(kAndCode, sizeof(kAndCode)));
-  printf("  [PASS] test_and_elf\n");
+TEST_CASE("and_elf", "[cpu-integration]") {
+  REQUIRE(run_elf(kAndCode, sizeof(kAndCode)));
 }
 
-static void test_or_elf() {
-  assert(run_elf(kOrCode, sizeof(kOrCode)));
-  printf("  [PASS] test_or_elf\n");
+TEST_CASE("or_elf", "[cpu-integration]") {
+  REQUIRE(run_elf(kOrCode, sizeof(kOrCode)));
 }
 
-static void test_sll_elf() {
-  assert(run_elf(kSllCode, sizeof(kSllCode)));
-  printf("  [PASS] test_sll_elf\n");
+TEST_CASE("sll_elf", "[cpu-integration]") {
+  REQUIRE(run_elf(kSllCode, sizeof(kSllCode)));
 }
 
-static void test_srli_elf() {
-  assert(run_elf(kSrliCode, sizeof(kSrliCode)));
-  printf("  [PASS] test_srli_elf\n");
+TEST_CASE("srli_elf", "[cpu-integration]") {
+  REQUIRE(run_elf(kSrliCode, sizeof(kSrliCode)));
 }
 
-int main() {
-  printf("test_demo_soc (SoC 联调 6 ELF):\n");
-  test_add_elf();
-  test_sub_elf();
-  test_and_elf();
-  test_or_elf();
-  test_sll_elf();
-  test_srli_elf();
-  printf("[PASS] all 6 ELF tests\n");
-  return 0;
-}
+

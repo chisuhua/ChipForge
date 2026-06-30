@@ -12,64 +12,48 @@
 //   5. B-type BEQ 译码
 //
 // 约束:
-//   - 纯 main() + assert (与 cf_plugin 现有测试一致)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/arch/riscv/decoder_table.h"
 
 using namespace cf::cpu::arch::riscv;
 
-static void test_lui_decode() {
+TEST_CASE("lui_decode", "[cpu]") {
   std::uint32_t inst = 0x123451B7;  // LUI x3, 0x12345
-  assert(decode_rv32(inst) == OpCode::LUI);
-  assert(get_rd(inst) == 3);
-  assert(get_imm(OpCode::LUI, inst) == 0x12345000);
-  printf("  [PASS] test_lui_decode\n");
+  REQUIRE(decode_rv32(inst) == OpCode::LUI);
+  REQUIRE(get_rd(inst) == 3);
+  REQUIRE(get_imm(OpCode::LUI, inst) == 0x12345000);
 }
 
-static void test_jal_decode() {
+TEST_CASE("jal_decode", "[cpu]") {
   std::uint32_t inst = 0x008000EF;  // JAL x1, +8
-  assert(decode_rv32(inst) == OpCode::JAL);
-  assert(get_rd(inst) == 1);
-  assert(get_op_class(decode_rv32(inst)) == 1);  // BRANCH
-  printf("  [PASS] test_jal_decode\n");
+  REQUIRE(decode_rv32(inst) == OpCode::JAL);
+  REQUIRE(get_rd(inst) == 1);
+  REQUIRE(get_op_class(decode_rv32(inst)) == 1);  // BRANCH
 }
 
-static void test_addi_decode() {
+TEST_CASE("addi_decode", "[cpu]") {
   std::uint32_t inst = 0x00108093;  // ADDI x1, x1, 1
-  assert(decode_rv32(inst) == OpCode::ADDI);
-  assert(get_rs1(inst) == 1);
-  assert(get_rd(inst) == 1);
-  assert(get_imm(OpCode::ADDI, inst) == 1);
-  printf("  [PASS] test_addi_decode\n");
+  REQUIRE(decode_rv32(inst) == OpCode::ADDI);
+  REQUIRE(get_rs1(inst) == 1);
+  REQUIRE(get_rd(inst) == 1);
+  REQUIRE(get_imm(OpCode::ADDI, inst) == 1);
 }
 
-static void test_sub_decode() {
+TEST_CASE("sub_decode", "[cpu]") {
   std::uint32_t inst = 0x40208133;  // SUB x2, x1, x2
-  assert(decode_rv32(inst) == OpCode::SUB);
-  assert(get_funct3(inst) == 0);
-  assert(get_funct7(inst) == 0x20);  // 区分 ADD (0x00) vs SUB (0x20)
-  printf("  [PASS] test_sub_decode\n");
+  REQUIRE(decode_rv32(inst) == OpCode::SUB);
+  REQUIRE(get_funct3(inst) == 0);
+  REQUIRE(get_funct7(inst) == 0x20);  // 区分 ADD (0x00) vs SUB (0x20)
 }
 
-static void test_beq_decode() {
+TEST_CASE("beq_decode", "[cpu]") {
   std::uint32_t inst = 0x00208163;  // BEQ x1, x2, +4
-  assert(decode_rv32(inst) == OpCode::BEQ);
-  assert(get_funct3(inst) == 0b000);
-  assert(get_op_class(decode_rv32(inst)) == 1);
-  printf("  [PASS] test_beq_decode\n");
+  REQUIRE(decode_rv32(inst) == OpCode::BEQ);
+  REQUIRE(get_funct3(inst) == 0b000);
+  REQUIRE(get_op_class(decode_rv32(inst)) == 1);
 }
 
-int main() {
-  printf("test_decode:\n");
-  test_lui_decode();
-  test_jal_decode();
-  test_addi_decode();
-  test_sub_decode();
-  test_beq_decode();
-  printf("[PASS] all RiscvDecodePlugin tests\n");
-  return 0;
-}
+

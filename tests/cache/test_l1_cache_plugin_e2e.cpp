@@ -21,8 +21,7 @@
 //   - 验证 ModuleFactory 发现 + 实例化 + Bridge lifecycle (不验证 ch_stream 数据通路)
 //   - Phase 1.3d-extras 范围: ch_stream adapter 注册 + full JSON instantiateAll e2e
 
-#include <cassert>
-#include <cstdio>
+#include "catch_amalgamated.hpp"
 #include <memory>
 #include <string>
 
@@ -37,9 +36,7 @@ using cf::bundles::CacheResp;
 using cf::plugin::bridge::L1CacheTLMBridge;
 using cf::plugin::bridge::L1CacheTLMBridgeAdapter;
 
-namespace {
-
-void test_module_factory_recognizes_adapter_type() {
+TEST_CASE("module_factory_recognizes_adapter_type", "[cache]") {
   ModuleFactory::registerObject<L1CacheTLMBridgeAdapter>(
       "L1CacheTLMBridgeAdapter");
   auto types = ModuleFactory::getRegisteredObjectTypes();
@@ -47,29 +44,23 @@ void test_module_factory_recognizes_adapter_type() {
   for (const auto& t : types) {
     if (t == "L1CacheTLMBridgeAdapter") found = true;
   }
-  assert(found);
-  printf("  [PASS] test_module_factory_recognizes_adapter_type\n");
+  REQUIRE(found);
 }
 
-void test_adapter_constructs_with_bridge() {
-  // Phase 1.3d 限制: ModuleFactory 没有 create<T>() 方法, instantiateAll
-  // 需要 ch_stream adapter 注册 (Phase 1.3d-extras 范围). 本测试直接构造
-  // Adapter 验证 Bridge 生命周期, ModuleFactory 注册在 test1 验证.
+TEST_CASE("adapter_constructs_with_bridge", "[cache]") {
   EventQueue eq;
   auto adapter = std::make_unique<L1CacheTLMBridgeAdapter>("l1", &eq);
-  assert(adapter != nullptr);
-  assert(adapter->getName() == "l1");
+  REQUIRE(adapter != nullptr);
+  REQUIRE(adapter->getName() == "l1");
 
   auto* bridge = adapter->bridge();
-  assert(bridge != nullptr);
-
-  printf("  [PASS] test_adapter_constructs_with_bridge\n");
+  REQUIRE(bridge != nullptr);
 }
 
-void test_adapter_tick_triggers_bridge_pb_run() {
+TEST_CASE("adapter_tick_triggers_bridge_pb_run", "[cache]") {
   EventQueue eq;
   auto adapter = std::make_unique<L1CacheTLMBridgeAdapter>("l1", &eq);
-  assert(adapter != nullptr);
+  REQUIRE(adapter != nullptr);
 
   CacheReq req{};
   req.address = 0xDEADBEEFULL;
@@ -81,18 +72,16 @@ void test_adapter_tick_triggers_bridge_pb_run() {
   adapter->tick();
   const int after_count = adapter->bridge()->pb_run_count();
 
-  assert(after_count == before_count + 1);
+  REQUIRE(after_count == before_count + 1);
 
   CacheResp resp = adapter->bridge()->read_response();
-  assert(resp.hit == false);
-
-  printf("  [PASS] test_adapter_tick_triggers_bridge_pb_run\n");
+  REQUIRE(resp.hit == false);
 }
 
-void test_miss_workflow_through_adapter() {
+TEST_CASE("miss_workflow_through_adapter", "[cache]") {
   EventQueue eq;
   auto adapter = std::make_unique<L1CacheTLMBridgeAdapter>("l1", &eq);
-  assert(adapter != nullptr);
+  REQUIRE(adapter != nullptr);
   auto* bridge = adapter->bridge();
 
   constexpr uint64_t kTestAddr = 0x000012340ABCDE00ULL;
@@ -104,18 +93,14 @@ void test_miss_workflow_through_adapter() {
   bridge->issue_request(req);
   adapter->tick();
   CacheResp resp = bridge->read_response();
-  assert(resp.hit == false);
-  assert(resp.id == 100);
-
-  printf("  [PASS] test_miss_workflow_through_adapter\n");
+  REQUIRE(resp.hit == false);
+  REQUIRE(resp.id == 100);
 }
 
-void test_multiple_transactions_via_adapter() {
-  // Phase 1.3d 限制: refill 未实现 (ch_stream), 全为 miss
-  // 验证: Adapter 生命周期稳定 + 多事务 Adapter::tick() 正确
+TEST_CASE("multiple_transactions_via_adapter", "[cache]") {
   EventQueue eq;
   auto adapter = std::make_unique<L1CacheTLMBridgeAdapter>("l1", &eq);
-  assert(adapter != nullptr);
+  REQUIRE(adapter != nullptr);
   auto* bridge = adapter->bridge();
 
   int hit_count = 0;
@@ -135,23 +120,7 @@ void test_multiple_transactions_via_adapter() {
     }
   }
 
-  assert(hit_count + miss_count == 1000);
-  assert(miss_count == 1000);
-  assert(hit_count == 0);
-
-  printf("  [PASS] test_multiple_transactions_via_adapter (1000 tx, %d hit / %d miss)\n",
-         hit_count, miss_count);
-}
-
-}  // namespace
-
-int main() {
-  printf("=== L1CachePlugin E2E Tests (Phase 1.3d, Adapter direct 路径) ===\n");
-  test_module_factory_recognizes_adapter_type();
-  test_adapter_constructs_with_bridge();
-  test_adapter_tick_triggers_bridge_pb_run();
-  test_miss_workflow_through_adapter();
-  test_multiple_transactions_via_adapter();
-  printf("=== All tests passed ===\n");
-  return 0;
+  REQUIRE(hit_count + miss_count == 1000);
+  REQUIRE(miss_count == 1000);
+  REQUIRE(hit_count == 0);
 }

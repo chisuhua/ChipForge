@@ -27,6 +27,7 @@
 #include "ip/mmu/lib/tlb_base.h"
 #include "ip/mmu/lib/tlb_entry.h"
 #include "ip/mmu/lib/tlb_lookup.h"
+#include "ip/mmu/policies/tlb_replacement_policy.h"
 
 namespace cf {
 namespace ip {

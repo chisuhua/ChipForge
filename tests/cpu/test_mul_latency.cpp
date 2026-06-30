@@ -17,15 +17,13 @@
 //   - setup() 中, LATENCY==1 不声明 substage; 否则声明 mul_s1..mul_s(LATENCY-1)
 //
 // 约束:
-//   - 纯 main() + assert (项目约定, 不用 gtest)
 //   - T must be unsigned (mul.h static_assert(std::is_unsigned<T>::value))
 //   - 5-stage baseline 必须 byte-identical (mul_latency=1 不改变行为)
 //   - 本测试只验证 LATENCY 模板机制本身; 多周期 perf 验证阻塞于 Task 5 cpu_sim
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <memory>
 
 #include "cf/plugin/pipe_builder.h"
@@ -38,52 +36,49 @@ using T = std::uint32_t;
 
 // 1. LATENCY=1: baseline 单周期 (byte-identical, no substage)
 //    验证 default template 参数仍为 1, 不引入新 stage
-static void test_latency_one_is_baseline() {
+TEST_CASE("latency_one_is_baseline", "[cpu]") {
   RiscvMulPlugin<T, 1> mul;
-  assert(mul.expected_latency() == 1);
-  assert(mul.substage_count() == 0);
+  REQUIRE(mul.expected_latency() == 1);
+  REQUIRE(mul.substage_count() == 0);
 
   // setup() must NOT declare any mul_s substage
   PipeBuilder pb;
   pb.at_stage("execute", Phase::NORMAL, []() {});
   mul.setup(pb);
-  assert(pb.node_of_logic_stage("mul_s1") == nullptr);
-  printf("  [PASS] test_latency_one_is_baseline\n");
+  REQUIRE(pb.node_of_logic_stage("mul_s1") == nullptr);
 }
 
 // 2. LATENCY=3: 多周期, 2 substage (mul_s1, mul_s2)
-static void test_latency_three_adds_substages() {
+TEST_CASE("latency_three_adds_substages", "[cpu]") {
   RiscvMulPlugin<T, 3> mul;
-  assert(mul.expected_latency() == 3);
-  assert(mul.substage_count() == 2);
+  REQUIRE(mul.expected_latency() == 3);
+  REQUIRE(mul.substage_count() == 2);
 
   // setup() must declare mul_s1, mul_s2
   PipeBuilder pb;
   pb.at_stage("execute", Phase::NORMAL, []() {});
   mul.setup(pb);
-  assert(pb.node_of_logic_stage("mul_s1") != nullptr);
-  assert(pb.node_of_logic_stage("mul_s2") != nullptr);
+  REQUIRE(pb.node_of_logic_stage("mul_s1") != nullptr);
+  REQUIRE(pb.node_of_logic_stage("mul_s2") != nullptr);
   // must NOT declare mul_s3 (LATENCY=3 → only 2 substages)
-  assert(pb.node_of_logic_stage("mul_s3") == nullptr);
-  printf("  [PASS] test_latency_three_adds_substages\n");
+  REQUIRE(pb.node_of_logic_stage("mul_s3") == nullptr);
 }
 
 // 3. LATENCY=5: 多周期, 4 substage (mul_s1..mul_s4)
-static void test_latency_five_adds_four_substages() {
+TEST_CASE("latency_five_adds_four_substages", "[cpu]") {
   RiscvMulPlugin<T, 5> mul;
-  assert(mul.expected_latency() == 5);
-  assert(mul.substage_count() == 4);
+  REQUIRE(mul.expected_latency() == 5);
+  REQUIRE(mul.substage_count() == 4);
 
   PipeBuilder pb;
   pb.at_stage("execute", Phase::NORMAL, []() {});
   mul.setup(pb);
-  assert(pb.node_of_logic_stage("mul_s1") != nullptr);
-  assert(pb.node_of_logic_stage("mul_s2") != nullptr);
-  assert(pb.node_of_logic_stage("mul_s3") != nullptr);
-  assert(pb.node_of_logic_stage("mul_s4") != nullptr);
+  REQUIRE(pb.node_of_logic_stage("mul_s1") != nullptr);
+  REQUIRE(pb.node_of_logic_stage("mul_s2") != nullptr);
+  REQUIRE(pb.node_of_logic_stage("mul_s3") != nullptr);
+  REQUIRE(pb.node_of_logic_stage("mul_s4") != nullptr);
   // must NOT declare mul_s5
-  assert(pb.node_of_logic_stage("mul_s5") == nullptr);
-  printf("  [PASS] test_latency_five_adds_four_substages\n");
+  REQUIRE(pb.node_of_logic_stage("mul_s5") == nullptr);
 }
 
 // 4. LAT 公开成员编译期检查
@@ -92,11 +87,4 @@ static void test_latency_five_adds_four_substages() {
 static_assert(RiscvMulPlugin<T, 3>::LAT == 3,
               "RiscvMulPlugin<T, LATENCY>::LAT must equal LATENCY");
 
-int main() {
-  printf("test_mul_latency:\n");
-  test_latency_one_is_baseline();
-  test_latency_three_adds_substages();
-  test_latency_five_adds_four_substages();
-  printf("[PASS] all mul_latency tests\n");
-  return 0;
-}
+

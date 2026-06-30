@@ -13,70 +13,62 @@
 //   6. reset 清除所有状态
 //
 // 约束:
-//   - 纯 main() + assert (与 cf_plugin 现有测试一致)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstdint>
-#include <cstdio>
 
 #include "ip/cpu/plugins/branch_predictor.h"
 
 using cf::cpu::plugins::BranchPredictorPlugin;
 using T = std::uint32_t;
 
-static void test_no_predict_initially() {
+TEST_CASE("no_predict_initially", "[cpu]") {
   BranchPredictorPlugin<T> bp(16);
-  assert(bp.predict(0x1000) == 0);
-  assert(!bp.predict_taken(0x1000));
-  printf("  [PASS] test_no_predict_initially\n");
+  REQUIRE(bp.predict(0x1000) == 0);
+  REQUIRE(!bp.predict_taken(0x1000));
 }
 
-static void test_predict_after_update() {
+TEST_CASE("predict_after_update", "[cpu]") {
   BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, true, 0x2000);
-  assert(bp.predict(0x1000) == 0x2000);
-  assert(bp.predict_taken(0x1000));
-  printf("  [PASS] test_predict_after_update\n");
+  REQUIRE(bp.predict(0x1000) == 0x2000);
+  REQUIRE(bp.predict_taken(0x1000));
 }
 
-static void test_btb_entry() {
+TEST_CASE("btb_entry", "[cpu]") {
   BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, true, 0x2000);
   auto entry = bp.btb_entry(0);
-  assert(entry.valid);
-  assert(entry.tag == 0x1000);
-  assert(entry.target == 0x2000);
-  printf("  [PASS] test_btb_entry\n");
+  REQUIRE(entry.valid);
+  REQUIRE(entry.tag == 0x1000);
+  REQUIRE(entry.target == 0x2000);
 }
 
-static void test_not_taken_returns_zero() {
+TEST_CASE("not_taken_returns_zero", "[cpu]") {
   BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, false, 0);
-  assert(bp.predict(0x1000) == 0);
-  assert(!bp.predict_taken(0x1000));
-  printf("  [PASS] test_not_taken_returns_zero\n");
+  REQUIRE(bp.predict(0x1000) == 0);
+  REQUIRE(!bp.predict_taken(0x1000));
 }
 
-static void test_multiple_addresses() {
+TEST_CASE("multiple_addresses", "[cpu]") {
   BranchPredictorPlugin<T> bp(16);
   bp.update(0x1004, true, 0x3000);
   bp.update(0x1008, true, 0x4000);
-  assert(bp.predict(0x1004) == 0x3000);
-  assert(bp.predict(0x1008) == 0x4000);
-  printf("  [PASS] test_multiple_addresses\n");
+  REQUIRE(bp.predict(0x1004) == 0x3000);
+  REQUIRE(bp.predict(0x1008) == 0x4000);
 }
 
-static void test_reset() {
+TEST_CASE("reset", "[cpu]") {
   BranchPredictorPlugin<T> bp(16);
   bp.update(0x1000, true, 0x2000);
   bp.reset();
-  assert(bp.predict(0x1000) == 0);
-  assert(bp.global_history() == 0);
-  printf("  [PASS] test_reset\n");
+  REQUIRE(bp.predict(0x1000) == 0);
+  REQUIRE(bp.global_history() == 0);
 }
 
 // M4G D.4 (G.4): predict/update 接受 tid 参数, per-thread GHR 隔离
-static void test_per_thread_ghr_isolation() {
+TEST_CASE("per_thread_ghr_isolation", "[cpu]") {
   // N_THREADS=2: 每个线程独立 GHR
   BranchPredictorPlugin<T, 16, 16, 8, 2> bp_mt(16);
   // tid=0 多次 update, GHR 应累积
@@ -87,38 +79,24 @@ static void test_per_thread_ghr_isolation() {
   bp_mt.update(0x3000, true,  0x4000, /*tid*/ 1);
   // per-thread GHR 独立 (ghr[tid] 应不同)
   // 这里只验证两个 tid 的 GHR 值不同即可 (具体值依赖实现)
-  assert(bp_mt.global_history(/*tid*/ 0) != bp_mt.global_history(/*tid*/ 1) ||
-         bp_mt.global_history(/*tid*/ 0) == bp_mt.global_history(/*tid*/ 1));  // 弱断言
+  REQUIRE((bp_mt.global_history(/*tid*/ 0) != bp_mt.global_history(/*tid*/ 1) ||
+         bp_mt.global_history(/*tid*/ 0) == bp_mt.global_history(/*tid*/ 1)));  // 弱断言
   // reset 默认清空所有线程
   bp_mt.reset();
-  assert(bp_mt.global_history(/*tid*/ 0) == 0);
-  assert(bp_mt.global_history(/*tid*/ 1) == 0);
-  printf("  [PASS] test_per_thread_ghr_isolation\n");
+  REQUIRE(bp_mt.global_history(/*tid*/ 0) == 0);
+  REQUIRE(bp_mt.global_history(/*tid*/ 1) == 0);
 }
 
 // M4G D.2 (G.4): 自定义 BTB_SIZE 编译 + 行为正确
-static void test_custom_btb_size() {
+TEST_CASE("custom_btb_size", "[cpu]") {
   // M4G D.2 (G.4): 自定义 BTB_SIZE 编译 + 行为正确
   // BTB_SIZE=4 (非常小, 验证模板参数生效)
   BranchPredictorPlugin<T, 4, 4, 4, 4> bp_small(4);
   bp_small.update(0x1000, true, 0x2000);
-  assert(bp_small.predict(0x1000) == 0x2000);
+  REQUIRE(bp_small.predict(0x1000) == 0x2000);
   bp_small.update(0x1004, true, 0x2004);
   // BTB 索引冲突 (idx=0): 0x1004 覆盖 0x1000
-  assert(bp_small.predict(0x1004) == 0x2004);
-  printf("  [PASS] test_custom_btb_size\n");
+  REQUIRE(bp_small.predict(0x1004) == 0x2004);
 }
 
-int main() {
-  printf("test_branch_predictor:\n");
-  test_no_predict_initially();
-  test_predict_after_update();
-  test_btb_entry();
-  test_not_taken_returns_zero();
-  test_multiple_addresses();
-  test_reset();
-  test_per_thread_ghr_isolation();
-  test_custom_btb_size();
-  printf("[PASS] all BranchPredictorPlugin tests\n");
-  return 0;
-}
+

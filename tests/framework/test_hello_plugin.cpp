@@ -1,6 +1,5 @@
 // tests/framework/test_hello_plugin.cpp
 //
-// 功能描述: 最小验证 Plugin (Phase 0 退出标准 §2.1)
 // 作者: ChipForge Plugin Team
 // 最后修改日期: 2026-06-08
 //
@@ -13,8 +12,7 @@
 //     4. PipeBuilder 编译 + 运行
 //   - 验证多次运行结果一致 (调度确定性)
 
-#include <cassert>
-#include <cstdio>
+#include "catch_amalgamated.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -46,41 +44,31 @@ static int run_hello_pipeline() {
   return pb.node_of_logic_stage("greet")->operator()(g_greet_count);
 }
 
-static void test_hello_plugin_runs() {
+TEST_CASE("hello_plugin_runs", "[framework]") {
   int count = run_hello_pipeline();
-  assert(count == 1);
-  printf("  [PASS] test_hello_plugin_runs\n");
+  REQUIRE(count == 1);
 }
 
-static void test_determinism_multiple_runs() {
+TEST_CASE("determinism_multiple_runs", "[framework]") {
   std::vector<int> results;
   for (int i = 0; i < 5; ++i) {
     results.push_back(run_hello_pipeline());
   }
   for (std::size_t i = 1; i < results.size(); ++i) {
-    assert(results[i] == results[i - 1]);
+    REQUIRE(results[i] == results[i - 1]);
   }
   for (int r : results) {
-    assert(r == 1);
+    REQUIRE(r == 1);
   }
-  printf("  [PASS] test_determinism_multiple_runs\n");
 }
 
-static void test_determinism_independent_instances() {
+TEST_CASE("determinism_independent_instances", "[framework]") {
   int count_a = run_hello_pipeline();
   int count_b = run_hello_pipeline();
   int count_c = run_hello_pipeline();
-  assert(count_a == count_b);
-  assert(count_b == count_c);
-  assert(count_a == 1);
-  printf("  [PASS] test_determinism_independent_instances\n");
+  REQUIRE(count_a == count_b);
+  REQUIRE(count_b == count_c);
+  REQUIRE(count_a == 1);
 }
 
-int main() {
-  printf("=== HelloPlugin + Determinism Tests (Phase 0 退出标准) ===\n");
-  test_hello_plugin_runs();
-  test_determinism_multiple_runs();
-  test_determinism_independent_instances();
-  printf("=== All HelloPlugin tests passed ===\n");
-  return 0;
-}
+

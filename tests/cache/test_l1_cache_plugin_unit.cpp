@@ -17,16 +17,14 @@
 //   - 存储数组 (tags_/data_/valid_) 是成员变量, 因此需要 helper 实例的 storage
 //     与注册的 Plugin 实例的 storage 同步. 测试通过让 helper 与注册的 Plugin
 //     都是 "空 + 单独操作" 的等价实例, 简化驱动路径.
-//   - 纯 main() + assert (与 Phase 0 cf_plugin + Phase 1.1 mem_bundles 一致)
 //
 // 详见:
 //   - docs/roadmap/phases/phase-1-tlm-foundation.md §1.2
 //   - bundles/mem_bundles.h (CacheReq / CacheResp / MemResp)
 //   - ip/cache/tlm/L1CachePlugin.h (Phase 1.2 主实现)
 
-#include <cassert>
+#include "catch_amalgamated.hpp"
 #include <cstddef>
-#include <cstdio>
 #include <memory>
 #include <type_traits>
 
@@ -64,8 +62,8 @@ struct TestCtx {
     pb.build();
     lookup_node = pb.node_of_logic_stage("lookup");
     refill_node = pb.node_of_logic_stage("refill");
-    assert(lookup_node != nullptr);
-    assert(refill_node != nullptr);
+    REQUIRE(lookup_node != nullptr);
+    REQUIRE(refill_node != nullptr);
   }
 };
 
@@ -74,7 +72,7 @@ struct TestCtx {
 // ----------------------------------------------------------------------------
 // Test 1: Miss 路径 —— 首次访问空 set
 // ----------------------------------------------------------------------------
-static void test_lookup_miss_path() {
+TEST_CASE("lookup_miss_path", "[cache]") {
   TestCtx ctx;
   // address = 0x00001234_0ABCDE00
   //   idx (addr[11:4])  = 0xE0
@@ -89,17 +87,16 @@ static void test_lookup_miss_path() {
   ctx.pb.run();
 
   CacheResp resp = ctx.helper->read_response(ctx.lookup_node);
-  assert(resp.hit == false);
-  assert(resp.data == 0);
-  assert(resp.error == false);
-  assert(resp.id == 1);
-  printf("  [PASS] test_lookup_miss_path\n");
+  REQUIRE(resp.hit == false);
+  REQUIRE(resp.data == 0);
+  REQUIRE(resp.error == false);
+  REQUIRE(resp.id == 1);
 }
 
 // ----------------------------------------------------------------------------
 // Test 2: Refill 路径 —— MemResp 到达后 set 被填充
 // ----------------------------------------------------------------------------
-static void test_refill_path() {
+TEST_CASE("refill_path", "[cache]") {
   TestCtx ctx;
 
   CacheReq req{};
@@ -117,15 +114,14 @@ static void test_refill_path() {
   ctx.pb.run();  // lookup + refill 同 cycle
 
   constexpr std::size_t kSet = 0xE0;
-  assert(ctx.helper->is_set_valid(kSet) == true);
-  assert(ctx.helper->read_tag(kSet) == 0x0ABCDULL);
-  printf("  [PASS] test_refill_path\n");
+  REQUIRE(ctx.helper->is_set_valid(kSet) == true);
+  REQUIRE(ctx.helper->read_tag(kSet) == 0x0ABCDULL);
 }
 
 // ----------------------------------------------------------------------------
 // Test 3: Hit 路径 —— refill 后再次访问命中
 // ----------------------------------------------------------------------------
-static void test_hit_after_refill() {
+TEST_CASE("hit_after_refill", "[cache]") {
   TestCtx ctx;
 
   CacheReq req{};
@@ -154,29 +150,18 @@ static void test_hit_after_refill() {
   ctx.pb.run();
 
   CacheResp resp = ctx.helper->read_response(ctx.lookup_node);
-  assert(resp.hit == true);
-  assert(resp.data == 0xCAFEBABEDEADBEEFULL);
-  assert(resp.error == false);
-  assert(resp.id == 3);
-  printf("  [PASS] test_hit_after_refill\n");
+  REQUIRE(resp.hit == true);
+  REQUIRE(resp.data == 0xCAFEBABEDEADBEEFULL);
+  REQUIRE(resp.error == false);
+  REQUIRE(resp.id == 3);
 }
 
 // ----------------------------------------------------------------------------
 // Test 4: D4 合规 —— Plugin 在最小 PipeBuilder 下运行不崩溃
 // ----------------------------------------------------------------------------
-static void test_d4_compliance_runtime() {
+TEST_CASE("d4_compliance_runtime", "[cache]") {
   TestCtx ctx;
   ctx.pb.run();
   ctx.pb.reset_all();
-  printf("  [PASS] test_d4_compliance_runtime\n");
 }
 
-int main() {
-  printf("=== L1CachePlugin Unit Tests (Phase 1.2) ===\n");
-  test_lookup_miss_path();
-  test_refill_path();
-  test_hit_after_refill();
-  test_d4_compliance_runtime();
-  printf("=== All L1CachePlugin unit tests passed ===\n");
-  return 0;
-}
