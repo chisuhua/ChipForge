@@ -121,27 +121,27 @@ static bool run_elf(const std::uint8_t* code, std::size_t size) {
   return mem.exited() && mem.exit_code() == 0;
 }
 
-TEST_CASE("add_elf", "[cpu]") {
+TEST_CASE("add_elf", "[cpu-integration]") {
   REQUIRE(run_elf(kAddCode, sizeof(kAddCode)));
 }
 
-TEST_CASE("sub_elf", "[cpu]") {
+TEST_CASE("sub_elf", "[cpu-integration]") {
   REQUIRE(run_elf(kSubCode, sizeof(kSubCode)));
 }
 
-TEST_CASE("and_elf", "[cpu]") {
+TEST_CASE("and_elf", "[cpu-integration]") {
   REQUIRE(run_elf(kAndCode, sizeof(kAndCode)));
 }
 
-TEST_CASE("or_elf", "[cpu]") {
+TEST_CASE("or_elf", "[cpu-integration]") {
   REQUIRE(run_elf(kOrCode, sizeof(kOrCode)));
 }
 
-TEST_CASE("sll_elf", "[cpu]") {
+TEST_CASE("sll_elf", "[cpu-integration]") {
   REQUIRE(run_elf(kSllCode, sizeof(kSllCode)));
 }
 
-TEST_CASE("srli_elf", "[cpu]") {
+TEST_CASE("srli_elf", "[cpu-integration]") {
   REQUIRE(run_elf(kSrliCode, sizeof(kSrliCode)));
 }
 

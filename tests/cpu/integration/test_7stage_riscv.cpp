@@ -32,7 +32,7 @@ using T = std::uint32_t;
 // 1. 7-stage superscalar 拓扑: 7 节点含 retire/commit
 //    与 test_topology_builder 重复测试, 但通过 cpu_superscalar.json 配置触发
 //    (集成视角: 验证 JSON → CPUConfig → build_cpu → 拓扑 完整链路)
-TEST_CASE("build_7stage_superscalar", "[cpu]") {
+TEST_CASE("build_7stage_superscalar", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_7stage_superscalar";
   cfg.isa = "rv64gc";
@@ -64,7 +64,7 @@ TEST_CASE("build_7stage_superscalar", "[cpu]") {
 
 // 2. 7-stage 拓扑从 cpu_superscalar.json 配置加载
 //    验证 JSON → CPUConfig 字段映射 + TopologyBuilder 路由
-TEST_CASE("7stage_topology_from_config", "[cpu]") {
+TEST_CASE("7stage_topology_from_config", "[cpu-integration]") {
   std::ifstream ifs("ip/cpu/configs/cpu_superscalar.json");
   REQUIRE(ifs.is_open());
   nlohmann::json j;
@@ -102,7 +102,7 @@ TEST_CASE("7stage_topology_from_config", "[cpu]") {
 // 3. 7-stage dispatch_width=2 触发 lane 派发 (T4 验证)
 //    TopologyBuilder<7> 注册 7 个无 op 闭包 → lane 派发再注册 7 个 lane 闭包
 //    总 stage_count=14 (7 + 7), node_count=7 (deduplicated)
-TEST_CASE("7stage_dispatch_width_2", "[cpu]") {
+TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_7stage_dw2";
   cfg.isa = "rv64gc";
@@ -129,7 +129,7 @@ static std::string exec_cmd(const std::string& cmd) {
   return result;
 }
 
-TEST_CASE("7stage_add_elf_end_to_end", "[cpu]") {
+TEST_CASE("7stage_add_elf_end_to_end", "[cpu-integration]") {
   // M4.16: add.elf end-to-end on 7-stage. RV32I interpreter is pipeline-agnostic
   // (M4.15) so tohost=1 across 3/5/7/10-stage.
   std::string output = exec_cmd(

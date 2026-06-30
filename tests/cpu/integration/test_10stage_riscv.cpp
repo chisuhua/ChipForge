@@ -31,7 +31,7 @@ using T = std::uint32_t;
 //    TopologyBuilder<10>: 7 main + 8 substages (IF1, IF2, ID, RENAME, ISSUE,
 //    EX1, EX2, EX3, MEM1, MEM2 — declared via declare_substage)
 //    注: 10-stage 当前 scope 不触发 lane 派发 (dispatch_width 默认 1)
-TEST_CASE("build_10stage_deep", "[cpu]") {
+TEST_CASE("build_10stage_deep", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_deep";
   cfg.isa = "rv64gc";
@@ -65,7 +65,7 @@ TEST_CASE("build_10stage_deep", "[cpu]") {
 
 // 2. 10-stage 拓扑从 cpu_deep_pipeline.json 配置加载
 //    验证 JSON → CPUConfig 字段映射 + TopologyBuilder<10> 路由
-TEST_CASE("10stage_topology_from_config", "[cpu]") {
+TEST_CASE("10stage_topology_from_config", "[cpu-integration]") {
   std::ifstream ifs("ip/cpu/configs/cpu_deep_pipeline.json");
   REQUIRE(ifs.is_open());
   nlohmann::json j;
@@ -98,7 +98,7 @@ TEST_CASE("10stage_topology_from_config", "[cpu]") {
 // 3. 10-stage + mul_latency=5 组合 (M5.14 多周期延迟)
 //    当前 CpuFactory mul_latency 路由仅验证合法值 (1/3/5), 不实例化 plugin,
 //    所以此测试仅验证 CPUConfig 字段被路由 + 拓扑正确展开
-TEST_CASE("10stage_mul_latency_5", "[cpu]") {
+TEST_CASE("10stage_mul_latency_5", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_mul5";
   cfg.isa = "rv64gc";
@@ -123,7 +123,7 @@ static std::string exec_cmd(const std::string& cmd) {
   return result;
 }
 
-TEST_CASE("10stage_add_elf_end_to_end", "[cpu]") {
+TEST_CASE("10stage_add_elf_end_to_end", "[cpu-integration]") {
   // M4.16: add.elf end-to-end on 10-stage. RV32I interpreter is pipeline-agnostic
   // (M4.15) so tohost=1 across 3/5/7/10-stage.
   std::string output = exec_cmd(

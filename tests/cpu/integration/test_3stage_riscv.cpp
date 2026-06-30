@@ -28,7 +28,7 @@
 using namespace cf::cpu;
 using T = std::uint32_t;
 
-TEST_CASE("build_3stage", "[cpu]") {
+TEST_CASE("build_3stage", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_3stage";
   cfg.isa = "rv32imac";
@@ -46,7 +46,7 @@ TEST_CASE("build_3stage", "[cpu]") {
   REQUIRE(pb->has_stage("wb"));
 }
 
-TEST_CASE("3_vs_5_stages", "[cpu]") {
+TEST_CASE("3_vs_5_stages", "[cpu-integration]") {
   CPUConfig cfg3;
   cfg3.pipeline_stages = 3;
   auto pb3 = CpuFactory<T>::build_cpu(cfg3);
@@ -61,7 +61,7 @@ TEST_CASE("3_vs_5_stages", "[cpu]") {
   REQUIRE(pb3.get() != pb5.get());
 }
 
-TEST_CASE("tohost_3stage", "[cpu]") {
+TEST_CASE("tohost_3stage", "[cpu-integration]") {
   PicolibcHostMemory mem;
   // 模拟 add.elf 执行: li x1, 5; li x2, 3; add x3, x1, x2;
   // li x4, 1; sw x4, 0(x0) → mem[0] = 1
@@ -70,7 +70,7 @@ TEST_CASE("tohost_3stage", "[cpu]") {
   REQUIRE(mem.exit_code() == 0);
 }
 
-TEST_CASE("multiple_instances", "[cpu]") {
+TEST_CASE("multiple_instances", "[cpu-integration]") {
   // 多个 PicolibcHostMemory 实例独立
   PicolibcHostMemory mem1, mem2;
   mem1.write_word(0x0, 1);  // mem1: PASS
@@ -91,7 +91,7 @@ static std::string exec_cmd(const std::string& cmd) {
   return result;
 }
 
-TEST_CASE("3stage_add_elf_end_to_end", "[cpu]") {
+TEST_CASE("3stage_add_elf_end_to_end", "[cpu-integration]") {
   std::string output = exec_cmd(
       "./build/src/cf_plugin/cpu_sim "
       "--config ip/cpu/configs/cpu_embedded.json "

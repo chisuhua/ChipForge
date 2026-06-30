@@ -30,7 +30,7 @@
 using namespace cf::cpu;
 using T = std::uint32_t;
 
-TEST_CASE("build_5stage", "[cpu]") {
+TEST_CASE("build_5stage", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_5stage";
   cfg.isa = "rv32i";
@@ -56,7 +56,7 @@ TEST_CASE("build_5stage", "[cpu]") {
   REQUIRE(pb->node_of_logic_stage("writeback") != nullptr);
 }
 
-TEST_CASE("host_memory_init", "[cpu]") {
+TEST_CASE("host_memory_init", "[cpu-integration]") {
   PicolibcHostMemory mem;
   // 初始状态: tohost=0, 未退出
   REQUIRE(!mem.exited());
@@ -67,7 +67,7 @@ TEST_CASE("host_memory_init", "[cpu]") {
   }
 }
 
-TEST_CASE("load_binary", "[cpu]") {
+TEST_CASE("load_binary", "[cpu-integration]") {
   PicolibcHostMemory mem;
   // 模拟加载 add.elf 前 4 字节
   std::uint8_t code[] = {0x93, 0x01, 0x50, 0x00};  // addi x3, x0, 5
@@ -78,7 +78,7 @@ TEST_CASE("load_binary", "[cpu]") {
   REQUIRE(mem.read_byte(3) == 0x00);
 }
 
-TEST_CASE("tohost_mechanism", "[cpu]") {
+TEST_CASE("tohost_mechanism", "[cpu-integration]") {
   PicolibcHostMemory mem;
   // 写入 tohost = 1 (PASS)
   mem.write_word(0x0, 1);
@@ -87,7 +87,7 @@ TEST_CASE("tohost_mechanism", "[cpu]") {
   REQUIRE(mem.exit_code() == 0);
 }
 
-TEST_CASE("tohost_fail", "[cpu]") {
+TEST_CASE("tohost_fail", "[cpu-integration]") {
   PicolibcHostMemory mem;
   // 写入 tohost = 2 (FAIL)
   mem.write_word(0x0, 2);
@@ -108,7 +108,7 @@ static std::string exec_cmd(const std::string& cmd) {
   return result;
 }
 
-TEST_CASE("5stage_add_elf_end_to_end", "[cpu]") {
+TEST_CASE("5stage_add_elf_end_to_end", "[cpu-integration]") {
   std::string output = exec_cmd(
       "./build/src/cf_plugin/cpu_sim "
       "--config ip/cpu/configs/cpu_default.json "
