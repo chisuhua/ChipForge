@@ -35,7 +35,7 @@
 
 ## 1. 当前架构的 2 个硬墙 + 6 个中等障碍
 
-> 本节提炼 [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md) 的核心结论。
+> 本节提炼 `ooo_forward_compat_gap_analysis.md` (未实现) 的核心结论。
 
 ### 1.1 框架脊柱 (不需要改)
 
@@ -154,7 +154,7 @@ void update(T pc, bool taken, T target, uint8_t tid);
 
 ## 3. 可以推迟到 Phase 5+ 的 8 项决策 (E.1-E.8)
 
-> 本节是 [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md) §E 的提炼。
+> 本节是 `ooo_forward_compat_gap_analysis.md` (未实现) §E 的提炼。
 
 **以下项目**不是 Phase 1 工作。它们是 Phase 5+ 工作,框架已经支持 (或需要设计新插件)。**不要在 Phase 1 触及它们**。
 
@@ -288,9 +288,9 @@ Payload 系统**保持不变**。这是使当前架构 OoO-friendly 的设计点
 
 ### 6.4 参考文档
 
-- **Gap 分析**: [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md) (615 行)
-- **gem5 参考**: [`gem5_dse_reference.md`](gem5_dse_reference.md) (1209 行)
-- **开源 RISC-V 调研**: [`../../docs/research/dse-open-source-riscv-survey.md`](../../docs/research/dse-open-source-riscv-survey.md) (~480 行)
+- **Gap 分析**: `ooo_forward_compat_gap_analysis.md` (未实现) (615 行)
+- **gem5 参考**: `gem5_dse_reference.md` (未实现) (1209 行)
+- **开源 RISC-V 调研**: [`../../../docs/research/dse-open-source-riscv-survey.md`](../../../docs/research/dse-open-source-riscv-survey.md) (~480 行)
 - **SMT 接口调研**: [`research/smt-interface-design-survey.md`](research/smt-interface-design-survey.md) (~2500 词)
 - **DSE 框架调研**: [`research/dse-framework-survey.md`](research/dse-framework-survey.md) (~3000 词)
 

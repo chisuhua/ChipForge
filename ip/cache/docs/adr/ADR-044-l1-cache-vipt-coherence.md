@@ -280,4 +280,4 @@ grep -q "ADR-044" docs/architecture/adr.md
 
 ---
 
-*本 ADR 由 mmu-tlb-ptw-impl 预备调研驱动（2026-07-01）。Phase 1.5 L1Cache upgrade 时从 🚧 升级到 ✅，并同步更新 [`docs/architecture/adr.md`](../../../docs/architecture/adr.md) 主表。*
+*本 ADR 由 mmu-tlb-ptw-impl 预备调研驱动（2026-07-01）。Phase 1.5 L1Cache upgrade 时从 🚧 升级到 ✅，并同步更新 [`docs/architecture/adr.md`](../../../../docs/architecture/adr.md) 主表。*

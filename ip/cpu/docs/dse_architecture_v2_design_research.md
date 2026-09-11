@@ -7,7 +7,7 @@
 | 状态 | 🟡 Draft (基于 5 个调研 agent 的综合改进) |
 | 适用范围 | ChipForge IP/CPU 子系统 |
 | 父文档 | [`dse_architecture.md`](dse_architecture.md) v1.0, [`multi_isa_architecture.md`](multi_isa_architecture.md) v2.0 |
-| 参考文档 | [`gem5_dse_reference.md`](gem5_dse_reference.md), [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md), [`../../docs/research/dse-open-source-riscv-survey.md`](../../docs/research/dse-open-source-riscv-survey.md) |
+| 参考文档 | `gem5_dse_reference.md` (未实现), `ooo_forward_compat_gap_analysis.md` (未实现), [`../../../docs/research/dse-open-source-riscv-survey.md`](../../../docs/research/dse-open-source-riscv-survey.md) |
 
 > **本文档定位**: 在 v1.0 的基础上,**基于 5 个并行调研 agent 的综合发现** 提出架构改进建议。
 >
@@ -133,7 +133,7 @@
 
 **调研范围**: 本地代码审计 + v1.0 文档分析
 
-**关键发现** (详见 [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md)):
+**关键发现** (详见 `ooo_forward_compat_gap_analysis.md` (未实现)):
 
 1. **VexRiscv 声明式 plugin 模型是 OoO-friendly by accident**:
    - 框架脊柱 (PipeNode/PipeBuilder/PluginBase/PayloadStore/CtrlLink/PipeArbitration) **不需要改**
@@ -210,7 +210,7 @@
 
 ## 2. 当前架构的 2 个硬墙 + 6 个中等障碍
 
-> 本节提炼 [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md) 的核心结论。
+> 本节提炼 `ooo_forward_compat_gap_analysis.md` (未实现) 的核心结论。
 
 ### 2.1 框架脊柱 (不需要改)
 
@@ -367,7 +367,7 @@ pb.at_stage("execute", Phase::NORMAL, [&pb]() {
 
 ## 3. Phase 1 必须锁定的 7 项决策 (D.1-D.7)
 
-> 本节是 [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md) §D 的提炼。
+> 本节是 `ooo_forward_compat_gap_analysis.md` (未实现) §D 的提炼。
 
 **总成本**: ~150 行 header churn,0 行行为改变。**防止**: ~2000 行 Phase 5+ 重构。
 
@@ -463,7 +463,7 @@ v1.0 §6.3 提议添加 `PluginBase::setup_with_config(pb, const void* cfg)`。*
 
 ## 4. 可以推迟到 Phase 5+ 的 8 项决策 (E.1-E.8)
 
-> 本节是 [`ooo_forward_compat_gap_analysis.md`](ooo_forward_compat_gap_analysis.md) §E 的提炼。
+> 本节是 `ooo_forward_compat_gap_analysis.md` (未实现) §E 的提炼。
 
 **以下项目**不是 Phase 1 工作。它们是 Phase 5+ 工作,框架已经支持 (或需要设计新插件)。**不要在 Phase 1 触及它们**。
 

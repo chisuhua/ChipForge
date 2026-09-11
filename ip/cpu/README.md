@@ -5,7 +5,7 @@
 CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），实际位置：
 
 - **单元测试**: `../tests/cpu/test_*.cpp`（14 个 GoogleTest 文件）
-  - 详见 [tests/cpu/README.md](../tests/cpu/README.md)
+  - 详见 [tests/cpu/README.md](../../tests/cpu/README.md)
 - **集成测试**: `../tests/cpu/integration/test_*.cpp`（3 阶段 RISC-V 验证）
 - **验证规范**: [./docs/verification.md](./docs/verification.md)（前 `ip/cpu/test/README.md`，描述 Level A/B/C 测试层级）
 
@@ -13,7 +13,7 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 基于 CppTLM 的 RISC-V CPU IP 核，采用 Plugin + Stageable 架构设计，支持 RV32I/RV64GC 指令集。
 
 ## 设计方案
-本 IP 采用 **VexRiscv-on-CppTLM Stageable 方案**（详见 [VexRiscvOnCppTLM.md](docs/riscv/VexRiscvOnCppTLM.md)）作为最终实现规范。
+本 IP 采用 **VexRiscv-on-CppTLM Stageable 方案**（详见 `VexRiscvOnCppTLM.md` (未实现)）作为最终实现规范。
 
 核心设计原则：
 - **水平功能切片**：每个 Plugin 横跨多个流水线阶段
@@ -21,7 +21,7 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 - **PipeBuilder DSL 编译式调度**：Plugin 在 setup 阶段声明/发现能力
 - **权威设计**: 详见 [multi_isa_architecture.md](docs/multi_isa_architecture.md) v2.0
 
-> 📖 [VexRiscvArch.md](docs/riscv/VexRiscvArch.md) 为早期设计参考文档，仅供理解设计演进使用。
+> 📖 `VexRiscvArch.md` (未实现) 为早期设计参考文档，仅供理解设计演进使用。
 
 ## 目录结构
 

@@ -21,5 +21,5 @@
 ## 相关文档
 
 - [项目架构总览 - IP 目录](../../../docs/architecture/ip-catalog.md)
-- [TileCopy IP 文档](../tilecopy/docs/README.md) — TileCore 的数据搬运依赖
+- [TileCopy IP 文档](../../tilecopy/docs/README.md) — TileCore 的数据搬运依赖
 - [SoC 集成指南](../../../soc/docs/integration-guide.md) — 如何在 SoC 配置中引用此 IP

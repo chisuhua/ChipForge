@@ -176,9 +176,9 @@ RiscvDecodePlugin  (arch/riscv/decode.h)
 
 > **⚠️ 2026-06-17 实证状态**: 当前 `ip/cpu/cpu_factory.h` 的 `build_cpu()` 是 **空 stub** — 三个 `register_*_plugins` 私有方法仅 `(void)pb; (void)sizeof(U);`, **零个 plugin 被注册**。本文档描述的是**设计意图**, 真实落实路径见 [`dse_architecture.md`](dse_architecture.md) §7 (M4-DSE 实施后 `build_cpu` 真实实现)。
 >
-> 详细实施状态: [`dse_architecture.md` §1.1](../dse_architecture.md) (审计结果) + [`status.md` §4.1](../status.md) (M4-DSE 子任务清单)
+> 详细实施状态: [`dse_architecture.md` §1.1](dse_architecture.md) (审计结果) + [`status.md` §4.1](status.md) (M4-DSE 子任务清单)
 >
-> **🟢 M4G (2026-06-19)**: 3 个核心插件 (RegFile/Hazard/BranchPredictor) 已模板化 `N_REGS`/`N_THREADS` 等前瞻参数 (D.1-D.4), `register_late_plugins<U>` 含编译期 smoke test 验证 `RegFilePlugin<U>` 实例化链。详细任务拆分: [`implementation-plan/M4G-forward-compat-locks.md`](implementation-plan/M4G-forward-compat-locks.md), 状态: [`status.md` §4.2](../status.md) (8/8 PASS, 43/43 ctest 全绿)。M4-DSE 启动后删除 smoke test 并真实 `register` 这些模板化插件。
+> **🟢 M4G (2026-06-19)**: 3 个核心插件 (RegFile/Hazard/BranchPredictor) 已模板化 `N_REGS`/`N_THREADS` 等前瞻参数 (D.1-D.4), `register_late_plugins<U>` 含编译期 smoke test 验证 `RegFilePlugin<U>` 实例化链。详细任务拆分: [`implementation-plan/M4G-forward-compat-locks.md`](implementation-plan/M4G-forward-compat-locks.md), 状态: [`status.md` §4.2](status.md) (8/8 PASS, 43/43 ctest 全绿)。M4-DSE 启动后删除 smoke test 并真实 `register` 这些模板化插件。
 
 ```cpp
 // ip/cpu/cpu_factory.h
@@ -506,6 +506,6 @@ VexRiscv 是 SpinalHDL 生态最成功的开源 RISC-V CPU:
 - **各阶段实施规划**: [`implementation-plan/M1..M5`](implementation-plan/)
 - **任务状态看板**: [`status.md`](status.md)
 - **权威设计**: [`multi_isa_architecture.md`](multi_isa_architecture.md) v2.0
-- **框架层**: [`docs/architecture/plugin-framework.md`](../../docs/architecture/plugin-framework.md)
-- **方法学**: [`docs/methodology/plugin-style-design-methodology-v1.md`](../../docs/methodology/plugin-style-design-methodology-v1.md)
-- **L1Cache 经验**: [`docs/lessons/phase-1.2-l1cacheplugin.md`](../../docs/lessons/phase-1.2-l1cacheplugin.md)
+- **框架层**: [`docs/architecture/plugin-framework.md`](../../../docs/architecture/plugin-framework.md)
+- **方法学**: [`docs/methodology/plugin-style-design-methodology-v1.md`](../../../docs/methodology/plugin-style-design-methodology-v1.md)
+- **L1Cache 经验**: [`docs/lessons/phase-1.2-l1cacheplugin.md`](../../../docs/lessons/phase-1.2-l1cacheplugin.md)

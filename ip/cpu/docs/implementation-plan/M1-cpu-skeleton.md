@@ -118,7 +118,7 @@ M1 任务必须 100% 符合 D4 + ADR-040。 这是 v2.0 决策约束 (议题 1 �
 |------|------|
 | 修改 cf::plugin::PipeBuilder 破坏下游 (L1CachePlugin) | M1 启动前先跑 L1CachePlugin 4/4 单元测试基线; M1 完成后复测 |
 | declare_substage 实现复杂度超预期 | 议题 1 选 C 推荐方案 A (直接改 cf_plugin); 若不达预期降级为方案 B (新建 ip/cpu/core/pipe_builder.h 包装) |
-| 单元测试覆盖不足 (at_stage 早返陷阱) | 复用 L1Cache 6 维度方法学 D6 测试便利 (见 `../../docs/lessons/phase-1.2-l1cacheplugin.md`) |
+| 单元测试覆盖不足 (at_stage 早返陷阱) | 复用 L1Cache 6 维度方法学 D6 测试便利 (见 `../../../../docs/lessons/phase-1.2-l1cacheplugin.md`) |
 
 ## 6. ADR 需求
 
@@ -132,5 +132,5 @@ M1 任务必须 100% 符合 D4 + ADR-040。 这是 v2.0 决策约束 (议题 1 �
 
 - 总体任务: [`README.md`](README.md) §6 M1 行
 - 静态架构 (Plugin 套件 + cf_plugin 扩展点): [`../blueprint.md`](../blueprint.md) §4, §6
-- L1Cache 6 维度方法学: [`../../docs/lessons/phase-1.2-l1cacheplugin.md`](../../docs/lessons/phase-1.2-l1cacheplugin.md)
+- L1Cache 6 维度方法学: [`../../../../docs/lessons/phase-1.2-l1cacheplugin.md`](../../../../docs/lessons/phase-1.2-l1cacheplugin.md)
 - 任务状态: [`../status.md`](../status.md)

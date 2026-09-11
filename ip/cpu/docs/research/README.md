@@ -16,9 +16,9 @@ This directory contains research reports and surveys that inform the CPU Design 
 
 | Document | Description | Date | Source |
 |----------|-------------|------|--------|
-| [gem5_dse_reference.md](../gem5_dse_reference.md) | gem5 DSE patterns and architectural insights | 2026-06-17 | Background agent bg_9668b73e |
-| [ooo_forward_compat_gap_analysis.md](../ooo_forward_compat_gap_analysis.md) | OoO/Superscalar/SMT forward-compatibility gap analysis | 2026-06-17 | Background agent bg_45968b90 |
-| [dse-open-source-riscv-survey.md](../../../docs/research/dse-open-source-riscv-survey.md) | Open-source RISC-V CPU DSE survey (BOOM, XiangShan, etc.) | 2026-06-17 | Background agent bg_2d204563 |
+| `gem5_dse_reference.md` (未实现) | gem5 DSE patterns and architectural insights | 2026-06-17 | Background agent bg_9668b73e |
+| `ooo_forward_compat_gap_analysis.md` (未实现) | OoO/Superscalar/SMT forward-compatibility gap analysis | 2026-06-17 | Background agent bg_45968b90 |
+| [dse-open-source-riscv-survey.md](../../../../docs/research/dse-open-source-riscv-survey.md) | Open-source RISC-V CPU DSE survey (BOOM, XiangShan, etc.) | 2026-06-17 | Background agent bg_2d204563 |
 | [smt-interface-design-survey.md](./smt-interface-design-survey.md) | SMT (Simultaneous Multithreading) interface design survey | 2026-06-17 | Background agent bg_41470f52 |
 | [dse-framework-survey.md](./dse-framework-survey.md) | CPU DSE frameworks and methodology survey | 2026-06-17 | Background agent bg_a592c1cb |
 | [post-m4g-strategic-decision-2026-06-20.md](./post-m4g-strategic-decision-2026-06-20.md) | Post-M4G strategic decision: should architecture lock more forward-compatibility hooks for OoO/Superscalar/SMT, or defer to Phase 5+? Synthesizes 4 background research agents (D.1-D.4 audit, gap audit, oracle cost analysis, open-source evidence) and recommends 3 zero-/low-cost locks. | 2026-06-20 | Background agent team (ses_11a632554 + ses_11a63b494 + ses_11a63770b + ses_11a62a155) |

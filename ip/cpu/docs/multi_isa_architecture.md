@@ -733,7 +733,7 @@ build_cpu(const json& config, ImplMode mode) {
 > **三种 ISA 表示法的关系 (2026-06-17 校核)**:
 > - **`isa` 字符串前缀** (`rv32i`/`rv32im`/`rv64gc`) 是 [`cpu_params_schema.json`](../../configs/cpu_params_schema.json) 的唯一权威字段,也是所有 `configs/cpu_*.json` 实例文件实际使用的形式
 > - **`isa_extensions` 数组** (本节描述) 是设计意图视图,与字符串前缀语义等价 (运行时归并)
-> - **`ext_*` boolean 字段** 是 DSE 工具 ([`../dse_architecture.md` §4.2](../dse_architecture.md)) 为笛卡尔积扫描引入的 flat 形式,运行时与字符串前缀互验
+> - **`ext_*` boolean 字段** 是 DSE 工具 ([`dse_architecture.md` §4.2](dse_architecture.md)) 为笛卡尔积扫描引入的 flat 形式,运行时与字符串前缀互验
 > 三者冗余但等价,所有变更应同时反映到 `cpu_params_schema.json`
 
 ```json
@@ -1146,8 +1146,8 @@ TEST(Compare, RV32I_AllPayloadsMatch) {
 
 - [ip/cpu/README.md](../README.md) — IP/CPU 总览
 - [ip/cpu/docs/README.md](./README.md) — 文档索引
-- [ip/cpu/docs/riscv/VexRiscvArch.md](./riscv/VexRiscvArch.md) — VexRiscv 架构参考
-- [ip/cpu/docs/riscv/VexRiscvOnCppTLM.md](./riscv/VexRiscvOnCppTLM.md) — VexRiscv 在 CppTLM 的映射
+- `VexRiscvArch.md` (未实现) — VexRiscv 架构参考
+- `VexRiscvOnCppTLM.md` (未实现) — VexRiscv 在 CppTLM 的映射
 - [ip/cpu/configs/cpu_params_schema.json](../configs/cpu_params_schema.json) — JSON Schema
 - [docs/architecture/overview.md](../../../docs/architecture/overview.md) — 顶层架构
 - [docs/architecture/interface-design.md](../../../docs/architecture/interface-design.md) — 接口设计

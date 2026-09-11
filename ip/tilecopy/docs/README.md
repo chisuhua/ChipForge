@@ -21,5 +21,5 @@
 ## 相关文档
 
 - [项目架构总览 - IP 目录](../../../docs/architecture/ip-catalog.md)
-- [TileCore IP 文档](../tilecore/docs/README.md) — TileCopy 的主要调用方
+- [TileCore IP 文档](../../tilecore/docs/README.md) — TileCopy 的主要调用方
 - [SoC 集成指南](../../../soc/docs/integration-guide.md) — 如何在 SoC 配置中引用此 IP
