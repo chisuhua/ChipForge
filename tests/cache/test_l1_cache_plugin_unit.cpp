@@ -19,7 +19,7 @@
 //     都是 "空 + 单独操作" 的等价实例, 简化驱动路径.
 //
 // 详见:
-//   - docs/roadmap/phases/phase-1-tlm-foundation.md §1.2
+//   - soc/cpu/docs/roadmap/phase-1-tlm-foundation.md §1.2
 //   - bundles/mem_bundles.h (CacheReq / CacheResp / MemResp)
 //   - ip/cache/tlm/L1CachePlugin.h (Phase 1.2 主实现)
 

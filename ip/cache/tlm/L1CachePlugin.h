@@ -10,7 +10,7 @@
 //   - D4 强制: 无 tick(), 无状态机, Bundle 字段用 uint_t<N>, 阶段间通信用 Payload<T>
 //
 // 详见:
-//   - docs/roadmap/phases/phase-1-tlm-foundation.md §1.2
+//   - soc/cpu/docs/roadmap/phase-1-tlm-foundation.md §1.2
 //   - .omo/drafts/decision-plugin-framework-2026-06-08.md (D4)
 //   - bundles/mem_bundles.h (CacheReq / CacheResp / MemResp 输入)
 //
@@ -75,6 +75,10 @@ class L1CachePlugin : public cf::plugin::PluginBase {
   static constexpr unsigned kOffsetBits = 4;       // addr[3:0] (Phase 0 简化)
   static constexpr unsigned kLineDataBits = 512;   // 64-byte line (Phase 0 退化为 uint64)
   static constexpr unsigned kAddrBitsRaw = 64;     // 物理地址位宽 (helper 用)
+
+  // VIPT safety: idx+offset bits must fit in 4KB page offset (12 bits). ADR-044 §2.2.
+  static_assert(kIdxBits + kOffsetBits <= 12,
+                "VIPT safety: idx_bits + offset_bits must <= 12. See ADR-044 §2.2.");
 
   // ------------------------------------------------------------------------
   // 构造函数 (Phase 1.4: 替换策略注入点)

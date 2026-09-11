@@ -21,7 +21,7 @@
 //
 // 详见:
 //   - L1CachePlugin.h
-//   - docs/roadmap/phases/phase-1-tlm-foundation.md §1.2
+//   - soc/cpu/docs/roadmap/phase-1-tlm-foundation.md §1.2
 
 #include "ip/cache/tlm/L1CachePlugin.h"
 
