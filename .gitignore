@@ -64,10 +64,10 @@ worktrees/
 .mcp.json
 openspec/
 
-# .omo/ workflow subdirs that are transient (plans/ and drafts/ are tracked)
-.omo/evidence/
-.omo/notepads/
-.omo/run-continuation/
+# .omo/ workflow subdirs are transient workspace state (boulder/notepad/evidence/run-continuation),
+# and decision/plan drafts are intentionally untracked — see docs/architecture/adr.md and
+# openspec/changes/ as the canonical archive for historical decisions.
+.omo/
 
 # riscv-arch-test: only the chipforge config overlay is tracked; the rest
 # is a local clone for reference and must not enter version control.
