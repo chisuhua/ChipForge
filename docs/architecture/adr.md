@@ -120,7 +120,7 @@
 |----|------|------|------------|----------|
 | ADR-024 | Bundle 三层分层 | Bundle | Bundle + Protocol | Mapper 模板未实现 |
 
-### 2.3 Phase 1 提案决策（🚧）— 8 条
+### 2.3 Phase 1 提案决策（🚧）— 9 条
 
 | ID | 标题 | 类别 | 状态 | 备注 |
 |----|------|------|------|------|
@@ -132,6 +132,7 @@
 | ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部; Phase 1.3d-extras L1Cache Adapter 已注册, 通用模板 Phase 5 实施） |
 | ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
 | ADR-040 | TLM→HDL 移植性约束 | 移植 | 🚧（`array_store` 已实现，迁移手册待 Phase 5 验证；2026-06-12 从 §2.1 移除, 实质仍为 Phase 1 提案） |
+| ADR-044 | L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 | IP 架构 | 🚧（设计方向已锁，实装推迟 mmu-tlb-ptw-impl 以后） | [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../../ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) |
 
 ### 2.4 统计
 
@@ -149,9 +150,10 @@
 | 目录与组织 (J) | 2 | 0 | 1 | 3 |
 | 范式决策 (K) | 1 | 0 | 0 | 1 |
 | 可移植性约束 (L) | 0 | 0 | 1 | 1 |
-| **合计** | **34** | **1** | **8** | **43** |
+| IP 架构 (M) | 0 | 0 | 1 | 1 |
+| **合计** | **34** | **1** | **9** | **44** |
 
-**实现率**：34/43 ≈ **79%**（含部分实现）
+**实现率**：34/44 ≈ **77%**（含部分实现）
 
 ---
 

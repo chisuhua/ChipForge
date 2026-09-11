@@ -11,6 +11,7 @@ This IP has **skeleton-level partial implementation**. 目录骨架、Plugin 入
 
 ## Implementation Roadmap
 - 下一里程碑: **mmu-tlb-ptw-impl** change —— TLB lookup/insert 算法 + PageTableWalker Sv32/Sv39/Sv48 解码 + MMUPlugin at_stage 闭包实装 + CtrlLink halt_when PTW stall
+- 前提依赖: ADR-044 (L1 Cache VIPT 锁定, [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md)) — MMUPlugin 输出 `pl::MMU_VADDR` 供 VIPT L1 索引
 - 依赖: `cf::plugin` Phase 0 (5/5 P0 组件稳定) + `ip/cache/` Plugin-style 先例 + `ip/cpu/plugins/` ISA 无关 Plugin 套件
 - 状态: 🟡 骨架阶段 (mmu-ip-skeleton, 2026-06-29 落地, 同 mmu-tlb-ptw-impl+ 实施)
 - 子模块: TLB 模板化 + MultiLevelTLB 编排器 + PageTableWalker 接口 + 4 种替换策略 + Plugin 集成

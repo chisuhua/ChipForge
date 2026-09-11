@@ -26,6 +26,8 @@ MMU 不直接暴露 Bundle，而是**通过 CPU 的 fetch/memory 阶段 Payload 
    - **miss**: 写 `pl::PTW_ACTIVE=1`, 写 `pl::PTW_VADDR=vpc`, 写 `pl::PTW_ASID=asid`
 3. `IBusPlugin` 后续 `at_stage` 读 `pl::PADDR`, 用 paddr 查 L1I
 
+> **注 (Phase 1.5+)**: L1I 采用 VIPT (ADR-044), 索引来自 vaddr。MMUPlugin 除写 `pl::PADDR` 外还需写 `pl::MMU_VADDR` 供 L1CachePlugin 消费。详细见 [ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md](../../cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) §3.2。
+
 ### 1.2 memory 阶段集成（数据翻译）
 
 类似 fetch，DBusPlugin 在 `memory` 阶段写 `pl::MEM_ADDR` (虚地址)，MMUPlugin 在 `tlb_lookup_loadstore` 阶段翻译为 paddr，DBusPlugin 后续阶段读 `pl::PADDR`。
