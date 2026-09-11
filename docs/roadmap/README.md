@@ -22,11 +22,11 @@
 | Phase | 文档 | 状态 | 关键目标 |
 |-------|------|------|---------|
 | **Phase 0** | [Plugin 最小脚手架](phases/phase-0-plugin-scaffolding.md) | ✅ Completed (2026-06-08) | PluginBase / Payload<T> / PipeNode / PipeBuilder / CtrlLink（5/5 P0 完成，51/51 单元测试 PASS） |
-| Phase 1 | [基础 TLM 平台（Hello World = L1CachePlugin）](phases/phase-1-tlm-foundation.md) | 🚧 In Progress (~75%, 1.1+1.2+1.3全部子任务完成) | 第一个 Plugin-style IP 验证 Plugin 风格可行性 |
-| Phase 2 | [Bare-metal 测试套件](phases/phase-2-baremetal.md) | Not Started | riscv-tests RV64GC |
-| Phase 3 | [RTOS 测试套件](phases/phase-3-rtos.md) | Not Started | FreeRTOS + Zephyr |
-| Phase 4 | [Linux 启动支持](phases/phase-4-linux.md) | Not Started | OpenSBI + Linux Kernel |
-| Phase 5 | [RTL 协同验证 + Verilog 生成](phases/phase-5-rtl.md) | Not Started | CppHDL RTL 与 TLM 对比 |
+| Phase 1 | [基础 TLM 平台（Hello World = L1CachePlugin）](../../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md) | 🚧 In Progress (~95%, 1.1+1.2+1.3全部子任务+1.4方法学复盘+M4G-extend+M4-DSE完成) | 第一个 Plugin-style IP 验证 Plugin 风格可行性 |
+| Phase 2 | [Bare-metal 测试套件](../../soc/cpu/docs/roadmap/phase-2-baremetal.md) | Not Started | riscv-tests RV64GC |
+| Phase 3 | [RTOS 测试套件](../../soc/cpu/docs/roadmap/phase-3-rtos.md) | Not Started | FreeRTOS + Zephyr |
+| Phase 4 | [Linux 启动支持](../../soc/cpu/docs/roadmap/phase-4-linux.md) | Not Started | OpenSBI + Linux Kernel |
+| Phase 5 | [RTL 协同验证 + Verilog 生成](../../soc/cpu/docs/roadmap/phase-5-rtl.md) | Not Started | CppHDL RTL 与 TLM 对比 |
 | **Phase 6** | [完整 PipeBuilder 框架 + RTL 生成](phases/phase-6-declarative.md) | Not Started | 完整调度算法 + RTL 生成（推迟的 Phase 1a/1b/1c）|
 
 ### 其他

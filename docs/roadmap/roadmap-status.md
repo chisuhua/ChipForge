@@ -3,7 +3,7 @@
 > **最后更新**: 2026-06-24 (本次会话: **M4-DSE CpuFactory Real 完整收官** + ADR renumber + Honest baseline doc + PR #2 OPEN; 3 天间隔)
 > **当前可启动**: ① **M5-DSE 启动** (硬前置 m4-dse-cpufactory-real PR #2 OPEN 待 merge, 8/8 完成, 576/576 sweep `tohost=1`) ② **Phase 2 bare-metal 测试套件** (`.omo/plans/phase-2-baremetal-riscv-tests.md` 723 行 plan 完整, F1-F8 Accepted 2026-06-21, 仅 ACT4 clone + elfio apt install 待 P0)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
-> **权威源**: `docs/roadmap/phases/*.md` + `.omo/plans/*.md` + `.omo/drafts/*.md`
+> **权威源**: `docs/roadmap/phases/*.md` (框架级 Phase 0/6) + `soc/cpu/docs/roadmap/*.md` (CPU SoC Phase 1-5) + `.omo/plans/*.md` + `.omo/drafts/*.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
 
 > **3 天进展摘要 (2026-06-21 → 2026-06-24)**:
@@ -60,13 +60,15 @@
 | 1.3 | PipeNode 节点 | 3d | ✅ 完成 (2026-06-08) | 14/14 PASS |
 | 1.4 | PipeBuilder 编排器 | 4d | ✅ 完成 (2026-06-08) | 11/11 PASS |
 | 1.5 | CtrlLink 控制 API | 3d | ✅ 完成 (2026-06-08) | 11/11 PASS |
+| M1.5 | PipeArbitration | — | ✅ 完成 (Phase 1.5) | 7/7 PASS |
+| M1.6 | Storage (array_store) | — | ✅ 完成 (ADR-040) | 5/5 PASS |
+| M1.7 | Coexistence + HelloPlugin | — | ✅ 完成 | 5+3=8/8 PASS |
 
-**进度**: 5/5 P0 组件完成;51/51 单元测试通过(100% ctest pass rate)
-**剩余**: 退出标准 §2.2(质量标准)与 §2.3(集成标准)待验证 — 调度确定性证明、零 TODO、覆盖率≥80%、Doxygen、与 ChStreamModuleBase/Component 共存
+**进度**: 5+3/5+3 P0+M1 组件完成; **71 个框架测试用例通过** (100% ctest pass rate, 44/44)
 
 ### Phase 1 - TLM Foundation (L1CachePlugin)
 
-- **状态**: In Progress (~75%, 1.1 + 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f 完成; Phase 1.3 全部子任务落地, 8/8 ✅)
+- **状态**: In Progress (~95%, 1.1 + 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f 完成; Phase 1.3 全部子任务落地, 8/8 ✅; Phase 1.4 方法学复盘完成; M4G-extend + M4-DSE 7/8 完成)
 - **依赖**: Phase 0
 - **预估工时**: 7-9 工作日(~1.5 周); Phase 1.3 单项重估 **1 天 → 4.5 天** (v2 决策草案 §8)
 - **已完成** (2026-06-10):
@@ -182,7 +184,7 @@
 | ID | 类型 | 项目 | 前置条件 | 状态 | 优先级 |
 |----|------|------|---------|------|-------|
 | **PA-6** | 实施 | **Phase 1.3d-extras**: ch_stream 协议转换 + full JSON `instantiateAll` e2e | ✅ **Completed (2026-06-13)**: 静态注册 `ChStreamAdapterFactory::registerAdapter<L1CacheTLMBridgeAdapter, ::bundles::CacheReqBundle, ::bundles::CacheRespBundle>` + Adapter 内部 4 字段窄桥 (F1.A) + `test_l1_cache_json_instantiate` 5/5 子测试 PASS + 16/16 ctest | ✅ Done | ~~P1~~ |
-| **PA-7** | 实施 | **Phase 1.4**: L1CachePlugin 设计方法学复盘 v1 文档 | ✅ **Completed (2026-06-13, 本次会话十)**: `docs/methodology/plugin-style-design-methodology-v1.md` (352 行) — 6 维度 × 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务链接。详见 `docs/roadmap/phases/phase-1-tlm-foundation.md §1.4` (E1-E5 重解读) | ✅ Done | ~~P1~~ |
+| **PA-7** | 实施 | **Phase 1.4**: L1CachePlugin 设计方法学复盘 v1 文档 | ✅ **Completed (2026-06-13, 本次会话十)**: `docs/methodology/plugin-style-design-methodology-v1.md` (352 行) — 6 维度 × 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务链接。详见 `soc/cpu/docs/roadmap/phase-1-tlm-foundation.md §1.4` (E1-E5 重解读) | ✅ Done | ~~P1~~ |
 | **PA-8** | 文档 | **Phase 1.3d-extras 决策草案** (`decision-phase-1.3d-extras-bridge-2026-06-13.md` 草案) | ✅ **Completed (2026-06-13)**: `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md` (PA-6+PA-8 合并), F1-F5 决议, 状态改 Proposed v1 | ✅ Done | ~~P2~~ |
 | **PA-9** | 文档 | **Phase 1.4 决策草案** (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`) | ✅ **Completed (2026-06-13, 本次会话十)**: DECISION-2026-06-13-02, F1-F5 决议 (E1=A 复盘对象 / E2=6 维度 / E3=5 类输入 / E4=3 类边界 / E5=单例子深复盘) | ✅ Done | ~~P2~~ |
 

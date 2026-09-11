@@ -768,7 +768,7 @@ private:
 
 `L1CachePlugin`（Phase 1 Hello World）是**第一个验证 Phase 0 脚手架**的真实 Plugin：
 
-- **位置**: 详见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../docs/roadmap/phases/phase-1-tlm-foundation.md) §1.2
+- **位置**: 详见 [`soc/cpu/docs/roadmap/phase-1-tlm-foundation.md`](../../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md) §1.2
 - **目的**: 验证 Plugin-style 业务逻辑在 Phase 0 脚手架下能端到端跑通
 - **设计约束**: 业务代码无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`（D4 强制）
 - **不修改**: Phase 0 接口承诺的稳定性（§6.8 关联承诺）

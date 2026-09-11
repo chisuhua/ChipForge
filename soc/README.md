@@ -3,7 +3,8 @@
 > **当前状态 (Phase 1.3, 2026-06-17)**: 本目录目前有 **2 个 L1Cache 验证配置**。RISC-V virt SoC 配置 (`soc/riscv_virt.json`) 已在 2026-06-17 移除 (详见 [CHANGELOG](../CHANGELOG.md) v0.0.2)，RISC-V virt 完整装配推迟到 **Phase 2+** 实施。
 >
 > **本目录文件作用**:机器可读的 SoC 集成清单,描述一个 SoC 由哪些 IP、按什么参数、什么地址映射组成。
-> **本目录文档位置**: [`docs/`](../docs/) 子目录,说明如何读、改、创建这些 .json 文件。
+> **SoC 架构文档**: [`cpu/docs/architecture.md`](cpu/docs/architecture.md) — 系统数据流 + IP 集成状态 + 建议后续计划（面向设计者）
+> **JSON 格式指南**: [`docs/integration-guide.md`](docs/integration-guide.md) — 如何读、改、创建 .json 配置（面向集成者）
 
 ## 速查
 
