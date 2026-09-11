@@ -1,6 +1,6 @@
-name: Architecture Gates (ADR / D4 / Portability)
+name: Architecture Gates (ADR / D4 / Portability / Doc Links)
 
-# 本 workflow 是 PR 强制门禁: 3 个架构验证脚本任一失败 → exit 1 → 阻止 PR merge
+# 本 workflow 是 PR 强制门禁: 4 个架构验证脚本任一失败 → exit 1 → 阻止 PR merge
 # 引用文档: docs/architecture/adr.md ADR-043
 # 设计来源: .omo/drafts/fix-plan-2026-06-12-design.md §3 Change 4
 
@@ -23,7 +23,7 @@ on:
 jobs:
   architecture-gates:
     runs-on: ubuntu-latest
-    name: Architecture Compliance Gates (3 scripts)
+    name: Architecture Compliance Gates (4 scripts)
 
     env:
       # CHIPFORGE_ROOT 覆盖脚本默认值 (本地 dev 路径) 为 CI workspace 路径
@@ -70,6 +70,13 @@ jobs:
           bash tools/check_plugin_portability.sh
         continue-on-error: false
 
+      - name: Run Doc link check (doc_link_check.sh)
+        id: verify_doc_links
+        run: |
+          echo "=== Running doc_link_check.sh ==="
+          bash tools/doc_link_check.sh --quiet
+        continue-on-error: false
+
       - name: Summary (always)
         if: always()
         run: |
@@ -77,3 +84,4 @@ jobs:
           echo "verify_adr.sh:        ${{ steps.verify_adr.outcome }}"
           echo "verify_plugin_decision.sh:  ${{ steps.verify_d4.outcome }}"
           echo "check_plugin_portability.sh: ${{ steps.verify_portability.outcome }}"
+          echo "doc_link_check.sh:         ${{ steps.verify_doc_links.outcome }}"

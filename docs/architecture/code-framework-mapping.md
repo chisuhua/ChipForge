@@ -417,7 +417,7 @@
 
 ### 7.6 已修复 (2026-06-17)
 
-通过 [`openspec/changes/doc-code-realignment`](../CHANGELOG.md#v002-2026-06-17---doc-code-realignment) 实施的 8 项修复：
+通过 [doc-code-realignment change](../../CHANGELOG.md#v002-2026-06-17---doc-code-realignment) 实施的 8 项修复：
 
 | # | 漂移项 | 修复方式 | 关联任务 |
 |---|--------|----------|----------|
