@@ -5,7 +5,7 @@ This IP is **planned but not yet implemented**. No source code exists.
 <!-- Conforms to: docs/templates/IP_STATUS_TEMPLATE.md (PLANNED variant) -->
 
 ## Implementation Roadmap
-- 实施预计: Phase 2+ (见 docs/roadmap/phases/phase-2-baremetal.md)
+- 实施预计: Phase 2+ (见 soc/cpu/docs/roadmap/phase-2-baremetal.md)
 - 依赖: 无直接依赖；为 cpu/cache/peripheral 提供总线/NoC
 - 状态: 🔴 规划中
 

@@ -5,7 +5,7 @@ This IP is **planned but not yet implemented**. No source code exists.
 <!-- Conforms to: docs/templates/IP_STATUS_TEMPLATE.md (PLANNED variant) -->
 
 ## Implementation Roadmap
-- 实施预计: Phase 3+ (见 docs/roadmap/phases/phase-3-rtos.md)
+- 实施预计: Phase 3+ (见 soc/cpu/docs/roadmap/phase-3-rtos.md)
 - 依赖: interconnect (Phase 2+); 为 cpu 提供中断
 - 状态: 🔴 规划中
 - 子模块: PLIC (Platform-Level Interrupt Controller) / CLINT (Core Local Interruptor, mtime+mtimecmp) / UART (NS16550A) / Timer

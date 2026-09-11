@@ -4,7 +4,7 @@
 > **所属阶段**: Phase 1 — 基础 TLM 平台 (L1CachePlugin)
 > **目标版本**: ChipForge 0.1.x
 > **依赖**: `cf::plugin::uint_t<N>` (Phase 0 脚手架)
-> **详见**: [phase-1-tlm-foundation.md §1.1](../docs/roadmap/phases/phase-1-tlm-foundation.md)
+> **详见**: [phase-1-tlm-foundation.md §1.1](../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md)
 
 ## 1. 目标
 

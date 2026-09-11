@@ -5,7 +5,7 @@
 // 最后修改日期: 2026-06-10
 //
 // 详见:
-//   - docs/roadmap/phases/phase-1-tlm-foundation.md §1.1
+//   - soc/cpu/docs/roadmap/phase-1-tlm-foundation.md §1.1
 //   - .omo/drafts/decision-plugin-framework-2026-06-08.md (D4 Plugin-style 强制)
 //
 // 设计目标:

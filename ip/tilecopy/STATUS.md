@@ -9,7 +9,7 @@ This IP has **architectural documentation** but no source code yet.
 - 政策框架: `policies/` (空目录, 待实施, 见 `ip/README.md` 标准子结构)
 
 ## Implementation Roadmap
-- 实施预计: Phase 5+ (见 docs/roadmap/phases/phase-5-rtl.md, GPU 形态)
+- 实施预计: Phase 5+ (见 soc/cpu/docs/roadmap/phase-5-rtl.md, GPU 形态)
 - 依赖: `interconnect` (Phase 2+); `memory` (Phase 2+)
 - 状态: 🟡 初始设计
 - 角色: Tile 级异步数据搬运 (类 TMA / Tile 级 DMA)
