@@ -30,6 +30,7 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 | `rtl/` | CppHDL RTL 实现 |
 | `test/` | 缓存验证套件 |
 | `configs/` | 容量/策略配置 |
+| `docs/` | 微架构 + 集成契约 + ADR (含 ADR-044 VIPT 设计) |
 
 ## 3. 接口设计
 
@@ -82,6 +83,11 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 | replacement_policy | [LRU, PLRU, Random] | 命中率 vs 复杂度 |
 | prefetch_policy | [None, NextLine, Stride] | 带宽 vs 命中率 |
 
+> **VIPT 安全约束** (ADR-044): `num_sets` 和 `line_size_bytes` 必须满足 `idx_bits + offset_bits ≤ 12`。
+> 即: `log2(num_sets/associativity) + log2(line_size_bytes) ≤ 12`。
+> 当前 DSE 扫描范围超出此限制的配置（如 32KB/1-way, 64KB/1-way）将被 VIPT 编译期 `static_assert` 拒绝。
+> 如需更大容量，可增加 associativity (如 64 sets × 8-way × 64B = 32KB, 安全) 或使用 2MB megapage。
+
 ## 7. 性能统计
 
 | 统计项 | 类型 | 说明 |
@@ -99,6 +105,9 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 - [测试与 DSE 框架](../../docs/architecture/testing-and-dse.md)
 - [Phase 1.3 v2 决策草案](../../.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md)
 - [Phase 1.2 Lessons 文档](../../docs/lessons/phase-1.2-l1cacheplugin.md)
+- [ADR-044 L1 Cache VIPT 设计锁定](docs/adr/ADR-044-l1-cache-vipt-coherence.md)
+- [L1Cache 微架构](docs/architecture.md)
+- [L1Cache 集成契约](docs/integration.md)
 
 ---
 
