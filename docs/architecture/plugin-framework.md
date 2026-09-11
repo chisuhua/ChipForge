@@ -2,9 +2,9 @@
 
 | 字段 | 值 |
 |------|-----|
-| 版本号 | 1.0 |
+| 版本号 | 1.2 |
 | 日期 | 2026-06-09 |
-| 状态 | **Active (Phase 0 已完成, 5/5 P0 组件稳定)** |
+| 状态 | **Active (Phase 0 已完成, 5+3/5+3 P0+M1 组件稳定, Phase 1.5 进行中)** |
 | 关联决策 | [decision-plugin-framework-2026-06-08](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) |
 | 适用范围 | ChipForge 插件架构（独立于 CppTLM/CppHDL 框架层） |
 
@@ -646,7 +646,7 @@ static int run_hello_pipeline() {
 - 想给上述 Cache 注入"tag lookup 逻辑"——实现 `Plugin`，用 `Payload<T>` 共享状态，由 `at_stage` 阶段调度
 - 二者通过**配置层**（JSON 模块列表 + C++ Plugin 注册）组合，而非通过**代码继承**组合
 
-> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 [`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../docs/roadmap/phases/phase-1-tlm-foundation.md)）。
+> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 [`soc/cpu/docs/roadmap/phase-1-tlm-foundation.md`](../../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md)）。
 
 ### 4.2 Component
 
@@ -752,13 +752,13 @@ D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业�
 
 | Phase | 状态 | 说明 |
 |-------|------|------|
-| Phase 0 | ✅ 已完成 (2026-06-08) | 5/5 P0 组件 + 51/51 单元测试 PASS（PluginBase 7/7、Payload 8/8、PipeNode 14/14、PipeBuilder 11/11、CtrlLink 11/11） |
+| Phase 0 | ✅ 已完成 (2026-06-08) | 5/5 P0 组件 + 71 个框架测试用例 PASS（PluginBase 7/7、Payload 8/8、PipeNode 14/14、PipeBuilder 11/11、CtrlLink 11/11、Storage 5/5、PipeArbitration 7/7、Coexistence 5/5、HelloPlugin 3/3） |
 | Phase 1 | 🚧 待开发 | L1CachePlugin Hello World（验证 Plugin 风格可行性）；首条端到端 Plugin 业务代码落地 |
 | Phase 6 | 🚧 待开发 | 完整 PipeBuilder 框架 + RTL 生成（12-20 周）；推迟的 Phase 1a/1b/1c 内容合并到此阶段 |
 
 > **详细阶段定义**：
 > - Phase 0：[`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
-> - Phase 1：[`docs/roadmap/phases/phase-1-tlm-foundation.md`](../../docs/roadmap/phases/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
+> - Phase 1：[`soc/cpu/docs/roadmap/phase-1-tlm-foundation.md`](../../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
 > - Phase 6：[`docs/roadmap/phases/phase-6-declarative.md`](../../docs/roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
 
 ### 5.2 Phase 0 接口稳定性承诺

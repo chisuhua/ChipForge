@@ -19,7 +19,7 @@
 
 ## 1. 任务清单（5 个 P0 交付物）
 
-> **批量标记说明**：以下所有任务已于 2026-06-08 单次 session 内完成（51/51 单元测试 PASS, 7/7 ctest PASS, 退出标准 v2 全部达成）。本次更新补全遗漏的 checkbox 标记，不影响实际完成状态。
+> **批量标记说明**：以下所有任务已于 2026-06-08 单次 session 内完成（完成时 51/51 单元测试 PASS, 7/7 ctest PASS, 退出标准 v2 全部达成）。后续扩展至 71 个框架测试用例（新增 test_storage、test_pipe_arbitration、test_coexistence、test_hello_plugin）。本次更新补全遗漏的 checkbox 标记，不影响实际完成状态。
 
 ### 1.1 `PluginBase` 接口（2 天）
 

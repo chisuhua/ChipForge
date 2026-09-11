@@ -63,6 +63,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > `mmu-tlb-ptw-impl` change —— TLB lookup/insert 算法实装 + PageTableWalker Sv32/Sv39/Sv48 解码 + CtrlLink halt_when PTW stall + cpptlm MMUTLMBridge + RISC-V 特定 hook (satp 拦截 / SFENCE.VMA / exception 12/13/15)
 
+## v0.0.8 (2026-07-02) - l1-cache-vipt-coherence
+
+> **目的**: ADR-044 落地 — L1 Cache↔MMU 耦合策略锁定 VIPT (虚地址索引 + 物理地址 tag), 反别名安全边界定义。准备 `mmu-tlb-ptw-impl` 实施前置条件。
+
+### Added (L1Cache VIPT 设计)
+- **ADR-044**: L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 ([`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md))
+  - L1 ICache/DCache 统一 VIPT, L2 PIPT
+  - VIPT 安全条件: `idx_bits + offset_bits ≤ 12` (4KB page)
+  - Phase 1.5 升级路径: 16KB 1-way → 16KB 4-way (64 sets × 4-way × 64B)
+  - VIPT 数据流方案 A: MMUPlugin 同时输出 `pl::PADDR` + `pl::MMU_VADDR`
+- `ip/cache/docs/architecture.md` (L1Cache 微架构: 地址映射 + VIPT 安全 + DSE 边界)
+- `ip/cache/docs/integration.md` (L1Cache 集成契约: CPU/MMU 接口 + SoC JSON 样例)
+- `ip/cache/configs/params_schema.json` 加 `associativity` 字段 (enum [1,2,4,8], default 4)
+- `ip/cache/tlm/L1CachePlugin.h` 加 VIPT 编译期 `static_assert(kIdxBits + kOffsetBits <= 12)`
+
+### Cross-document sync
+- `ip/cache/README.md` §6 DSE 表加 VIPT 安全约束警告 + §8 引用新 docs
+- `ip/mmu/docs/integration.md` §1.1 加 VIPT 数据流引用
+- `ip/mmu/STATUS.md` Implementation Roadmap 加 ADR-044 依赖
+- `docs/architecture/adr.md` 主表 ADR-044 注册 (🚧 Phase 1 提案)
+
+### ADR status
+- ADR-044: 🚧 → 🚧 (保持 Phase 1 提案; Phase 1.5 L1Cache 升级时升级到 ✅)
+
 ## v0.0.6 (2026-06-21) - m4g-extend-tid-and-hooks
 
 > **OpenSpec change**: `m4g-extend-tid-and-hooks` (详见 `openspec/changes/archive/2026-06-21-m4g-extend-tid-and-hooks/`)

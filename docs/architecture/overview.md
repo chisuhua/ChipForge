@@ -1,11 +1,14 @@
 # 总体架构设计
 
-> **📌 实现状态快照 (2026-06-13)**
+> **📌 实现状态快照 (2026-07-01)**
 >
-> - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 5 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink）+ 51/51 单元测试 PASS + 16/16 ctest PASS
+> - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 5 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink）+ 71 个框架测试用例 PASS + 44/44 ctest PASS
 > - ✅ **框架层已就位**：CppTLM (TLM 建模) + CppHDL (RTL/lnode DAG) 集成完成，`cpptlm_core` / `cpphdl` 目标可达
-> - ✅ **应用层 Phase 1.3 全部子任务完成**（2026-06-13, 含 1.3d-extras）：`bundles/mem_bundles.h` 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle, D4 合规) + `ip/cache/tlm/L1CachePlugin.{h,cpp}` (lookup + refill 两阶段, 256 sets × 64B direct-mapped, 4/4 单元测试) + `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (L1CacheTLMBridge, 2/2 测试) + `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (cpptlm ModuleFactory 兼容层 + ch_stream 4 字段窄桥注册, 5/5 e2e + 5/5 instantiateAll) + `soc/l1_cache_minimal.json` (静态验证 spec) + `soc/l1_cache_adapter_e2e.json` (full JSON instantiateAll spec) + `ip/cache/configs/params_schema.json` (JSON Schema draft-07)
-> - 🚧 **下一里程碑 (Phase 1.4)**：`cpptlm::CacheTLM` baseline 对比 (PA-7) + baseline 决策草案 (PA-9)；Phase 2+ 应用层（CPU / memory / interconnect / peripheral）待建设
+> - ✅ **Phase 1.3 全部子任务完成**（2026-06-13）：L1CachePlugin (lookup+refill) + Bridge + Adapter e2e + 5 缓存测试文件 (21 test cases)
+> - ✅ **Phase 1.4 完成**（2026-06-13）：L1CachePlugin 设计方法学复盘（[`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md)）
+> - ✅ **CPU M4/M5 完成**（2026-06-24）：11 Plugin 套件 CpuFactory 真实注册 + DSE 576-config sweep
+> - ✅ **MMU 骨架落地**（2026-06-29）：`ip/mmu/` IP 目录骨架 + TLB 模板 + MultiLevelTLB + 4 替换策略（TLB/PTW 算法推迟到 `mmu-tlb-ptw-impl`）
+> - 🚧 **下一里程碑 (Phase 1.5)**：`mmu-tlb-ptw-impl` — TLB/PTW 算法实装 + MMU↔Cache 集成 + L1Cache VIPT 升级（ADR-044）。SoC 路线图见 [`soc/cpu/docs/roadmap/`](../../soc/cpu/docs/roadmap/)
 >
 > **本文档描述目标架构**；具体实现进度以 [`roadmap/roadmap-status.md`](../roadmap/roadmap-status.md) 为准。
 
