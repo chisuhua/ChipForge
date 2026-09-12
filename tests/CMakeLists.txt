@@ -16,6 +16,8 @@ set(CACHE_IMPL_SOURCES
     ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/mmu_bridge.cpp
+    # mmu_bridge_adapter.cpp 推迟到 commit 10 (涉及 cpptlm::ChStreamModuleBase 完整集成)
 )
 list(APPEND TEST_SOURCES ${CACHE_IMPL_SOURCES})
 
