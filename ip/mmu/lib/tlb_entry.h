@@ -47,6 +47,7 @@ namespace mmu {
 // ----------------------------------------------------------------------------
 template <std::size_t TAG_BITS, std::size_t ASID_BITS>
 struct TLBEntry {
+  using tag_type = cf::plugin::uint_t<TAG_BITS>;
   static_assert(TAG_BITS > 0 && TAG_BITS <= 52,
                 "TAG_BITS must be in (0, 52]");
   static_assert(ASID_BITS >= 0 && ASID_BITS <= 16,

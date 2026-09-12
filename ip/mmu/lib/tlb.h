@@ -224,9 +224,9 @@ class TLB : public TLBBase {
   std::unique_ptr<class TLBReplacementPolicy<ENTRIES, WAYS>> policy_;
   const char* name_ = "L?";
 
-  uint64_t hits_ = 0;
-  uint64_t misses_ = 0;
-  uint64_t evicts_ = 0;
+  mutable uint64_t hits_ = 0;
+  mutable uint64_t misses_ = 0;
+  mutable uint64_t evicts_ = 0;
 };
 
 }  // namespace mmu
