@@ -1,4 +1,16 @@
-# STATUS: PARTIAL (骨架阶段, mmu-ip-skeleton, 2026-06-29)
+# STATUS: IMPLEMENTED (TLB/PTW/Bridge 实装, 2026-09-XX)
+
+mmu-tlb-ptw-impl change 完成:
+- TLB lookup/insert/invalidate (4 替换策略: None/FIFO/LRU/RRIP)
+- PTW Sv39 三级 walk (含 reserved encoding + V=0 fault)
+- MultiLevelTLB coherence (并行查 + 返回最深 hit + shadow fill)
+- TLBFactory 11 组特化 + VIPT safety check
+- MMUPlugin at_stage 闭包实装 (tlb_lookup_ifetch + tlb_lookup_loadstore + ptw_l0/l1/l2)
+- RISC-V RiscvMMUPlugin (satp CSR + SFENCE.VMA + exception 12/13/15)
+- mmu_keys.h 新增 4 Key (MMU_VADDR/EXCEPTION_CODE/SATP_PPN/SATP_MODE)
+- MMUTLMBridge (核心, mirror L1CacheTLMBridge)
+- bundles/tlb_bundles_tlm.hh (4 字段窄桥 ch_stream Bundle)
+- 5 个 mmu tests 解阻塞 (29 cases PASS)
 
 This IP has **skeleton-level partial implementation**. 目录骨架、Plugin 入口、Bundle、Config schema 落地，TLB/PTW 算法推迟到下一个 change。
 

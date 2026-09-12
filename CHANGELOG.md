@@ -63,6 +63,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > `mmu-tlb-ptw-impl` change —— TLB lookup/insert 算法实装 + PageTableWalker Sv32/Sv39/Sv48 解码 + CtrlLink halt_when PTW stall + cpptlm MMUTLMBridge + RISC-V 特定 hook (satp 拦截 / SFENCE.VMA / exception 12/13/15)
 
+## v0.0.9 (2026-09-13) - mmu-tlb-ptw-impl
+
+
+> **目的**: 实现 TLB lookup/insert 算法 + PTW Sv39 三级 walk + MultiLevelTLB coherence + MMUPlugin at_stage 闭包 + RISC-V satp/SFENCE.VMA/exception 12/13/15 hook + cpptlm MMUTLMBridge. 解锁 ADR-044 VIPT 数据流真实链路 (MMUPlugin 同时输出 pl::PADDR + pl::MMU_VADDR).
+
+### Added
+- **`ip/mmu/lib/tlb.h`**: `mutable` 关键字修复 `hits_`/`misses_` const-correctness (L227-229)
+- **`ip/mmu/lib/tlb_entry.h`**: 新增 `using tag_type = cf::plugin::uint_t<TAG_BITS>;` (解决 8 处 typename Entry::tag_type 编译错误)
+- **`ip/mmu/lib/ptw.{h,cpp}`**: Sv39 三级 walk state machine 实装 + `stub_write_pte`/`stub_read_pte` 测试 API + reserved encoding + V=0 fault handling
+- **`ip/mmu/lib/multi_level_tlb.{h,cpp}`**: 并行查全部 level + 返回最深 hit (deepest = largest level index) + shadow fill + reverse invalidate
+- **`ip/mmu/lib/tlb_factory.cpp`**: 11 组特化 (None 16,1 / LRU 64,4 / LRU 64,8 / LRU 32,2 / FIFO 256,1 / RRIP 64,4 / RRIP 64,8 / etc.) + VIPT safety check (idx_bits + offset_bits > 12 throw runtime_error)
+- **`ip/mmu/policies/tlb_replacement_policy.cpp`**: 显式实例化 8→12 组 (覆盖新增 TLBFactory 特化所需组合)
+- **`ip/mmu/tlm/MMUPlugin.{h,cpp}`**: at_stage 闭包实装 (tlb_lookup_ifetch + tlb_lookup_loadstore + ptw_l0/l1/l2) + 5 substage declare + set_name/declare_substage 修复
+- **`ip/mmu/tlm/mmu_keys.h`**: 新增 4 Key (MMU_VADDR / EXCEPTION_CODE / SATP_PPN / SATP_MODE)
+- **`ip/cpu/plugins/mmu.h`**: RiscvMMUPlugin 实装 (csr_write_satp + sfence_vma + exception 12/13/15 + satp_value accessors)
+- **`bundles/tlb_bundles_tlm.hh`**: ch_stream Bundle 类型 (TlbReqBundle + TlbRespBundle, 4 字段窄桥, 全局 bundles:: 命名空间)
+- **`src/cf_plugin/bridge/mmu_bridge.{h,cpp}`**: MMUTLMBridge 核心 (mirror L1CacheTLMBridge, issue_request/read_response API + tick() 末尾 pb.run())
+- **`tests/CMakeLists.txt`**: mmu lib/policies/tlm 5 个 .cpp 加入 MMU_IMPL_SOURCES, 5 个 mmu tests 解阻塞
+
+### Fixed
+- `ip/mmu/lib/tlb.h`: `mutable` 关键字修复 `lookup()` const 方法修改 `hits_`/`misses_` 编译错误
+- `ip/mmu/lib/tlb.h`: `name_` 类型 const char* → std::string (避免 dangling pointer, test `L0`/`L1` 字符串显示乱码已修复)
+- `ip/mmu/lib/tlb_entry.h`: 加 tag_type typedef (8 处编译错误)
+- `tests/mmu/test_tlb_factory.cpp`: 3 个测试用 VIPT-unsafe 配置 (32/4, 64/4, 64/16) 改为 8/8 全关联 VIPT-safe
+- `tests/mmu/test_mmu_plugin.cpp`: BareMode 4/1 → 8/8; L1 level 配置 64/4 → 8/8 (VIPT safe)
+- `tests/mmu/test_multi_level_tlb.cpp`: deepest-hit 语义下 L0 hit_count 期望从 1 → 0 (commit 6 改了语义)
+
+### Verified
+- 288/288 chipforge_tests PASS (was 259 baseline; +29 mmu test cases)
+- 5 consecutive stable runs
+- 4 architecture gates all PASS (verify_adr + verify_plugin_decision + check_plugin_portability + doc_link_check)
+
+### Pending (下一阶段入口)
+
+> `mmu-cache-integration` change —— L1CachePlugin 消费 pl::MMU_VADDR (VIPT index) + SoC 集成测试 + DSE 配置扫描 + CtrlLink stall 机制
+
+
 ## v0.0.8 (2026-07-02) - l1-cache-vipt-coherence
 
 > **目的**: ADR-044 落地 — L1 Cache↔MMU 耦合策略锁定 VIPT (虚地址索引 + 物理地址 tag), 反别名安全边界定义。准备 `mmu-tlb-ptw-impl` 实施前置条件。
