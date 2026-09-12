@@ -18,18 +18,27 @@ MultiLevelTLB::MultiLevelTLB(std::vector<std::unique_ptr<TLBBase>> levels,
 }
 
 TLBLookup MultiLevelTLB::lookup(uint64_t vaddr, uint16_t asid) {
+  // mmu-tlb-ptw-impl Decision 4: 返回最深 hit (deepest = largest level index).
+  // 查询所有 level, 选取 level 编号最大的命中; 同时把最深命中
+  // shadow fill 到所有浅层 level (替代原"首个 hit 立即返回"语义).
+  TLBLookup best{};
+  std::size_t best_level = 0;
+  bool found = false;
   for (std::size_t i = 0; i < levels_.size(); ++i) {
     TLBLookup r = levels_[i]->lookup(vaddr, asid);
-    if (r.hit) {
-      if (shadow_fill_enabled_) {
-        for (std::size_t j = 0; j < i; ++j) {
-          levels_[j]->insert_from(vaddr, r.paddr, asid, r.perms);
-        }
-      }
-      return r;
+    if (r.hit && (!found || i > best_level)) {
+      best = r;
+      best_level = i;
+      found = true;
     }
   }
-  return TLBLookup::make_miss();
+  if (!found) return TLBLookup::make_miss();
+  if (shadow_fill_enabled_) {
+    for (std::size_t j = 0; j < best_level; ++j) {
+      levels_[j]->insert_from(vaddr, best.paddr, asid, best.perms);
+    }
+  }
+  return best;
 }
 
 void MultiLevelTLB::refill_from_ptw(uint64_t vaddr, uint16_t asid,
