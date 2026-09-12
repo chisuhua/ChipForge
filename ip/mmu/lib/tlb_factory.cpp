@@ -32,21 +32,41 @@ std::unique_ptr<TLBBase> create_with_asid(const TLBLevelConfig& cfg) {
 }  // namespace
 
 std::unique_ptr<TLBBase> TLBFactory::create(const TLBLevelConfig& cfg) {
-  // 白名单: entries × ways
+  // VIPT safety check (ADR-044 §2.2)
+  constexpr std::size_t kPageOffsetBits = 12;  // 4KB page
+  std::size_t idx_bits = 0;
+  std::size_t ent = cfg.entries / cfg.associativity;
+  while (ent > 1) { ++idx_bits; ent >>= 1; }
+  if (idx_bits + kPageOffsetBits > 12) {
+    throw std::runtime_error(
+        "VIPT safety violated: idx_bits + offset_bits > 12 (idx=" + std::to_string(idx_bits) +
+        " offset=" + std::to_string(kPageOffsetBits) + " entries=" + std::to_string(cfg.entries) +
+        " ways=" + std::to_string(cfg.associativity) + ")");
+  }
+
+  // 白名单: entries × ways (mmu-ip-skeleton 8 组 + mmu-tlb-ptw-impl 新增 3 组 = 11 组)
   if (cfg.entries == 8 && cfg.associativity == 1)
     return create_with_asid<8, 1>(cfg);
   if (cfg.entries == 8 && cfg.associativity == 8)
     return create_with_asid<8, 8>(cfg);
+  if (cfg.entries == 16 && cfg.associativity == 1)   // +None(16,1)
+    return create_with_asid<16, 1>(cfg);
   if (cfg.entries == 16 && cfg.associativity == 2)
     return create_with_asid<16, 2>(cfg);
   if (cfg.entries == 16 && cfg.associativity == 16)
     return create_with_asid<16, 16>(cfg);
+  if (cfg.entries == 32 && cfg.associativity == 2)   // +LRU-2w(32,2)
+    return create_with_asid<32, 2>(cfg);
   if (cfg.entries == 32 && cfg.associativity == 4)
     return create_with_asid<32, 4>(cfg);
   if (cfg.entries == 64 && cfg.associativity == 4)
     return create_with_asid<64, 4>(cfg);
+  if (cfg.entries == 64 && cfg.associativity == 8)   // +LRU-8w/RRIP-8w(64,8)
+    return create_with_asid<64, 8>(cfg);
   if (cfg.entries == 128 && cfg.associativity == 4)
     return create_with_asid<128, 4>(cfg);
+  if (cfg.entries == 256 && cfg.associativity == 1)   // +FIFO(256,1)
+    return create_with_asid<256, 1>(cfg);
   if (cfg.entries == 256 && cfg.associativity == 8)
     return create_with_asid<256, 8>(cfg);
 
