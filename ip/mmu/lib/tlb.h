@@ -22,6 +22,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "cf/plugin/uint_t.h"
 #include "ip/mmu/lib/tlb_base.h"
@@ -66,7 +67,7 @@ class TLB : public TLBBase {
   }
 
   // 设置层级名 (如 "L0" / "L1")
-  void set_name(const char* n) { name_ = n; }
+  void set_name(const std::string& n) { name_ = n; }
 
   // 查询
   LookupResult lookup(uint64_t vaddr, uint16_t asid) const override {
@@ -216,13 +217,13 @@ class TLB : public TLBBase {
   uint64_t hit_count() const override { return hits_; }
   uint64_t miss_count() const override { return misses_; }
   uint64_t evict_count() const override { return evicts_; }
-  const char* name() const override { return name_; }
+  const char* name() const override { return name_.c_str(); }
 
  private:
   std::array<Entry, ENTRIES> entries_{};
   std::array<cf::plugin::bool_t, ENTRIES> valid_{};
   std::unique_ptr<class TLBReplacementPolicy<ENTRIES, WAYS>> policy_;
-  const char* name_ = "L?";
+  std::string name_ = "L?";
 
   mutable uint64_t hits_ = 0;
   mutable uint64_t misses_ = 0;

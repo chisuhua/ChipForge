@@ -9,9 +9,10 @@ namespace ip {
 namespace mmu {
 
 TEST_CASE("Construct", "[mmu][MMUPlugin]") {
+  // VIPT-safe: 8/8 全关联 (idx=0 + offset=12=12 SAFE)
   std::vector<MMUPlugin::TLBConfig> levels = {
     {"L0", 8, 8, 1, 1, "FIFO"},
-    {"L1", 64, 4, 1, 2, "LRU"}
+    {"L1", 8, 8, 1, 2, "LRU"}
   };
   MMUPlugin::PTWConfig ptw_cfg{2};
   MMUPlugin mmu(SvMode::Sv39, levels, ptw_cfg);
@@ -39,13 +40,14 @@ TEST_CASE("SetupDeclaresSubstages", "[mmu][MMUPlugin]") {
 }
 
 TEST_CASE("BareMode", "[mmu][MMUPlugin]") {
-  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 4, 1, 1, 1, "None"}};
+  // VIPT-safe: 8/8 全关联
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "None"}};
   MMUPlugin mmu(SvMode::Bare, levels, {});
   CHECK(mmu.mode() == SvMode::Bare);
 }
 
 TEST_CASE("SingleLevelConfig", "[mmu][MMUPlugin]") {
-  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 64, 4, 1, 1, "LRU"}};
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
   MMUPlugin mmu(SvMode::Sv39, levels, {});
   CHECK(mmu.num_levels() == 1u);
 }

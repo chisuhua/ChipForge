@@ -34,9 +34,12 @@ MMUPlugin::MMUPlugin(SvMode mode, std::vector<TLBConfig> levels_cfg, PTWConfig p
 }
 
 void MMUPlugin::setup(cf::plugin::PipeBuilder& pb) {
-  (void)pb;
-  // 5 个 logical stage 由 build() 通过 at_stage 隐式注册; 现有骨架
-  // setup() 已有 declare_substage 调用, 此处仅做 placeholder.
+  // 5 个 logical stage (mmu-tlb-ptw-impl commit 7: 沿用骨架的 5 substage 命名)
+  pb.declare_substage("fetch", "tlb_lookup_ifetch", 1);
+  pb.declare_substage("memory", "tlb_lookup_loadstore", 1);
+  pb.declare_substage("tlb_lookup_ifetch", "ptw_l0", 1);
+  pb.declare_substage("ptw_l0", "ptw_l1", 1);
+  pb.declare_substage("ptw_l1", "ptw_l2", 1);
 }
 
 void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {

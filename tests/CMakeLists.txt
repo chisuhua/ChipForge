@@ -35,15 +35,7 @@ set(MMU_IMPL_SOURCES
 )
 list(APPEND TEST_SOURCES ${MMU_IMPL_SOURCES})
 
-# 临时排除 mmu/ 测试 (skeleton 阶段 mmu 库代码 stub 不完整 + MMUPlugin API 错用)
-# 待 commit 4 (MMUPlugin.cpp 实装) + commit 5-7 (PTW/MLTLB/Factory 实装) 完成后再恢复
-list(REMOVE_ITEM TEST_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_config_schema.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_plugin.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_multi_level_tlb.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_tlb_factory.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_tlb_unit.cpp"
-)
+# mmu tests re-enabled in mmu-tlb-ptw-impl commit 10 (skeleton stub completed)
 
 # 把 catch_amalgamated.cpp 加入编译（提供默认 main）
 list(APPEND TEST_SOURCES

@@ -24,7 +24,7 @@ std::unique_ptr<TLBBase> create_with_asid(const TLBLevelConfig& cfg) {
 
   using TLBType = TLB<ENTRIES, WAYS, TAG_BITS, ASID_BITS, PORTS>;
   auto tlb = std::make_unique<TLBType>();
-  tlb->set_name(cfg.name.c_str());
+  tlb->set_name(cfg.name);
   tlb->set_policy(TLBReplacementPolicy<ENTRIES, WAYS>::create(cfg.replacement_policy));
   return tlb;
 }

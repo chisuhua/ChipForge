@@ -13,8 +13,9 @@ namespace mmu {
 namespace {
 std::unique_ptr<MultiLevelTLB> make_2level(bool shadow = true) {
   std::vector<std::unique_ptr<TLBBase>> levels;
+  // VIPT-safe: 8/8 全关联
   levels.push_back(TLBFactory::create({"L0", 8, 8, 1, 1, "FIFO"}));
-  levels.push_back(TLBFactory::create({"L1", 64, 4, 1, 2, "LRU"}));
+  levels.push_back(TLBFactory::create({"L1", 8, 8, 1, 2, "LRU"}));
   return std::make_unique<MultiLevelTLB>(std::move(levels), shadow);
 }
 }  // namespace
@@ -34,8 +35,11 @@ TEST_CASE("L0MissL1HitShadowFill", "[mmu][MultiLevelTLB]") {
   m->level(1)->insert(0x3000ULL, 0x4000ULL, 0, 0xFF);
   auto r = m->lookup(0x3000ULL, 0);
   CHECK(r.hit);
-  // shadow fill: L0 should now have it
-  CHECK(m->level(0)->hit_count() == 1u);  // looked up in L0 first, hit via shadow fill
+  // mmu-tlb-ptw-impl commit 6: 改 deepest-hit 语义后, L0 查到 0 次 (只查 1 次是 miss),
+  // L1 查到 1 次 (L1 是 deepest hit, 查 L1 也算 L1 的 hit_count++)
+  // shadow fill 仍然把 L1 的 entry 复制到 L0
+  CHECK(m->level(0)->hit_count() == 0u);  // L0 查了 1 次是 miss
+  CHECK(m->level(1)->hit_count() == 1u);  // L1 查了 1 次是 hit
 }
 
 TEST_CASE("BothMissTriggersRefill", "[mmu][MultiLevelTLB]") {
