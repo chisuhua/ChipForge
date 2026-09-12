@@ -21,28 +21,45 @@ PTW::PTW(SvMode mode, std::size_t max_inflight)
 
 std::size_t PTW::max_levels() const { return max_levels_; }
 
-void PTW::start_walk(uint64_t vaddr, uint16_t asid,
+void PTW::start_walk(uint64_t vaddr, uint16_t asid, uint64_t satp_ppn,
                      WalkCallback on_success, FaultCallback on_fault) {
   vaddr_ = vaddr;
   asid_ = asid;
+  satp_ppn_ = satp_ppn;
   current_level_ = 0;
   busy_ = true;
   done_ = false;
   result_fault_ = 0;
   on_success_ = std::move(on_success);
   on_fault_ = std::move(on_fault);
-  // stub: 起始 PTE 地址 = satp.PPN << 12 + vaddr[31:22] << 2 (Sv32 简例)
-  // 完整实装推迟到 mmu-tlb-ptw-impl
-  current_pte_paddr_ = 0;
+  // Sv39: L2 PTE paddr = satp_ppn << 12 + vaddr[38:30] * 8
+  current_pte_paddr_ = (satp_ppn << 12) + ((vaddr >> 30) & 0x1FF) * 8;
+  current_pte_l2_ = 0;
+  current_pte_l1_ = 0;
+  current_pte_l0_ = 0;
 }
 
 void PTW::advance(uint64_t pte_raw, std::size_t level) {
   if (!busy_) return;
   PTE pte = decode_pte(pte_raw, mode_);
 
+  // 存储当前级别 PTE (用于异常时审计)
+  if (current_level_ == 0) current_pte_l2_ = pte_raw;
+  else if (current_level_ == 1) current_pte_l1_ = pte_raw;
+  else if (current_level_ == 2) current_pte_l0_ = pte_raw;
+
   if (!pte.v) {
-    // Invalid PTE → page fault (12)
+    // Invalid PTE → page fault (12 for exec, 13 for read, 15 for write — caller decides)
     result_fault_ = 12;
+    done_ = true;
+    busy_ = false;
+    if (on_fault_) on_fault_(result_fault_);
+    return;
+  }
+
+  // Reserved encoding (R=1, W=1, X=1) → ptw fault (15)
+  if (pte.r && pte.w && pte.x) {
+    result_fault_ = 15;
     done_ = true;
     busy_ = false;
     if (on_fault_) on_fault_(result_fault_);
@@ -60,9 +77,19 @@ void PTW::advance(uint64_t pte_raw, std::size_t level) {
     return;
   }
 
-  // Non-leaf → continue walk
+  // Non-leaf → continue walk (Sv39 3-level: L2 → L1 → L0)
+  // next level PTE paddr = pte.ppn << 12 + vaddr[VPN_i] * 8
   current_pte_paddr_ = next_pte_paddr(pte.ppn, current_level_ + 1);
   ++current_level_;
+}
+
+void PTW::stub_write_pte(std::size_t idx, const PTE& pte) {
+  if (idx < kPteStubSize) pte_stub_memory_[idx] = pte;
+}
+
+PTE PTW::stub_read_pte(std::size_t idx) const {
+  if (idx < kPteStubSize) return pte_stub_memory_[idx];
+  return PTE{};
 }
 
 uint64_t PTW::next_pte_paddr(uint64_t pte_ppn, std::size_t level) const {

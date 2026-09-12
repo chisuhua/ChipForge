@@ -13,6 +13,7 @@
 #ifndef CF_IP_MMU_LIB_PTW_H
 #define CF_IP_MMU_LIB_PTW_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -53,7 +54,7 @@ class PTW {
   PTW();
   explicit PTW(SvMode mode, std::size_t max_inflight = 2);
 
-  void start_walk(uint64_t vaddr, uint16_t asid,
+  void start_walk(uint64_t vaddr, uint16_t asid, uint64_t satp_ppn,
                   WalkCallback on_success, FaultCallback on_fault);
 
   // 由 MMUPlugin 在 at_stage 闭包内调用, 推进 1 步 walk
@@ -70,6 +71,13 @@ class PTW {
   SvMode mode() const { return mode_; }
   std::size_t max_levels() const;
 
+  // Stub memory test API (mmu-tlb-ptw-impl Oracle 风险 #2):
+  // pte_stub_memory_ is private. Tests need a way to plant PTE entries
+  // without exposing internal array. Add public read/write accessors.
+  static constexpr std::size_t kPteStubSize = 4096;
+  void stub_write_pte(std::size_t idx, const PTE& pte);
+  PTE stub_read_pte(std::size_t idx) const;
+
  private:
   SvMode mode_;
   std::size_t max_inflight_;
@@ -82,8 +90,14 @@ class PTW {
   std::uint64_t vaddr_ = 0;
   std::uint16_t asid_ = 0;
   std::uint64_t current_pte_paddr_ = 0;
+  std::uint64_t satp_ppn_ = 0;
 
-  // 结果
+  // Sv39 walk state (3-level: L2 root, L1, L0 leaf)
+  std::uint64_t current_pte_l2_ = 0;
+  std::uint64_t current_pte_l1_ = 0;
+  std::uint64_t current_pte_l0_ = 0;
+
+ public:
   std::uint64_t result_paddr_ = 0;
   std::uint8_t result_perms_ = 0;
   std::uint8_t result_fault_ = 0;
@@ -97,6 +111,10 @@ class PTW {
 
   // 计算下一级 PTE 地址 (stub)
   std::uint64_t next_pte_paddr(std::uint64_t pte_ppn, std::size_t level) const;
+
+  // PTE stub memory (4096 entries × sizeof(PTE) ≈ 192KB/instance)
+  // Sv39 walk reads from pte_stub_memory_[(ppn >> 12) & 0xFFF]
+  std::array<PTE, kPteStubSize> pte_stub_memory_{};
 };
 
 // SvMode 字符串化 (for logging)
