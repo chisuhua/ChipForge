@@ -7,10 +7,34 @@ file(GLOB_RECURSE TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/*/test_*.cpp"
 )
 
-# 临时排除 mmu/ 测试 (mmu-ip-skeleton 阶段, 库代码有预先存在的 bug:
-#   TLBEntry 无 tag_type 成员, hits_/misses_ 在 const 方法中修改等)
-# 详见 ip/mmu/lib/tlb.h. 这些是 mmu 库本身问题, 与 Catch2 迁移无关.
-# 等 mmu 库代码完成 (mmu-tlb-ptw-impl phase) 后再恢复.
+# 关键: cache + mmu 测试需要的实现 .cpp 源文件
+# 这些 .cpp 之前在 src/cf_plugin/CMakeLists.txt 中被显式编译进独立 test target
+# 单二进制模式下, 必须显式列出以确保链接找到符号
+# (cf_plugin 是 INTERFACE 库, 不包含 .cpp 实现)
+set(CACHE_IMPL_SOURCES
+    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
+)
+list(APPEND TEST_SOURCES ${CACHE_IMPL_SOURCES})
+
+# MMU 库实装源文件 (mmu-tlb-ptw-impl change 解阻塞)
+# cf_plugin 是 INTERFACE 库, 不编译 .cpp; mmu 库实现必须显式加入
+# 注: MMUPlugin.cpp 含 skeleton 阶段 stub 代码 (auto* n = pb.node_of_logic_stage(...) API 错用)
+#     commit 4 才完整重写 at_stage 闭包. commit 2 仅加入 lib/ + policies/ 4 个 .cpp
+# commit 4 加入 MMUPlugin.cpp (at_stage 闭包实装)
+set(MMU_IMPL_SOURCES
+    ${CMAKE_SOURCE_DIR}/ip/mmu/lib/multi_level_tlb.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/lib/ptw.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/lib/tlb_factory.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/policies/tlb_replacement_policy.cpp
+    # ${CMAKE_SOURCE_DIR}/ip/mmu/tlm/MMUPlugin.cpp  # commit 4 加入
+)
+list(APPEND TEST_SOURCES ${MMU_IMPL_SOURCES})
+
+# 临时排除 mmu/ 测试 (skeleton 阶段 mmu 库代码 stub 不完整 + MMUPlugin API 错用)
+# 待 commit 4 (MMUPlugin.cpp 实装) + commit 5-7 (PTW/MLTLB/Factory 实装) 完成后再恢复
 list(REMOVE_ITEM TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_config_schema.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_plugin.cpp"
@@ -23,18 +47,6 @@ list(REMOVE_ITEM TEST_SOURCES
 list(APPEND TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/catch2/catch_amalgamated.cpp"
 )
-
-# 关键: cache 测试需要的实现 .cpp 源文件
-# 这些 .cpp 之前在 src/cf_plugin/CMakeLists.txt 中被显式编译进独立 test target
-# 单二进制模式下, 必须显式列出以确保链接找到符号
-# (cf_plugin 是 INTERFACE 库, 不包含 .cpp 实现)
-set(CACHE_IMPL_SOURCES
-    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
-    ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
-    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
-    ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp
-)
-list(APPEND TEST_SOURCES ${CACHE_IMPL_SOURCES})
 
 # 单二进制 chipforge_tests
 add_executable(chipforge_tests ${TEST_SOURCES})
