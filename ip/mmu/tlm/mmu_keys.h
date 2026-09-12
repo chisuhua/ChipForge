@@ -39,6 +39,12 @@ struct mmu_keys {
   static inline cf::plugin::Payload<std::uint64_t> PTW_L1_RAW{"mmu.ptw_l1_raw"};
   static inline cf::plugin::Payload<std::uint64_t> PTW_L2_RAW{"mmu.ptw_l2_raw"};
   static inline cf::plugin::Payload<std::uint8_t>  PTW_FAULT{"mmu.ptw_fault"};
+
+  // mmu-tlb-ptw-impl commit 8 新增 4 Key
+  static inline cf::plugin::Payload<T>       MMU_VADDR{"mmu.mmu_vaddr"};
+  static inline cf::plugin::Payload<std::uint8_t>  EXCEPTION_CODE{"mmu.exception_code"};
+  static inline cf::plugin::Payload<T>       SATP_PPN{"mmu.satp_ppn"};
+  static inline cf::plugin::Payload<std::uint8_t>  SATP_MODE{"mmu.satp_mode"};
 };
 
 }  // namespace payload

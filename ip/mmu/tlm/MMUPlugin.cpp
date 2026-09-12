@@ -43,16 +43,13 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
   using namespace cf::plugin;
   using Key = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
 
-  // 注: mmu_keys.h 现状没有 EXCEPTION_CODE/MMU_VADDR (在 mmu-tlb-ptw-impl commit 8 加入);
-  //     这里先用现有 Key (PTW_VADDR/PTW_ACTIVE) 写, commit 8 加新 Key 后补 EXCEPTION_CODE/MMU_VADDR.
-
   auto do_lookup = [this, &pb](const char* stage_name, uint64_t vaddr) {
     auto node = pb.node_of_logic_stage(stage_name);
     if (!node) return;
     auto result = multi_tlb_->lookup(vaddr, current_asid_);
     if (result.hit) {
       (*node)(Key::PADDR) = result.paddr;
-      (*node)(Key::PTW_VADDR) = vaddr;  // commit 8 改为 Key::MMU_VADDR
+      (*node)(Key::MMU_VADDR) = vaddr;  // ADR-044 §3.2 VIPT dual-write
     } else {
       (*node)(Key::PTW_ACTIVE) = 1;
       (*node)(Key::PTW_VADDR) = vaddr;
@@ -61,9 +58,7 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
           (*node)(Key::PADDR) = paddr;
         },
         [node](uint8_t fault_code) {
-          // commit 8 改为 Key::EXCEPTION_CODE
-          (void)fault_code;  // TODO: write exception key
-          (void)node;
+          (*node)(Key::EXCEPTION_CODE) = fault_code;
         });
     }
   };
