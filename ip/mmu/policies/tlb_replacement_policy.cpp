@@ -32,11 +32,17 @@ TLBReplacementPolicy<ENTRIES, WAYS>::create(const std::string& name) {
 }
 
 // 显式实例化 (避免链接器丢符号)
+// mmu-ip-skeleton 8 组 (L35-42): <8,1>/<16,2>/<32,4>/<64,4>/<128,4>/<256,8>/<8,8>/<16,16>
+// mmu-tlb-ptw-impl commit 3 扩展 4 组: <16,1>/<32,2>/<64,8>/<256,1> (覆盖 TLBFactory 新增 7 组特化)
 template class TLBReplacementPolicy<8, 1>;
+template class TLBReplacementPolicy<16, 1>;  // +None(16,1) in TLBFactory
 template class TLBReplacementPolicy<16, 2>;
+template class TLBReplacementPolicy<32, 2>;  // +LRU-2w(32,2) in TLBFactory
 template class TLBReplacementPolicy<32, 4>;
 template class TLBReplacementPolicy<64, 4>;
+template class TLBReplacementPolicy<64, 8>;  // +LRU-8w/RRIP-8w(64,8) in TLBFactory
 template class TLBReplacementPolicy<128, 4>;
+template class TLBReplacementPolicy<256, 1>;  // +FIFO(256,1) in TLBFactory
 template class TLBReplacementPolicy<256, 8>;
 template class TLBReplacementPolicy<8, 8>;
 template class TLBReplacementPolicy<16, 16>;
