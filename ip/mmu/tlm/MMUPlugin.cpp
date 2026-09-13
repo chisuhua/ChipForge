@@ -56,13 +56,15 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
     } else {
       (*node)(Key::PTW_ACTIVE) = 1;
       (*node)(Key::PTW_VADDR) = vaddr;
-      ptw_->start_walk(vaddr, current_asid_, /*satp_ppn=*/0,
-        [node](uint64_t paddr, uint8_t /*perms*/) {
-          (*node)(Key::PADDR) = paddr;
-        },
-        [node](uint8_t fault_code) {
-          (*node)(Key::EXCEPTION_CODE) = fault_code;
-        });
+    ptw_->start_walk(vaddr, current_asid_, /*satp_ppn=*/0,
+      [node, vaddr](uint64_t paddr, uint8_t /*perms*/) {
+        (*node)(Key::PADDR) = paddr;
+        (*node)(Key::MMU_VADDR) = vaddr;
+      },
+      [node, vaddr](uint8_t fault_code) {
+        (*node)(Key::EXCEPTION_CODE) = fault_code;
+        (*node)(Key::MMU_VADDR) = vaddr;
+      });
     }
   };
 
