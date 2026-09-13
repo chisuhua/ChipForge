@@ -1,0 +1,52 @@
+{
+  "name": "MMUCacheMinimalSoC",
+  "description": "mmu-cache-integration commit 5 — full chain traffic_gen → MMUTLMBridge → L1CacheTLMBridge → Memory. Validates MMU→Cache VIPT data flow (ADR-044 §3.2) via cpptlm ModuleFactory JSON path. Full simulation deferred (Decision 7 RETRY + traffic_gen retry support known-limitation); structural validation only.",
+  "impl_mode": "TLM_ONLY",
+  "modules": [
+    {
+      "name": "tg",
+      "type": "TrafficGenTLM",
+      "params": {
+        "pattern": "SEQUENTIAL",
+        "start_addr": "0x1000",
+        "end_addr": "0x2000",
+        "num_requests": 1000
+      }
+    },
+    {
+      "name": "mmu",
+      "type": "MMUTLMBridge",
+      "params": {
+        "sv_mode": "sv39",
+        "levels": [
+          {"name": "L0", "entries": 8, "associativity": 8, "replacement_policy": "LRU"},
+          {"name": "L1", "entries": 8, "associativity": 8, "replacement_policy": "LRU"}
+        ],
+        "ptw_max_inflight": 2
+      }
+    },
+    {
+      "name": "l1",
+      "type": "L1CacheTLMBridge",
+      "params": {
+        "num_sets": 256,
+        "tag_bits": 20,
+        "idx_bits": 8,
+        "line_data_bits": 512
+      }
+    },
+    {
+      "name": "mem",
+      "type": "MemoryTLM",
+      "params": {
+        "size_bytes": "1MB",
+        "latency_cycles": 50
+      }
+    }
+  ],
+  "connections": [
+    {"src": "tg", "dst": "mmu", "latency": 1},
+    {"src": "mmu", "dst": "l1", "latency": 1},
+    {"src": "l1", "dst": "mem", "latency": 100}
+  ]
+}
