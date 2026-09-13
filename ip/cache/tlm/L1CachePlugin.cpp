@@ -32,6 +32,7 @@
 #include "cf/plugin/payload.h"
 #include "cf/plugin/pipe_node.h"
 #include "ip/cache/policies/no_replacement_policy.h"  // default policy (Phase 1.4)
+#include "ip/mmu/tlm/mmu_keys.h"  // mmu-cache-integration commit 2: consume MMU_VADDR + PADDR
 
 namespace cf {
 namespace ip {
@@ -144,10 +145,21 @@ void L1CachePlugin::build(cf::plugin::PipeBuilder& pb) {
     auto* n = lookup_node_.get();
     assert(n && "build() must initialize lookup_node_ before at_stage callback runs");
 
-    // 1. 从 addr 提取 idx / tag (使用 helper, 替代 shift+mask 内联 — ADR-040 §2.5)
-    cf::plugin::uint_t<kAddrBits> addr = n->operator()(g_addr);
-    auto idx = extract_idx(addr);
-    auto tag = extract_tag(addr);
+    // 1. VIPT 索引提取 (mmu-cache-integration commit 2)
+    //    有 MMU 输出时: idx 来自 MMU_VADDR (VIPT), tag 来自 PADDR (物理 tag 比对)
+    //    无 MMU 输出时: idx/tag 都来自 g_addr (PIPT fallback, baseline 兼容)
+    //    D4 合规: 用 has() 三元选择 + 全分支, 无早返
+    using mmu_keys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+    bool has_mmu_vaddr = n->has(mmu_keys::MMU_VADDR);
+    bool has_mmu_paddr = n->has(mmu_keys::PADDR);
+    cf::plugin::uint_t<kAddrBits> idx_src = has_mmu_vaddr
+        ? static_cast<cf::plugin::uint_t<kAddrBits>>(n->operator()(mmu_keys::MMU_VADDR))
+        : n->operator()(g_addr);
+    cf::plugin::uint_t<kAddrBits> tag_src = has_mmu_paddr
+        ? static_cast<cf::plugin::uint_t<kAddrBits>>(n->operator()(mmu_keys::PADDR))
+        : n->operator()(g_addr);
+    auto idx = extract_idx(idx_src);
+    auto tag = extract_tag(tag_src);
     n->put(g_idx, idx);
     n->put(g_tag, tag);
 
