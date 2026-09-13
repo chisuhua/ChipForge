@@ -1,18 +1,22 @@
-# STATUS: IMPLEMENTED (TLB/PTW/Bridge 实装, 2026-09-XX)
+# STATUS: INTEGRATED (mmu-cache-integration + L1Cache VIPT + SoC 全链, 2026-09-13)
 
-mmu-tlb-ptw-impl change 完成:
+mmu-tlb-ptw-impl (archived 2026-09-12) + mmu-cache-integration (current) 完成:
 - TLB lookup/insert/invalidate (4 替换策略: None/FIFO/LRU/RRIP)
 - PTW Sv39 三级 walk (含 reserved encoding + V=0 fault)
-- MultiLevelTLB coherence (并行查 + 返回最深 hit + shadow fill)
+- MultiLevelTLB coherence (并行查 + 返回最深 hit + shadow fill + cross-level invalidate)
 - TLBFactory 11 组特化 + VIPT safety check
 - MMUPlugin at_stage 闭包实装 (tlb_lookup_ifetch + tlb_lookup_loadstore + ptw_l0/l1/l2)
-- RISC-V RiscvMMUPlugin (satp CSR + SFENCE.VMA + exception 12/13/15)
-- mmu_keys.h 新增 4 Key (MMU_VADDR/EXCEPTION_CODE/SATP_PPN/SATP_MODE)
-- MMUTLMBridge (核心, mirror L1CacheTLMBridge)
-- bundles/tlb_bundles_tlm.hh (4 字段窄桥 ch_stream Bundle)
-- 5 个 mmu tests 解阻塞 (29 cases PASS)
+- RISC-V RiscvMMUPlugin 实装 (satp CSR + SFENCE.VMA hook + exception 12/13/15 + csr_write_satp)
+- mmu_keys.h 14 Key (10 原有 + 4 新增 MMU_VADDR/EXCEPTION_CODE/SATP_PPN/SATP_MODE)
+- invalidate_vaddr_any_asid 新 API (RISC-V SFENCE.VMA rs1!=0, rs2=0 跨 ASID 失效)
+- MMUTLMBridge + MMUTLMBridgeAdapter (cpptlm ModuleFactory 兼容 + ch_stream 4 字段窄桥)
+- bundles/tlb_bundles_tlm.hh (TlbReqBundle/TlbRespBundle)
+- L1CachePlugin VIPT 索引 (consume pl::MMU_VADDR + pl::PADDR, PIPT fallback 兼容 baseline)
+- cache_keys.h (VIPT Key 集合 + vipt_fallback Knob)
+- soc/mmu_minimal.json (tg → mmu → l1 → mem 全链集成)
+- 39 个 mmu tests + 24 个 cache tests + 14 个 soc tests (306/306 PASS)
 
-This IP has **skeleton-level partial implementation**. 目录骨架、Plugin 入口、Bundle、Config schema 落地，TLB/PTW 算法推迟到下一个 change。
+下一里程碑: `cache-dse-sweep` (DSE 48-case 配置扫描) + `cache-phase1.5-4way` (4-way VIPT 升 Phase 1.5)
 
 <!-- Conforms to: docs/templates/IP_STATUS_TEMPLATE.md (PARTIAL variant) -->
 

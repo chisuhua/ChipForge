@@ -68,7 +68,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **目的**: 实现 TLB lookup/insert 算法 + PTW Sv39 三级 walk + MultiLevelTLB coherence + MMUPlugin at_stage 闭包 + RISC-V satp/SFENCE.VMA/exception 12/13/15 hook + cpptlm MMUTLMBridge. 解锁 ADR-044 VIPT 数据流真实链路 (MMUPlugin 同时输出 pl::PADDR + pl::MMU_VADDR).
 
+## v0.1.0 (2026-09-13) - mmu-cache-integration
+
+> **目的**: 完成 ADR-044 §3.2 VIPT 数据流方案 A 双端契约 — L1CachePlugin 消费 pl::MMU_VADDR 做 VIPT 索引 + PIPT fallback 兼容 + MMUTLMBridgeAdapter cpptlm 集成 + soc/mmu_minimal.json 全链 + PTW completion dual-write bug 修补.
+
 ### Added
+- **`ip/mmu/tlm/MMUPlugin.cpp`** (commit 0): PTW completion `WalkCallback`/`FaultCallback` 闭包加 `[node, vaddr]` capture, 同时写 `pl::PADDR` + `pl::MMU_VADDR` (修复 stale vaddr 风险, mmu-tlb-ptw-impl 遗留 defer)
+- **`tests/mmu/test_ptw_unit.cpp`** (commit 0): 3 PTW 单测 — 闭包 capture vaddr 模式 + V=0 fault 12 + reserved encoding fault 15
+- **`ip/cpu/plugins/mmu.cpp`** (commit 6): `RiscvMMUPlugin::csr_write_satp` + `sfence_vma` 实装 (mmu-tlb-ptw-impl 遗留 defer)
+- **`ip/mmu/lib/tlb_base.h` / `tlb.h` / `multi_level_tlb.{h,cpp}`** (commit 6): `invalidate_vaddr_any_asid` 新 API (RISC-V SFENCE.VMA rs1!=x0, rs2=x0 跨 ASID 失效语义)
+- **`ip/mmu/tlm/MMUPlugin.h`** (commit 6): `multi_tlb()` public getter + `invalidate_vaddr_any_asid` facade
+- **`ip/cache/tlm/cache_keys.h`** (commit 1): 新增 `g_vaddr` VIPT Key + `vipt_fallback` Knob (Auto/PaddrOnly/Panic)
+- **`ip/cache/tlm/L1CachePlugin.cpp`** (commit 2): lookup 闭包用 `n->has(MMU_VADDR)` 三元选择 idx_src/tag_src (VIPT 索引 + PIPT fallback 兼容 baseline)
+- **`src/cf_plugin/bridge/mmu_bridge_adapter.{h,cpp}`** (commit 4): `MMUTLMBridgeAdapter` 独立 cpptlm `ChStreamModuleBase` 子类 + `ChStreamAdapterFactory` 注册
+- **`soc/mmu_minimal.json`** (commit 5): 4 modules + 3 connections 全链 (`tg → mmu → l1 → mem`)
+- **`tests/mmu/test_ptw_unit.cpp`** (commit 6): 3 边界 case — MMU_VADDR 一致性 (success + 2 fault paths)
+- **`tests/mmu/test_mmu_plugin.cpp`** (commit 6): 4 RISC-V test — SFENCE.VMA (单 vaddr + 全清) + csr_write_satp + ASID switch + 多 ASID 失效
+- **`tests/cache/test_mmu_cache_integration.cpp`** (commit 3): 3 integration test — VIPT 命中 + PIPT fallback + has() 对称性
+- **`tests/soc/test_mmu_minimal_json.cpp`** (commit 5): 4 结构验证 — top-level + modules + connections + params
+- **`ip/mmu/STATUS.md`**: `IMPLEMENTED` → `INTEGRATED (mmu-cache-integration + L1Cache VIPT + SoC 全链)`
+- **`openspec/changes/mmu-cache-integration/`**: 完整 OpenSpec lifecycle artifacts (proposal + design + tasks + 6 ADDED + 2 MODIFIED specs)
+
+### Fixed
+- mmu-tlb-ptw-impl 遗留 PTW completion stale vaddr bug (commit 0): WalkCallback 闭包不写 pl::MMU_VADDR, 多 ASID 场景导致 cache 索引错误
+- Oracle round-2 发现 sfence_vma rs1!=0, rs2=0 分支不跨 ASID 失效, 加 invalidate_vaddr_any_asid API 修复
+- header 注释 `rs1 (vaddr, -1=all)` 修正为 `0=all (x0)` 约定
+
+### Verified
+- `./build/bin/chipforge_tests` → 306/306 PASS (was 291 baseline; +15: 7 mmu + 3 cache + 4 soc + 1 集成微调)
+- `[mmu]` 32 → **40** PASS
+- `[RiscV]` 0 → **4** PASS (新 tag)
+- `[cache][MMUCacheIntegration]` 3/3 PASS (新 tag)
+- `[soc][MMUMinimalJson]` 4/4 PASS (新 tag)
+- 4 architecture gates all PASS (verify_adr + verify_plugin_decision + check_plugin_portability + doc_link_check)
+- 5 次连跑稳定性 PASS (无 flaky test)
+
+### Pending (下一阶段入口)
+
+> `cache-dse-sweep` change —— 完整 12-case Pareto DSE 配置扫描 (Phase 1.5 L1Cache 升 4-way 触发)
+
+## v0.0.9 (2026-09-13) - mmu-tlb-ptw-impl
 - **`ip/mmu/lib/tlb.h`**: `mutable` 关键字修复 `hits_`/`misses_` const-correctness (L227-229)
 - **`ip/mmu/lib/tlb_entry.h`**: 新增 `using tag_type = cf::plugin::uint_t<TAG_BITS>;` (解决 8 处 typename Entry::tag_type 编译错误)
 - **`ip/mmu/lib/ptw.{h,cpp}`**: Sv39 三级 walk state machine 实装 + `stub_write_pte`/`stub_read_pte` 测试 API + reserved encoding + V=0 fault handling
