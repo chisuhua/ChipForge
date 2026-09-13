@@ -32,6 +32,7 @@ set(MMU_IMPL_SOURCES
     ${CMAKE_SOURCE_DIR}/ip/mmu/lib/tlb_factory.cpp
     ${CMAKE_SOURCE_DIR}/ip/mmu/policies/tlb_replacement_policy.cpp
     ${CMAKE_SOURCE_DIR}/ip/mmu/tlm/MMUPlugin.cpp  # commit 7 (mmu-tlb-ptw-impl) 加入
+    ${CMAKE_SOURCE_DIR}/ip/cpu/plugins/mmu.cpp    # mmu-cache-integration commit 6 (sfence_vma + csr_write_satp 实装)
 )
 list(APPEND TEST_SOURCES ${MMU_IMPL_SOURCES})
 

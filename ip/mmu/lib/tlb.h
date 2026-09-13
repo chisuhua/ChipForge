@@ -198,6 +198,19 @@ class TLB : public TLBBase {
     }
   }
 
+  // 失效 (单 vaddr, 所有 ASID) — RISC-V SFENCE.VMA rs1!=x0, rs2=x0 语义
+  void invalidate_vaddr_any_asid(uint64_t vaddr) override {
+    const uint64_t vpn = vaddr >> 12;
+    const typename Entry::tag_type tag = vpn >> ASID_BITS;
+    const std::size_t set_idx = vpn % kSets;
+    for (std::size_t way = 0; way < WAYS; ++way) {
+      const std::size_t idx = set_idx * WAYS + way;
+      if (valid_[idx] && entries_[idx].tag == tag) {
+        valid_[idx] = false;
+      }
+    }
+  }
+
   // 失效 (整 ASID)
   void invalidate_asid(uint16_t asid) override {
     for (std::size_t idx = 0; idx < ENTRIES; ++idx) {

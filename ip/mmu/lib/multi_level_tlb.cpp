@@ -59,6 +59,12 @@ void MultiLevelTLB::invalidate_vaddr(uint64_t vaddr, uint16_t asid) {
   for (auto& lvl : levels_) lvl->invalidate_vaddr(vaddr, asid);
 }
 
+void MultiLevelTLB::invalidate_vaddr_any_asid(uint64_t vaddr) {
+  // RISC-V SFENCE.VMA rs1!=x0, rs2=x0: invalidate all entries matching vaddr
+  // across ALL ASIDs (and global entries)
+  for (auto& lvl : levels_) lvl->invalidate_vaddr_any_asid(vaddr);
+}
+
 void MultiLevelTLB::invalidate_asid(uint16_t asid) {
   for (auto& lvl : levels_) lvl->invalidate_asid(asid);
 }

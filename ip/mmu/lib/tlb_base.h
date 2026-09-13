@@ -62,8 +62,10 @@ class TLBBase {
   virtual void insert_from(uint64_t vaddr, uint64_t paddr,
                            uint16_t asid, uint8_t perms) = 0;
 
-  // 失效 (单条 / 整 ASID / 全清)
+  // 失效 (单条 / 单 vaddr 跨所有 ASID / 整 ASID / 全清)
+  // invalidate_vaddr_any_asid: SFENCE.VMA rs1!=x0, rs2=x0 语义 (RISC-V Spec §6.2)
   virtual void invalidate_vaddr(uint64_t vaddr, uint16_t asid) = 0;
+  virtual void invalidate_vaddr_any_asid(uint64_t vaddr) = 0;
   virtual void invalidate_asid(uint16_t asid) = 0;
   virtual void invalidate_all() = 0;
 

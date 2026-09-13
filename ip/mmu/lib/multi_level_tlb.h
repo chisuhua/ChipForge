@@ -29,6 +29,7 @@ class MultiLevelTLB {
   TLBLookup lookup(uint64_t vaddr, uint16_t asid);
   void refill_from_ptw(uint64_t vaddr, uint16_t asid, uint64_t paddr, uint8_t perms);
   void invalidate_vaddr(uint64_t vaddr, uint16_t asid);
+  void invalidate_vaddr_any_asid(uint64_t vaddr);
   void invalidate_asid(uint16_t asid);
   void invalidate_all();
 

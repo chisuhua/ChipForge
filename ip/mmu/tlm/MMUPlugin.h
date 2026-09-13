@@ -52,6 +52,15 @@ class MMUPlugin : public cf::plugin::PluginBase {
   SvMode mode() const { return sv_mode_; }
   std::size_t num_levels() const { return multi_tlb_ ? multi_tlb_->num_levels() : 0; }
 
+  // mmu-cache-integration commit 6: 公开 multi_tlb_ 访问器供 RiscvMMUPlugin
+  // sfence_vma + csr_write_satp hook 调用 invalidate_* API (mmu-tlb-ptw-impl 遗留 defer)
+  cf::ip::mmu::MultiLevelTLB* multi_tlb() const { return multi_tlb_.get(); }
+
+  // 多 ASID 失效 (RISC-V SFENCE.VMA rs1!=x0, rs2=x0 语义)
+  void invalidate_vaddr_any_asid(std::uint64_t vaddr) {
+    if (multi_tlb_) multi_tlb_->invalidate_vaddr_any_asid(vaddr);
+  }
+
  private:
   SvMode sv_mode_;
   PTWConfig ptw_config_;
