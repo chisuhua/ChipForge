@@ -43,9 +43,10 @@ TEST_CASE("build_3stage", "[cpu-integration]") {
   // cpu-mmu-integration commit 1: pb.build() 触发所有 plugins
   // baseline enable_mmu=false 时 8 nodes (3 topology + 5 plugin substages)
   REQUIRE(pb->node_count() == 8);
-  REQUIRE(pb->stage_count() == 20);  // 3 topology + 11 plugin at_stage + 2 cpu_factory + 4 StageLink EARLY = 20
+  REQUIRE(pb->stage_count() == 21);  // 3 topology + 11 plugin at_stage + 2 cpu_factory + 4 StageLink EARLY + 1 IBus writeback = 21
   // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 增加 4 个 EARLY 闭包
   // (fetch→decode, decode→execute, execute→memory, memory→writeback)
+  // commit C: IBusPlugin 增加 1 个 writeback LATE 闭包 (PC 更新)
   REQUIRE(pb->has_stage("if"));
   REQUIRE(pb->has_stage("exmem"));
   REQUIRE(pb->has_stage("wb"));

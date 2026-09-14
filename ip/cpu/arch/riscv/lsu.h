@@ -62,8 +62,8 @@ class RiscvLsuPlugin : public cf::plugin::PluginBase {
 
         if (dec.op_class == Dp::OpClass::LOAD) {
           n->operator()(KeyType::MEM_ADDR) = addr;
-          // M2 stub: 返回 0, M4 集成 TLM 事务
-          n->operator()(KeyType::MEM_DATA) = T{0};
+          // cpu-pipeline-stubs-replace commit D: 删 MEM_DATA 写入, 归 DBusPlugin 接管.
+          // (LSU 仅做地址生成; STORE 路径仍由 LSU 写 addr+data)
         } else if (dec.op_class == Dp::OpClass::STORE) {
           T rs2_val = n->operator()(KeyType::RS2);
           n->operator()(KeyType::MEM_ADDR) = addr;

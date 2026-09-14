@@ -2,13 +2,14 @@
 //
 // 功能描述: IBusPlugin — 指令总线接口 (M2.4, P0)
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-16
+// 最后修改日期: 2026-09-14
 //
 // 设计:
 //   - P0 (ISA-无关): 指令总线是通用 CPU 接口
 //   - fetch 阶段: 根据 PC 发起指令读取请求
 //   - 返回指令字存入 INSTRUCTION Payload
-//   - M2 阶段: 存根实现, M4 集成 TLM 事务
+//   - M2 阶段: 存根实现, 默认 NOP (cpu-pipeline-stubs-replace commit C 保留向后兼容)
+//   - cpu-pipeline-stubs-replace commit C: 注入 PicolibcHostMemory* 后真实 read_word 取指
 //
 // 约束:
 //   - 头文件为主 (.cpp 仅 stub)
@@ -22,7 +23,9 @@
 
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/picolibc_host_memory.h"
 
 namespace cf {
 namespace cpu {
@@ -33,7 +36,11 @@ class IBusPlugin : public cf::plugin::PluginBase {
   static_assert(std::is_unsigned<T>::value, "IBusPlugin<T>: T must be unsigned");
 
  public:
+  // cpu-pipeline-stubs-replace commit C: 注入 PicolibcHostMemory* 真实取指.
+  // mem=nullptr 时维持旧 NOP stub 行为, 保持 tests/cpu/test_ibus.cpp 兼容.
   IBusPlugin() = default;
+  explicit IBusPlugin(PicolibcHostMemory* mem) : mem_(mem) {}
+
   ~IBusPlugin() override = default;
 
   IBusPlugin(const IBusPlugin&) = delete;
@@ -44,23 +51,39 @@ class IBusPlugin : public cf::plugin::PluginBase {
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
 
+    // fetch 阶段 NORMAL: 取指 (mem 非空时真读; 否则 NOP stub)
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
       if (n) {
         T pc = n->operator()(KeyType::PC);
+        const cf::plugin::uint_t<32> inst =
+            mem_ ? cf::plugin::uint_t<32>(mem_->read_word(static_cast<std::uint64_t>(pc)))
+                 : cf::plugin::uint_t<32>(0x00000013u);
+        n->operator()(KeyType::INSTRUCTION) = inst;
+      }
+    });
 
-        // M2 阶段: 存根, 直接返回假指令
-        // M4 集成 TLM 后: 发起总线事务, 等待响应
-        n->operator()(KeyType::INSTRUCTION) = cf::plugin::uint_t<32>(0x00000013);  // NOP
+    // writeback 阶段 LATE: PC 更新 (cpu-pipeline-stubs-replace commit C)
+    // 单 pass 语义下, 分支决策在 execute 已完成 (DECODE.branch_taken/target),
+    // 写回阶段计算新 PC 供下一轮取指. 无 mispredict/flush (单 pass = 单条指令).
+    pb.at_stage("writeback", cf::plugin::Phase::LATE, [&pb]() {
+      auto* n = pb.node_of_logic_stage("writeback").get();
+      if (n) {
+        const auto& dec = n->operator()(KeyType::DECODE);
+        T pc = n->operator()(KeyType::PC);
+        const bool taken = dec.branch_taken;
+        const T target = static_cast<T>(dec.branch_target);
+        n->operator()(KeyType::PC) = taken ? target : static_cast<T>(pc + 4);
       }
     });
   }
 
-  // 测试辅助: 手动设置指令
+  // 测试辅助: 手动设置指令 (cpu-pipeline-stubs-replace commit C 保留向后兼容)
   void set_instruction(std::uint32_t inst) { next_instruction_ = inst; }
 
  private:
-  std::uint32_t next_instruction_ = 0x00000013;  // NOP
+  PicolibcHostMemory* mem_ = nullptr;
+  std::uint32_t next_instruction_ = 0x00000013;  // NOP (default for legacy test)
 };
 
 }  // namespace plugins
