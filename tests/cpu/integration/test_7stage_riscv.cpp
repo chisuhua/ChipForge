@@ -51,8 +51,8 @@ TEST_CASE("build_7stage_superscalar", "[cpu-integration]") {
   cfg.mmu_mode = "sv39";
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // TopologyBuilder<7>: fetch, decode, execute, memory, writeback, retire, commit
-  REQUIRE(pb->node_count() == 7);
+  // TopologyBuilder<7>: 7 nodes + MMUPlugin 5 substages (tlb_lookup_ifetch/loadstore/ptw_l0/l1/l2) + RiscVMMUPlugin 3 substages (csr_write_satp/sfence_vma/mmu_exit) = 15
+  REQUIRE(pb->node_count() == 15);
   REQUIRE(pb->has_stage("fetch"));
   REQUIRE(pb->has_stage("decode"));
   REQUIRE(pb->has_stage("execute"));
@@ -90,7 +90,8 @@ TEST_CASE("7stage_topology_from_config", "[cpu-integration]") {
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
   // 验证 JSON → CPUConfig → 7-stage 拓扑 链路
-  REQUIRE(pb->node_count() == 7);
+  // cpu_superscalar.json enable_mmu=true → +5 MMUPlugin + +3 RiscVMMUPlugin substages
+  REQUIRE(pb->node_count() == 15);
   REQUIRE(pb->has_stage("retire"));  // 7-stage 关键: retire 节点
   REQUIRE(pb->has_stage("commit"));  // 7-stage 关键: commit 节点
   // 验证 dispatch_width 字段已加载
@@ -113,10 +114,10 @@ TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   cfg.btb_entries = 128;
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // 7 节点 (3 + 4 拓扑, 与 dispatch_width=1 一致)
-  REQUIRE(pb->node_count() == 7);
-  // 14 阶段 (7 baseline + 7 lane 派发闭包, 覆盖原 baseline 闭包)
-  REQUIRE(pb->stage_count() == 14);
+  // 7 拓扑节点 + MMUPlugin 5 substages + RiscVMMUPlugin 3 substages = 15 nodes
+  REQUIRE(pb->node_count() == 15);
+  // 7 baseline + 7 lane 派发闭包 + 5 MMUPlugin at_stage + 3 RiscVMMUPlugin at_stage = 22 stages
+  REQUIRE(pb->stage_count() == 22);
 }
 
 static std::string exec_cmd(const std::string& cmd) {

@@ -40,6 +40,7 @@
 #include "ip/cpu/arch/riscv/branch.h"
 #include "ip/cpu/arch/riscv/lsu.h"
 #include "ip/cpu/arch/riscv/csr.h"
+#include "ip/cpu/plugins/mmu.h"  // mmu-cache-integration commit 6/9: RiscVMMUPlugin 接入 CPU pipeline
 
 namespace cf {
 namespace cpu {
@@ -289,6 +290,34 @@ class CpuFactory {
                      });
       }
     }
+
+// cpu-mmu-integration commit 1/6: 条件注册 RiscvMMUPlugin (仅 enable_mmu=true)
+    // mmu-cache-integration commit 7 + 8 已实装 MMU 核心算法 + 14 Payload Key
+    // 这里把 RiscV hook (csr_write_satp/sfence_vma/exception) 接到 CPU pipeline
+    // (commit 2/6 实装 at_stage 闭包; commit 1 仅注册 plugin + substage 声明)
+    if (config.enable_mmu) {
+      // 映射 mmu_mode 字符串到 SvMode 枚举
+      cf::ip::mmu::SvMode sv_mode = cf::ip::mmu::SvMode::Sv39;
+      if (config.mmu_mode == "sv32")      sv_mode = cf::ip::mmu::SvMode::Sv32;
+      else if (config.mmu_mode == "sv48") sv_mode = cf::ip::mmu::SvMode::Sv48;
+
+      // 默认 TLB 几何: 2-level 8/8 + LRU + ptw_max_inflight=2
+      // 与 mmu-cache-integration commit 5 SoC JSON 一致
+      using mmu_cfg_t = cf::cpu::plugins::RiscvMMUPlugin::TLBConfig;
+      std::vector<mmu_cfg_t> mmu_levels = {
+        {"L0", 8, 8, 1, 1, "LRU"},
+        {"L1", 8, 8, 1, 2, "LRU"}
+      };
+      pb->register_plugin(std::make_unique<cf::cpu::plugins::RiscvMMUPlugin>(
+          sv_mode, mmu_levels, cf::ip::mmu::MMUPlugin::PTWConfig{2},
+          /*satp_value=*/0));
+    }
+
+    // cpu-mmu-integration commit 1/6: 调 pb.build() 触发所有 plugin 的 setup() + build()
+    // 此调用前 cpu_factory 只 调了 TopologyBuilder::expand 和 lane dispatch at_stage,
+    // plugin 自身 (含 MMUPlugin) 的 declare_substage / at_stage 闭包都未运行.
+    // 之前 baseline 不需要 plugin 闭包 (只 topology 正确); 加 MMU 后必须 build().
+    pb->build();
 
     return pb;
   }

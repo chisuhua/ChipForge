@@ -93,7 +93,7 @@ TEST_CASE("build_cpu_registers_11_real_plugins", "[cpu]") {
   auto pb = cf::cpu::CpuFactory<std::uint64_t>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
   const auto& plugins = pb->plugins();
-  REQUIRE(plugins.size() == 11);
+  REQUIRE(plugins.size() == 12);  // mmu-cache-integration commit 7: +1 RiscVMMUPlugin
 }
 
 
