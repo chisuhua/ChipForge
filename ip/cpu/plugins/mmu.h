@@ -38,6 +38,10 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
       : cf::ip::mmu::MMUPlugin(mode, std::move(levels_cfg), ptw_cfg),
         satp_value_(satp_value) {}
 
+  // cpu-mmu-integration commit 2/9: 覆盖基类 setup/build 加 3 个 substage 闭包
+  void setup(cf::plugin::PipeBuilder& pb) override;
+  void build(cf::plugin::PipeBuilder& pb) override;
+
   ~RiscvMMUPlugin() override = default;
 
   RiscvMMUPlugin(const RiscvMMUPlugin&) = delete;

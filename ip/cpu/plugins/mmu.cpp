@@ -19,7 +19,10 @@
 
 #include "ip/cpu/plugins/mmu.h"
 
+#include "cf/plugin/pipe_builder.h"
+#include "ip/cpu/tlm/cpu_keys.h"
 #include "ip/mmu/lib/multi_level_tlb.h"
+#include "ip/mmu/tlm/mmu_keys.h"
 
 namespace cf {
 namespace cpu {
@@ -51,6 +54,60 @@ void RiscvMMUPlugin::sfence_vma(std::int64_t rs1_vaddr, std::int64_t rs2_asid) {
     tlb->invalidate_vaddr(static_cast<std::uint64_t>(rs1_vaddr),
                           static_cast<std::uint16_t>(rs2_asid));
   }
+}
+
+void RiscvMMUPlugin::setup(cf::plugin::PipeBuilder& pb) {
+  // mmu-cache-integration commit 2/9: 声明 3 个 substage 给 CPU pipeline hook
+  // csr_write_satp / sfence_vma 挂 execute 阶段 (CSR 写 / SFENCE.VMA 在 execute 拦截)
+  // mmu_exit 挂 memory 阶段 (MMU access 后路由 exception)
+  pb.declare_substage("execute", "csr_write_satp", 1);
+  pb.declare_substage("execute", "sfence_vma", 1);
+  pb.declare_substage("memory", "mmu_exit", 1);
+}
+
+void RiscvMMUPlugin::build(cf::plugin::PipeBuilder& pb) {
+  using cpu_keys_t = cf::cpu::tlm::payload::cpu_keys<std::uint64_t>;
+  using mmu_keys_t = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+
+  // csr_write_satp 闭包: CPU execute 阶段写 cpu_keys::SAT 后, 此闭包读取并路由到 csr_write_satp hook
+  // D4 合规: 用 if/else 全分支, 无早返
+  pb.at_stage("csr_write_satp", cf::plugin::Phase::NORMAL, [this, &pb]() {
+    auto node = pb.node_of_logic_stage("csr_write_satp");
+    if (node != nullptr && node->has(cpu_keys_t::SAT)) {
+      const std::uint64_t satp_value = node->operator()(cpu_keys_t::SAT);
+      csr_write_satp(satp_value);
+    } else {
+      // node 不存在或 SAT 未写入, no-op (D4 全分支)
+      (void)0;
+    }
+  });
+
+  // sfence_vma 闭包: CPU execute 阶段写 cpu_keys::SFENCE_VADDR + SFENCE_ASID 后, 此闭包读取
+  pb.at_stage("sfence_vma", cf::plugin::Phase::NORMAL, [this, &pb]() {
+    auto node = pb.node_of_logic_stage("sfence_vma");
+    if (node != nullptr && node->has(cpu_keys_t::SFENCE_VADDR)
+        && node->has(cpu_keys_t::SFENCE_ASID)) {
+      const std::int64_t rs1_vaddr = static_cast<std::int64_t>(
+          node->operator()(cpu_keys_t::SFENCE_VADDR));
+      const std::int64_t rs2_asid = static_cast<std::int64_t>(
+          node->operator()(cpu_keys_t::SFENCE_ASID));
+      sfence_vma(rs1_vaddr, rs2_asid);
+    } else {
+      (void)0;
+    }
+  });
+
+  // mmu_exit 闭包: MMU access 完后, 读 mmu_keys::EXCEPTION_CODE 并写到 cpu_keys::CPU_EXCEPTION_CODE
+  // 让 CPU pipeline 走 trap 路径 (M5 集成时)
+  pb.at_stage("mmu_exit", cf::plugin::Phase::NORMAL, [&pb]() {
+    auto node = pb.node_of_logic_stage("mmu_exit");
+    if (node != nullptr && node->has(mmu_keys_t::EXCEPTION_CODE)) {
+      const std::uint8_t exc_code = node->operator()(mmu_keys_t::EXCEPTION_CODE);
+      node->put(cpu_keys_t::CPU_EXCEPTION_CODE, exc_code);
+    } else {
+      (void)0;
+    }
+  });
 }
 
 }  // namespace plugins

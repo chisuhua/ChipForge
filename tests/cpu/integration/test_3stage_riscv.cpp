@@ -39,8 +39,11 @@ TEST_CASE("build_3stage", "[cpu-integration]") {
   cfg.btb_entries = 16;
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // M5.11 拓扑断言: TopologyBuilder<3> 展开为 3 节点 (if/exmem/wb)
-  REQUIRE(pb->node_count() == 3);
+  // M5.11 拓扑断言: TopologyBuilder<3> 展开为 3 节点 (if/exmem/wb) + 5 cpu plugins declare_substage
+  // cpu-mmu-integration commit 1: pb.build() 触发所有 plugins
+  // baseline enable_mmu=false 时 8 nodes (3 topology + 5 plugin substages)
+  REQUIRE(pb->node_count() == 8);
+  REQUIRE(pb->stage_count() == 16);  // 3 topology + 11 plugin at_stage + 2 cpu_factory = 16
   REQUIRE(pb->has_stage("if"));
   REQUIRE(pb->has_stage("exmem"));
   REQUIRE(pb->has_stage("wb"));

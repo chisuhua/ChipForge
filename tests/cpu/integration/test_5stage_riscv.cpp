@@ -42,7 +42,11 @@ TEST_CASE("build_5stage", "[cpu-integration]") {
   // M5.11 拓扑断言: TopologyBuilder<5> 必须 byte-identical (5 节点)
   // 顺序: fetch → decode → execute → memory → writeback
   REQUIRE(pb->node_count() == 5);
-  REQUIRE(pb->stage_count() == 5);
+  // cpu-mmu-integration commit 1: pb.build() 触发 11 个 baseline cpu plugins
+  // (IBus/Branch/Hazard/Decode/Alu/Mul/Branch/Lsu/Csr/DBus/RegFile) 都 at_stage 注册;
+  // 加上 5 个 TopologyBuilder at_stage + 2 cpu_factory lane dispatch (n_lanes=1 时 0)
+  // = 5 (topology) + 11 (plugins) = 16 baseline + 2 mm substage (enable_mmu=false) = 18
+  REQUIRE(pb->stage_count() == 18);
   REQUIRE(pb->has_stage("fetch"));
   REQUIRE(pb->has_stage("decode"));
   REQUIRE(pb->has_stage("execute"));
