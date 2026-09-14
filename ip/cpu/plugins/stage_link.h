@@ -29,6 +29,7 @@
 #include "cf/plugin/payload.h"
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
+#include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/core/payload_common.h"
 
 namespace cf {
@@ -52,6 +53,7 @@ class StageLinkPlugin : public cf::plugin::PluginBase {
 
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
+    using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<T>;
 
     // fetch → decode: 复制 PC + INSTRUCTION
     pb.at_stage("decode", cf::plugin::Phase::EARLY, [&pb]() {
@@ -63,9 +65,9 @@ class StageLinkPlugin : public cf::plugin::PluginBase {
       }
     });
 
-    // decode → execute: 复制 PC + DECODE + RS1 + RS2
-    // (RISCV_DETAIL 是 RISC-V 专属 Key, 不在通用 payload::keys 集合;
-    //  由 RiscVStageLinkPlugin 单独处理 — 后续 PR)
+    // decode → execute: 复制 PC + DECODE + RS1 + RS2 + RISCV_DETAIL
+    // (RISCV_DETAIL 是 RISC-V 专属 Key; branch/LSU 在 execute/memory 阶段需要
+    //  它的 funct3/funct7/imm)
     pb.at_stage("execute", cf::plugin::Phase::EARLY, [&pb]() {
       auto* decode = pb.node_of_logic_stage("decode").get();
       auto* execute = pb.node_of_logic_stage("execute").get();
@@ -74,16 +76,22 @@ class StageLinkPlugin : public cf::plugin::PluginBase {
         (*execute)(KeyType::DECODE) = (*decode)(KeyType::DECODE);
         (*execute)(KeyType::RS1) = (*decode)(KeyType::RS1);
         (*execute)(KeyType::RS2) = (*decode)(KeyType::RS2);
+        (*execute)(RvKey::RISCV_DETAIL) = (*decode)(RvKey::RISCV_DETAIL);
       }
     });
 
-    // execute → memory: 复制 PC + DECODE + MEM_ADDR + MEM_DATA + RD_DATA
+    // execute → memory: 复制 PC + DECODE + RS1 + RS2 + RISCV_DETAIL
+    //  + MEM_ADDR + MEM_DATA + RD_DATA
+    // (LSU 在 memory 阶段读 RS1 做地址生成, 读 RISCV_DETAIL.imm)
     pb.at_stage("memory", cf::plugin::Phase::EARLY, [&pb]() {
       auto* execute = pb.node_of_logic_stage("execute").get();
       auto* memory = pb.node_of_logic_stage("memory").get();
       if (execute && memory) {
         (*memory)(KeyType::PC) = (*execute)(KeyType::PC);
         (*memory)(KeyType::DECODE) = (*execute)(KeyType::DECODE);
+        (*memory)(KeyType::RS1) = (*execute)(KeyType::RS1);
+        (*memory)(KeyType::RS2) = (*execute)(KeyType::RS2);
+        (*memory)(RvKey::RISCV_DETAIL) = (*execute)(RvKey::RISCV_DETAIL);
         (*memory)(KeyType::MEM_ADDR) = (*execute)(KeyType::MEM_ADDR);
         (*memory)(KeyType::MEM_DATA) = (*execute)(KeyType::MEM_DATA);
         (*memory)(KeyType::RD_DATA) = (*execute)(KeyType::RD_DATA);

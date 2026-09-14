@@ -229,21 +229,24 @@ template <typename T = std::uint32_t>
 class CpuFactory {
  public:
   // 主入口: 接受 CPUConfig, 返回完整 PipeBuilder
+  // cpu-pipeline-stubs-replace commit E: 可选 mem 参数 — 非空时注入 IBusPlugin/DBusPlugin
+  // 真实访存 (取指/读写 PicolibcHostMemory). null (默认) 维持 stub 行为, 零回归.
   static std::unique_ptr<cf::plugin::PipeBuilder> build_cpu(
-      const CPUConfig& config) {
+      const CPUConfig& config,
+      cf::cpu::PicolibcHostMemory* mem = nullptr) {
     auto pb = std::make_unique<cf::plugin::PipeBuilder>();
 
     // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 必须在 register_early_plugins 之前注册,
     // 保证 StageLinkPlugin 的 4 个 EARLY 闭包在所有业务 plugin 之前跑.
     pb->register_plugin(std::make_unique<cf::cpu::plugins::StageLinkPlugin<T>>());
 
-    register_early_plugins<T>(*pb, config);
+    register_early_plugins<T>(*pb, config, mem);
 
     // 2. NORMAL 阶段: decode + execute
     register_normal_plugins<T>(*pb, config);
 
     // 3. LATE 阶段: writeback
-    register_late_plugins<T>(*pb, config);
+    register_late_plugins<T>(*pb, config, mem);
 
     // M5-DSE M5.10: 编译期 TopologyBuilder 展开 (按 config.pipeline_stages)
     // 5-stage 路径必须 byte-identical to baseline (现 register_*/at_stage 行为)
@@ -331,8 +334,10 @@ class CpuFactory {
   // EARLY 阶段: fetch
   template <typename U>
   static void register_early_plugins(cf::plugin::PipeBuilder& pb,
-                                     const CPUConfig& config) {
-    pb.register_plugin(std::make_unique<cf::cpu::plugins::IBusPlugin<U> >());
+                                     const CPUConfig& config,
+                                     PicolibcHostMemory* mem = nullptr) {
+    pb.register_plugin(
+        std::make_unique<cf::cpu::plugins::IBusPlugin<U> >(mem));
     pb.register_plugin(
         std::make_unique<cf::cpu::plugins::BranchPredictorPlugin<U>>(
             config.btb_entries));
@@ -376,8 +381,9 @@ class CpuFactory {
   // LATE 阶段: writeback
   template <typename U>
   static void register_late_plugins(cf::plugin::PipeBuilder& pb,
-                                    const CPUConfig& /*config*/) {
-    pb.register_plugin(std::make_unique<cf::cpu::plugins::DBusPlugin<U> >());
+                                    const CPUConfig& /*config*/,
+                                    PicolibcHostMemory* mem = nullptr) {
+    pb.register_plugin(std::make_unique<cf::cpu::plugins::DBusPlugin<U> >(mem));
     pb.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<U> >());
     (void)sizeof(U);
   }

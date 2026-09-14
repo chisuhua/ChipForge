@@ -61,34 +61,38 @@ class RiscvBranchPlugin : public cf::plugin::PluginBase {
         bool taken = false;
         T target = pc_val + 4;  // 默认 next_pc
 
-        // 根据 funct3 判断分支条件 (B-type)
-        switch (rv.funct3) {
-          case 0b000: taken = (rs1_val == rs2_val); break;  // BEQ
-          case 0b001: taken = (rs1_val != rs2_val); break;  // BNE
-          case 0b100: taken = (static_cast<std::int32_t>(rs1_val) <
-                               static_cast<std::int32_t>(rs2_val)); break;  // BLT
-          case 0b101: taken = (static_cast<std::int32_t>(rs1_val) >=
-                               static_cast<std::int32_t>(rs2_val)); break;  // BGE
-          case 0b110: taken = (rs1_val < rs2_val); break;  // BLTU
-          case 0b111: taken = (rs1_val >= rs2_val); break;  // BGEU
-        }
+        // cpu-pipeline-stubs-replace commit C: 仅当 op_class == BRANCH 才评估分支.
+        // 修 bug: 之前对所有指令无条件评估 (funct3 默认 0 落入 BEQ, 两操作数默认 0
+        // 使 taken=true → PC 被错误写为 pc+imm), 导致 ALU 指令后 PC 不推进.
+        if (dec.op_class == Dp::OpClass::BRANCH) {
+          // 根据 funct3 判断分支条件 (B-type)
+          switch (rv.funct3) {
+            case 0b000: taken = (rs1_val == rs2_val); break;  // BEQ
+            case 0b001: taken = (rs1_val != rs2_val); break;  // BNE
+            case 0b100: taken = (static_cast<std::int32_t>(rs1_val) <
+                                 static_cast<std::int32_t>(rs2_val)); break;  // BLT
+            case 0b101: taken = (static_cast<std::int32_t>(rs1_val) >=
+                                 static_cast<std::int32_t>(rs2_val)); break;  // BGE
+            case 0b110: taken = (rs1_val < rs2_val); break;  // BLTU
+            case 0b111: taken = (rs1_val >= rs2_val); break;  // BGEU
+          }
 
-        if (taken) {
-          // B-type 目标: PC + imm (imm 已在 RISCV_DETAIL.imm)
-          target = pc_val + static_cast<T>(rv.imm);
-        }
-
-        // JAL: 无条件跳转, 链接 PC+4 到 RD
-        // JALR: 跳转到 rs1+imm, 链接 PC+4 到 RD
-        if (dec.op_class == Dp::OpClass::BRANCH && rv.funct7 == 0) {
-          // JAL/JALR: 总是跳转
-          if (rv.funct3 == 0) {  // JALR
-            target = rs1_val + static_cast<T>(rv.imm);
-          } else {
+          if (taken) {
+            // B-type 目标: PC + imm (imm 已在 RISCV_DETAIL.imm)
             target = pc_val + static_cast<T>(rv.imm);
           }
-          taken = true;
-          n->operator()(KeyType::RD_DATA) = pc_val + 4;  // link
+
+          // JAL: 无条件跳转, 链接 PC+4 到 RD
+          // JALR: 跳转到 rs1+imm, 链接 PC+4 到 RD
+          if (rv.funct7 == 0) {
+            if (rv.funct3 == 0) {  // JALR
+              target = rs1_val + static_cast<T>(rv.imm);
+            } else {  // JAL
+              target = pc_val + static_cast<T>(rv.imm);
+            }
+            taken = true;
+            n->operator()(KeyType::RD_DATA) = pc_val + 4;  // link
+          }
         }
 
         // 写结果到通用 payload (RISC-V 特有)

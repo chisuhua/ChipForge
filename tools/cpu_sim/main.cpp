@@ -1,23 +1,26 @@
 // tools/cpu_sim/main.cpp
 //
-// 功能描述: cpu_sim CLI 二进制 (M5-DSE / M5.16, M4.15 PicolibcHostMemory 集成)
+// 功能描述: cpu_sim CLI 二进制 (M5-DSE / M5.16, M4.15 PicolibcHostMemory, cpu-pipeline-stubs-replace commit E)
 //   - 解析 JSON 配置 (cpu_params_schema.json 兼容)
-//   - 通过 cf::cpu::CpuFactory<T>::build_cpu(cfg) 构建 CPU 流水线
+//   - 通过 cf::cpu::CpuFactory<T>::build_cpu(cfg) 构建 CPU 流水线 (含 StageLinkPlugin 阶段间传播)
 //   - (可选) 加载 ELF 程序到 PicolibcHostMemory
-//   - 运行 N cycles 后输出 KEY=VALUE 格式 (sweep_driver 可解析)
+//   - 注入 PicolibcHostMemory 到 IBusPlugin + DBusPlugin (commit C+D 实装)
+//   - 运行 N cycles; mem.exited() 时提前退出 (picolibc 约定 tohost!=0)
+//   - 输出 KEY=VALUE 格式 (sweep_driver 可解析)
 //
-// M4.15 变更:
-//   - 集成 PicolibcHostMemory (64KB 静态 RAM)
-//   - 新增 --elf 标志: 加载 ELF .text 段到 PicolibcHostMemory
-//   - tohost 输出真实内存值 (非占位 0)
-//   - ipc 仍输出占位 0.0 (retired 计数推迟 Phase 5+)
+// 关键变更 (cpu-pipeline-stubs-replace commit E):
+//   - 删除 M4.15 引入的软件解释器 (main.cpp:170-213 旧代码)
+//     原解释器直接读写 PicolibcHostMemory, 实际是绕过 Plugin CPU 的欺骗性 demo
+//   - 现在 pb->run() 跑真实 Plugin CPU pipeline: IBusPlugin read_word(mem) 真实取指,
+//     DBusPlugin read/write_word(mem) 真实访存, StageLinkPlugin 跨阶段传播 Payload
+//   - isa="rv32i" 显式 pin (修复既有 CpuFactory<uint32_t> vs config.isa="rv64gc" 不一致)
 //
 // 约束:
-//   - 仅做 5/7-stage 默认流水线烟测, 不验证指令执行正确性 (M5-DSE 范围)
-//   - 不接入 CLI11 依赖 — 用 std::strcmp 简单 argv 解析
+//   - 依赖 build/add.elf 由既有 RISC-V 工具链生成 (若不可用, tohost 仍 0 但不报错)
+//   - 仅做 5/7-stage 默认流水线烟测; Phase 5+ 增加 retired 计数与真实 IPC
 //
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-23
+// 最后修改日期: 2026-09-14
 
 #include <cstdint>
 #include <cstdlib>
@@ -109,7 +112,8 @@ int main(int argc, char** argv) {
     if (std::strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
       config_path = argv[++i];
     } else if (std::strcmp(argv[i], "--cycles") == 0 && i + 1 < argc) {
-      cycles = std::strtoull(argv[++i], nullptr, 10);
+      cycles = std::strtoull(argv[i + 1], nullptr, 10);
+      ++i;
     } else if (std::strcmp(argv[i], "--elf") == 0 && i + 1 < argc) {
       elf_path = argv[++i];
     } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
@@ -122,13 +126,42 @@ int main(int argc, char** argv) {
   }
 
   // --------------------------------------------------------------------------
-  // 5.2: 加载 JSON + 构建 CPU
+  // 5.2: 加载 JSON 配置
+  // cpu-pipeline-stubs-replace commit E: isa="rv32i" 显式 pin
+  // (修复既有 CpuFactory<uint32_t> vs config.isa="rv64gc" 不一致)
   // --------------------------------------------------------------------------
   cf::cpu::CPUConfig cfg = load_config(config_path);
+  cfg.isa = "rv32i";
 
+  // --------------------------------------------------------------------------
+  // 5.3: 加载 ELF 程序到 PicolibcHostMemory (M4.15 集成)
+  //   - 仅在 --elf 指定时执行; 未指定时 mem 不注入 (维持 NOP/0 行为)
+  //   - 必须在 build_cpu 之前完成 (IBusPlugin 需要从 cycle 0 就能取到真指令)
+  // --------------------------------------------------------------------------
+  cf::cpu::PicolibcHostMemory mem;
+  bool elf_loaded = false;
+  if (!elf_path.empty()) {
+    try {
+      std::uint64_t base_addr = 0;
+      std::vector<std::uint8_t> text =
+          cf::tools::load_elf_text(elf_path, base_addr);
+      mem.load_binary(text.data(), text.size(), base_addr);
+      elf_loaded = true;
+    } catch (const std::exception& e) {
+      std::cerr << "FAIL: ELF load: " << e.what() << "\n";
+      return 1;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 5.4: 构建 CPU (cpu-pipeline-stubs-replace commit E: 注入 mem)
+  //   - --elf 指定时把 &mem 注入 IBusPlugin + DBusPlugin, 走真实取指/访存
+  //   - 未指定时传 nullptr, 维持原有 NOP/0 stub 行为 (零回归)
+  // --------------------------------------------------------------------------
   std::unique_ptr<cf::plugin::PipeBuilder> pb;
   try {
-    pb = cf::cpu::CpuFactory<std::uint32_t>::build_cpu(cfg);
+    pb = cf::cpu::CpuFactory<std::uint32_t>::build_cpu(
+        cfg, elf_loaded ? &mem : nullptr);
   } catch (const std::exception& e) {
     std::cerr << "FAIL: build_cpu: " << e.what() << "\n";
     return 1;
@@ -139,77 +172,13 @@ int main(int argc, char** argv) {
   }
 
   // --------------------------------------------------------------------------
-  // 5.3: 加载 ELF 程序到 PicolibcHostMemory (M4.15 集成)
-  //   - 解析 ELF32 .text 段 → 复制到 PicolibcHostMemory
-  //   - 仅在 --elf 指定时执行; 未指定时跳过 (与 M5.16 baseline 行为兼容)
-  // --------------------------------------------------------------------------
-  cf::cpu::PicolibcHostMemory mem;
-  if (!elf_path.empty()) {
-    try {
-      std::uint64_t base_addr = 0;
-      std::vector<std::uint8_t> text =
-          cf::tools::load_elf_text(elf_path, base_addr);
-      mem.load_binary(text.data(), text.size(), base_addr);
-    } catch (const std::exception& e) {
-      std::cerr << "FAIL: ELF load: " << e.what() << "\n";
-      return 1;
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // 5.4: 运行 N cycles; tohost 写入后提前退出 (picolibc 约定)
+  // 5.5: 运行 N cycles; tohost 写入后提前退出 (picolibc 约定)
   // --------------------------------------------------------------------------
   std::uint64_t actual_cycles = 0;
   for (std::uint64_t i = 0; i < cycles; ++i) {
     pb->run();
     ++actual_cycles;
-    if (mem.exited()) break;
-  }
-
-  // --------------------------------------------------------------------------
-  // 5.5: M4.15 — 最小 RV32I 软件解释器 (驱动 PicolibcHostMemory)
-  //   - 动机: pipeline plugins (IBus/DBus/...) 均为 stub, pb->run() 不会
-  //     真正执行 ELF. 叠加最小软件解释器直接读写 PicolibcHostMemory, 让
-  //     tohost 输出真实值 (替代占位 0). 仅在 --elf 指定时执行.
-  //   - 范围: add.S 子集 (ADDI / ADD / SW / JAL). 真实全 RV32I 推迟到 Phase 5+.
-  // --------------------------------------------------------------------------
-  if (!elf_path.empty()) {
-    std::uint32_t regs[32] = {0};
-    const std::uint64_t max_steps = std::min<std::uint64_t>(
-        cycles, cf::cpu::PicolibcHostMemory::kMemorySize / 4);
-    for (std::uint64_t step = 0; step < max_steps && !mem.exited(); ++step) {
-      const std::uint32_t pc = static_cast<std::uint32_t>(step * 4);
-      const std::uint32_t instr = mem.read_word(pc);
-      if (instr == 0) break;
-      const std::uint32_t opcode = instr & 0x7F;
-      if (opcode == 0x13) {
-        const std::uint32_t rd = (instr >> 7) & 0x1F;
-        const std::uint32_t funct3 = (instr >> 12) & 0x7;
-        const std::uint32_t rs1 = (instr >> 15) & 0x1F;
-        const std::int32_t imm = static_cast<std::int32_t>(instr) >> 20;
-        if (funct3 == 0x0) regs[rd] = regs[rs1] + imm;
-      } else if (opcode == 0x33) {
-        const std::uint32_t rd = (instr >> 7) & 0x1F;
-        const std::uint32_t funct3 = (instr >> 12) & 0x7;
-        const std::uint32_t rs1 = (instr >> 15) & 0x1F;
-        const std::uint32_t rs2 = (instr >> 20) & 0x1F;
-        const std::uint32_t funct7 = (instr >> 25) & 0x7F;
-        if (funct3 == 0x0 && funct7 == 0x00) regs[rd] = regs[rs1] + regs[rs2];
-      } else if (opcode == 0x23) {
-        const std::uint32_t funct3 = (instr >> 12) & 0x7;
-        const std::uint32_t rs1 = (instr >> 15) & 0x1F;
-        const std::uint32_t rs2 = (instr >> 20) & 0x1F;
-        const std::int32_t imm = static_cast<std::int32_t>(
-            ((instr >> 7) & 0x1F) | (((instr >> 25) & 0x7F) << 5));
-        if (funct3 == 0x2) {
-          mem.write_word(static_cast<std::uint64_t>(
-              static_cast<std::int64_t>(regs[rs1]) + imm), regs[rs2]);
-        }
-      } else if (opcode == 0x6F) {
-        // add.S 用 jal x0, . 做自循环, 解释器停止等价于无限循环
-        break;
-      }
-    }
+    if (elf_loaded && mem.exited()) break;
   }
 
   // --------------------------------------------------------------------------

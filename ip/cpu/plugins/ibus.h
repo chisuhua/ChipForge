@@ -65,15 +65,17 @@ class IBusPlugin : public cf::plugin::PluginBase {
 
     // writeback 阶段 LATE: PC 更新 (cpu-pipeline-stubs-replace commit C)
     // 单 pass 语义下, 分支决策在 execute 已完成 (DECODE.branch_taken/target),
-    // 写回阶段计算新 PC 供下一轮取指. 无 mispredict/flush (单 pass = 单条指令).
+    // 写回阶段计算新 PC 供下一轮取指. **PC 是循环携带值** — 必须写回 fetch 节点
+    // (fetch 每次从 fetch 节点读 PC); writeback 节点只是当轮快照.
     pb.at_stage("writeback", cf::plugin::Phase::LATE, [&pb]() {
-      auto* n = pb.node_of_logic_stage("writeback").get();
-      if (n) {
-        const auto& dec = n->operator()(KeyType::DECODE);
-        T pc = n->operator()(KeyType::PC);
+      auto* wb = pb.node_of_logic_stage("writeback").get();
+      auto* fetch = pb.node_of_logic_stage("fetch").get();
+      if (wb && fetch) {
+        const auto& dec = wb->operator()(KeyType::DECODE);
+        T pc = wb->operator()(KeyType::PC);
         const bool taken = dec.branch_taken;
         const T target = static_cast<T>(dec.branch_target);
-        n->operator()(KeyType::PC) = taken ? target : static_cast<T>(pc + 4);
+        fetch->operator()(KeyType::PC) = taken ? target : static_cast<T>(pc + 4);
       }
     });
   }

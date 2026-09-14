@@ -85,14 +85,27 @@ endif()
 # 依赖 cf_plugin (含 pipe_builder.h / cpu_factory.h 的传递 include 路径)
 # ----------------------------------------------------------------------------
 if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
+  # cpu-pipeline-stubs-replace commit E: cpu_sim 通过 cpu_factory.h 传递 include 了
+  # RiscvMMUPlugin 头 (实例化需要 vtable + 构造函数). 显式追加 mmu 实现源文件
+  # (镜像 tests/CMakeLists.txt 的 MMU_IMPL_SOURCES 做法).
+  set(cpu_sim_mmu_sources
+    ${CMAKE_SOURCE_DIR}/ip/mmu/lib/multi_level_tlb.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/lib/ptw.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/lib/tlb_factory.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/policies/tlb_replacement_policy.cpp
+    ${CMAKE_SOURCE_DIR}/ip/mmu/tlm/MMUPlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cpu/plugins/mmu.cpp
+  )
   add_executable(cpu_sim
     ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp
+    ${cpu_sim_mmu_sources}
   )
   target_link_libraries(cpu_sim PRIVATE cf_plugin)
   target_include_directories(cpu_sim
     PRIVATE
       ${CMAKE_SOURCE_DIR}
   )
+  target_compile_options(cpu_sim PRIVATE -w)  # suppress warnings from third-party headers
   cf_plugin_link_cpptlm(cpu_sim)  # nlohmann/json via CppTLM bundled
 endif()
 

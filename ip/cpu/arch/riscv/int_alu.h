@@ -54,11 +54,20 @@ class RiscvIntAluPlugin : public cf::plugin::PluginBase {
         T rs1_val = n->operator()(KeyType::RS1);
         T rs2_val = n->operator()(KeyType::RS2);
         const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+        const auto& dec = n->operator()(KeyType::DECODE);
 
         // 推断 OpCode (简化: 根据 funct3/funct7)
         OpCode op = infer_opcode(rv.funct3, rv.funct7);
 
-        T result = compute(op, rs1_val, rs2_val);
+        // cpu-pipeline-stubs-replace commit E: I-type ALU 指令 (ADDI/SLTI/XORI/...)
+        // 用 imm 而不是 rs2 (decoder 对 I-type 置 reads_rs2=false).
+        // 修 bug: 之前一律用 rs2_val (I-type 时 rs2 未读 = 0), addi 结果恒错.
+        T op2 = dec.reads_rs2 ? rs2_val : static_cast<T>(rv.imm);
+
+        T result = compute(op, rs1_val, op2);
+        // cpu-pipeline-stubs-replace commit E: RegFilePlugin 写回读 RD_DATA,
+        // 必须写 RD_DATA (修 bug: 之前只写 RESULT, 写回取到旧值).
+        n->operator()(KeyType::RD_DATA) = result;
         n->operator()(KeyType::RESULT) = result;
       }
     });
