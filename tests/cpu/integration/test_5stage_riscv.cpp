@@ -46,7 +46,8 @@ TEST_CASE("build_5stage", "[cpu-integration]") {
   // (IBus/Branch/Hazard/Decode/Alu/Mul/Branch/Lsu/Csr/DBus/RegFile) 都 at_stage 注册;
   // 加上 5 个 TopologyBuilder at_stage + 2 cpu_factory lane dispatch (n_lanes=1 时 0)
   // = 5 (topology) + 11 (plugins) = 16 baseline + 2 mm substage (enable_mmu=false) = 18
-  REQUIRE(pb->stage_count() == 18);
+  REQUIRE(pb->stage_count() == 22);  // 5 baseline + 5 MMUPlugin + 3 RiscVMMUPlugin + 1 lane + 4 StageLink = 22
+  // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 增加 4 个 EARLY 闭包
   REQUIRE(pb->has_stage("fetch"));
   REQUIRE(pb->has_stage("decode"));
   REQUIRE(pb->has_stage("execute"));

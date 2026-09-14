@@ -34,6 +34,7 @@
 #include "ip/cpu/plugins/branch_predictor.h"
 #include "ip/cpu/plugins/hazard.h"
 #include "ip/cpu/plugins/dbus.h"
+#include "ip/cpu/plugins/stage_link.h"  // cpu-pipeline-stubs-replace commit B: 阶段间 Payload 传播
 #include "ip/cpu/arch/riscv/decode.h"
 #include "ip/cpu/arch/riscv/int_alu.h"
 #include "ip/cpu/arch/riscv/mul.h"
@@ -231,6 +232,10 @@ class CpuFactory {
   static std::unique_ptr<cf::plugin::PipeBuilder> build_cpu(
       const CPUConfig& config) {
     auto pb = std::make_unique<cf::plugin::PipeBuilder>();
+
+    // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 必须在 register_early_plugins 之前注册,
+    // 保证 StageLinkPlugin 的 4 个 EARLY 闭包在所有业务 plugin 之前跑.
+    pb->register_plugin(std::make_unique<cf::cpu::plugins::StageLinkPlugin<T>>());
 
     register_early_plugins<T>(*pb, config);
 

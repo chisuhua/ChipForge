@@ -93,7 +93,9 @@ TEST_CASE("build_cpu_registers_11_real_plugins", "[cpu]") {
   auto pb = cf::cpu::CpuFactory<std::uint64_t>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
   const auto& plugins = pb->plugins();
-  REQUIRE(plugins.size() == 12);  // mmu-cache-integration commit 7: +1 RiscVMMUPlugin
+  REQUIRE(plugins.size() == 13);  // 11 baseline + 1 RiscVMMUPlugin + 1 StageLinkPlugin
+  // mmu-cache-integration commit 7: +1 RiscVMMUPlugin
+  // cpu-pipeline-stubs-replace commit B: +1 StageLinkPlugin (阶段间传播)
 }
 
 

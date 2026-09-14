@@ -144,7 +144,8 @@ TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   // 7 nodes (TopologyBuilder<7>) + 5 MMUPlugin substages - 2 mul_latency substages (mul_latency=1 = no-op) = 10 nodes
   REQUIRE(pb->node_count() == 10);
   // 7 TopologyBuilder + 7 lane dispatch + 11 baseline cpu plugins at_stage + 5 MMUPlugin at_stage + 3 RiscVMMUPlugin at_stage - 3 mul_latency1 baseline at_stage (no-op substages 排除) = 30 stages
-  REQUIRE(pb->stage_count() == 30);
+  REQUIRE(pb->stage_count() == 34);  // 7 TopologyBuilder + 7 lane + 11 baseline + 5 MMU + 3 RiscVMMU + 4 StageLink = 34
+  // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 增加 4 个 EARLY 闭包
 }
 
 static std::string exec_cmd(const std::string& cmd) {
