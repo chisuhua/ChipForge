@@ -64,6 +64,20 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 | icache_latency_cycles | int (0-32) | 1 | ICache 命中延迟 |
 | dcache_latency_cycles | int (0-32) | 1 | DCache 命中延迟 |
 
+## RiscV MMU Integration (mmu-cache-integration v0.2.0)
+
+当 `enable_mmu=true` 时, `CpuFactory::build_cpu()` 条件注册 `cf::cpu::plugins::RiscvMMUPlugin` (继承 `cf::ip::mmu::MMUPlugin`)。Plugin 在 `setup()` 中声明 3 个 RiscV hook substage:
+
+- `csr_write_satp` 挂 `execute` — CPU 写 `cpu_keys::SAT` payload key 后, 闭包读取并调 `csr_write_satp()` hook (satp CSR 写拦截)
+- `sfence_vma` 挂 `execute` — 读 `SFENCE_VADDR`/`SFENCE_ASID` 后调 `sfence_vma()` (RISC-V Spec §6.2 4-way dispatch)
+- `mmu_exit` 挂 `memory` — 读 `mmu_keys::EXCEPTION_CODE` 并写到 `cpu_keys::CPU_EXCEPTION_CODE`
+
+**Payload Key 契约**: `ip/cpu/tlm/cpu_keys.h` (CPU → MMU IPC) + `ip/mmu/tlm/mmu_keys.h` 已有 Key (MMU → CPU)。Key identity 是全局 static 指针身份, IP 间通过 `pb.at_stage` 闭包共享 PayloadStore。
+
+**baseline 行为**: `enable_mmu=false` 时不注册 MMUPlugin, byte-identical baseline (5-stage 5 nodes, stage_count 18 含 11 baseline plugins + 5 topology + 2 lane dispatch)。
+
+**集成测试**: `tests/cpu/integration/test_{3,5,7,10}stage_riscv.cpp` 各加 `EnableMMU*` 测试 + `tests/cpu/test_cpu_riscv_mmu_hooks.cpp` 3 个 RiscV hook 集成测试。
+
 ## 快速开始
 
 ```bash

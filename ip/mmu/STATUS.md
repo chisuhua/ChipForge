@@ -1,4 +1,4 @@
-# STATUS: INTEGRATED (mmu-cache-integration + L1Cache VIPT + SoC 全链, 2026-09-13)
+# STATUS: INTEGRATED (mmu-cache-integration + L1Cache VIPT + SoC 全链 + CPU PIPELINE, 2026-09-13)
 
 mmu-tlb-ptw-impl (archived 2026-09-12) + mmu-cache-integration (current) 完成:
 - TLB lookup/insert/invalidate (4 替换策略: None/FIFO/LRU/RRIP)

@@ -68,6 +68,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **目的**: 实现 TLB lookup/insert 算法 + PTW Sv39 三级 walk + MultiLevelTLB coherence + MMUPlugin at_stage 闭包 + RISC-V satp/SFENCE.VMA/exception 12/13/15 hook + cpptlm MMUTLMBridge. 解锁 ADR-044 VIPT 数据流真实链路 (MMUPlugin 同时输出 pl::PADDR + pl::MMU_VADDR).
 
+## v0.2.0 (2026-09-13) - cpu-mmu-integration
+
+> **目的**: 把 mmu-cache-integration v0.1.0 实装的 RiscVMMUPlugin 真正接到 CPU pipeline. 条件注册 + 3 个 RiscV hook substage (csr_write_satp/sfence_vma/mmu_exit) + exception 12/13/15 传播到 CPU. 落地 Oracle Tier 1 #1 推荐的 M5 critical path 起点.
+
+### Added
+
+- **`ip/cpu/cpu_factory.h`**（修改）：`build_cpu()` 在 `config.enable_mmu=true` 时条件注册 `cf::cpu::plugins::RiscvMMUPlugin`; 映射 `config.mmu_mode` ("sv32"/"sv39"/"sv48") 到 `cf::ip::mmu::SvMode` 枚举; 默认 TLB 几何 2-level 8/8 + LRU + ptw_max_inflight=2（与 SoC JSON 一致）; 加 `pb->build()` 调用触发所有 plugin 的 setup()/build() 闭包（之前 baseline 不需要 plugin 闭包，加 MMU 后必须 build()）
+- **`ip/cpu/tlm/cpu_keys.h`**（NEW）：4 个 Payload Key `SAT`/`SFENCE_VADDR`/`SFENCE_ASID`/`CPU_EXCEPTION_CODE`（CPU→MMU IPC Key 集合）；放 `ip/cpu/` 而非 `ip/mmu/` 避免反向依赖；Key identity 是全局 static 指针身份
+- **`ip/cpu/plugins/mmu.h`**（修改）：override `setup()` + `build()` 声明 3 个 RiscV hook substage
+- **`ip/cpu/plugins/mmu.cpp`**（修改）：`setup()` 声明 3 substage（csr_write_satp/sfence_vma 挂 execute，mmu_exit 挂 memory）；`build()` 注册 3 个 at_stage 闭包，路由到 `csr_write_satp()`/`sfence_vma()` hook（4-way RISC-V Spec §6.2 dispatch）/exception 传播；D4 合规：用 if/else 全分支（无早返）
+- **`tests/cpu/integration/test_{3,5,7,10}stage_riscv.cpp`**（修改）：各加 `EnableMMU{3,5,7,10}Stage*` 测试 + `EnableMMUDisabledBitIdenticalBaseline`（5-stage enable_mmu=false 字节级 baseline）
+- **`tests/cpu/test_cpu_riscv_mmu_hooks.cpp`**（NEW）：3 个 RiscV hook 集成测试（`CSRWriteSatpRoutesToRiscVMMUPlugin` + `SFENCEVMARoutesToRiscVMMUPlugin` + `MMUExceptionPropagatesToCPU`），镜像 test_l1_cache_plugin_unit.cpp 隔离测试原则
+- **`tests/cpu/test_cpu_factory.cpp`**（修改）：`plugins.size() == 11` → `12`（Oracle B2 修复：RiscVMMUPlugin 注册后 +1）
+- **`ip/cpu/README.md`**（修改）：新增 "RiscV MMU Integration (mmu-cache-integration v0.2.0)" 段说明 3 个 hook substage 契约
+- **`ip/cpu/configs/cpu_params_schema.json`**（修改）：`enable_mmu` description 指向 `cf::cpu::plugins::RiscvMMUPlugin`
+- **`ip/mmu/STATUS.md`**（修改）：`INTEGRATED + CPU PIPELINE`
+
+### Fixed
+- Oracle B2 breaking（commit 1 引入）：`cpu_factory` 默认 `enable_mmu=true` 导致现有 5+ 个 cpu 测试的 `node_count`/`stage_count`/`plugins.size` assertions 硬错误。**修复**：commit 1.5-1.7 tasks 同步更新 4 个测试文件（3-stage/5-stage/7-stage/test_cpu_factory）到新数字（详细注释说明来源）
+- D4 早返违规（commit 2 引入）：3 个 RiscV hook 闭包用 `if (!node) return;` 早返。**修复**：改为 `if (node && has(key)) { ... } else { (void)0; }` 全分支（D4 HDL 1:1 友好）
+
+### Verified
+- `./build/bin/chipforge_tests` → **314/314 PASS**（was 291 baseline; +23 cases = 15 mmu-cache-integration + 8 cpu-mmu-integration）
+- `[cpu-integration]` 25 → **33/33 PASS**（+8: 5 stage + 3 RiscV hook baseline）
+- `[RiscV]` 4 → **7/7 PASS**（+3 new hook integration tests）
+- `[cpu]` 114/114 PASS（含 B2 修复）
+- 4 architecture gates all PASS（verify_adr + verify_plugin_decision + check_plugin_portability + doc_link_check）
+- 5 次连跑稳定性 PASS（无 flaky test）
+
+### Pending (下一阶段入口)
+
+> `plugin-framework-stall` change —— `PipeBuilder::run()` 消费 `CtrlLink::should_halt()` 替代 RETRY 数据依赖（Oracle Tier 1 #2）
+
 ## v0.1.0 (2026-09-13) - mmu-cache-integration
 
 > **目的**: 完成 ADR-044 §3.2 VIPT 数据流方案 A 双端契约 — L1CachePlugin 消费 pl::MMU_VADDR 做 VIPT 索引 + PIPT fallback 兼容 + MMUTLMBridgeAdapter cpptlm 集成 + soc/mmu_minimal.json 全链 + PTW completion dual-write bug 修补.

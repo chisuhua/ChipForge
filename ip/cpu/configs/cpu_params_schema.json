@@ -42,7 +42,7 @@
         "enable_mmu": {
           "type": "boolean",
           "default": true,
-          "description": "启用 MMU"
+          "description": "启用 MMU (cf::cpu::plugins::RiscvMMUPlugin, 见 ip/cpu/plugins/mmu.h)"
         },
         "mmu_mode": {
           "type": "string",
