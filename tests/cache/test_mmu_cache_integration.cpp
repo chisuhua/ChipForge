@@ -8,12 +8,21 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/mmu/tlm/MMUPlugin.h"
 #include "ip/mmu/tlm/mmu_keys.h"
+#include "bundles/tlb_bundles_tlm.hh"
+#include "bundles/tlb_bundles_extension.h"
+#include "cf_plugin/bridge/mmu_bridge.h"
 
 namespace cf {
 namespace ip {
 namespace cache {
 namespace tlm {
+namespace {
+
+using MMUPlugin = ::cf::ip::mmu::MMUPlugin;
+
+}  // namespace
 
 TEST_CASE("MMUPluginOutputDrivesVIPTIndex", "[cache][MMUCacheIntegration]") {
   // Mock MMU 输出: vaddr=0x4000_07F0 → idx=0x7F (kIdxBits=8, kOffsetBits=4)
@@ -86,6 +95,34 @@ TEST_CASE("VIPTMissWhenVAddrMatchesButPAddrAbsent", "[cache][MMUCacheIntegration
 
   auto resp = helper->read_response(lookup);
   CHECK_FALSE(resp.hit);
+}
+
+// ptw-walk-bridge-fix commit B: MMUTLMBridge 端到端 issue_request → tick → read_response 回归网
+// (修复 mmu-tlb-ptw-impl commit 9b stub 注释; 镜像 mmu_bridge_adapter.cpp:59-66 的 ch_stream→POD 转换)
+TEST_CASE("EndToEndTranslationThroughBridge", "[cache][MMUCacheIntegration]") {
+  // Setup: 构造 MMUTLMBridge + 预填 TLB (避免走 PTW walk 路径, 直接 hit)
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  auto plugin = std::make_unique<MMUPlugin>(cf::ip::mmu::SvMode::Sv39, levels, MMUPlugin::PTWConfig{2});
+  MMUPlugin* plugin_raw = plugin.get();
+  plugin_raw->multi_tlb()->level(0)->insert(0x40000000ULL, 0x80000000ULL, 0, 0xFF);
+
+  cf::plugin::bridge::MMUTLMBridge bridge(std::move(plugin));
+
+  // Construct TlbReqBundle (ch_uint 字段) — mirror mmu_bridge_adapter.cpp:59-63
+  ::bundles::TlbReqBundle ch_req{};
+  ch_req.transaction_id.write(static_cast<uint64_t>(0x1));
+  ch_req.vaddr.write(static_cast<uint64_t>(0x40000000ULL));
+  ch_req.asid.write(static_cast<uint16_t>(0));
+  ch_req.access_type.write(static_cast<uint8_t>(0));
+
+  // issue_request → tick → read_response 真实调 MMUPlugin issue_request
+  bridge.issue_request(ch_req);
+  bridge.tick();
+  ::bundles::TlbRespBundle ch_resp = bridge.read_response();
+
+  CHECK(static_cast<uint64_t>(ch_resp.paddr.read()) == 0x80000000ULL);
+  CHECK(static_cast<uint8_t>(ch_resp.hit.read()) == 1);
+  CHECK(static_cast<uint8_t>(ch_resp.exception_code.read()) == 0);
 }
 
 }  // namespace tlm

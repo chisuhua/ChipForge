@@ -1,6 +1,9 @@
 // Bundles extension: TlbReq / TlbResp (mmu-ip-skeleton, 9.1-9.2)
 // 追加到 bundles/mem_bundles.h
 
+#ifndef BUNDLES_TLB_BUNDLES_EXTENSION_H
+#define BUNDLES_TLB_BUNDLES_EXTENSION_H
+
 #include "cf/plugin/uint_t.h"
 
 namespace cf {
@@ -24,3 +27,5 @@ struct TlbResp {
 
 }  // namespace bundles
 }  // namespace cf
+
+#endif  // BUNDLES_TLB_BUNDLES_EXTENSION_H

@@ -39,16 +39,24 @@ void MMUTLMBridge::tick() {
 
 void MMUTLMBridge::issue_request(const ::bundles::TlbReqBundle& req) {
   if (!plugin_ || !payload_node_) return;
-  // MMUPlugin 通过 at_stage() 闭包驱动, 这里只做 4 字段窄桥 stub.
-  // 完整 issue_request 实装推迟到 mmu-cache-integration change.
-  (void)req;
+  // Bundle→POD 转换: TlbReqBundle ch_uint 字段 → cf::bundles::TlbReq POD 字段
+  // (trans_id 和 access_type 在 POD 中无对应字段, 丢弃; mirror l1_cache_bridge.cpp:62-65)
+  const uint64_t vaddr = req.vaddr.read();
+  const uint16_t asid  = static_cast<uint16_t>(req.asid.read());
+  plugin_->issue_request(vaddr, asid);
 }
 
 ::bundles::TlbRespBundle MMUTLMBridge::read_response() const {
-  if (!plugin_ || !payload_node_) return {};
-  (void)plugin_;
-  (void)payload_node_;
-  return {};
+  ::bundles::TlbRespBundle ch_resp{};
+  if (!plugin_ || !payload_node_) return ch_resp;
+  // POD→Bundle 转换: cf::bundles::TlbResp POD 字段 → TlbRespBundle ch_uint 字段
+  const cf::bundles::TlbResp pod = plugin_->read_response(payload_node_);
+  ch_resp.transaction_id.write(0);
+  ch_resp.paddr.write(static_cast<uint64_t>(pod.paddr));
+  ch_resp.hit.write(static_cast<uint8_t>(pod.hit ? 1 : 0));
+  ch_resp.perms.write(static_cast<uint8_t>(pod.perms));
+  ch_resp.exception_code.write(static_cast<uint8_t>(pod.fault_code));
+  return ch_resp;
 }
 
 }  // namespace bridge

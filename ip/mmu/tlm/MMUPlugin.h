@@ -23,6 +23,8 @@
 #include "ip/mmu/lib/multi_level_tlb.h"
 #include "ip/mmu/lib/ptw.h"
 #include "ip/mmu/lib/tlb_factory.h"
+#include "ip/mmu/tlm/mmu_keys.h"
+#include "bundles/tlb_bundles_extension.h"  // cf::bundles::TlbResp POD (commit B read_response)
 
 namespace cf {
 namespace ip {
@@ -65,6 +67,32 @@ class MMUPlugin : public cf::plugin::PluginBase {
   // (mirror multi_tlb 模式; lib/ 类型出现在 tlm/ public API 是 stub 测试 API 的
   // 妥协, 与 mmutlb-ptw-impl commit 4 stub_write_pte public accessor 一致)
   cf::ip::mmu::PTW* ptw() const { return ptw_.get(); }
+
+  // ptw-walk-bridge-fix commit B: 公开 issue_request API 喂 last_vaddr_/current_asid_ 给 at_stage 闭包
+  // (mirror L1CachePlugin::issue_request L1CachePlugin.h:123-124)
+  void issue_request(uint64_t vaddr, uint16_t asid = 0) {
+    last_vaddr_ = vaddr;
+    current_asid_ = asid;
+  }
+
+  // ptw-walk-bridge-fix commit B: 公开 read_response API 从 tlb_lookup_ifetch 节点读结果
+  // (mirror L1CachePlugin::read_response L1CachePlugin.h:133-134)
+  // 从节点读 mmu_keys<T>::PADDR / EXCEPTION_CODE (do_lookup 闭包写入)
+  // hit 推导规则: hit = (exception_code == 0 && paddr != 0)
+  // (mmu-cache-integration commit 8 没 缺 PERMS payload key 写入, 暂以 paddr!=0 间接证明 hit)
+  cf::bundles::TlbResp read_response(
+      const std::shared_ptr<cf::plugin::PipeNode>& n) const {
+    using Keys = payload::mmu_keys<std::uint64_t>;
+    cf::bundles::TlbResp resp{};
+    if (!n) return resp;
+    std::uint64_t paddr = static_cast<std::uint64_t>(n->operator()(Keys::PADDR));
+    std::uint8_t exception = static_cast<std::uint8_t>(n->operator()(Keys::EXCEPTION_CODE));
+    resp.paddr = static_cast<cf::plugin::uint_t<64>>(paddr);
+    resp.fault_code = static_cast<cf::plugin::uint_t<4>>(exception);
+    resp.hit = (exception == 0 && paddr != 0);
+    resp.fault = (exception != 0);
+    return resp;
+  }
 
  private:
   SvMode sv_mode_;
