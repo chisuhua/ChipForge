@@ -78,6 +78,11 @@ class PTW {
   void stub_write_pte(std::size_t idx, const PTE& pte);
   PTE stub_read_pte(std::size_t idx) const;
 
+  // ptw-walk-bridge-fix commit A: MMUPlugin at_stage 闭包 1 行推进接口
+  // 从 pte_stub_memory_ 读 PTE 并调 advance(pte.raw, current_level_)
+  // busy=false 时 no-op; 复用 advance 状态机, 不修改 stub memory
+  void advance_from_stub();
+
  private:
   SvMode mode_;
   std::size_t max_inflight_;

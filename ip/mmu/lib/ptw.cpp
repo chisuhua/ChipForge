@@ -92,6 +92,14 @@ PTE PTW::stub_read_pte(std::size_t idx) const {
   return PTE{};
 }
 
+void PTW::advance_from_stub() {
+  if (!busy_) return;
+  const std::uint64_t ppn = current_pte_paddr_ >> 12;
+  const std::size_t idx = ppn & 0xFFF;
+  const PTE pte = pte_stub_memory_[idx];
+  advance(pte.raw, current_level_);
+}
+
 uint64_t PTW::next_pte_paddr(uint64_t pte_ppn, std::size_t level) const {
   // stub: 完整 PTE 地址计算推迟到 mmu-tlb-ptw-impl
   return (pte_ppn << 12);

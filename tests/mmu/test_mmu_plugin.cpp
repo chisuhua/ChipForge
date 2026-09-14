@@ -140,6 +140,74 @@ TEST_CASE("SFENCEVMARs1NonZeroInvalidatesAllASIDs", "[mmu][MMUPlugin][RiscV]") {
   CHECK_FALSE(mmu.multi_tlb()->level(0)->lookup(0x40000000ULL, 1).hit);
 }
 
+// ptw-walk-bridge-fix commit A: Sv39 3-level PTW walk 端到端回归网
+// (MMUPlugin::at_stage("ptw_l0/l1/l2") 闭包从空 lambda 改为调 advance_from_stub)
+// 测试用 PTW::stub_write_pte 准备完整 L2→L1→L0 PTE chain, 验证 start_walk + 3 次 advance_from_stub
+// 触发 WalkCallback with correct paddr/perms.
+// 注: PTW stub memory size = 4096 (kPteStubSize); multi-level walk 的 next_pte_paddr
+// 简化 = (ppn << 12), 所以 idx 必须 < 4096. 本测试用 satp_ppn=0 + ppn=1/2/0x80000 让 idx=0/1/2 都 < 4096.
+// 注: 此测试直接调 PTW API (不依赖 do_lookup 闭包 + last_vaddr_ 私有字段;
+// commit B 的 issue_request() API 才完整 enable at_stage 路径端到端测试)
+TEST_CASE("PTWSv39ThreeLevelWalkCompletesViaAdvanceFromStub", "[mmu][MMUPlugin][PTW]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  MMUPlugin mmu(SvMode::Sv39, levels, MMUPlugin::PTWConfig{2});
+
+  // Setup: Sv39 PTE chain for vaddr=0x4000_0000, satp_ppn=0 (root paddr=0)
+  // L2 (root) at stub idx 0: V=1, non-leaf, ppn=0x1 → next_pte_paddr(0x1,1) = 0x1 << 12 = 0x1000
+  // L1 at stub idx (0x1000>>12)&0xFFF = 1: V=1, non-leaf, ppn=0x2 → next_pte_paddr(0x2,2) = 0x2 << 12 = 0x2000
+  // L0 (leaf) at stub idx (0x2000>>12)&0xFFF = 2: V=1, R=1, ppn=0x80000 → paddr 0x8000_0000
+  cf::ip::mmu::PTE l2_pte{};
+  l2_pte.raw = (1ULL << 0) | (0x1ULL << 10);  // V=1, ppn=0x1
+  mmu.ptw()->stub_write_pte(0, l2_pte);
+
+  cf::ip::mmu::PTE l1_pte{};
+  l1_pte.raw = (1ULL << 0) | (0x2ULL << 10);  // V=1, ppn=0x2
+  mmu.ptw()->stub_write_pte(1, l1_pte);
+
+  cf::ip::mmu::PTE l0_pte{};
+  l0_pte.raw = (1ULL << 0) | (1ULL << 1) | (0x80000ULL << 10);  // V=1, R=1, ppn=0x80000
+  mmu.ptw()->stub_write_pte(2, l0_pte);
+
+  // Trigger walk + advance 3 steps (镜像 at_stage("ptw_l0/l1/l2") 闭包调 advance_from_stub)
+  bool walk_done = false;
+  std::uint64_t result_paddr = 0;
+  std::uint8_t result_perms = 0;
+  mmu.ptw()->start_walk(0x40000000ULL, /*asid=*/0, /*satp_ppn=*/0ULL,
+    [&walk_done, &result_paddr, &result_perms](
+        std::uint64_t paddr, std::uint8_t perms) {
+      walk_done = true;
+      result_paddr = paddr;
+      result_perms = perms;
+    },
+    nullptr);
+
+  // 3-level walk: l2 → l1 → l0 leaf (commit A 的 at_stage 闭包将自动调这 3 次)
+  mmu.ptw()->advance_from_stub();
+  mmu.ptw()->advance_from_stub();
+  mmu.ptw()->advance_from_stub();
+
+  CHECK(walk_done);
+  CHECK(result_paddr == 0x80000000ULL);     // (0x80000 << 12) | (0x40000000 & 0xFFF)
+  CHECK_FALSE(mmu.ptw()->is_busy());          // walk 完成后 busy_=false
+  CHECK(mmu.ptw()->is_done());
+  CHECK((result_perms & 0x01) != 0);          // R bit set
+}
+
+TEST_CASE("PTWAdvanceFromStubIsNoOpWhenNotBusy", "[mmu][MMUPlugin][PTW]") {
+  PTW ptw(SvMode::Sv39);
+  // 不调 start_walk, busy=false
+  CHECK_FALSE(ptw.is_busy());
+
+  // advance_from_stub 应该是 no-op, 不修改任何状态
+  std::size_t level_before = ptw.current_level();
+  ptw.advance_from_stub();
+  std::size_t level_after = ptw.current_level();
+
+  CHECK(level_before == level_after);
+  CHECK_FALSE(ptw.is_busy());
+  CHECK_FALSE(ptw.is_done());
+}
+
 }  // namespace mmu
 }  // namespace ip
 }  // namespace cf

@@ -61,6 +61,11 @@ class MMUPlugin : public cf::plugin::PluginBase {
     if (multi_tlb_) multi_tlb_->invalidate_vaddr_any_asid(vaddr);
   }
 
+  // ptw-walk-bridge-fix commit A: 公开 ptw_ 访问器供测试种 PTE chain
+  // (mirror multi_tlb 模式; lib/ 类型出现在 tlm/ public API 是 stub 测试 API 的
+  // 妥协, 与 mmutlb-ptw-impl commit 4 stub_write_pte public accessor 一致)
+  cf::ip::mmu::PTW* ptw() const { return ptw_.get(); }
+
  private:
   SvMode sv_mode_;
   PTWConfig ptw_config_;

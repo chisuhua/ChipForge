@@ -76,9 +76,9 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
     do_lookup("tlb_lookup_loadstore", last_vaddr_);
   });
 
-  pb.at_stage("ptw_l0", Phase::NORMAL, []() {});
-  pb.at_stage("ptw_l1", Phase::NORMAL, []() {});
-  pb.at_stage("ptw_l2", Phase::NORMAL, []() {});
+  pb.at_stage("ptw_l0", Phase::NORMAL, [this]() { ptw_->advance_from_stub(); });
+  pb.at_stage("ptw_l1", Phase::NORMAL, [this]() { ptw_->advance_from_stub(); });
+  pb.at_stage("ptw_l2", Phase::NORMAL, [this]() { ptw_->advance_from_stub(); });
 }
 
 }  // namespace mmu
