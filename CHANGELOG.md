@@ -63,6 +63,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > `mmu-tlb-ptw-impl` change —— TLB lookup/insert 算法实装 + PageTableWalker Sv32/Sv39/Sv48 解码 + CtrlLink halt_when PTW stall + cpptlm MMUTLMBridge + RISC-V 特定 hook (satp 拦截 / SFENCE.VMA / exception 12/13/15)
 
+## v0.1.1 (2026-09-14) - ptw-walk-bridge-fix
+
+> **目的**: 修复 mmu-cache-integration 遗留的 2 处隐藏 bug — MMUPlugin at_stage ptw_l0/l1/l2 闭包是空 lambda (PTW walk 永远 busy) + MMUTLMBridge issue_request/read_response 是 stub (SoC 端到端仿真失败).
+
+### Added
+- **`ip/mmu/lib/ptw.h/.cpp`**: `advance_from_stub()` 方法 — MMUPlugin at_stage 闭包一行推进 PTW walk
+- **`ip/mmu/tlm/MMUPlugin.h/.cpp`**: `issue_request(vaddr, asid)` + `read_response(node)` 公开 API (mirror L1CachePlugin)
+- **`src/cf_plugin/bridge/mmu_bridge.cpp`**: issue_request 真实调 MMUPlugin + read_response 从节点读 PADDR/EXCEPTION_CODE
+- **`bundles/tlb_bundles_extension.h`**: include guard (修复重复 include 编译错误)
+
+### Fixed
+- MMUPlugin::at_stage("ptw_l0/l1/l2") 空 lambda → 调 `ptw_->advance_from_stub()` (PTW walk 从"永远 busy"修复为真实完成)
+- MMUTLMBridge::issue_request stub 注释 → Bundle→POD 转换 + 调用 plugin issue_request
+- MMUTLMBridge::read_response 无条件 return {} → 从 tlb_lookup_ifetch 节点读 PADDR/EXCEPTION_CODE
+- read_response hit 推导: `hit = (exception == 0 && paddr != 0)` (PERMS payload key 缺位暂以 paddr 间接证明)
+
+### Verified
+- `./build/bin/chipforge_tests` → 317/317 PASS (was 306; +11: 2 PTW end-to-end + 1 via-bridge)
+- `[mmu]` 40 → **42** PASS (`PTWSv39ThreeLevelWalkCompletesViaAdvanceFromStub` + `PTWAdvanceFromStubIsNoOpWhenNotBusy`)
+- `[MMUCacheIntegration]` 3 → **4** PASS (`EndToEndTranslationThroughBridge`)
+- 4 architecture gates all PASS
+- 5 次连跑稳定性 PASS
+
+### Pending (下一阶段入口)
+
+> `cache-dse-sweep` change — DSE 12-case Pareto (现在 PTW walk 实际工作, 可真实扫 satp_ppn 配置)
+> `cpu-mmu-integration` 后续 — RISC-V CPU 集成 MMU 时用真实 issue_request/read_response
+
 ## v0.0.9 (2026-09-13) - mmu-tlb-ptw-impl
 
 
