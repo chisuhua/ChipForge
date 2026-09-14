@@ -98,15 +98,46 @@ class PipeBuilder {
   }
 
   void run() {
-    // M4G-extend G.X: per-tid dispatch — for each tid in [0, n_threads),
-    // dispatch set_tid(tid) to every plugin then run stages.
-    // n_threads_ = 1 (default) preserves M4G baseline byte-identical behavior.
+    // cpu-pipeline-stubs-replace commit A: 阶段+相位有序调度 (canonical order)
+    // (stage_first_occurrence_order) × Phase(EARLY→NORMAL→LATE). 桶内保持稳定排序
+    // (按 stages_ 插入序). n_threads 循环和 commit_storages 保留 M4G 行为.
+    // 第一次 run() 时构建 canonical_order_ 缓存（缓存 stage 首现序）; 后续 at_stage
+    // 不会影响 in-progress run() — 见 canonical_order() lazy 计算.
     for (std::uint8_t tid = 0; tid < n_threads_; ++tid) {
       for (auto& p : plugins_) p->set_tid(tid);
-      for (auto& s : stages_) s.callback();
+      const auto order = canonical_stage_order();
+      for (const auto& stage_name : order) {
+        // 同 stage+同 phase 桶内按 stages_ 插入序稳定排序
+        for (int p_idx = 0; p_idx < 3; ++p_idx) {
+          const Phase target_phase = static_cast<Phase>(p_idx);
+          for (const auto& s : stages_) {
+            if (s.name == stage_name && s.phase == target_phase) {
+              s.callback();
+            }
+          }
+        }
+      }
     }
     commit_storages();
   }
+
+ private:
+  // 阶段首现序（按 stages_ 首次出现位置排序）。同阶段多个闭包按 stages_
+  // 插入序稳定排序（同一 phase 桶内）。这是 cpu-pipeline-stubs-replace Layer 0
+  // 修复：之前 run() 完全忽略阶段名按插入序调用，导致 RegFilePlugin 读闭包
+  // (在 LATE 组) 物理上排在 ALU execute 闭包之后，破坏真实数据流。
+  std::vector<std::string> canonical_stage_order() const {
+    std::vector<std::string> order;
+    order.reserve(stages_.size());
+    for (const auto& s : stages_) {
+      if (std::find(order.begin(), order.end(), s.name) == order.end()) {
+        order.push_back(s.name);
+      }
+    }
+    return order;
+  }
+
+ public:
 
   // set_n_threads —— 配置 per-cycle dispatch 的 tid 数量 (M4G-extend G.X)
   // 默认 1: 单线程 byte-identical. SMT/超标的扩展通过 config.n_threads 注入.
