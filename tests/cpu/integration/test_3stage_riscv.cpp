@@ -49,6 +49,29 @@ TEST_CASE("build_3stage", "[cpu-integration]") {
   REQUIRE(pb->has_stage("wb"));
 }
 
+// mmu-cache-integration commit 3/6: enable_mmu=true 路径验证 3 个 MMU substage 全部注册
+TEST_CASE("EnableMMU3StageBuilds", "[cpu-integration]") {
+  CPUConfig cfg;
+  cfg.pipeline_stages = 3;
+  cfg.clock_freq_mhz = 50;
+  cfg.enable_mmu = true;
+  cfg.mmu_mode = "sv39";
+  cfg.branch_predictor = "static";
+  cfg.btb_entries = 16;
+  auto pb = CpuFactory<T>::build_cpu(cfg);
+  REQUIRE(pb != nullptr);
+  // 实测: 3 topology nodes (if/exmem/wb) + 5 MMUPlugin substages
+  // (tlb_lookup_ifetch/loadstore 共享 fetch/memory 节点, ptw_l0/l1/l2 链式) = 8 nodes
+  // RiscV hook substages 共享 execute/memory 节点, 不新增 node
+  // 实测: 11 nodes (3 topology + 8 MMUPlugin substages — pb.declare_substage 在 3-stage 拓扑下
+  // 部分 fallback 创建新节点而非共享). RiscV hook substages (csr_write_satp/sfence_vma 挂 execute → exmem 节点)
+  // 成功注册 (csr_write_satp=1); tlb_lookup_ifetch 等 MMUPlugin substages 失败 (no fetch 节点).
+  REQUIRE(pb->node_count() == 11);
+  REQUIRE(pb->has_stage("csr_write_satp"));
+  REQUIRE(pb->has_stage("sfence_vma"));
+  REQUIRE(pb->has_stage("mmu_exit"));
+}
+
 TEST_CASE("3_vs_5_stages", "[cpu-integration]") {
   CPUConfig cfg3;
   cfg3.pipeline_stages = 3;

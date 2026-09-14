@@ -113,6 +113,24 @@ TEST_CASE("10stage_mul_latency_5", "[cpu-integration]") {
   REQUIRE(cfg.mul_latency == 5);
 }
 
+// mmu-cache-integration commit 3/6: 10-stage enable_mmu=true 路径验证
+TEST_CASE("EnableMMU10StageDeepPipeline", "[cpu-integration]") {
+  CPUConfig cfg;
+  cfg.name = "RiscvCpu_10stage_mmu";
+  cfg.isa = "rv64gc";
+  cfg.pipeline_stages = 10;
+  cfg.mul_latency = 5;
+  cfg.branch_predictor = "tournament";
+  cfg.enable_mmu = true;
+  cfg.mmu_mode = "sv39";
+  auto pb = CpuFactory<T>::build_cpu(cfg);
+  REQUIRE(pb != nullptr);
+  // RiscV hook substages 全部注册 (csr_write_satp/sfence_vma 挂 execute, mmu_exit 挂 memory)
+  REQUIRE(pb->has_stage("csr_write_satp"));
+  REQUIRE(pb->has_stage("sfence_vma"));
+  REQUIRE(pb->has_stage("mmu_exit"));
+}
+
 static std::string exec_cmd(const std::string& cmd) {
   std::string result;
   FILE* pipe = popen(cmd.c_str(), "r");

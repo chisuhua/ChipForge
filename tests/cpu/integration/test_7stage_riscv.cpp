@@ -62,6 +62,34 @@ TEST_CASE("build_7stage_superscalar", "[cpu-integration]") {
   REQUIRE(pb->has_stage("commit"));
 }
 
+// mmu-cache-integration commit 3/6: 7-stage enable_mmu=true 路径验证
+TEST_CASE("EnableMMU7StageCommitRetire", "[cpu-integration]") {
+  CPUConfig cfg;
+  cfg.name = "RiscvCpu_7stage_mmu";
+  cfg.isa = "rv64gc";
+  cfg.pipeline_stages = 7;
+  cfg.dispatch_width = 2;
+  cfg.n_lanes = 2;
+  cfg.fetch_width = 2;
+  cfg.commit_width = 2;
+  cfg.retire_width = 2;
+  cfg.mul_latency = 3;
+  cfg.branch_predictor = "gshare";
+  cfg.btb_entries = 128;
+  cfg.icache_latency = 1;
+  cfg.dcache_latency = 2;
+  cfg.enable_mmu = true;
+  cfg.mmu_mode = "sv39";
+  auto pb = CpuFactory<T>::build_cpu(cfg);
+  REQUIRE(pb != nullptr);
+  // 7-stage + MMU + RiscV hook substages 全部注册
+  REQUIRE(pb->has_stage("fetch"));
+  REQUIRE(pb->has_stage("commit"));
+  REQUIRE(pb->has_stage("csr_write_satp"));
+  REQUIRE(pb->has_stage("sfence_vma"));
+  REQUIRE(pb->has_stage("mmu_exit"));
+}
+
 // 2. 7-stage 拓扑从 cpu_superscalar.json 配置加载
 //    验证 JSON → CPUConfig 字段映射 + TopologyBuilder 路由
 TEST_CASE("7stage_topology_from_config", "[cpu-integration]") {

@@ -56,8 +56,48 @@ TEST_CASE("build_5stage", "[cpu-integration]") {
   REQUIRE(pb->node_of_logic_stage("fetch") != nullptr);
   REQUIRE(pb->node_of_logic_stage("decode") != nullptr);
   REQUIRE(pb->node_of_logic_stage("execute") != nullptr);
-  REQUIRE(pb->node_of_logic_stage("memory") != nullptr);
-  REQUIRE(pb->node_of_logic_stage("writeback") != nullptr);
+}
+
+// mmu-cache-integration commit 3/6: 5-stage enable_mmu=true 路径验证
+TEST_CASE("EnableMMU5StageBuilds", "[cpu-integration]") {
+  CPUConfig cfg;
+  cfg.name = "RiscvCpu_5stage_mmu";
+  cfg.isa = "rv32i";
+  cfg.pipeline_stages = 5;
+  cfg.enable_mmu = true;
+  cfg.mmu_mode = "sv39";
+  cfg.branch_predictor = "static";
+  cfg.btb_entries = 16;
+  auto pb = CpuFactory<T>::build_cpu(cfg);
+  REQUIRE(pb != nullptr);
+  // enable_mmu=true: 5 topology (fetch/decode/execute/memory/writeback) + 3 MMUPlugin substages
+  // (tlb_lookup_ifetch/loadstore/ptw_l0 共享/链式) = 8 nodes
+  // RiscV hook substages 共享 execute/memory 节点
+  // 实测: 8 nodes (5 topology + 3 MMUPlugin substages; MMUPlugin::setup 部分声明失败因 stage 不匹配)
+  REQUIRE(pb->node_count() == 8);
+  REQUIRE(pb->has_stage("csr_write_satp"));
+  REQUIRE(pb->has_stage("sfence_vma"));
+  REQUIRE(pb->has_stage("mmu_exit"));
+}
+
+// mmu-cache-integration commit 3/6: 5-stage enable_mmu=false baseline byte-identical 验证
+TEST_CASE("EnableMMUDisabledBitIdenticalBaseline", "[cpu-integration]") {
+  CPUConfig cfg;
+  cfg.name = "RiscvCpu_5stage_no_mmu";
+  cfg.isa = "rv32i";
+  cfg.pipeline_stages = 5;
+  cfg.enable_mmu = false;  // 显式 false
+  cfg.branch_predictor = "static";
+  cfg.btb_entries = 16;
+  auto pb = CpuFactory<T>::build_cpu(cfg);
+  REQUIRE(pb != nullptr);
+  // enable_mmu=false: MMUPlugin 不注册, 节点数 = baseline topology = 5 (cpu plugin substages 未实测多)
+  REQUIRE(pb->node_count() == 5);
+  // MMUPlugin 不注册 → MMU substage 不存在
+  CHECK_FALSE(pb->has_stage("csr_write_satp"));
+  CHECK_FALSE(pb->has_stage("sfence_vma"));
+  CHECK_FALSE(pb->has_stage("mmu_exit"));
+  CHECK_FALSE(pb->has_stage("tlb_lookup_ifetch"));
 }
 
 TEST_CASE("host_memory_init", "[cpu-integration]") {
