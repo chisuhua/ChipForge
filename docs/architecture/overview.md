@@ -1,14 +1,14 @@
 # 总体架构设计
 
-> **📌 实现状态快照 (2026-07-01)**
+> **📌 实现状态快照 (2026-09-14)**
 >
 > - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 5 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink）+ 71 个框架测试用例 PASS + 44/44 ctest PASS
 > - ✅ **框架层已就位**：CppTLM (TLM 建模) + CppHDL (RTL/lnode DAG) 集成完成，`cpptlm_core` / `cpphdl` 目标可达
 > - ✅ **Phase 1.3 全部子任务完成**（2026-06-13）：L1CachePlugin (lookup+refill) + Bridge + Adapter e2e + 5 缓存测试文件 (21 test cases)
 > - ✅ **Phase 1.4 完成**（2026-06-13）：L1CachePlugin 设计方法学复盘（[`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md)）
 > - ✅ **CPU M4/M5 完成**（2026-06-24）：11 Plugin 套件 CpuFactory 真实注册 + DSE 576-config sweep
-> - ✅ **MMU 骨架落地**（2026-06-29）：`ip/mmu/` IP 目录骨架 + TLB 模板 + MultiLevelTLB + 4 替换策略（TLB/PTW 算法推迟到 `mmu-tlb-ptw-impl`）
-> - 🚧 **下一里程碑 (Phase 1.5)**：`mmu-tlb-ptw-impl` — TLB/PTW 算法实装 + MMU↔Cache 集成 + L1Cache VIPT 升级（ADR-044）。SoC 路线图见 [`soc/cpu/docs/roadmap/`](../../soc/cpu/docs/roadmap/)
+> - ✅ **MMU 实装 + VIPT 集成 + CPU Pipeline**（2026-09-14）：`mmu-tlb-ptw-impl`（TLB/PTW 算法 + MMUTLMBridge）→ `mmu-cache-integration`（L1Cache 消费 MMU_VADDR VIPT + PIPT fallback）→ `cpu-mmu-integration`（RiscvMMUPlugin 注册 CpuFactory + 3 substage）→ `ptw-walk-bridge-fix`（PTW at_stage 接线 + Bridge 真实 issue_request/read_response）。**317/317 tests PASS**
+> - 🚧 **下一里程碑**：`soc-cpu-l1-mmu-demo`（CPU+MMU+L1+Memory 完整 SoC，真 RISC-V 程序 tohost 退出）→ `cache-phase1.5-4way`（VIPT 正式安全 ADR-044 §2.5）→ `plugin-framework-stall`（CtrlLink 框架消费）。SoC 路线图见 [`soc/cpu/docs/roadmap/`](../../soc/cpu/docs/roadmap/)
 >
 > **本文档描述目标架构**；具体实现进度以 [`roadmap/roadmap-status.md`](../roadmap/roadmap-status.md) 为准。
 

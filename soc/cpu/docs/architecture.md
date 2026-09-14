@@ -6,9 +6,9 @@
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🟡 Phase 1.3（CPU 核心 Plugin 套件完成 + L1Cache Plugin 完成 + MMU 骨架） |
-| 下一里程碑 | `mmu-tlb-ptw-impl` — TLB/PTW 算法实装 + MMU↔Cache 集成 |
-| 最后更新 | 2026-07-01 |
+| 状态 | ✅ Phase 1 核心完成（CPU Pipeline + MMU + L1Cache VIPT 集成，2026-09-14） |
+| 下一里程碑 | `soc-cpu-l1-mmu-demo` — CPU+MMU+L1+Memory 完整 SoC + `cache-phase1.5-4way` VIPT 正式化 |
+| 最后更新 | 2026-09-14 |
 
 ---
 
@@ -70,18 +70,18 @@ MMUPlugin::tlb_lookup_ifetch (miss)
     │ 写 PTW_ACTIVE=1, PTW_VADDR=vaddr, PTW_ASID=asid
     │ 启动 PTW::start_walk()
     ▼
-ptw_l0 ──▶ 读 L0 PTE (stub: pte=0, mmu-tlb-ptw-impl 实装内存读)
+ptw_l0 ──▶ 读 L0 PTE (ptw-walk-bridge-fix 实装: advance_from_stub() 自动读 stub memory)
     ▼
-ptw_l1 ──▶ 读 L1 PTE (stub)
+ptw_l1 ──▶ 读 L1 PTE
     ▼
 ptw_l2 ──▶ 读 L2 leaf PTE → 确定 paddr + perms
     │     写 pl::PADDR, 清 PTW_ACTIVE
-    │     multi_tlb_->refill_from_ptw() 回填多级 TLB
+    │     (PTW walk 完成回调写 BOTH pl::PADDR + pl::MMU_VADDR — 防 stale vaddr)
     ▼
 下游 (IBus/DBus) 重新查 TLB (此时 L0 hit)
 ```
 
-**当前限制**：`pb.run()` 单次遍历所有 `at_stage` 回调（无 cycle 精度）。PTW 三级是**逻辑阶段**，不是真实 3-cycle pipeline。Phase 6 框架升级后变为周期精确调度。
+**当前实现**：`pb.run()` 单次遍历所有 `at_stage` 回调（无 cycle 精度）。PTW 三级是**逻辑阶段**，单 cycle 串行走完（`at_stage("ptw_l0/l1/l2")` 均调 `advance_from_stub()`）。Phase 6 框架升级后变为周期精确调度。stub memory (`pte_stub_memory_`) 是测试友好接口，真实内存读推迟到 `soc-cpu-l1-mmu-demo` (memory 模型接入)。
 
 ---
 
@@ -89,17 +89,22 @@ ptw_l2 ──▶ 读 L2 leaf PTE → 确定 paddr + perms
 
 ### 2.1 Payload Key（CPU 内部跨 Plugin 通信）
 
-CPU 内部 11 个 Plugin 通过 `pl::*` (Payload Key) 共享数据。MMU 通过以下 Key 插入翻译流程：
+CPU 内部 12 个 Plugin（11 套件 + `enable_mmu=true` 时的 RiscvMMUPlugin）通过 `pl::*` (Payload Key) 共享数据。MMU 通过以下 Key 插入翻译流程：
 
 | Key | 类型 | 生产者 | 消费者 | 说明 |
 |-----|------|--------|--------|------|
 | `pl::PC` | `uint64_t` | IBusPlugin | MMUPlugin | 虚 PC（fetch 阶段写） |
-| `pl::PADDR` | `uint64_t` | MMUPlugin | IBusPlugin/DBusPlugin | 物理地址（TLB 命中后写） |
+| `pl::PADDR` | `uint64_t` | MMUPlugin | IBusPlugin/DBusPlugin | 物理地址（TLB 命中或 PTW 完成后写） |
+| `pl::MMU_VADDR` | `uint64_t` | MMUPlugin | L1CachePlugin | VIPT 索引源（ADR-044 §3.2，TLB hit + PTW 完成都写） |
 | `pl::MEM_ADDR` | `uint64_t` | DBusPlugin | MMUPlugin | 虚地址（load/store 阶段写） |
 | `pl::PTW_ACTIVE` | `bool` | MMUPlugin | CtrlLink | PTW 进行中 stall 下游 |
 | `pl::PTW_FAULT` | `uint8_t` | MMUPlugin | ExceptionPlugin | page fault → mcause 12/13/15 |
+| `pl::SAT` | `uint64_t` | CPU execute | RiscvMMUPlugin | satp CSR 写入拦截（cpu-mmu-integration, `ip/cpu/tlm/cpu_keys.h`） |
+| `pl::SFENCE_VADDR` | `uint64_t` | CPU execute | RiscvMMUPlugin | SFENCE.VMA rs1（cpu-mmu-integration） |
+| `pl::SFENCE_ASID` | `uint16_t` | CPU execute | RiscvMMUPlugin | SFENCE.VMA rs2（cpu-mmu-integration） |
+| `pl::MMU_EXCEPTION` | `uint8_t` | RiscvMMUPlugin | CPU exception path | exception 12/13/15 路由（cpu-mmu-integration `at_stage("mmu_exit")`） |
 
-见 `ip/mmu/tlm/mmu_keys.h`（10 个 MMU 专属 Key）+ `ip/mmu/docs/integration.md` §1。
+见 `ip/mmu/tlm/mmu_keys.h`（14 个 MMU 专属 Key）+ `ip/cpu/tlm/cpu_keys.h`（CPU→MMU IPC 4 Key，cpu-mmu-integration 新增）+ `ip/mmu/docs/integration.md` §1。
 
 ### 2.2 Bundle（IP 间硬件级通信）
 
@@ -120,10 +125,10 @@ MMU 不直接暴露 Bundle — 翻译结果通过 `pl::PADDR` Payload Key 传递
 
 | IP | 状态 | 核心能力 | 关键缺口 | 集成到 SoC？ |
 |----|------|---------|----------|:-----------:|
-| **CPU Core** | 🟡 M4/M5（11 Plugin 套件完整） | RV64IMACZicsrZifencei decode/execute/load-store/branch/csr | MMU/FPU/Exception Plugin 未注册到 CpuFactory（ADR-042）；5 个 RISC-V 仿真测试预存失败 | ✅ CpuFactory 可用 |
-| **L1 Cache** | 🟡 Phase 1.3（16KB direct-mapped） | lookup + refill 两阶段；Bridge + Adapter e2e | Phase 0 offset=4 简化；VIPT 需升 4-way（ADR-044）；无 L2 | ⚠️ 仅 TLM 验证 |
-| **MMU** | 🟡 骨架（mmu-ip-skeleton） | TLB 模板 + MultiLevelTLB + 4 策略 + PTW stub | TLB/PTW 算法实装、satp/sfence hook、VPN 切分 3 处 bug（见附录） | ❌ 未集成 |
-| **Memory** | 🔴 规划中 | — | 全部 | ❌ |
+| **CPU Core** | ✅ Phase 1 完成（11 Plugin 套件 + MMU 注册） | RV64IMACZicsrZifencei decode/execute/load-store/branch/csr + `enable_mmu=true` 时 RiscvMMUPlugin 条件注册 + 3 substage（csr_write_satp/sfence_vma/mmu_exit） | FPU Plugin 未注册；5 个 RISC-V 仿真测试预存失败（工具链） | ✅ CpuFactory 可用 |
+| **L1 Cache** | ✅ Phase 1.3 + VIPT（mmu-cache-integration） | lookup + refill 两阶段；Bridge + Adapter e2e；VIPT 索引消费（`pl::MMU_VADDR`）+ PIPT fallback | 16KB direct-mapped 非 4-way（ADR-044 §2.5 待 `cache-phase1.5-4way`）；无 L2 | ⚠️ 仅 TLM 验证 |
+| **MMU** | ✅ INTEGRATED + CPU PIPELINE（2026-09-14） | TLB lookup/insert/invalidate + PTW Sv39 walk 端到端 + VIPT 双写 + RiscvMMUPlugin hook + MMUTLMBridge/Adapter 真实工作 | Sv32/Sv48 PTW 解码（`mmu-sv32-sv48-ext`）；PTW 真实内存读（stub memory 是测试接口）；CtrlLink stall 框架（`plugin-framework-stall`） | ✅ soc/mmu_minimal.json |
+| **Memory** | 🔴 规划中 | — | 真实 SRAM/DRAM 模型（cpptlm MemoryTLM 暂时服务 SoC JSON） | ❌ |
 | **Interconnect** | 🔴 规划中 | — | 全部 | ❌ |
 | **Peripheral** | 🔴 规划中 | — | PLIC/CLINT/UART/Timer（Phase 3+） | ❌ |
 
@@ -131,63 +136,77 @@ MMU 不直接暴露 Bundle — 翻译结果通过 `pl::PADDR` Payload Key 传递
 
 ## 4. 集成缺口（跨 IP）
 
-### 4.1 阻塞项
+### 4.1 已解决（2026-09 归档 4 个 change）
+
+| # | 缺口 | 涉及 IP | 解决 change | 状态 |
+|---|------|---------|------------|:---:|
+| 1 | MMU TLB/PTW 算法实装 | mmu | `mmu-tlb-ptw-impl` (09-12) | ✅ |
+| 2 | `RiscvMMUPlugin` satp/sfence.vma hook | mmu ↔ cpu | `mmu-tlb-ptw-impl` + `cpu-mmu-integration` (09-14) | ✅ |
+| 3 | MMU → L1Cache 集成（VIPT 数据流双端） | mmu ↔ cache | `mmu-cache-integration` (09-13) | ✅ |
+| 4 | PTW at_stage 接线（walk 实际走通） | mmu | `ptw-walk-bridge-fix` (09-14) | ✅ |
+| 5 | MMUTLMBridge/Adapter 真实 issue_request/read_response | mmu ↔ CppTLM | `ptw-walk-bridge-fix` + `mmu-cache-integration` | ✅ |
+| 6 | RiscvMMUPlugin 注册到 CpuFactory + 3 substage | cpu | `cpu-mmu-integration` (09-14) | ✅ |
+| 7 | CPU→MMU IPC Payload Key（SAT/SFENCE/MMU_EXCEPTION） | cpu ↔ mmu | `cpu-mmu-integration` | ✅ |
+
+### 4.2 剩余缺口
 
 | # | 缺口 | 涉及 IP | 阻塞目标 | 状态 |
 |---|------|---------|----------|:---:|
-| 1 | MMU TLB/PTW 算法实装 | mmu | 虚实地址翻译功能 | `mmu-tlb-ptw-impl` 待 |
-| 2 | `RiscvMMUPlugin` satp/sfence.vma hook | mmu ↔ cpu | CSR 写入翻译到 TLB flush | 同上 |
-| 3 | MMU → L1Cache 集成（MMU 写 `pl::PADDR` → Cache 读 `pl::PADDR` 查 tag） | mmu ↔ cache | 虚实翻译生效 | 同上 + ADR-044 |
-| 4 | PTW 内存读（替换 `pte=0` stub） | mmu | Page table walk | 同上 |
+| A | L1Cache VIPT 升级（256×1 → 64×4） | cache | VIPT 正式安全（ADR-044 §2.5） | `cache-phase1.5-4way` 待 |
+| B | CtrlLink halt_when PTW stall（框架消费 `should_halt`） | mmu ↔ framework | PTW_ACTIVE RETRY workaround 替换 | `plugin-framework-stall` 待 |
+| C | Sv32/Sv48 PTW 解码 | mmu | 多 ISA 支持（当前仅 Sv39） | `mmu-sv32-sv48-ext` 待 |
+| D | PTW 真实内存读（替换 stub memory） | mmu ↔ memory | 生产 page table walk | `soc-cpu-l1-mmu-demo` 待 |
+| E | CPU+MMU+L1+Memory 完整 SoC JSON demo | soc | 真 RISC-V 程序 tohost 退出 | `soc-cpu-l1-mmu-demo` 待 |
+| F | 真实 Memory IP（SRAM/DRAM 模型） | memory | 替换 cpptlm MemoryTLM | Phase 2 待 |
+| G | L2 Cache PIPT + Interconnect + Peripheral | cache/interconn/periph | SoC 完整装配 | Phase 2 待 |
+| H | DSE 配置扫描（12-case Pareto） | cache | 参数空间验证 | `cache-dse-sweep` 待 |
 
-### 4.2 设计已锁但未实装
+### 4.3 RISC-V 规范合规缺口（残留）
 
-| # | 缺口 | 涉及 IP | 锁定文档 | 状态 |
-|---|------|---------|----------|:---:|
-| A | L1Cache VIPT 升级（256×1 → 64×4） | cache | ADR-044 | Phase 1.5 |
-| B | CtrlLink halt_when PTW stall | mmu | `MMUPlugin.cpp:130` | `mmu-tlb-ptw-impl` |
-| C | MMUTLMBridge（cpptlm 适配） | mmu ↔ CppTLM | 推迟 | Phase 1.5 以后 |
-| D | SoC JSON 拓扑（CPU+MMU+Cache+Mem） | soc | 推迟 | Phase 2+ |
-
-### 4.3 RISC-V 规范合规缺口（骨架 bug）
-
-| Bug | 文件 | 修复方案 |
-|-----|------|---------|
-| VPN 提取错（`tag=vpn>>ASID_BITS`） | `ip/mmu/lib/tlb.h:74` | 按 Sv39 VPN[2]/VPN[1]/VPN[0] 九位三字段切分 |
-| PTE.PPN 字段提取错（`raw>>10` 一刀切） | `ip/mmu/lib/ptw.cpp:91` | 按 Sv39/Sv48 PPN[0:2] (9+9+26 bits) 分字段拼合，大页判定 |
-| PTW 下一级地址错（`pte_ppn<<12` stub） | `ip/mmu/lib/ptw.cpp:68` | 按 vaddr[level_idx:9*(level+1)+12] 索引 + PPN << 12 |
-| 无 megapage/gigapage 支持 | `ip/mmu/lib/ptw.cpp:52` | leaf PTE 检测（V/R/W/X 组合）+ PPN[0] 和 PPN[1] 在大页时位置改变 |
+| Bug | 文件 | 状态 |
+|-----|------|------|
+| Sv32/Sv48 PTE 解码（当前仅 Sv39 `decode_pte` 完整） | `ip/mmu/lib/ptw.cpp:100` | `mmu-sv32-sv48-ext` 待 |
+| megapage/gigapage 大页支持（leaf PTE 检测 + PPN[0]/PPN[1] 大页位移） | `ip/mmu/lib/ptw.cpp:69` | `mmu-sv32-sv48-ext` 待 |
 
 ---
 
 ## 5. 建议后续计划
 
-### Phase 1.4: MMU 实装（`mmu-tlb-ptw-impl`）
+### 里程碑 1: SoC 完整 demo（`soc-cpu-l1-mmu-demo`）— 最高优先级
 
-**优先级：最高。** 阻塞所有虚实地址相关功能。
+**解锁**：真 RISC-V 程序跑通（CPU → MMU 翻译 → L1Cache → Memory → tohost 退出）。cpu-mmu-integration 已把 RiscvMMUPlugin 注册进 CPU pipeline，条件成熟。
 
-- [ ] 修复 3 处 RISC-V spec 合规 bug（§4.3）
-- [ ] 实装 TLB lookup/insert 算法（VPN 精确化 + PPN 拼合）
-- [ ] 实装 PTW Sv32/Sv39/Sv48 解码（含 leaf PTE + megapage/gigapage）
-- [ ] 实装 `RiscvMMUPlugin` 4 个 hook（satp/sfence/mstatus/fault mapping）
-- [ ] PTW 内存读（替换 `pte = 0` stub）
-- [ ] CtrlLink halt_when PTW stall 接线
-- [ ] MMU 5 个测试恢复编译 + 通过
+- [ ] 重建 `soc/cpu/riscv_virt.json`（CPU + MMU + L1Cache + Memory 4 模块全链）
+- [ ] PTW 真实内存读（替换 stub memory，Memory IP 或 cpptlm MemoryTLM 对接）
+- [ ] 最小 ELF 加载 → tohost 退出验证（替换当前 5 个预存失败的仿真测试）
+- [ ] 默认 `enable_mmu=false` 裸机启动路径（PIPT direct）
 
-### Phase 1.5: L1Cache VIPT 升级 + MMU↔Cache 集成
+### 里程碑 2: VIPT 正式化（`cache-phase1.5-4way`）
 
-- [ ] L1Cache 从 256×1 升到 64×4（ADR-044）
-- [ ] `extract_idx_from_vaddr` + `extract_idx_from_paddr` 双 helper
-- [ ] L1Cache 集成测试：MMU 翻译 → Cache lookup → hit/miss → refill
-- [ ] 性能基线：fetch hit 路径 2-cycle（TLB L0 1-cycle + Cache 1-cycle）
+- [ ] L1Cache 256×1 direct-mapped → 64×4 set-associative（ADR-044 §2.5 正式 VIPT 安全）
+- [ ] `kIdxBits=6` + `kOffsetBits=6`（64B line, Phase 0 offset=4 简化移除）
+- [ ] LRU 4-way 替换策略接入（policy 层已有）
+- [ ] 21 baseline + 3 MMU integration tests 零回归（PIPT fallback 保持）
 
-### Phase 2: SoC 完整装配
+### 里程碑 3: Framework stall 补全（`plugin-framework-stall`）
 
-- [ ] L2 Cache PIPT（256KB-1MB，8-16 way）
-- [ ] Memory IP（SRAM/DRAM 模型）
+- [ ] `PipeBuilder::run()` 消费 `CtrlLink::should_halt()`（框架级，任何 Plugin 可用）
+- [ ] PTW busy → `halt_when` 注册（替换 PTW_ACTIVE RETRY workaround）
+- [ ] 审计现有 317 tests 对"非 stall"行为的依赖，零回归
+
+### 里程碑 4: ISA 扩展 + DSE
+
+- [ ] `mmu-sv32-sv48-ext`：Sv32/Sv48 PTW 解码 + megapage/gigapage 大页（§4.3 残留）
+- [ ] `cache-dse-sweep`：12-case Pareto DSE 配置扫描（4-way 落地后）
+
+### Phase 2: SoC 完整装配（Bare-metal 测试套件前置）
+
+- [ ] Memory IP（真实 SRAM/DRAM 模型，替换 cpptlm MemoryTLM）
 - [ ] Interconnect IP（交叉开关/NoC）
-- [ ] SoC JSON 拓扑 `soc/cpu/riscv_virt.json`（CPU + MMU + L1I + L1D + L2 + Memory + CLINT/PLIC）
+- [ ] L2 Cache PIPT（256KB-1MB，8-16 way）
+- [ ] SoC JSON 拓扑 `soc/cpu/riscv_virt.json`（+CLINT/PLIC）
 - [ ] Bare-metal 固件启动（`firmware.elf` → tohost 退出）
+- [ ] riscv-tests RV64GC 集成（见 [roadmap/phase-2-baremetal.md](roadmap/phase-2-baremetal.md)）
 
 ---
 

@@ -26,17 +26,17 @@ mmu-tlb-ptw-impl (archived 2026-09-12) + mmu-cache-integration (current) 完成:
 - LOC: ~1500 (含 stub, 不含 .cpp/.h 业务实现细节)
 
 ## Implementation Roadmap
-- 下一里程碑: **mmu-tlb-ptw-impl** change —— TLB lookup/insert 算法 + PageTableWalker Sv32/Sv39/Sv48 解码 + MMUPlugin at_stage 闭包实装 + CtrlLink halt_when PTW stall
-- 前提依赖: ADR-044 (L1 Cache VIPT 锁定, [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md)) — MMUPlugin 输出 `pl::MMU_VADDR` 供 VIPT L1 索引
+- 已完成: **mmu-tlb-ptw-impl** (TLB/PTW 算法 + MMUTLMBridge) + **mmu-cache-integration** (VIPT 数据流 + Adapter + SoC JSON) + **cpu-mmu-integration** (RiscvMMUPlugin 注册 CpuFactory + 3 substage) + **ptw-walk-bridge-fix** (PTW at_stage 接线 + Bridge 真实 issue_request/read_response) — 全部 archived 2026-09
+- 下一里程碑: **soc-cpu-l1-mmu-demo** (CPU+MMU+L1+Memory 完整 SoC demo + PTW 真实内存读) → **cache-phase1.5-4way** (VIPT 正式安全 ADR-044 §2.5) → **plugin-framework-stall** (CtrlLink should_halt 框架消费) → **mmu-sv32-sv48-ext** (Sv32/Sv48 PTW 解码 + megapage/gigapage)
+- 前提依赖: ADR-044 (L1 Cache VIPT 锁定, [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md)) — MMUPlugin 输出 `pl::MMU_VADDR` 供 VIPT L1 索引 ✅ 已落地
 - 依赖: `cf::plugin` Phase 0 (5/5 P0 组件稳定) + `ip/cache/` Plugin-style 先例 + `ip/cpu/plugins/` ISA 无关 Plugin 套件
-- 状态: 🟡 骨架阶段 (mmu-ip-skeleton, 2026-06-29 落地, 同 mmu-tlb-ptw-impl+ 实施)
-- 子模块: TLB 模板化 + MultiLevelTLB 编排器 + PageTableWalker 接口 + 4 种替换策略 + Plugin 集成
+- 状态: ✅ **INTEGRATED + CPU PIPELINE** (2026-09-14, 4 change 归档后)
+- 子模块: TLB 模板化 + MultiLevelTLB 编排器 + PageTableWalker Sv39 端到端 + 4 种替换策略 + Plugin 集成 + RiscV hook
 
 ## 已知限制
-- **TLB/PTW 算法 stub**：骨架阶段提供接口，算法实现推迟到 `mmu-tlb-ptw-impl`
-- **PTW Sv32/Sv39/Sv48 解码 stub**：仅接口稳定，具体解码推迟
-- **CtrlLink halt_when PTW stall 未实装**：仅声明接口
-- **CPU 集成未实装**：`RiscvMMUPlugin` 仅声明类型别名，satp/sfence.vma hook 推迟
+- **Sv32/Sv48 PTW 解码未实装**：仅 Sv39 `decode_pte` 完整，Sv32/Sv48 + megapage/gigapage 推迟到 `mmu-sv32-sv48-ext`
+- **PTW 真实内存读未实装**：`pte_stub_memory_` 是测试接口，真实内存读推迟到 `soc-cpu-l1-mmu-demo`
+- **CtrlLink halt_when PTW stall 未实装**：框架未消费 `should_halt`，当前用 PTW_ACTIVE RETRY workaround，推迟到 `plugin-framework-stall`
 - **split_id 拓扑未实装**：`topology` 字段保留枚举值 `split_id`，骨架阶段仅 `unified` 工作
 - **cpptlm MMUTLMBridge 未实装**：与 `L1CacheTLMBridge` 同构但推迟到 TLB/PTW 算法稳定后
 - **rtl/ 目录空**：Phase 5+ CppHDL 转换时填充

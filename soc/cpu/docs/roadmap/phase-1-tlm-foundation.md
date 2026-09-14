@@ -1,6 +1,6 @@
 # Phase 1：基础 TLM 平台（L1CachePlugin "Hello World"）
 
-> **Status**: In Progress (~75%, Phase 1.3 全部子任务完成含1.3d-extras, 2026-06-13)
+> **Status**: ✅ 核心完成 (2026-09-14, Phase 1.3→1.5 全部子任务 + MMU/VIPT/CPU Pipeline 4 change 归档)
 > **Milestone**: M1 - L1CachePlugin 在 TLM 模式下端到端跑通
 > **Depends on**: Phase 0（Plugin 最小脚手架）
 > **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md` + `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`
@@ -12,6 +12,8 @@
 > - 1.3 全部子任务完成 (`26fe7d2`..`387b8ca`): 1.3a Bridge / 1.3b SoC JSON / 1.3c Schema / 1.3d Adapter / 1.3d-extras ch_stream注册 / 1.3e drift 防护 / 1.3f README
 > - Phase 1 进度: 0% → 10% (1.1) → 30% (1.2) → 65% (1.3) → 75% (1.3d-extras)
 > - 14/14 ctest PASS in ~4.5s
+>
+> **后续扩展** (2026-09-12..14, 见 [README.md](README.md) "当前进展"): `mmu-tlb-ptw-impl` (TLB/PTW) + `mmu-cache-integration` (VIPT) + `cpu-mmu-integration` (CPU Pipeline) + `ptw-walk-bridge-fix` (stall/stub 修复) — 317/317 tests PASS, 4 gates 全绿
 
 **目标**：在 Phase0 提供的 Plugin 脚手架上，实现第一个真实 Plugin（`L1CachePlugin`），验证 Plugin-style 设计在 TLM 模式下的可行性。
 
