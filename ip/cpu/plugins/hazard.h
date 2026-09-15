@@ -194,9 +194,20 @@ class HazardPlugin : public cf::plugin::PluginBase {
     });
 
     // plugin-framework-stall commit B: register execute stage CtrlLink
-    // halt when has_active_hazard() — 任何 scoreboard 飞行 + 下一指令读它 → stall
+    // halt when 当前 cycle decode 判定有真实 RAW/WAW 冒险 (last_decoded_hazard_)
+    // —— 而非 has_active_hazard() (scoreboard 有任意飞行寄存器).
+    //
+    // 根因修复 (riscv-tests-rv32ui Wave 1 apply follow-up, 2026-09-15):
+    //   原实现 halt_when(has_active_hazard()) 在单 pass 流水线语义下形成死锁:
+    //   decode NORMAL 每轮对 writes_rd 指令 mark_in_flight → execute 阶段入口
+    //   has_active_hazard() 恒 true → execute 被永久 skip → StageLink execute
+    //   EARLY (decode→execute 数据复制) 不执行 → execute/memory/writeback 全空
+    //   → writeback 空 DECODE 导致 PC = 0+4 恒卡 0x4 → 所有程序 timeout.
+    //   现语义: 仅当本轮 decode 判定当前指令确实读飞行中寄存器才 stall.
     auto execute_ctrl = std::make_shared<cf::plugin::CtrlLink>();
-    execute_ctrl->halt_when([this]() { return this->has_active_hazard(); });
+    execute_ctrl->halt_when([this]() {
+      return this->last_decoded_hazard_ != cf::cpu::plugins::HazardKind::NONE;
+    });
     pb.register_ctrl_link("execute", execute_ctrl);
 
     // commit_hook 在 pb.run() 末尾 (commit_storages) 复位 hazard cache

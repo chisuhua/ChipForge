@@ -56,15 +56,26 @@ class RiscvIntAluPlugin : public cf::plugin::PluginBase {
         const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
         const auto& dec = n->operator()(KeyType::DECODE);
 
-        // 推断 OpCode (简化: 根据 funct3/funct7)
-        OpCode op = infer_opcode(rv.funct3, rv.funct7);
+        // riscv-tests-rv32ui fix: LUI/AUIPC (U-type) 必须用 opcode 分流.
+        // infer_opcode(funct3, funct7) 无法区分 U-type (LUI/AUIPC 均 f3=0,f7=0,
+        // 旧实现把 AUIPC 误判为 ADD(0+imm) → 返回 imm 而非 PC+imm, 导致
+        // la t5,tohost (auipc+addi) 计算出错误地址, tohost 写失败 → timeout).
+        T result;
+        if (rv.opcode == opcode::OP_AUIPC) {
+          const T pc_val = n->operator()(KeyType::PC);
+          result = pc_val + static_cast<T>(rv.imm);
+        } else if (rv.opcode == opcode::OP_LUI) {
+          result = static_cast<T>(rv.imm);
+        } else {
+          // 推断 OpCode (简化: 根据 funct3/funct7)
+          OpCode op = infer_opcode(rv.funct3, rv.funct7);
 
-        // cpu-pipeline-stubs-replace commit E: I-type ALU 指令 (ADDI/SLTI/XORI/...)
-        // 用 imm 而不是 rs2 (decoder 对 I-type 置 reads_rs2=false).
-        // 修 bug: 之前一律用 rs2_val (I-type 时 rs2 未读 = 0), addi 结果恒错.
-        T op2 = dec.reads_rs2 ? rs2_val : static_cast<T>(rv.imm);
-
-        T result = compute(op, rs1_val, op2);
+          // cpu-pipeline-stubs-replace commit E: I-type ALU 指令 (ADDI/SLTI/XORI/...)
+          // 用 imm 而不是 rs2 (decoder 对 I-type 置 reads_rs2=false).
+          // 修 bug: 之前一律用 rs2_val (I-type 时 rs2 未读 = 0), addi 结果恒错.
+          T op2 = dec.reads_rs2 ? rs2_val : static_cast<T>(rv.imm);
+          result = compute(op, rs1_val, op2);
+        }
         // cpu-pipeline-stubs-replace commit E: RegFilePlugin 写回读 RD_DATA,
         // 必须写 RD_DATA (修 bug: 之前只写 RESULT, 写回取到旧值).
         n->operator()(KeyType::RD_DATA) = result;

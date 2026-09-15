@@ -69,7 +69,7 @@ class RiscvDecodePlugin : public cf::plugin::PluginBase {
 
         // 填通用 DecodePayload
         dec.op_class = static_cast<Dp::OpClass>(get_op_class(op));
-        dec.writes_rd = (get_rd(inst) != 0);  // rd != x0 才写回
+        dec.writes_rd = writes_rd(op, get_funct3(inst), get_rd(inst));
         dec.reads_rs1 = true;                 // 大多数指令都读 rs1
         dec.reads_rs2 = is_rs2_used(op);
         dec.rd_class = 0;                     // 0 = GPR
@@ -78,6 +78,7 @@ class RiscvDecodePlugin : public cf::plugin::PluginBase {
         dec.rd_idx = get_rd(inst);
 
         // 填 RISC-V 特有 RiscvDecodeDetail
+        rv.opcode = get_opcode(inst);
         rv.funct3 = get_funct3(inst);
         rv.funct7 = get_funct7(inst);
         rv.funct12 = get_funct12(inst);
@@ -88,6 +89,37 @@ class RiscvDecodePlugin : public cf::plugin::PluginBase {
   }
 
  private:
+  // riscv-tests-rv32ui fix: writes_rd 必须按 OpCode 判定, 不能用 `rd != x0`.
+  // B-type BRANCH 和 S-type STORE 的 rd 字段 (inst[11:7]) 是立即数位, 非目标
+  // 寄存器. 旧实现 `dec.writes_rd = (get_rd(inst) != 0)` 会把分支指令误标为
+  // 写 rd → HazardPlugin mark_in_flight 误标记 imm 位命中的寄存器 → 下一条
+  // 指令读该寄存器被判 RAW → execute 被 stall → 指令被丢弃 → 程序死循环
+  // (例: rv32ui-p-bgeu test_13 `bgeu ra,sp,fail` imm 位恰落在 x4=tp,
+  //  后续 `addi tp,tp,1` 被 stall → tp 永不递增 → 40/40 timeout 中 2 例).
+  static bool writes_rd(OpCode op, std::uint8_t funct3, std::uint8_t rd) {
+    if (rd == 0) return false;  // x0 写屏蔽 (LUI/AUIPC/ALU/LOAD/JAL/JALR 均适用)
+    switch (op) {
+      // U-type + I-type/R-type ALU + LOAD + JAL/JALR 写 rd
+      case OpCode::LUI: case OpCode::AUIPC:
+      case OpCode::ADDI: case OpCode::SLTI: case OpCode::SLTIU:
+      case OpCode::XORI: case OpCode::ORI: case OpCode::ANDI:
+      case OpCode::SLLI: case OpCode::SRLI: case OpCode::SRAI:
+      case OpCode::ADD: case OpCode::SUB: case OpCode::SLL:
+      case OpCode::SLT: case OpCode::SLTU: case OpCode::XOR:
+      case OpCode::SRL: case OpCode::SRA: case OpCode::OR: case OpCode::AND:
+      case OpCode::LB: case OpCode::LH: case OpCode::LW:
+      case OpCode::LBU: case OpCode::LHU:
+      case OpCode::JAL: case OpCode::JALR:
+        return true;
+      // SYSTEM: 仅 CSR 读/写指令 (funct3 != 0b000) 写 rd; ECALL/EBREAK/MRET/FENCE 不写
+      case OpCode::SYSTEM:
+        return funct3 != 0b000;
+      // BRANCH (B-type) / STORE: rd 字段是 imm 位, 不写寄存器
+      default:
+        return false;
+    }
+  }
+
   // 判断 OpCode 是否使用 rs2 字段
   static bool is_rs2_used(OpCode op) {
     switch (op) {

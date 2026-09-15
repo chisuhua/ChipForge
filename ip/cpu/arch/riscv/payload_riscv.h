@@ -48,6 +48,7 @@ namespace riscv {
 //     (M1.7 定义, M2.1 补充), 本结构仅含 RISC-V 特有字段
 // ----------------------------------------------------------------------------
 struct RiscvDecodeDetail {
+  std::uint8_t  opcode     = 0;   // 7-bit opcode [6:0] (JAL=0x6F/JALR=0x67/B-type=0x63 判别)
   std::uint8_t  funct3     = 0;   // 3-bit funct3
   std::uint8_t  funct7     = 0;   // 7-bit funct7
   std::uint16_t funct12    = 0;   // 12-bit funct12 (SYSTEM 指令)

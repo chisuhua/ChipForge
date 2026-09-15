@@ -61,37 +61,40 @@ class RiscvBranchPlugin : public cf::plugin::PluginBase {
         bool taken = false;
         T target = pc_val + 4;  // 默认 next_pc
 
-        // cpu-pipeline-stubs-replace commit C: 仅当 op_class == BRANCH 才评估分支.
-        // 修 bug: 之前对所有指令无条件评估 (funct3 默认 0 落入 BEQ, 两操作数默认 0
-        // 使 taken=true → PC 被错误写为 pc+imm), 导致 ALU 指令后 PC 不推进.
+        // cpu-pipeline-stubs-replace commit C + riscv-tests-rv32ui fix:
+        // 仅 op_class == BRANCH 才评估分支. JAL/JALR 与 B-type 必须用 opcode 区分
+        // (JAL=0x6F/JALR=0x67/B-type=0x63), 不能看 funct3/funct7:
+        //   JAL 的 funct3 区是 imm[14:12], funct7 区是 imm[31:25], 均任意值;
+        //   B-type 的 funct7 区是 imm[12|10:5], 小偏移 (如 bnez a0,+0) 时全 0,
+        //   旧实现 `if (rv.funct7 == 0) → JAL/JALR` 会把 B-type 误判为 JAL:
+        //   target=pc+imm=pc, taken=true → 死循环自旋 (40/40 rv32ui timeout).
         if (dec.op_class == Dp::OpClass::BRANCH) {
-          // 根据 funct3 判断分支条件 (B-type)
-          switch (rv.funct3) {
-            case 0b000: taken = (rs1_val == rs2_val); break;  // BEQ
-            case 0b001: taken = (rs1_val != rs2_val); break;  // BNE
-            case 0b100: taken = (static_cast<std::int32_t>(rs1_val) <
-                                 static_cast<std::int32_t>(rs2_val)); break;  // BLT
-            case 0b101: taken = (static_cast<std::int32_t>(rs1_val) >=
-                                 static_cast<std::int32_t>(rs2_val)); break;  // BGE
-            case 0b110: taken = (rs1_val < rs2_val); break;  // BLTU
-            case 0b111: taken = (rs1_val >= rs2_val); break;  // BGEU
-          }
-
-          if (taken) {
-            // B-type 目标: PC + imm (imm 已在 RISCV_DETAIL.imm)
+          if (rv.opcode == opcode::OP_JAL) {
+            // JAL: 无条件跳转, 链接 PC+4 到 RD
             target = pc_val + static_cast<T>(rv.imm);
-          }
-
-          // JAL: 无条件跳转, 链接 PC+4 到 RD
-          // JALR: 跳转到 rs1+imm, 链接 PC+4 到 RD
-          if (rv.funct7 == 0) {
-            if (rv.funct3 == 0) {  // JALR
-              target = rs1_val + static_cast<T>(rv.imm);
-            } else {  // JAL
-              target = pc_val + static_cast<T>(rv.imm);
-            }
             taken = true;
             n->operator()(KeyType::RD_DATA) = pc_val + 4;  // link
+          } else if (rv.opcode == opcode::OP_JALR) {
+            // JALR: 跳转到 rs1+imm, 链接 PC+4 到 RD
+            target = rs1_val + static_cast<T>(rv.imm);
+            taken = true;
+            n->operator()(KeyType::RD_DATA) = pc_val + 4;  // link
+          } else {
+            // B-type: 根据 funct3 判断分支条件
+            switch (rv.funct3) {
+              case 0b000: taken = (rs1_val == rs2_val); break;  // BEQ
+              case 0b001: taken = (rs1_val != rs2_val); break;  // BNE
+              case 0b100: taken = (static_cast<std::int32_t>(rs1_val) <
+                                   static_cast<std::int32_t>(rs2_val)); break;  // BLT
+              case 0b101: taken = (static_cast<std::int32_t>(rs1_val) >=
+                                   static_cast<std::int32_t>(rs2_val)); break;  // BGE
+              case 0b110: taken = (rs1_val < rs2_val); break;  // BLTU
+              case 0b111: taken = (rs1_val >= rs2_val); break;  // BGEU
+            }
+            if (taken) {
+              // B-type 目标: PC + imm (imm 已在 RISCV_DETAIL.imm)
+              target = pc_val + static_cast<T>(rv.imm);
+            }
           }
         }
 
