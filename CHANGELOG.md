@@ -182,6 +182,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **目的**: 实现 TLB lookup/insert 算法 + PTW Sv39 三级 walk + MultiLevelTLB coherence + MMUPlugin at_stage 闭包 + RISC-V satp/SFENCE.VMA/exception 12/13/15 hook + cpptlm MMUTLMBridge. 解锁 ADR-044 VIPT 数据流真实链路 (MMUPlugin 同时输出 pl::PADDR + pl::MMU_VADDR).
 
+## v0.2.1 (2026-09-15) - riscv-tests-rv32ui (Wave 1 of Phase 1.5)
+
+> **目的**: Phase 1.5 启动 — 建客观 RV32I 合规基线（riscv-tests rv32ui-p-*）用于 Wave 2 SoC demo 选题 gate + Wave 2 fix-rv32ui-N triage 输入.
+
+### Added
+
+- **`ip/cpu/picolibc_host_memory.h`**（修改）: `Config` 结构体参数化 base address window（base_addr/size/tohost_addr），`PicolibcHostMemory(Config)` 新构造函数，`write_half`（16-bit little-endian）新方法，`write_word` per-byte tohost check 修复 partial-byte bug，`load_section(sh_addr, bytes)` 多段 ELF 加载 API，`in_window` 含 underflow guard + min(cfg.size, kMemorySize) OOB 防护
+- **`ip/cpu/plugins/dbus.h`**（修改）: STORE 路径按 funct3 分发（SB→write_byte / SH→write_half / SW→write_word），通过 RISCV_DETAIL payload key 读 funct3，if-else 链（无 switch-on-state、无早返）遵守 ADR-040 Tier-1 #4
+- **`tools/cpu_sim/elf_loader.h`**（修改）: 新增 `ElfLoadResult` 结构体（sections + entry_addr + tohost_addr），新 `load_elf_full(path)` 函数：所有 SHF_ALLOC PROGBITS 段收集 + e_entry 不再 skip + shstrtab 解析找 `.tohost` section sh_addr + section overlap 检测 throw。保留 legacy `load_elf_text` 兼容 add.elf
+- **`tools/cpu_sim/main.cpp`**（修改）: 新 `--base-addr HEX` CLI flag；ELF load 改用 `load_elf_full` + `PicolibcHostMemory::Config`；build_cpu 后 caller-side 写入 ELF `entry_addr` 到 fetch node `KeyType::PC`（design Decision 3，不动 build_cpu ABI）
+- **`tests/cpu/test_picolibc_memory_base_window.cpp`**（NEW）: 7 测试覆盖 base=0 默认、base=0x80000000 布局、write_half endian、write_word per-byte tohost、out-of-window drop、load_section placement
+- **`tests/cpu/test_elf_loader_full.cpp`**（NEW）: 3 测试覆盖多 SHF_ALLOC PROGBITS 段收集、.tohost sh_addr 解析、无 .tohost 返回 UINT64_MAX
+- **`tests/cpu/test_cpu_sim_base_addr.cpp`**（NEW）: 2 测试覆盖 add.elf back-compat、--base-addr flag 在 help 中可见
+- **`tests/cpu/integration/test_rv32ui_runner.cpp`**（NEW）: 40 TEST_CASE 宏循环（macro RV32UI_P_TEST），每个 TEST_CASE: load_elf_full → PicolibcHostMemory Config → load_section 全部 → CpuFactory (enable_mmu=false) → 写 fetch PC → 跑 10000 cycles → hard REQUIRE mem.exited() + soft CHECK exit_code 写 CSV。CSV 用 std::once_flag + append-before-REQUIRE + `${CMAKE_SOURCE_DIR}` 绝对路径
+- **`tests/cpu/riscv_tests/`**（NEW directory）: `build_rv32ui.sh` 脚本（riscv32-unknown-elf-gcc 编译 riscv-tests/isa/rv32ui/*.S），`README.md` 文档（来源/许可/排除清单），`elf/` 空目录占位（**待 follow-up commit vendor**）
+- **`soc/cpu/docs/dse/rv32ui-baseline-matrix.csv`**（NEW artifact, committed）: Wave 1 baseline 合规矩阵入口，schema `elf,status,fail_stage,category,cycles,notes`，category ∈ {真 bug / feature stub / toolchain / timeout / runner_setup_error}
+- **`tests/CMakeLists.txt`**（修改）: `target_compile_definitions(chipforge_tests PRIVATE TEST_RV32UI_ELF_DIR=... RV32UI_CSV_PATH=...)` 注入绝对路径
+
+### Modified
+- `soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md`: Wave 1 估时 1 周→1.5 周；§6.1 风险表补 vendor ELFs（commit D 实际状态）
+- `openspec/specs/cpu-real-fetch-and-memory/spec.md`: delta（5 ADDED + 1 MODIFIED）：base window + multi-section loader + e_entry + DBusPlugin STORE funct3 dispatch（LOAD 路径声明 OUT OF SCOPE）
+
+### Verified
+- `./build/bin/chipforge_tests` → **344/389 PASS**（baseline 332 + 12 new: 7 picolibc + 3 elf-loader + 2 cpu-sim）
+- 40 new rv32ui-p TEST_CASE 全部 FAIL `category=runner_setup_error`（**预期**: ELF vendor 待 follow-up commit；runner-mechanics 正确：CSV 行已写入，hard REQUIRE 触发因为 ELF 不存在是 runner-mechanics violation）
+- 5 pre-existing toolchain failures unchanged（per AGENTS.md baseline）
+- 4 architecture gates all PASS（verify_adr + verify_plugin_decision + check_plugin_portability + doc_link_check）
+- 5/5 稳定连跑 PASS
+
+### Known Limitations (Documented)
+- DBusPlugin LOAD 路径（LB/LH/LBU/LHU）显式 OUT OF SCOPE — 4 个对应测试预期分类 feature stub/真 bug；Wave 2 fix 候选
+- riscv-tests ELF 实际 vendor 需 follow-up commit（riscv-tests 源码未 vendor 在本 session；`tests/cpu/riscv_tests/build_rv32ui.sh` 脚本就绪，README 记录来源/许可/排除清单）
+- byte-wise tohost check 对 TESTNUM≥128 误分类（rv32ui-p 测试 TESTNUM < 128 范围内安全）
+
+### Follow-up Work (Phase 1.5 Wave 2+)
+- `cpu-pipeline-fix-rv32ui-N`: 解析 CSV 矩阵的真 bug，N 由 Wave 1 实测确定
+- `soc-cpu-l1-mmu-demo` (Wave 2): 含 PTW 实内存接线 + 5 个 riscv-tests 通过子集
+- riscv-tests ELF vendor commit: 拉源码 + 跑 build_rv32ui.sh + commit ELF 到 git
+
 ## v0.2.0 (2026-09-13) - cpu-mmu-integration
 
 > **目的**: 把 mmu-cache-integration v0.1.0 实装的 RiscVMMUPlugin 真正接到 CPU pipeline. 条件注册 + 3 个 RiscV hook substage (csr_write_satp/sfence_vma/mmu_exit) + exception 12/13/15 传播到 CPU. 落地 Oracle Tier 1 #1 推荐的 M5 critical path 起点.

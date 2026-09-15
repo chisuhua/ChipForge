@@ -40,17 +40,18 @@
 
 > 设计原则：**验证先于堆叠**。Wave 1 建立基线，Wave 2-3 修补 + 扩展，Wave 4 是"毕业 demo"。
 
-### Wave 1（立即，1 周）：建立客观验收门槛
+### Wave 1（立即，1.5 周）：建立客观验收门槛
+
+> **状态** (2026-09-15): Wave 1 已启动，commit A/B/C/D 归档完毕。详见 `CHANGELOG.md v0.2.1`。
+> - ✅ commit A: PicolibcHostMemory base window + write_half + write_word 修复 + DBusPlugin STORE funct3 dispatch（7 测试）
+> - ✅ commit B: ELF loader multi-section + e_entry + .tohost shstrtab 解析（3 测试）
+> - ✅ commit C: cpu_sim --base-addr flag + entry_addr → fetch PC init（2 测试）
+> - ⚠️ commit D: fixture + CSV 基础设施已就绪，但实际 ELF vendor 待 follow-up commit（riscv-tests 源码未 vendor；40 new rv32ui TEST_CASE 全部 FAIL `category=runner_setup_error` 因 ELF 不存在）
+> - ⏳ commit E: docs + archive（待运行）
 
 | Change | 目标 | 估时 | 依赖 |
 |--------|------|------|------|
 | `riscv-tests-rv32ui` | 接入 rv32ui-p-* prebuilt ELFs 到 ctest，量化当前通过率 | 3 天 | 无（复用 `cpu_sim --elf` 机制） |
-
-**核心内容**：
-- `tests/cpu/riscv_tests/` 放 prebuilt ELFs（git submodule 或 build-time download）
-- `tests/cpu/integration/test_riscv_tests_runner.cpp`：catch2 fixture 按 `[riscv-tests][rv32ui-p-add]` 等 tag 跑每个 ELF，断言 `cpu_sim` 输出含 `tohost=1`
-- 基线快照：N 个用例 pass / M 个用例 fail / 失败原因分类（CSR/trap/branch CSR 依赖 vs 真 bug）
-- `tests/CMakeLists.txt` 添加 `[riscv-tests]` family 注册（已经 GLOB_RECURSE，无需改）
 
 **预期收益**：
 - **客观红/绿矩阵**替代"自造 add.elf 拍脑袋"
