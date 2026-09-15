@@ -27,15 +27,18 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
-
+#include "cf/plugin/pipe_builder.h"
+#include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/cpu_factory.h"
 #include "ip/cpu/picolibc_host_memory.h"
 #include "tools/cpu_sim/elf_loader.h"
+
+#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -44,13 +47,15 @@ void print_usage(const char* argv0) {
             << " --config PATH --cycles N [--elf PATH] [--seed S]\n"
                "\n"
                "Options:\n"
-               "  --config PATH    Path to JSON config (default: "
+               "  --config PATH        Path to JSON config (default: "
                "ip/cpu/configs/cpu_default.json)\n"
-               "  --cycles N       Number of cycles to run (default: 1000)\n"
-               "  --elf PATH       Load ELF program into PicolibcHostMemory "
+               "  --cycles N           Number of cycles to run (default: 1000)\n"
+               "  --elf PATH           Load ELF program into PicolibcHostMemory "
                "(optional, M4.15)\n"
-               "  --seed S         Random seed (reserved for future use)\n"
-               "  --help, -h       Show this help and exit\n"
+               "  --base-addr HEX      Base address of RAM window (default 0x0; "
+               "riscv-tests uses 0x80000000)\n"
+               "  --seed S             Random seed (reserved for future use)\n"
+               "  --help, -h           Show this help and exit\n"
                "\n"
                "Output: KEY=VALUE lines on stdout (cycles, ipc, tohost, "
                "config, pipeline_stages, dispatch_width, mul_latency).\n";
@@ -102,6 +107,8 @@ int main(int argc, char** argv) {
   std::uint64_t cycles = 1000;
   std::uint64_t seed = 0;  // reserved
   std::string elf_path;    // optional, M4.15
+  std::uint64_t base_addr_arg = 0;
+  bool base_addr_explicit = false;
 
   for (int i = 1; i < argc; ++i) {
     if ((std::strcmp(argv[i], "--help") == 0 ||
@@ -116,6 +123,10 @@ int main(int argc, char** argv) {
       ++i;
     } else if (std::strcmp(argv[i], "--elf") == 0 && i + 1 < argc) {
       elf_path = argv[++i];
+    } else if (std::strcmp(argv[i], "--base-addr") == 0 && i + 1 < argc) {
+      base_addr_arg = std::strtoull(argv[i + 1], nullptr, 0);
+      base_addr_explicit = true;
+      ++i;
     } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
       seed = std::strtoull(argv[++i], nullptr, 10);
     } else {
@@ -140,12 +151,28 @@ int main(int argc, char** argv) {
   // --------------------------------------------------------------------------
   cf::cpu::PicolibcHostMemory mem;
   bool elf_loaded = false;
+  std::uint64_t entry_addr = 0;
   if (!elf_path.empty()) {
     try {
-      std::uint64_t base_addr = 0;
-      std::vector<std::uint8_t> text =
-          cf::tools::load_elf_text(elf_path, base_addr);
-      mem.load_binary(text.data(), text.size(), base_addr);
+      auto elf = cf::tools::load_elf_full(elf_path);
+      entry_addr = elf.entry_addr;
+      // Window base: explicit --base-addr wins; else ELF e_entry aligned to 64KB.
+      std::uint64_t window_base = base_addr_explicit
+                                     ? base_addr_arg
+                                     : (elf.entry_addr & ~static_cast<std::uint64_t>(0xFFFF));
+      if (window_base == 0 && !base_addr_explicit && elf.entry_addr != 0) {
+        window_base = elf.entry_addr;
+      }
+      std::uint64_t tohost_addr = (elf.tohost_addr != std::numeric_limits<std::uint64_t>::max())
+                                      ? elf.tohost_addr
+                                      : 0;
+      mem = cf::cpu::PicolibcHostMemory(cf::cpu::PicolibcHostMemory::Config{
+          .base_addr = window_base,
+          .size = 64 * 1024,
+          .tohost_addr = tohost_addr});
+      for (const auto& sec : elf.sections) {
+        mem.load_section(sec.first, sec.second);
+      }
       elf_loaded = true;
     } catch (const std::exception& e) {
       std::cerr << "FAIL: ELF load: " << e.what() << "\n";
@@ -169,6 +196,15 @@ int main(int argc, char** argv) {
   if (!pb) {
     std::cerr << "FAIL: build_cpu returned null\n";
     return 1;
+  }
+
+  // e_entry → fetch PC init (caller-side, design Decision 3)
+  if (elf_loaded) {
+    using KeyType = cf::cpu::core::payload::keys<std::uint32_t, 32>;
+    auto fetch_node = pb->node_of_logic_stage("fetch");
+    if (fetch_node) {
+      fetch_node->operator()(KeyType::PC) = static_cast<std::uint32_t>(entry_addr);
+    }
   }
 
   // --------------------------------------------------------------------------
