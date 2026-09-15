@@ -5,6 +5,47 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.1.3 (2026-09-15) - plugin-framework-stall
+
+> **OpenSpec change**: `plugin-framework-stall` (详见 `openspec/changes/archive/2026-09-15-plugin-framework-stall/`)
+> **目的**: 兑现 `cf::plugin::CtrlLink` 4 种控制 API 的真实消费者, 让 D4 Plugin 范式的"声明式控制流"落地为框架级 stall 原语。
+
+### Added (框架层)
+- `include/cf/plugin/pipe_builder.h` 新 API: `register_ctrl_link(stage_name, shared_ptr<CtrlLink>)` + `should_stall_stage(name)` + `ctrl_link_count(name)` + `get_ctrl_link(name, idx)` + `clear_ctrl_links()` + private `stage_ctrl_links_`
+- `include/cf/plugin/plugin_exception.h` (新增): `cf::plugin::PluginException` 继承 `std::runtime_error`, 携带 `stage_name`
+- `include/cf/plugin/pipe_builder.h::run()`: 在 canonical stage 循环外层插入 `if (should_stall_stage(name)) continue;` (per-stage OR-merge stall)
+- `include/cf/plugin/pipe_builder.h::run()` 末尾: 追加 throw_when 全局异常检查, 抛 `PluginException` 跳过 `commit_storages()`
+
+### Added (Plugin consumers)
+- `ip/cpu/plugins/ibus.h`: build() 注册 fetch stage CtrlLink, `halt_when` 读 `tlb_lookup_ifetch` 节点 `mmu_keys::PTW_ACTIVE` (PTW-busy halt)
+- `ip/cpu/plugins/hazard.h`: 新增 `has_active_hazard()` + `reset_hazard_cache()` + `last_decoded_hazard_` 成员, build() 注册 execute stage CtrlLink, `register_commit_hook` 复位 cache
+- `ip/cpu/plugins/exception.h`: build() 注册 throw_when 演示桩 (lambda 恒 false, TODO Phase 5+ 实装 trap delivery)
+- `ip/cpu/plugins/branch_predictor.h`: build() 注册 flush_when 演示桩 (lambda 恒 false, TODO cpu-pipeline-mispredict 实装 mispredict recovery)
+- `ip/mmu/tlm/MMUPlugin.cpp`: PTW 完成回调 (success + fault 两条路径) 原子清零 `PTW_ACTIVE=0` (commit B 关键修复)
+
+### Test
+- `tests/framework/test_pipe_builder_stall.cpp` (12 case): empty_ctrl_no_effect, single_halt_skip/normal, or_merge_two/three, other_stage_not_affected, throw_when_throws, throw_then_no_commit, flush_not_framework_consumed, register_ctrl_link_count, halt_stateful, shared_ptr_ctrl_keeps_alive
+- `tests/mmu/test_ptw_stall_integration.cpp` (3 case): ptw_tlb_hit_fetch_not_stalled, ptw_tlb_miss_fetch_stalled, ptw_complete_unstall_fetch_resumes
+- `tests/cpu/integration/test_hazard_stall.cpp` (4 case): hazard_no_raw_no_stall_when_scoreboard_empty, hazard_raw_chain_stall_execute, hazard_long_raw_chain_repeated_stall, hazard_war_not_stall_framework_consumes_ctrl
+- **baseline 318 → 337 PASS** (66755 assertions, 5 RISC-V 仿真 pre-existing 失败不变)
+
+### Docs
+- `docs/architecture/adr/ADR-045-plugin-ctrl-link-consumption.md` (新增): 8 个 Decision sections, 8 项风险表
+- `docs/architecture/adr.md`: 注册 ADR-045
+- `openspec/specs/`: 4 个 spec 永久化 (pb-stall-loop, ctrllink-consumption-contract, ptw-fetch-stall-consumer, hazard-execute-stall-consumer)
+
+### Verified
+- 4 architecture gates 全绿 (verify_adr / verify_plugin_decision / check_plugin_portability / doc_link_check)
+- D4/ADR-040 全合规 (无 tick / 无状态机 / 无早返 / shared_ptr 仅 build() 注册期)
+
+### Pending (下一阶段入口)
+> `soc-cpu-l1-mmu-demo` 重启 — 现在 stall 原语就绪, PTW retry 可真做
+> `riscv-tests-rv32ui` 接入 — 客观验收门槛 (rv32ui-p-* 套件)
+> `cpu-pipeline-multi-cycle` — LATENCY>1 mul/div stall (复用本 change 的 framework primitive)
+> `cpu-pipeline-exception` — throw_when 真实消费者 (trap delivery)
+> `cpu-pipeline-mispredict` — flush_when 真实消费者 (branch recovery)
+> `plugin-framework-cycle-precision` — pb.run(cycle_count=N) 真 cycle 精度
+
 ## v0.1.2 (2026-09-15) - cpu-pipeline-stubs-replace
 
 > **OpenSpec change**: `cpu-pipeline-stubs-replace` (详见 `openspec/changes/archive/2026-09-15-cpu-pipeline-stubs-replace/`)

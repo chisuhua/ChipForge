@@ -36,7 +36,7 @@ mmu-tlb-ptw-impl (archived 2026-09-12) + mmu-cache-integration (current) 完成:
 ## 已知限制
 - **Sv32/Sv48 PTW 解码未实装**：仅 Sv39 `decode_pte` 完整，Sv32/Sv48 + megapage/gigapage 推迟到 `mmu-sv32-sv48-ext`
 - **PTW 真实内存读未实装**：`pte_stub_memory_` 是测试接口，真实内存读推迟到 `soc-cpu-l1-mmu-demo`
-- **CtrlLink halt_when PTW stall 未实装**：框架未消费 `should_halt`，当前用 PTW_ACTIVE RETRY workaround，推迟到 `plugin-framework-stall`
+- **CtrlLink halt_when PTW stall 未实装**（✅ v0.1.3 plugin-framework-stall 已实装）：框架消费 `should_halt`，fetch stage 闭包在 PTW_ACTIVE=1 时 skip，IBusPlugin::build() 注册 fetch CtrlLink 读 `mmu_keys::PTW_ACTIVE`；MMUPlugin PTW 完成回调原子清零 `PTW_ACTIVE=0`
 - **split_id 拓扑未实装**：`topology` 字段保留枚举值 `split_id`，骨架阶段仅 `unified` 工作
 - **cpptlm MMUTLMBridge 未实装**：与 `L1CacheTLMBridge` 同构但推迟到 TLB/PTW 算法稳定后
 - **rtl/ 目录空**：Phase 5+ CppHDL 转换时填充
