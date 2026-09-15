@@ -23,6 +23,7 @@
 
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
+#include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/picolibc_host_memory.h"
 
@@ -49,24 +50,40 @@ class DBusPlugin : public cf::plugin::PluginBase {
 
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
+    using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<T>;
+    constexpr std::uint8_t kFunct3SB = 0;  // RISC-V spec: SB=000
+    constexpr std::uint8_t kFunct3SH = 1;  // SH=001
+    constexpr std::uint8_t kFunct3SW = 2;  // SW=010
 
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
 
-        if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::LOAD) {
-          T addr = n->operator()(KeyType::MEM_ADDR);
-          // cpu-pipeline-stubs-replace commit D: 真实 read_word (mem 非空时)
-          n->operator()(KeyType::MEM_DATA) =
-              mem_ ? T(mem_->read_word(static_cast<std::uint64_t>(addr))) : T{0};
-        } else if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::STORE) {
-          T addr = n->operator()(KeyType::MEM_ADDR);
-          T data = n->operator()(KeyType::MEM_DATA);
-          // cpu-pipeline-stubs-replace commit D: 真实 write_word (mem 非空时)
-          if (mem_) mem_->write_word(static_cast<std::uint64_t>(addr),
-                                     static_cast<std::uint32_t>(data));
+      // LOAD 路径: LOAD width extraction (LB/LH/LBU/LHU) 是 Wave 2 候选,
+      // 当前一律 read_word; lb/lh 系失败预期分类 feature stub/真 bug.
+      if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::LOAD) {
+        T addr = n->operator()(KeyType::MEM_ADDR);
+        if (mem_) {
+          n->operator()(KeyType::MEM_DATA) = T(mem_->read_word(static_cast<std::uint64_t>(addr)));
+        } else {
+          n->operator()(KeyType::MEM_DATA) = T{0};
         }
+      } else if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::STORE) {
+        // STORE 路径按 funct3 分发 (SB/SH/SW); 用 if-else 链, 无早返 — ADR-040 Tier-1 #4.
+        T addr = n->operator()(KeyType::MEM_ADDR);
+        T data = n->operator()(KeyType::MEM_DATA);
+        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+        if (mem_) {
+          if (rv.funct3 == kFunct3SB) {
+            mem_->write_byte(static_cast<std::uint64_t>(addr), static_cast<std::uint8_t>(data));
+          } else if (rv.funct3 == kFunct3SH) {
+            mem_->write_half(static_cast<std::uint64_t>(addr), static_cast<std::uint16_t>(data));
+          } else if (rv.funct3 == kFunct3SW) {
+            mem_->write_word(static_cast<std::uint64_t>(addr), static_cast<std::uint32_t>(data));
+          }
+        }
+      }
       }
     });
   }
