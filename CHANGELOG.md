@@ -5,6 +5,51 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.1.2 (2026-09-15) - cpu-pipeline-stubs-replace
+
+> **OpenSpec change**: `cpu-pipeline-stubs-replace` (详见 `openspec/changes/archive/2026-09-15-cpu-pipeline-stubs-replace/`)
+> **目的**: 替换 CPU Plugin pipeline 的 4 个 stub（IBus/DBus 假数据 + 无 stage 间传播 + 无 PC 更新），让 `cpu_sim` 首次通过 Plugin pipeline 真实执行 RISC-V ELF 到 `tohost=1`。
+
+### Changed (框架层)
+- `include/cf/plugin/pipe_builder.h` — `run()` 改为按 **canonical stage first-occurrence order × Phase (EARLY→NORMAL→LATE)** 遍历回调（commit A）；新增 `canonical_stage_order()` helper
+- `src/cf_plugin/CMakeLists.txt` — `cpu_sim` 显式链接 `ip/mmu/` 实现源（RiscvMMUPlugin vtable 需要）
+
+### Added (plugins/)
+- `ip/cpu/plugins/stage_link.h` — **`StageLinkPlugin`**（commit B）：4 个 `at_stage(X, Phase::EARLY)` 闭包做 stage→stage Payload 传播
+  - fetch→decode: `PC`, `INSTRUCTION`
+  - decode→execute: `PC`, `DECODE`, `RISCV_DETAIL`, `RS1`, `RS2`
+  - execute→memory: `PC`, `DECODE`, `MEM_ADDR`, `MEM_DATA`, `RD_DATA`
+  - memory→writeback: `PC`, `DECODE`, `RD_DATA`, `MEM_DATA`
+- `ip/cpu/cpu_factory.h` — `build_cpu(config, PicolibcHostMemory* mem = nullptr)` 可选第二参数（commit B/E）；`register_early_plugins` / `register_late_plugins` 透传 `mem`
+
+### Changed (plugins/ + arch/riscv/)
+- `ip/cpu/plugins/ibus.h` — 构造函数加 `PicolibcHostMemory* mem`；`at_stage("fetch", NORMAL)` 真读 `mem_->read_word(pc)`；`at_stage("writeback", Phase::LATE)` 把 PC 写回 **fetch 节点**（循环携带值，非单向传播）
+- `ip/cpu/plugins/dbus.h` — 同上；`at_stage("memory", NORMAL)` LOAD→`read_word` / STORE→`write_word`
+- `ip/cpu/arch/riscv/lsu.h` — 删除 `n->operator()(MEM_DATA) = T{0}` stub（AGU 职责归位，DBus 接管 data）
+- `tools/cpu_sim/main.cpp` — 删除 M4.15 软件解释器（37 行）；`pb.run()` 真跑 pipeline；`cfg.isa = "rv32i"` 显式 pin
+
+### Fixed (commit E 发现并修复的 4 个隐藏 bug — pipeline 从未真跑所致)
+- `ip/cpu/arch/riscv/branch.h` — **仅 `op_class == BRANCH` 时评估分支**（之前 `addi` 的 funct3=0 落入 BEQ，操作数默认 0 → `taken=true` → PC 被错写 `pc+imm=0`）
+- `ip/cpu/arch/riscv/int_alu.h` — **I-type 用 `rv.imm` 而非 `rs2_val`**（decoder 对 I-type 置 `reads_rs2=false`）；**写 `RD_DATA`**（RegFilePlugin 写回读的键，之前只写 `RESULT`）
+- `ip/cpu/plugins/ibus.h` — writeback LATE PC 更新写到 **fetch 节点**（不是自身节点）
+
+### Test
+- `tests/cpu/test_cpu_factory.cpp` — `stage_count()` / `plugins.size()` 断言更新（+1 StageLinkPlugin）
+- `tests/cpu/integration/test_{3,5,7}stage_riscv.cpp` — `stage_count()` 断言 +4（每 stage 各 +1 StageLink EARLY）
+- **baseline 306 → 318 PASS**（66726 assertions，5/5 稳定）
+- `./build/src/cf_plugin/cpu_sim --cycles 100 --elf build/add.elf` → **tohost=1**（5 cycles 跑完 6 指令 add.elf）
+
+### Verified
+- `bash tools/verify_adr.sh` PASS
+- `bash tools/verify_plugin_decision.sh` PASS（0 新违规）
+- `bash tools/check_plugin_portability.sh` PASS（0 std::optional / 0 tick / 0 早返）
+- `bash tools/doc_link_check.sh` PASS（exit 0）
+
+### Pending (下一阶段入口)
+> `soc-cpu-l1-mmu-demo` 重启 —— 现在 CPU Pipeline 真执行，SoC JSON demo 可扩展（traffic_gen→mmu→l1→mem 全链 + CPU Plugin 真跑 add.elf 到 tohost）
+> `cache-dse-sweep` —— CPU Pipeline 真执行后，DSE sweep 测基线更有意义
+> `plugin-framework-stall` —— CtrlLink halt_when stall 可验证（PTW busy 时 stall fetch）
+
 ## v0.0.7 (2026-06-29) - mmu-ip-skeleton
 
 > **OpenSpec change**: `mmu-ip-skeleton` (详见 `openspec/changes/mmu-ip-skeleton/`)
