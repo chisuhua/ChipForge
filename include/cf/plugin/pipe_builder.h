@@ -31,8 +31,10 @@
 #include <utility>
 #include <vector>
 
+#include "cf/plugin/ctrl_link.h"
 #include "cf/plugin/pipe_node.h"
 #include "cf/plugin/plugin_base.h"
+#include "cf/plugin/plugin_exception.h"
 
 namespace cf {
 namespace plugin {
@@ -103,10 +105,20 @@ class PipeBuilder {
     // (按 stages_ 插入序). n_threads 循环和 commit_storages 保留 M4G 行为.
     // 第一次 run() 时构建 canonical_order_ 缓存（缓存 stage 首现序）; 后续 at_stage
     // 不会影响 in-progress run() — 见 canonical_order() lazy 计算.
+    //
+    // plugin-framework-stall commit A: 插入 CtrlLink stall loop.
+    // 每个 stage 入口先查 should_stall_stage(): true 则 skip 该 stage 的所有
+    // phase 闭包, false 则按 EARLY→NORMAL→LATE 顺序执行 (与既有 cpu-pipeline-
+    // stubs-replace commit A 行为一致). 末尾追加 throw_when 全局异常检查:
+    // 任一 CtrlLink should_throw() 为真则抛 PluginException, 跳过 commit_storages().
     for (std::uint8_t tid = 0; tid < n_threads_; ++tid) {
       for (auto& p : plugins_) p->set_tid(tid);
       const auto order = canonical_stage_order();
       for (const auto& stage_name : order) {
+        // plugin-framework-stall commit A: stall check (per-stage OR-merge)
+        if (should_stall_stage(stage_name)) {
+          continue;
+        }
         // 同 stage+同 phase 桶内按 stages_ 插入序稳定排序
         for (int p_idx = 0; p_idx < 3; ++p_idx) {
           const Phase target_phase = static_cast<Phase>(p_idx);
@@ -115,6 +127,14 @@ class PipeBuilder {
               s.callback();
             }
           }
+        }
+      }
+    }
+    // plugin-framework-stall commit A: throw_when 全局异常检查
+    for (const auto& [stage, ctrls] : stage_ctrl_links_) {
+      for (const auto& c : ctrls) {
+        if (c && c->should_throw()) {
+          throw PluginException(stage, "throw_when condition triggered");
         }
       }
     }
@@ -195,6 +215,47 @@ class PipeBuilder {
   std::size_t stage_count() const noexcept { return stages_.size(); }
   std::size_t node_count() const noexcept { return nodes_.size(); }
 
+  // ------------------------------------------------------------------------
+  // plugin-framework-stall commit A: CtrlLink stage binding
+  //
+  // 设计: 用 shared_ptr<CtrlLink> 保持 CtrlLink = delete 拷贝约束,
+  //       shared_ptr 持有 lambda 捕获对象, 生命周期由 PipeBuilder 管理.
+  //
+  // 多次调用同名 stage 累加 (不覆盖), 应在 pb.build() 之前调用.
+  //
+  // 注: flush_when / bypass 不框架自动消费 (推迟到 cpu-pipeline-mispredict)
+  // ------------------------------------------------------------------------
+  void register_ctrl_link(const std::string& stage_name,
+                          std::shared_ptr<CtrlLink> ctrl) {
+    if (stage_name.empty()) throw std::invalid_argument("empty stage name");
+    if (!ctrl) throw std::invalid_argument("null ctrl_link");
+    stage_ctrl_links_[stage_name].push_back(std::move(ctrl));
+  }
+
+  bool should_stall_stage(const std::string& stage_name) const {
+    auto it = stage_ctrl_links_.find(stage_name);
+    if (it == stage_ctrl_links_.end()) return false;
+    for (const auto& c : it->second) {
+      if (c && c->should_halt()) return true;
+    }
+    return false;
+  }
+
+  std::size_t ctrl_link_count(const std::string& stage_name) const noexcept {
+    auto it = stage_ctrl_links_.find(stage_name);
+    return (it == stage_ctrl_links_.end()) ? 0 : it->second.size();
+  }
+
+  std::shared_ptr<CtrlLink> get_ctrl_link(const std::string& stage_name,
+                                          std::size_t index) const {
+    auto it = stage_ctrl_links_.find(stage_name);
+    if (it == stage_ctrl_links_.end()) return nullptr;
+    if (index >= it->second.size()) return nullptr;
+    return it->second[index];
+  }
+
+  void clear_ctrl_links() noexcept { stage_ctrl_links_.clear(); }
+
   // plugins() —— 返回 plugin 列表只读引用 (M4.12, 供 CpuFactory 测试断言)
   const std::vector<std::unique_ptr<PluginBase>>& plugins() const noexcept {
     return plugins_;
@@ -225,6 +286,10 @@ class PipeBuilder {
   std::map<std::string, std::string> substage_parent_;
   std::vector<CommitHook> commit_hooks_;
   std::uint8_t n_threads_ = 1;  // M4G-extend: 默认 1, factory 端注入
+  // plugin-framework-stall commit A: stage → vector<shared_ptr<CtrlLink>>
+  // OR 合并语义在 should_stall_stage() 内执行
+  std::unordered_map<std::string, std::vector<std::shared_ptr<CtrlLink>>>
+      stage_ctrl_links_;
 };
 
 }  // namespace plugin
