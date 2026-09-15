@@ -135,6 +135,8 @@
 | ADR-044 | L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 | IP 架构 | 🚧（设计方向已锁，实装推迟 mmu-tlb-ptw-impl 以后） | [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../../ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) |
 | ADR-045 | Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop | Plugin | ✅ Accepted (2026-09-15, plugin-framework-stall v0.1.3) | [`adr/ADR-045-plugin-ctrl-link-consumption.md`](adr/ADR-045-plugin-ctrl-link-consumption.md) |
 
+> ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 [`../soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md` §11](../../soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md)。
+
 ### 2.4 统计
 
 | 类别 | ✅ | ⚠️ | 🚧 | 合计 |

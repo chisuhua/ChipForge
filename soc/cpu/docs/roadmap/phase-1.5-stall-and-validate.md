@@ -250,3 +250,85 @@ Phase 2 Bare-metal Kickoff
 | 日期 | 变更 |
 |------|------|
 | 2026-09-15 | 初版：plugin-framework-stall 归档后启动 Phase 1.5，4-wave 计划 |
+| 2026-09-15 | +§11 已知风险（plugin-framework-stall v0.1.3 引入, Wave 1+2 验证/修） |
+
+## 11. 已知风险（plugin-framework-stall v0.1.3 引入，待 Wave 1+2 验证 / 修）
+
+> 这些风险由 `plugin-framework-stall` v0.1.3 引入。当前 337/337 测试不暴露（验证范围限定整数 ALU add.elf），但 `riscv-tests-rv32ui`（Wave 1）会客观地揭示影响面。Wave 2 的 `cpu-pipeline-fix-rv32ui-N` 视红/绿矩阵决定修/接受/推迟。
+
+### 11.1 HazardPlugin scoreboard 生命周期 vs 单 pass-per-run 语义
+
+**现象**：`hazard.h:159-185` 在 decode 阶段 `mark_in_flight(rd_idx)`、在 writeback LATE 阶段 `clear_in_flight(rd_idx)`。单 pass 语义下每个 `pb.run()` 一条指令走完 5 stage，scoreboard 标记与清零在**同一 run 内**发生。
+
+**影响**：
+- 若 scoreboard 实际有效（mark/clear 跨 run 持久），Hazard stall 可能在不该 stall 时 stall（假 stall）或永远 stall（无限循环）
+- TDD 在 commit B 验证了 `pb.run()` 调用不破 318 baseline，但 5 个 pre-existing RISC-V 仿真测试仍是 fail 状态——不证明该机制对真实 RAW 链正确
+
+**Wave 1 验证方法**：
+- 接入 `riscv-tests-rv32ui-p-*` 后，跑 `rv32ui-p-add`、`rv32ui-p-addi`、`rv32ui-p-lw`、`rv32ui-p-sw` 等含 RAW 依赖的用例
+- 红/绿矩阵给出客观 baseline
+
+**Wave 2 修/接受判定**：
+- 失败用例 ≥3 且属于真 bug → 触发 `cpu-pipeline-fix-rv32ui-N` 修 `hazard.h::build` 闭包顺序（可能要把 mark_in_flight 延后到 execute 阶段）
+- 失败用例 < 3 或全部 CSR/trap 依赖 → 接受为"当前模型限制"，记入 Phase 2+
+
+**Owner**: Wave 2 负责人
+
+### 11.2 canonical at_stage 注册序约束（MMU 必须先于 IBus build）
+
+**现象**：`plugin-framework-stall` §3.1 数据流图假设 `tlb_lookup_ifetch` 在 `fetch` 之前出现在 `canonical_stage_order`——这是 `PipeBuilder::run()` 的 stall check 能在 cycle 0 当 cycle 生效的前提。`canonical_stage_order` 是 stage **首现序**（`pipe_builder.h:129-138`），取决于 `at_stage` 注册顺序。
+
+**影响**：
+- 若 `IBusPlugin::build()` 先于 `MMUPlugin::build()` 注册，`fetch` 排在 `tlb_lookup_ifetch` 前 → **stall 晚 1 cycle 生效** → 缺失 cycle fetch 读 stale PADDR=0
+- 当前 `cpu_factory.h::register_early_plugins` 调用顺序（commit B 隐式保证）正确，但**没有任何断言**——未来若重构 CpuFactory 或允许多 MMU 拓扑，会静默回归
+
+**Wave 1 验证方法**：
+- 通过 `riscv-tests-rv32ui` 中含 load/store + 地址翻译的用例（如 `rv32ui-p-lw`、`rv32ui-p-sb`）客观验证 stall 时序正确
+- 若 `rv32ui-p-lw` fail 且 trace 显示 "miss cycle fetch 读了 stale PADDR=0" → 重新检查 CpuFactory 注册顺序
+
+**Wave 2 修/接受判定**：
+- 修 `cpu_factory.h::register_early_plugins` 加 `static_assert` 或 runtime 断言（断言 `MMUPlugin::build()` 早于 `IBusPlugin::build()`）
+- 或在 `PipeBuilder::run()` 末尾加 per-stage 拓扑检查（推迟到 Phase 5+ 动态化时）
+
+**Owner**: Wave 2 负责人
+
+### 11.3 Stall 期间下游 stage 对 stale payload 重复执行（"bubble" 名不副实）
+
+**现象**：本 sim 无 instruction queue，stage 间通过 shared Payload 通信。当 `fetch` stage 被 stall（PTW busy）时，`decode/execute/memory/writeback` 继续跑，但读的是**未更新的 stale payload**（fetch 没刷新 INSTRUCTION）→ 同一指令被重复 decode+execute N 次。
+
+**当前验证范围（v0.1.3 限定）**：
+- 整数 ALU 指令幂等（`addi x1,x0,5` 重跑 N 次结果都是 5），`cpu_sim --elf add.elf` → `tohost=1` 端到端正确
+- 5 个 pre-existing RISC-V 仿真 fail 与本风险**无关**（它们是 tohost 机制/工具链配置问题）
+
+**Wave 1 验证方法**：
+- 接入 `riscv-tests-rv32ui` 后，跑 `rv32ui-p-sb`（store byte）—— store **非幂等**（重写内存位置），如 stall 期间重复执行会出现"store 了 N 次但期望只 1 次"的不一致
+- 红/绿矩阵给出客观答案
+
+**Wave 2 修/接受判定**：
+- 失败用例 ≥1（store 类）→ 触发 `cpu-pipeline-fix-rv32ui-N` 增加 per-stage instruction validity tracking（在 PipeNode 增 valid bit，stall 时 valid=false，下游 stage 跳过）
+- 全部 PASS（意外）→ 当前 0-stage latching 设计巧合正确
+- 接受为"已知限制" → 记入 Phase 2+ stall buffer / IQ 实装时解决
+
+**Owner**: Wave 2 负责人
+
+### 11.4 汇总：3 风险暴露路径与解决次序
+
+```
+plugin-framework-stall v0.1.3 (已完成)
+   └─ ADR-045 8 Decision + 8 risk table
+       └─ 此 §11: 3 已知风险延展 (TDD 兜底外, 真实程序验证是 Wave 1)
+
+Wave 1 (riscv-tests-rv32ui)
+   └─ 客观红/绿矩阵
+       └─ Wave 2 优先级排序依据
+
+Wave 2 (cpu-pipeline-fix-rv32ui-N + soc-cpu-l1-mmu-demo 双轨)
+   ├─ §11.1 scoreboard 跨 run 持久性 (修 hazard.h)
+   ├─ §11.2 canonical 注册序约束 (修 cpu_factory.h 加 assert)
+   └─ §11.3 stale payload 重复执行 (修 PipelineNode valid bit 或接受)
+
+Wave 3+ (DSE / 多周期 / 异常 / mispredict)
+   └─ 此 3 风险已闭环或记入"已知限制"
+```
+
+**关键认识**：3 风险不是"plugin-framework-stall 没做完"——它是 D4 框架的**结构性限制**（per-stage shared-payload sim 模型）。Wave 1+2 决定是"修"还是"接受+记入 Phase 2+"，由客观红/绿矩阵驱动而非主观判断。
