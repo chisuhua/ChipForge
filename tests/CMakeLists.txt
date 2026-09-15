@@ -48,6 +48,10 @@ add_executable(chipforge_tests ${TEST_SOURCES})
 # CppHDL 使用 C++20 特性 (std::source_location, std::bit_width, consteval)
 # chipforge_tests 通过 cf_plugin_link_cpphdl 链接 CppHDL 头, 所以本 target 需 C++20
 target_compile_features(chipforge_tests PRIVATE cxx_std_20)
+target_compile_definitions(chipforge_tests PRIVATE
+    TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
+    RV32UI_CSV_PATH="${CMAKE_SOURCE_DIR}/soc/cpu/docs/dse/rv32ui-baseline-matrix.csv"
+)
 
 # tests/ 子目录加入 include 路径（让 #include "catch_amalgamated.hpp" 解析）
 # catch_amalgamated.hpp 在 tests/catch2/ 子目录, 必须显式加进去
