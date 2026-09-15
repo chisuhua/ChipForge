@@ -36,7 +36,7 @@ namespace {
 
 constexpr std::uint64_t kMaxCycles = 10000;
 
-// 41 ELF names (excl fence_i + ma_data) per riscv-tests rv32ui/ dir
+// 40 ELF names (42 rv32ui .S sources excl fence_i + ma_data)
 // Source: https://github.com/riscv-software-src/riscv-tests/tree/master/isa/rv32ui
 constexpr const char* kRv32uiPElfs[] = {
     "add",    "addi",   "and",    "andi",   "auipc",  "beq",    "bge",

@@ -1,41 +1,41 @@
 elf,status,fail_stage,category,cycles,notes
-rv32ui-p-add,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-add
-rv32ui-p-addi,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-addi
-rv32ui-p-and,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-and
-rv32ui-p-andi,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-andi
-rv32ui-p-auipc,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-auipc
-rv32ui-p-beq,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-beq
-rv32ui-p-bge,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-bge
-rv32ui-p-bgeu,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-bgeu
-rv32ui-p-blt,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-blt
-rv32ui-p-bltu,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-bltu
-rv32ui-p-bne,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-bne
-rv32ui-p-jal,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-jal
-rv32ui-p-jalr,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-jalr
-rv32ui-p-lb,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-lb
-rv32ui-p-lbu,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-lbu
-rv32ui-p-ld_st,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-ld_st
-rv32ui-p-lh,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-lh
-rv32ui-p-lhu,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-lhu
-rv32ui-p-lui,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-lui
-rv32ui-p-lw,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-lw
-rv32ui-p-or,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-or
-rv32ui-p-ori,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-ori
-rv32ui-p-sb,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sb
-rv32ui-p-sh,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sh
-rv32ui-p-simple,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-simple
-rv32ui-p-sll,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sll
-rv32ui-p-slli,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-slli
-rv32ui-p-slt,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-slt
-rv32ui-p-slti,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-slti
-rv32ui-p-sltiu,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sltiu
-rv32ui-p-sltu,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sltu
-rv32ui-p-sra,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sra
-rv32ui-p-srai,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-srai
-rv32ui-p-srl,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-srl
-rv32ui-p-srli,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-srli
-rv32ui-p-st_ld,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-st_ld
-rv32ui-p-sub,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sub
-rv32ui-p-sw,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-sw
-rv32ui-p-xor,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-xor
-rv32ui-p-xori,FAIL,,runner_setup_error,0,ELF not found: /workspace/project/ChipForge/tests/cpu/riscv_tests/elf/rv32ui-p-xori
+rv32ui-p-add,PASS,,,461,
+rv32ui-p-addi,PASS,,,238,
+rv32ui-p-and,PASS,,,481,
+rv32ui-p-andi,PASS,,,194,
+rv32ui-p-auipc,PASS,,,55,
+rv32ui-p-beq,PASS,,,287,
+rv32ui-p-bge,PASS,,,305,
+rv32ui-p-bgeu,PASS,,,330,
+rv32ui-p-blt,PASS,,,287,
+rv32ui-p-bltu,PASS,,,312,
+rv32ui-p-bne,PASS,,,287,
+rv32ui-p-jal,PASS,,,51,
+rv32ui-p-jalr,PASS,,,111,
+rv32ui-p-lb,FAIL,execute,feature stub,44,LOAD width extraction OOS (Wave 2)
+rv32ui-p-lbu,FAIL,execute,feature stub,44,LOAD width extraction OOS (Wave 2)
+rv32ui-p-ld_st,FAIL,execute,feature stub,47,LOAD width extraction OOS (Wave 2)
+rv32ui-p-lh,FAIL,execute,feature stub,44,LOAD width extraction OOS (Wave 2)
+rv32ui-p-lhu,FAIL,execute,feature stub,44,LOAD width extraction OOS (Wave 2)
+rv32ui-p-lui,PASS,,,61,
+rv32ui-p-lw,FAIL,execute,feature stub,46,LOAD width extraction OOS (Wave 2)
+rv32ui-p-or,PASS,,,484,
+rv32ui-p-ori,PASS,,,201,
+rv32ui-p-sb,FAIL,execute,feature stub,48,LOAD width extraction OOS (Wave 2)
+rv32ui-p-sh,FAIL,execute,feature stub,48,LOAD width extraction OOS (Wave 2)
+rv32ui-p-simple,PASS,,,37,
+rv32ui-p-sll,PASS,,,489,
+rv32ui-p-slli,PASS,,,237,
+rv32ui-p-slt,PASS,,,455,
+rv32ui-p-slti,PASS,,,233,
+rv32ui-p-sltiu,PASS,,,233,
+rv32ui-p-sltu,PASS,,,455,
+rv32ui-p-sra,PASS,,,508,
+rv32ui-p-srai,PASS,,,252,
+rv32ui-p-srl,PASS,,,502,
+rv32ui-p-srli,PASS,,,246,
+rv32ui-p-st_ld,FAIL,execute,feature stub,45,LOAD width extraction OOS (Wave 2)
+rv32ui-p-sub,PASS,,,453,
+rv32ui-p-sw,FAIL,execute,feature stub,50,LOAD width extraction OOS (Wave 2)
+rv32ui-p-xor,PASS,,,483,
+rv32ui-p-xori,PASS,,,203,
