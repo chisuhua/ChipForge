@@ -182,6 +182,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **目的**: 实现 TLB lookup/insert 算法 + PTW Sv39 三级 walk + MultiLevelTLB coherence + MMUPlugin at_stage 闭包 + RISC-V satp/SFENCE.VMA/exception 12/13/15 hook + cpptlm MMUTLMBridge. 解锁 ADR-044 VIPT 数据流真实链路 (MMUPlugin 同时输出 pl::PADDR + pl::MMU_VADDR).
 
+## v0.2.2 (2026-09-15) - riscv-tests-rv32ui ELF vendor + pipeline exec fixes
+
+> **目的**: 兑现 v0.2.1 记录的 follow-up —— vendor 实际 riscv-tests ELF 并跑通 Wave 1 合规基线。过程中暴露并修复 5 个 CPU pipeline 执行断链 bug（40/40 rv32ui timeout → 30 PASS）。
+
+### Fixed (CPU pipeline 执行断链, riscv-tests-rv32ui 暴露)
+
+- **`ip/cpu/plugins/hazard.h`**（修改）: execute stage CtrlLink `halt_when(has_active_hazard())` → `last_decoded_hazard_ != NONE`。根因: decode 每轮 `mark_in_flight` 后 `has_active_hazard()` 恒 true → execute 被永久 skip → StageLink execute EARLY 不执行 → execute/memory/writeback 全空 → PC 恒卡 0x4 → 所有程序 timeout（含 add.elf）。现仅当本轮 decode 判定真实 RAW/WAW 才 stall
+- **`ip/cpu/arch/riscv/branch.h`**（修改）: JAL/JALR 与 B-type 分支改用 `rv.opcode` 区分（JAL=0x6F/JALR=0x67/B-type=0x63），废弃 `funct7==0` 判定。根因: B-type 的 funct7 区是 imm[12|10:5]，小偏移（如 `bnez a0,+0`）时全 0 → 旧实现把 B-type 误判为 JAL → target=pc+imm=pc 自旋死循环
+- **`ip/cpu/arch/riscv/int_alu.h`**（修改）: LUI/AUIPC 按 `rv.opcode` 分流（AUIPC 返回 PC+imm），其余走 `infer_opcode`。根因: U-type 的 funct3/funct7 均 0，旧实现把 AUIPC 误判为 ADD(0+imm) → `la t5,tohost`（auipc+addi）计算出错误地址 → tohost 写失败
+- **`ip/cpu/arch/riscv/decode.h`**（修改）: `writes_rd` 从 `rd != x0` 改为按 OpCode 判定。根因: B-type/STORE 的 rd 字段是 imm 位，旧实现误标 writes_rd → HazardPlugin 误标记 imm 位命中的寄存器 → 后续指令被判 RAW → execute stall → 指令丢弃 → 死循环（bgeu/bltu 2 例）
+- **`ip/cpu/arch/riscv/payload_riscv.h`**（修改）: `RiscvDecodeDetail` 增加 `opcode` 字段（decode.h 填充），供 branch/int_alu 按 opcode 分流
+
+### Added
+
+- **`tests/cpu/riscv_tests/env-p/`**（NEW）: ChipForge p-env harness（`riscv_test.h` + `link.ld`）。上游 riscv-test-env v2 的 RVTEST_PASS/FAIL 走 `ecall`（a7=93 SYS_exit）需完整 trap 机（Wave 4 scope）；ChipForge 变体改为直接 `sw TESTNUM,tohost`（与 PicolibcHostMemory 约定一致），测试体 (.S) 100% 上游
+- **`tests/cpu/riscv_tests/elf/`**（NEW, committed）: 40 个 `rv32ui-p-*.elf` prebuilt 二进制（~500KB，来自 riscv-tests @ `2ebecad`，`-march=rv32i_zicsr` 编译，排除 fence_i + ma_data）
+
+### Modified
+- `tests/cpu/riscv_tests/build_rv32ui.sh`: 指向本地 `env-p/` harness（-I/-T 均本地），march 修正 `rv32i_zicsr`（GCC 15 下 rv32i 不含 zicsr）
+- `tests/cpu/riscv_tests/README.md`: 实装记录 + env-p harness 说明 + 基线矩阵表
+- `soc/cpu/docs/dse/rv32ui-baseline-matrix.csv`: 真实 triage 结果（30 PASS / 10 feature stub）
+
+### Verified
+- `./build/bin/chipforge_tests "[riscv-tests]"` → **30 PASS / 10 FAIL**（10 FAIL 全部 LOAD-family `category=feature stub`，LOAD width extraction 为 Wave 2 显式 OOS；sb/sh/sw/st_ld/ld_st 因内嵌 load 验证失败同源）
+- `./build/bin/chipforge_tests` → **378/389 PASS**（11 FAIL = 10 LOAD feature stub + 1 pre-existing `7stage_add_elf_end_to_end` superscalar segfault，stash 验证与本次修复无关）
+- **4 个 pre-existing RISC-V 仿真失败被本次 CPU 修复治愈**（test_3stage/5stage/10stage_riscv + test_cpu_sim_real_tohost → 现 PASS）；仅 7-stage segfault 残留
+- 4 architecture gates all PASS（verify_adr + verify_plugin_decision + check_plugin_portability + doc_link_check）
+
+### Known Limitations (Documented)
+- DBusPlugin LOAD width extraction（LB/LH/LBU/LHU）仍 OUT OF SCOPE — 10 个 LOAD-family 用例 feature stub，Wave 2 `cpu-pipeline-fix-rv32ui-N` 候选
+- 7-stage superscalar cpu_sim segfault（pre-existing，非本次引入；`--config cpu_superscalar.json` 路径）
+- riscv-tests 源码本身未 vendor（仅 ELF 产物 + build 脚本 + 来源 commit 记录）
+
 ## v0.2.1 (2026-09-15) - riscv-tests-rv32ui (Wave 1 of Phase 1.5)
 
 > **目的**: Phase 1.5 启动 — 建客观 RV32I 合规基线（riscv-tests rv32ui-p-*）用于 Wave 2 SoC demo 选题 gate + Wave 2 fix-rv32ui-N triage 输入.
