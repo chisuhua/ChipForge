@@ -74,6 +74,7 @@
 
 **`soc-cpu-l1-mmu-demo` 范围**：
 - 新建 `soc/cpu_l1_mmu_demo.json`：CPU(`cf::cpu::plugins`)+ MMU(`cf::ip::mmu::MMUPlugin` + `cf::ip::mmu::RiscvMMUPlugin`) + L1(`cf::ip::cache::L1CachePlugin`) + Memory(PicolibcHostMemory 64KB)
+- **PTW 真实内存接线**（兑现 `ip/mmu/STATUS.md:38` 的 deferred 承诺）：`MMUPlugin::ptw_->read_pte(vaddr)` 从 PicolibcHostMemory 而非 `pte_stub_memory_` 读 PTE — 不做此步，demo 里的 MMU 仍在跑测试 stub，"端到端真跑"名不副实
 - `tests/soc/test_cpu_l1_mmu_demo.cpp`：catch2 集成测试，跑 `add.elf`（已有）+ 选 3-5 个 riscv-tests 用例通过子集 → 端到端 tohost=1
 - 删除 `riscv_virt.json` 删除警告（v0.0.2 删除记录）→ 重建
 - 文档：`soc/README.md` 更新、Phase 1.5 → 1 推进状态
@@ -101,17 +102,19 @@
 
 | Change | 目标 | 估时 | 依赖 |
 |--------|------|------|------|
-| `mmu-sv32-sv48-ext` | Sv32/Sv48 PTW decode + megapage/gigapage | 1 周 | Wave 2 |
-| `cpu-pipeline-exception` | throw_when 真实消费者（trap delivery + mcause/mepc/mtvec CSR） | 1 周 | Wave 3 cycle-precision |
-| `ip-cpu-csr-minimal` | mstatus/mtvec/mepc/mcause CSR 写实装 | 并入 exception | Wave 3 |
-| `cpu-pipeline-mispredict` | flush_when 真实消费者（branch recovery + flush ROB） | 并入 mispredict | Wave 3 |
+| `mmu-sv32-ext` | Sv32 PTW decode + megapage（**Sv48 砍掉**：Sv48 是 RV64-only 格式，RV32-only CPU 无消费者，scope creep） | 1 周 | Wave 2 |
+| `cpu-pipeline-exception` | throw_when 真实消费者（trap delivery + mcause/mepc/mtvec CSR + mstatus/sstatus） | **1.5 周** | exception CSR 落地（并入） |
+| `ip-cpu-csr-minimal` | mstatus/mtvec/mepc/mcause/mtval/sstatus CSR 写实装 | 并入 exception | 无 |
+| `cpu-pipeline-mispredict` | flush_when 真实消费者（branch recovery + flush ROB） | 1 周 | exception CSR 落地后 |
 | `phase-2-baremetal-kickoff` | Phase 2 启动文档 + riscv-tests RV64GC 接入计划 | 0.5 周 | Wave 4 完成 |
+
+> **Wave 4 依赖解耦说明**：cycle-precision 与 exception 是**正交**的——throw_when 的语义正确性在单遍 run 下完全可实现，cycle-precision 只影响时序精确度。原计划断言"cycle-precision 是 exception 的基础"无证据，且会把 1.5 周 exception 工作阻塞在 Wave 3 后。解耦后 exception 可与 Wave 3 并行（不同 IP 区域）。`cpu-pipeline-mispredict` 依赖 exception 的 CSR 基础设施（非 cycle-precision）。
 
 **Phase 1.5 毕业标准**：
 - ✅ RV32I ISA 合规 ≥85%（CSR/trap 子集除外）
-- ✅ 端到端 SoC demo 真跑 ≥10 个 riscv-tests 用例
+- ✅ 端到端 SoC demo 真跑 **≥5** 个 riscv-tests 用例（**门槛**；**≥10** 为 stretch goal）
 - ✅ cache-dse-sweep CSV 数据落盘
-- ✅ D4 + ADR-040 + ADR-044 + ADR-045 全合规
+- ✅ D4 + ADR-040 + ADR-044 + ADR-045全合规
 - ✅ CHANGELOG v0.2.0 发布
 
 ## 3. Wave 间依赖图
@@ -171,16 +174,49 @@ Phase 2 Bare-metal Kickoff
 
 ## 6. 风险
 
+### 6.1 进度 / 资源风险
+
 | 风险 | 概率 | 影响 | 缓解 |
 |------|------|------|------|
 | Wave 1 riscv-tests 大面积 fail（>50% 用例 fail） | 中 | 高 | 立即聚焦 Wave 2 为"CPU 真 bug 修"，不强行推 Phase 1.5 |
 | Wave 2 fix 后 rv32ui 通过率卡在 60-70%（CSR 依赖） | 中 | 中 | 接受，标记 CSR 为 Phase 2+ work；Phase 1.5 以 RV32I 整数子集毕业 |
-| SoC demo 的 memory 模型不够（cpptlm MemoryTLM 限制） | 低 | 中 | Wave 2 内用 PicolibcHostMemory 替代（cpu_sim 已在用） |
+| SoC demo 的 memory 模型不够（cpptlm MemoryTLM 限制） | 低 | 中 | Wave 2 内用 PicolibcHostMemory 替代（cpu_sim 已在用） + **PTW 实内存接线**（兑现 `ip/mmu/STATUS.md:38`） |
 | riscv-tests ELFs 不可获得（submodule / 网络问题） | 低 | 中 | vendor 到 `build/third_party/riscv-tests/` 路径 + CI 缓存 |
 | Wave 3 DSE 时间爆炸（>1 周） | 中 | 中 | 缩小维度范围：仅 sweep line_size × replacement，固定 assoc=1 |
-| Phase 1.5 总耗时超 6 周 | 中 | 中 | Wave 4 拆分：CSR 单独 change 推迟到 Phase 2；mmu-sv32 可推迟 |
+| Phase 1.5 总耗时超 7 周 | 中 | 中 | Wave 4 拆分：CSR 单独 change 推迟到 Phase 2；`mmu-sv32-ext` 独立为单个 change；exception 与 cycle-precision 解耦并行 |
+
+### 6.2 技术语义风险（Oracle R2 标记，plugin-framework-stall 评审时识别，未被任何 wave 覆盖）
+
+| 风险 | 来源 | 影响 | 缓解 |
+|------|------|------|------|
+| **HazardPlugin scoreboard 生命周期 vs 单 pass-per-run 语义** | plugin-framework-stall R2 盲点：mark/clear 同 run 发生，stall 可能永不触发或永久 stall | cpu-integration 4 个 RISC-V 测试最高危；riscv-tests 中 load-use 序列（`lb`/`sb` 数据依赖）会**被动暴露** | **Wave 2 预设** `hazard-scoreboard-lifecycle` 验证任务：落地 scoreboard 跨 cycle 持久化方案（每次 `pb.run()` 前 snapshot） |
+| **stall ≠ bubble**（下游 stage 重执行陈旧 payload，非幂等指令被破坏） | plugin-framework-stall R2：fetch stall 时 decode/execute/memory 继续在 stale payload 上跑，同条指令被反复 decode+execute | `cpu-pipeline-multi-cycle`（Wave 3）的正确性前提；store/CSR 类非幂等指令直接被破坏 | **Wave 3 multi-cycle 前置条件**：在 commit B 前 spike 一个"非幂等指令破坏"测试（`sw x_n, 0(x0)` 跑 N 次 → 验证只写一次） |
+| **`tlb_lookup_ifetch` 在 PTW 期间不 stall / 无 TLB refill** | plugin-framework-stall R2：每 cycle 重复 `do_lookup` → TLB 未 refill → 重复 `start_walk` | demo 与 rv32ui 的 MMU 路径有持续空转开销 | Wave 2 demo 范围：**MMUPlugin 完成回调需 refill TLB**（除写 PADDR 外）—— 与 PTW 实内存接线合并实现 |
+| **canonical stage ordering**（MMUPlugin 必须先于 IBusPlugin 注册） | plugin-framework-stall R2 盲点：MMUPlugin 晚于 IBusPlugin 注册 → stall 晚 1 cycle，stale-read bug 残留 | 沉默 bug（demo 可能偶发失败） | Wave 2 demo 验证：`CpuFactory` 调用顺序断言 + CI 检查 |
+| **commit_storages 与 throw 路径交互**（throw 跳过 commit_storages → 1-cycle 假 stall 残留） | plugin-framework-stall R2 | Wave 4 exception 引入 throw_when 真触发后影响 real consumers | Wave 4 exception 内部处理（throw 时强制 reset hazard cache） |
+
+### 6.3 战略风险
+
+| 风险 | 概率 | 影响 | 缓解 |
+|------|------|------|------|
+| RV64GC 跳跃（Phase 2 声明范围 vs Phase 1.5 RV32-only） | 中 | 中 | Phase 2 启动文档显式说明 XLEN=64 切换工作量为新 change |
+| Sv48 无 RV32 消费者 | — | — | 已砍（Wave 4 仅 Sv32） |
+| PLIC/CLINT 缺口（Phase 3 RTOS 依赖 timer interrupt） | 高 | 中 | `phase-2-baremetal.md` 显式立项 CLINT 子项，不推迟到 Phase 3 |
+| 6.1 资源风险与 6.2 技术风险耦合（Wave 1 暴露 scoreboard bug → Wave 2 fix 时间爆炸） | 中 | 高 | 见 §6.2 表第 1 行：预设验证任务；Wave 2 N > 5 时转 Phase 2 |
 
 ## 7. 决策可追溯
+
+### 7.1 与 CHANGELOG Pending 顺序的有意偏离
+
+`CHANGELOG.md` v0.1.3 §Pending 列出 6 个后续 change，**`soc-cpu-l1-mmu-demo` 第一、`riscv-tests-rv32ui` 第二**。本计划在 Wave 1 把 `riscv-tests-rv32ui` 提前、`soc-cpu-l1-mmu-demo` 延后到 Wave 2。
+
+**偏离理由**（防止 `verify_adr` 文档漂移检查视为不一致）：
+1. **CHANGELOG Pending 顺序基于"feature 价值"**（先解锁 demo 解锁多 capability）
+2. **本计划基于"先验证后堆叠"**（先建客观基线，避免 demo 跑不动时回溯根因）
+3. CHANGELOG Pending 与本 Wave 1 的目标**互补非冲突**：riscv-tests 是工具，soc-demo 是结果。先有工具再判结果可信度
+4. CHANGELOG 在 Wave 1 完成后应同步更新为 `riscv-tests-rv32ui` (done) + `soc-cpu-l1-mmu-demo` (in progress)
+
+### 7.2 其他决策来源
 
 - **Wave 1 优先 riscv-tests**：Oracle R1 评估 hidden 4th candidate `riscv-tests-rv32ui`（分 20）作为 follow-up；本次前瞻判断"先做"而非"后做"
 - **Wave 2 双轨**：识别 high-impact 真 bug 与 demo 端到端并行，互不阻塞
@@ -205,7 +241,7 @@ Phase 2 Bare-metal Kickoff
 | [README.md](README.md) | SoC 整体 roadmap 与 Phase 状态 |
 | [phase-1-tlm-foundation.md](phase-1-tlm-foundation.md) | Phase 1 详细任务（已完成） |
 | [phase-2-baremetal.md](phase-2-baremetal.md) | Phase 2 启动条件 |
-| [`../../../docs/roadmap/README.md`](../../../docs/roadmap/README.md) | 全局路线图入口 |
+| [`../../../../docs/roadmap/README.md`](../../../../docs/roadmap/README.md) | 全局路线图入口 |
 | [`../../../../CHANGELOG.md`](../../../../CHANGELOG.md) | v0.0.x → v0.2.x 变更历史 |
 | [`../../architecture.md`](../architecture.md) | SoC 系统架构 |
 
