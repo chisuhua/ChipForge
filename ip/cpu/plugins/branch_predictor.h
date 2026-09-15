@@ -25,9 +25,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
+#include "cf/plugin/ctrl_link.h"
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cpu/core/payload_common.h"
@@ -140,6 +142,13 @@ class BranchPredictorPlugin : public cf::plugin::PluginBase {
         }
       }
     });
+
+    // plugin-framework-stall commit C: flush_when 演示桩
+    // TODO Phase 5+ (cpu-pipeline-mispredict): 实装真实 mispredict recovery
+    // 当前 fetch stage CtrlLink flush_when 恒 false, 不实装触发
+    auto flush_demo = std::make_shared<cf::plugin::CtrlLink>();
+    flush_demo->flush_when([]() { return false; });
+    pb.register_ctrl_link("fetch", flush_demo);
   }
 
   // ------------------------------------------------------------------------
