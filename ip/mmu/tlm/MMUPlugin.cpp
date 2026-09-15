@@ -60,10 +60,12 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
       [node, vaddr](uint64_t paddr, uint8_t /*perms*/) {
         (*node)(Key::PADDR) = paddr;
         (*node)(Key::MMU_VADDR) = vaddr;
+        (*node)(Key::PTW_ACTIVE) = 0;  // plugin-framework-stall commit B: 原子清零
       },
       [node, vaddr](uint8_t fault_code) {
         (*node)(Key::EXCEPTION_CODE) = fault_code;
         (*node)(Key::MMU_VADDR) = vaddr;
+        (*node)(Key::PTW_ACTIVE) = 0;  // plugin-framework-stall commit B: 原子清零
       });
     }
   };

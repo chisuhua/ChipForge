@@ -19,13 +19,16 @@
 #define CF_IP_CPU_PLUGINS_IBUS_H
 
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 
+#include "cf/plugin/ctrl_link.h"
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/picolibc_host_memory.h"
+#include "ip/mmu/tlm/mmu_keys.h"
 
 namespace cf {
 namespace cpu {
@@ -50,8 +53,21 @@ class IBusPlugin : public cf::plugin::PluginBase {
 
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
+    using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+
+    // plugin-framework-stall commit B: register fetch CtrlLink (PTW-busy halt)
+    // halt when tlb_lookup_ifetch node has PTW_ACTIVE=1 (PTW walk in progress).
+    // shared_ptr holds the lambda (no need for a member ctrl_link).
+    auto fetch_ctrl = std::make_shared<cf::plugin::CtrlLink>();
+    fetch_ctrl->halt_when([&pb]() {
+      auto* n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+      if (!n) return false;
+      return static_cast<bool>((*n)(MmuKeys::PTW_ACTIVE));
+    });
+    pb.register_ctrl_link("fetch", fetch_ctrl);
 
     // fetch 阶段 NORMAL: 取指 (mem 非空时真读; 否则 NOP stub)
+    // 当 PTW busy 时, 框架 stall loop 会 skip 本闭包 (不调), 保持 PC 不推进.
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
       if (n) {

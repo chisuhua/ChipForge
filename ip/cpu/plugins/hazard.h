@@ -26,8 +26,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 
+#include "cf/plugin/ctrl_link.h"
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cpu/core/payload_common.h"
@@ -117,6 +119,23 @@ class HazardPlugin : public cf::plugin::PluginBase {
     return HazardKind::NONE;
   }
 
+  // plugin-framework-stall commit B: has_active_hazard() + reset
+  // has_active_hazard: 当前 tid 是否有任何 RAW/WAW 在 scoreboard 中
+  // 用于 execute stage CtrlLink halt_when
+  // 单 thread only (N_THREADS=1); SMT 推迟到 Phase 5+
+  bool has_active_hazard(std::uint8_t tid = 0) const {
+    for (std::uint8_t i = 0; i < kNumRegs; ++i) {
+      if (tid < N_THREADS && scoreboard_[tid][i]) return true;
+    }
+    return false;
+  }
+
+  // 显式复位: 由 commit_hook 在每个 pb.run() 末尾 (commit_storages) 调用
+  // 避免 decode 节点缺失时残留 stale hazard 导致假 stall
+  void reset_hazard_cache() noexcept {
+    last_decoded_hazard_ = HazardKind::NONE;
+  }
+
   // 标记寄存器为飞行中 (默认 tid=0)
   void mark_in_flight(std::uint8_t rd_idx, std::uint8_t tid = 0) {
     if (tid < N_THREADS && rd_idx < kNumRegs) scoreboard_[tid][rd_idx] = true;
@@ -163,6 +182,7 @@ class HazardPlugin : public cf::plugin::PluginBase {
         const std::uint8_t tid = this->tid_;
 
         HazardKind hazard = this->has_hazard(dec, tid);
+        this->last_decoded_hazard_ = hazard;  // plugin-framework-stall commit B
         if (hazard != HazardKind::NONE) {
           // M2 阶段: 仅记录冒险, 不实际阻塞 (M4 集成后通过 CtrlLink 阻塞)
         } else {
@@ -172,6 +192,16 @@ class HazardPlugin : public cf::plugin::PluginBase {
         }
       }
     });
+
+    // plugin-framework-stall commit B: register execute stage CtrlLink
+    // halt when has_active_hazard() — 任何 scoreboard 飞行 + 下一指令读它 → stall
+    auto execute_ctrl = std::make_shared<cf::plugin::CtrlLink>();
+    execute_ctrl->halt_when([this]() { return this->has_active_hazard(); });
+    pb.register_ctrl_link("execute", execute_ctrl);
+
+    // commit_hook 在 pb.run() 末尾 (commit_storages) 复位 hazard cache
+    // throw 路径跳过 commit_storages → reset 跳过, 已知可接受 edge case
+    pb.register_commit_hook([this]() { this->reset_hazard_cache(); });
 
     // writeback 阶段: 清除飞行标记
     pb.at_stage("writeback", cf::plugin::Phase::LATE, [this, &pb]() {
@@ -188,6 +218,7 @@ class HazardPlugin : public cf::plugin::PluginBase {
  private:
   std::array<std::array<bool, kNumRegs>, N_THREADS> scoreboard_{};
   std::uint8_t tid_ = 0;
+  HazardKind last_decoded_hazard_ = HazardKind::NONE;  // plugin-framework-stall B
 };
 
 }  // namespace plugins
