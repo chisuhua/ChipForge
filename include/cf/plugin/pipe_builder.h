@@ -36,6 +36,15 @@
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/plugin_exception.h"
 
+#ifdef CF_PLUGIN_USE_CH_MEM
+// Forward declarations for CppHDL types (used in elaboration API only)
+namespace ch::core {
+class context;
+class lnodeimpl;
+struct ch_bool;
+}  // namespace ch::core
+#endif
+
 namespace cf {
 namespace plugin {
 
@@ -53,6 +62,30 @@ inline const char* phase_name(Phase p) noexcept {
   }
   return "UNKNOWN";
 }
+
+#ifdef CF_PLUGIN_USE_CH_MEM
+// ----------------------------------------------------------------------------
+// StagePayloadMapEntry: type-erased payload connector descriptor
+// Used to insert pipeline_reg between stages during elaboration.
+// ----------------------------------------------------------------------------
+struct StagePayloadMapEntry {
+  std::string stage;             // Which stage's payload cell to update
+  const PayloadKeyBase* key;     // Payload key (type-erased)
+
+  // Connector functor: takes (prev_lnodeimpl*, stall, flush, name)
+  // and returns the lnodeimpl* that the cell should reference.
+  std::function<
+      ch::core::lnodeimpl*(ch::core::lnodeimpl* /*prev*/,
+                          ch::core::ch_bool /*stall*/,
+                          ch::core::ch_bool /*flush*/,
+                          const std::string& /*name*/)>
+      connector;
+
+  // Type-erased applier (internal): reads cell, calls connector, writes result
+  // back. Created by register_stage_payload_connector when T is known.
+  std::function<void(PipeBuilder&, ch::core::ch_bool, ch::core::ch_bool)> applier;
+};
+#endif
 
 class PipeBuilder {
  public:
@@ -256,6 +289,106 @@ class PipeBuilder {
 
   void clear_ctrl_links() noexcept { stage_ctrl_links_.clear(); }
 
+#ifdef CF_PLUGIN_USE_CH_MEM
+  // ------------------------------------------------------------------------
+  // Phase 6c M2 Spike 1: type-erased stage connector infrastructure
+  //
+  // register_stage_payload_connector - register a pipeline_reg connector
+  //   between stages for the given payload key. The connector wraps the
+  //   previous stage's signal in chlib::pipeline_reg<N>() and writes the
+  //   pipelined value to the target stage's cell.
+  //
+  // commit_payload_map - execute all registered connectors, inserting
+  //   pipeline registers into the elaborated circuit.
+  //
+  // elaborate(ctx) - run at_stage() callbacks for elaboration, then
+  //   commit all registered payload connectors.
+  // ------------------------------------------------------------------------
+
+  template <typename T>
+  void register_stage_payload_connector(
+      const std::string& stage_name,
+      const Payload<T>& key,
+      std::function<
+          ch::core::lnodeimpl*(ch::core::lnodeimpl* /*prev*/,
+                              ch::core::ch_bool /*stall*/,
+                              ch::core::ch_bool /*flush*/,
+                              const std::string& /*name*/)> connector) {
+    if (stage_name.empty()) throw std::invalid_argument("empty stage name");
+    if (!connector) throw std::invalid_argument("null connector");
+
+    // Capture stable global pointer (Payload<T> is a global static)
+    const auto* key_ptr = &key;
+
+    StagePayloadMapEntry entry;
+    entry.stage = stage_name;
+    entry.key = key_ptr;
+    entry.connector = connector;
+
+    // Create type-erased applier that knows T at compile time
+    entry.applier = [stage_name, key_ptr, conn = std::move(connector)](
+        PipeBuilder& pb,
+        ch::core::ch_bool stall,
+        ch::core::ch_bool flush) {
+      auto node = pb.node_of_logic_stage(stage_name);
+      if (!node) return;
+      const auto& typed_key = *static_cast<const Payload<T>*>(key_ptr);
+      auto& cell = node->payloads().template get<T>(typed_key);
+      auto* prev = cell.impl();
+      auto* result = conn(prev, stall, flush, "pipe_reg_" + stage_name);
+      // Wrap result back into T (both ch_uint<N> and ch_bool have
+      // explicit constructors from lnodeimpl*)
+      T pipelined(result);
+      cell = pipelined;
+    };
+
+    stage_payload_map_[stage_name].push_back(std::move(entry));
+  }
+
+  std::size_t stage_payload_count() const noexcept {
+    std::size_t cnt = 0;
+    for (const auto& [stage, entries] : stage_payload_map_) {
+      cnt += entries.size();
+    }
+    return cnt;
+  }
+
+  void commit_payload_map(
+      ch::core::ch_bool default_stall = ch::core::ch_bool(false),
+      ch::core::ch_bool default_flush = ch::core::ch_bool(false)) {
+    for (auto& [stage, entries] : stage_payload_map_) {
+      for (auto& entry : entries) {
+        if (entry.applier) {
+          entry.applier(*this, default_stall, default_flush);
+        }
+      }
+    }
+  }
+
+  // Phase 6c M2 Spike 2: elaborate() — run at_stage() callbacks in
+  // canonical order (same as run() but without TLM commit, CtrlLink
+  // stall check, or commit_storages), then insert pipeline registers
+  // via commit_payload_map().
+  void elaborate(ch::core::context& ctx) {
+    const auto order = canonical_stage_order();
+    for (const auto& stage_name : order) {
+      for (int p_idx = 0; p_idx < 3; ++p_idx) {
+        const Phase target_phase = static_cast<Phase>(p_idx);
+        for (const auto& s : stages_) {
+          if (s.name == stage_name && s.phase == target_phase) {
+            s.callback();
+          }
+        }
+      }
+    }
+
+    // Insert all registered pipeline registers (default stall=0, flush=0)
+    ch::core::ch_bool default_stall(false);
+    ch::core::ch_bool default_flush(false);
+    commit_payload_map(default_stall, default_flush);
+  }
+#endif
+
   // plugins() —— 返回 plugin 列表只读引用 (M4.12, 供 CpuFactory 测试断言)
   const std::vector<std::unique_ptr<PluginBase>>& plugins() const noexcept {
     return plugins_;
@@ -290,6 +423,11 @@ class PipeBuilder {
   // OR 合并语义在 should_stall_stage() 内执行
   std::unordered_map<std::string, std::vector<std::shared_ptr<CtrlLink>>>
       stage_ctrl_links_;
+#ifdef CF_PLUGIN_USE_CH_MEM
+  // Phase 6c M2 Spike 1: stage → vector<StagePayloadMapEntry>
+  std::unordered_map<std::string, std::vector<StagePayloadMapEntry>>
+      stage_payload_map_;
+#endif
 };
 
 }  // namespace plugin

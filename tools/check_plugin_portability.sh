@@ -31,7 +31,7 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 1: at_stage 回调内无 'if (cond) return;' 早返
 # ----------------------------------------------------------------------------
-echo "[1/5] 检查 at_stage 回调内 'if (cond) return;' 早返 ..."
+echo "[1/6] 检查 at_stage 回调内 'if (cond) return;' 早返 ..."
 EARLY_RETURN_FILES=$(grep -rlnE "at_stage" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null || true)
 EARLY_RETURN_VIOLATIONS=""
@@ -76,7 +76,7 @@ echo ""
 #   - 文件名以 _tlm.h 结尾 或 普通 ip/cpu/plugins/*.h → 可不含 ch_*
 #     (TLM 仿真路径, Phase 6c 标记 deprecated 但仍可用)
 # ----------------------------------------------------------------------------
-echo "[2/5] 检查 ip/*/plugins/ 业务代码的 ch_* 使用 (Phase 6c CH_MEM 是正道) ..."
+echo "[2/6] 检查 ip/*/plugins/ 业务代码的 ch_* 使用 (Phase 6c CH_MEM 是正道) ..."
 
 CHMEM_FILES=$(find ${TARGET_DIRS} -path "*/plugins/*_chmem.h" 2>/dev/null || true)
 CHMEM_MISSING=""
@@ -122,7 +122,7 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 3: Plugin::build() 内不调用 pb.run() (TLM 已废弃)
 # ----------------------------------------------------------------------------
-echo "[3/5] 检查 Plugin::build() 内调用 pb.run() (Phase 6c: TLM 废弃) ..."
+echo "[3/6] 检查 Plugin::build() 内调用 pb.run() (Phase 6c: TLM 废弃) ..."
 PB_B_VIOLATIONS=""
 PLUGIN_BUILD_FILES=$(grep -rlnE "::build\s*\(\s*cf::plugin::PipeBuilder|::build\s*\(\s*PipeBuilder" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null || true)
@@ -158,7 +158,7 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 4 [WARN]: 存储声明优先 array_store (TLM) 或 ch_mem (CH_MEM)
 # ----------------------------------------------------------------------------
-echo "[4/5] 检查存储声明 ([WARN] 鼓励但不强制) ..."
+echo "[4/6] 检查存储声明 ([WARN] 鼓励但不强制) ..."
 
 # TLM 模式: 鼓励 array_store
 TLM_STDLIB=$(grep -rlnE "std::array\s*<\s*(cf::plugin::)?(uint_t|bool_t)" ${TARGET_DIRS}/cpu/plugins/ \
@@ -190,7 +190,7 @@ echo ""
 # C++17 contextual conversion 允许 if(ch_bool) 编译期通过; 但运行期语义错误.
 # 编译期无法拦截, 必须 CI grep 静态检查.
 # ----------------------------------------------------------------------------
-echo "[5/5] 检查 at_stage 回调内禁运行期 if(ch_bool) ..."
+echo "[5/6] 检查 at_stage 回调内禁运行期 if(ch_bool) ..."
 IF_CHBOOL_VIOLATIONS=""
 AT_STAGE_FILES=$(grep -rlnE "at_stage\(" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" 2>/dev/null || true)
@@ -228,13 +228,41 @@ fi
 echo ""
 
 # ----------------------------------------------------------------------------
+# Check 6 (NEW Phase 6c M2): 禁源/头文件内 #define CF_PLUGIN_USE_CH_MEM
+#
+# 设计意图:
+#   - CF_PLUGIN_USE_CH_MEM 编译开关只允许在 CMakeLists.txt 命令行注入
+#   - 禁止 .h/.cpp 内 #define CF_PLUGIN_USE_CH_MEM (避免污染所有 includer)
+#   - 此项检查是 build 基础设施, 不限 ip/ 目录 (全工程扫描)
+# ----------------------------------------------------------------------------
+echo "[6/6] 检查源/头文件内禁 #define CF_PLUGIN_USE_CH_MEM ..."
+DEFINE_CHMEM_VIOLATIONS=""
+DEFINE_CHMEM_FILES=$(grep -rlnE "^\s*#\s*define\s+CF_PLUGIN_USE_CH_MEM" ${ROOT_DIR} \
+  --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null \
+  | grep -v "/build/" || true)
+if [ -n "${DEFINE_CHMEM_FILES}" ]; then
+  for f in ${DEFINE_CHMEM_FILES}; do
+    DEFINE_CHMEM_VIOLATIONS="${DEFINE_CHMEM_VIOLATIONS}${f}"$'\n'
+  done
+fi
+if [ -z "${DEFINE_CHMEM_VIOLATIONS}" ]; then
+  echo "  [PASS] 源/头文件内无 #define CF_PLUGIN_USE_CH_MEM (仅允许 CMake 命令行)"
+else
+  echo "  [FAIL] 源/头文件内发现 #define CF_PLUGIN_USE_CH_MEM (污染 includer):"
+  echo "${DEFINE_CHMEM_VIOLATIONS}" | sed 's/^/    /'
+  echo "  [FIX] 移到 tests/CMakeLists.txt 的 target_compile_definitions() 行"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
 # 汇总
 # ----------------------------------------------------------------------------
 if [ ${FAIL_COUNT} -eq 0 ]; then
   if [ ${WARN_COUNT} -gt 0 ]; then
     echo "=== ADR-040 v2.0 移植性检查通过 (含 ${WARN_COUNT} 项 WARN) ==="
   else
-    echo "=== ADR-040 v2.0 移植性检查全部通过 (5/5) ==="
+    echo "=== ADR-040 v2.0 移植性检查全部通过 (6/6) ==="
   fi
   exit 0
 else

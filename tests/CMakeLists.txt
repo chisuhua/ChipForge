@@ -100,3 +100,46 @@ set_tests_properties(chipforge_tests PROPERTIES LABELS "unit;integration;catch2"
 set_tests_properties(chipforge_tests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+# ----------------------------------------------------------------------------
+# chipforge_tests_chmem: 第二测试 target, 编译选项 -DCF_PLUGIN_USE_CH_MEM=ON
+# 验证框架在 CH_MEM 模式下也能 build 通过 (Phase 6c M2 Spike 3)
+# 注: 仅编译 framework/ 测试 (M2/W3 之前 CPU/Cache 测试未适配 CH_MEM)
+# ----------------------------------------------------------------------------
+set(CHMEM_TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_cppHDL_hello_poc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_elaborate_connector.cpp
+)
+# 同样需要 catch_amalgamated.cpp 提供 main
+list(APPEND CHMEM_TEST_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/catch2/catch_amalgamated.cpp"
+)
+
+add_executable(chipforge_tests_chmem ${CHMEM_TEST_SOURCES})
+target_compile_features(chipforge_tests_chmem PRIVATE cxx_std_20)
+target_compile_definitions(chipforge_tests_chmem PRIVATE
+    CF_PLUGIN_USE_CH_MEM
+    CHIPFORGE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(chipforge_tests_chmem PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/catch2
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/bundles
+    ${CMAKE_SOURCE_DIR}/ip
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_link_libraries(chipforge_tests_chmem PRIVATE cf_plugin)
+cf_plugin_link_cpptlm(chipforge_tests_chmem)
+cf_plugin_link_cpphdl(chipforge_tests_chmem)
+
+set_target_properties(chipforge_tests_chmem PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    LINK_FLAGS "-Wl,--allow-multiple-definition"
+)
+add_test(NAME chipforge_tests_chmem COMMAND chipforge_tests_chmem)
+set_tests_properties(chipforge_tests_chmem PROPERTIES LABELS "unit;chmem")
+set_tests_properties(chipforge_tests_chmem PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
