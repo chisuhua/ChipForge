@@ -57,9 +57,12 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
       (*node)(Key::PTW_ACTIVE) = 1;
       (*node)(Key::PTW_VADDR) = vaddr;
     ptw_->start_walk(vaddr, current_asid_, /*satp_ppn=*/0,
-      [node, vaddr](uint64_t paddr, uint8_t /*perms*/) {
+      [this, node, vaddr](uint64_t paddr, uint8_t perms) {
         (*node)(Key::PADDR) = paddr;
         (*node)(Key::MMU_VADDR) = vaddr;
+        // Wave 2 Commit A: refill 统一 TLB，关闭 tlb_lookup_ifetch stall 链空转
+        // (roadmap §6.2 R3: PTW 完成回调除写 PADDR 外还须 refill TLB)
+        multi_tlb_->refill_from_ptw(vaddr, current_asid_, paddr, perms);
         (*node)(Key::PTW_ACTIVE) = 0;  // plugin-framework-stall commit B: 原子清零
       },
       [node, vaddr](uint8_t fault_code) {
