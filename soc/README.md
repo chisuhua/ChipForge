@@ -12,6 +12,7 @@
 | --- | --- | --- | --- | --- |
 | `l1_cache_minimal.json` | 最小 L1 cache SoC | 1×L1Cache Plugin + 1×TrafficGen | 单元级 cache 行为验证 | ✅ 可用 |
 | `l1_cache_adapter_e2e.json` | L1 cache 端到端适配 | 1×L1Cache Plugin + CppTLM CacheTLM 适配层 | ACT4 DUT 集成测试 | ✅ 可用 |
+| `cpu_l1_mmu_demo.json` | CPU+MMU+Memory 结构验证 demo | CpuFactory(enable_mmu) + MMUPlugin + PicolibcHostMemory + L1CachePlugin(结构声明) | 5×riscv-tests tohost=1 | 🚧 Active (v0.2.3, Wave 2 soc-cpu-l1-mmu-demo) |
 | ~~`riscv_virt.json`~~ | ~~基线 RISC-V 虚拟平台~~ | ~~`cpu` + `cache` + `memory` + `peripheral`~~ | ~~通用 RTL/TLM 仿真入口~~ | ❌ **已删除** (2026-06-17, 引用 7 个不存在的 IP 类 + `impl_mode` 字段无消费者) |
 
 ## 命名约定

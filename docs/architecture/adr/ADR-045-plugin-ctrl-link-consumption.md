@@ -100,6 +100,8 @@ class PluginException : public std::runtime_error {
 
 **实装要求**：CpuFactory 端通过调用顺序保证（典型：先 MMUPlugin 后 IBusPlugin）。如未来 plugin 注册顺序动态化，需在 `pb.run()` 内显式断言此约束（推迟到 Phase 5+ 流水线拓扑动态化时）。
 
+> **⚠️ 修订注解 (2026-09-16, Wave 2 Oracle 评审)**：本 Decision 的约束当前**未满足且操作上 inert**。实际代码中 `CpuFactory::build_cpu()` 在 `TopologyBuilder<5>::expand`（`cpu_factory.h:253-269`，创建 `fetch` 节点）之后注册 MMUPlugin（`cpu_factory.h:306-322`），且 `MMUPlugin::setup()` 用 `declare_substage("fetch", "tlb_lookup_ifetch")` 使 `tlb_lookup_ifetch` 成为 `fetch` 的子阶段——因此 `canonical_stage_order()`（`pipe_builder.h:149-158`，按 `stages_` 首次出现排序）中 `fetch` 排在 `tlb_lookup_ifetch` 之前。这在单次 pass-per-run 模型中**不咬人**：PTW 走查在同一个 `pb.run()` 内完成（`ptw_l0/l1/l2` 阶段晚于 `tlb_lookup_ifetch` 运行），`PTW_ACTIVE` 在下次 `fetch` 入口检查前已被清零，故 stall 机制从未真正触发。加之 IBus/DBus 不消费 MMU 翻译的 PADDR（`ibus.h:76` 直接读 `pc`，`dbus.h:66` 直接读 `MEM_ADDR`），本 stall 原语在 Wave 2 是"mechanism present, inert"。**修复推迟到 Wave 3 `cpu-pipeline-multi-cycle`**（届时多周期 stall 跨越多个 `pb.run()` 使顺序可观察，且 PADDR consumption + PTW real-memory wiring 一起落地）。
+
 ### Decision 7: HazardPlugin last_decoded_hazard_ 单 thread only
 
 **当前实装**：单成员 `last_decoded_hazard_` 缓存（cache 上一 cycle decode 闭包的 hazard 检测结果）。

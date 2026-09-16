@@ -182,6 +182,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **目的**: 实现 TLB lookup/insert 算法 + PTW Sv39 三级 walk + MultiLevelTLB coherence + MMUPlugin at_stage 闭包 + RISC-V satp/SFENCE.VMA/exception 12/13/15 hook + cpptlm MMUTLMBridge. 解锁 ADR-044 VIPT 数据流真实链路 (MMUPlugin 同时输出 pl::PADDR + pl::MMU_VADDR).
 
+## v0.2.3 (2026-09-16) - soc-cpu-l1-mmu-demo (Phase 1.5 Wave 2)
+
+> **OpenSpec change**: `soc-cpu-l1-mmu-demo` (修订版, Oracle+Metis 2026-09-16 评审后)
+> **目的**: PTW TLB refill 关闭 stall 链空转 + CPU+MMU+Memory 结构验证 demo 端到端 tohost=1 + Wave 1 lessons-learned 永久化。
+>
+> **修订说明**: 原始 plan 声称 "端到端 CPU+MMU+L1+Memory demo"。评审揭示 (1) MMU 在流水线中装饰性 (IBus/DBus 不消费 PADDR)，(2) PTW 从 stub 读 PTE 非真实内存，(3) `cf::soc::Topology::from_json` 不存在。demo 缩窄为 TLB refill + CPU+MMU+Memory 结构 smoke，L1 仅 JSON 声明，PTW real-memory + PADDR consumption + 典范顺序修复推迟 Wave 3。
+
+### Added (MMU — TLB refill)
+- `tests/mmu/test_ptw_tlb_refill_integration.cpp` (NEW, 2 case): PTW success callback 验证 TLB refill + walk 完成状态
+
+### Modified (MMU — PTW success callback)
+- `ip/mmu/tlm/MMUPlugin.cpp` (修改): PTW success 回调捕获 `this`，调用 `multi_tlb_->refill_from_ptw(vaddr, current_asid_, paddr, perms)` 关闭 ±存链空转（roadmap §6.2 R3 风险关闭）
+
+### Added (SoC — demo)
+- `soc/cpu_l1_mmu_demo.json` (NEW): 结构拓扑声明 (CPU+MMU+L1+Memory, L1 仅声明)
+- `tests/soc/test_cpu_l1_mmu_demo.cpp` (NEW, 6 case): JSON 结构验证 + 5 ELF tohost=1 (enable_mmu=true, sv32)
+
+### Docs
+- `CHANGELOG.md`: v0.2.3 条目
+- `AGENTS.md`: 已知测试状态同步 (mmu 重新启用 + [cpu-l1-mmu-demo] + LOAD OOS follow-up 路由)
+- `soc/README.md`: 速查表新增 `cpu_l1_mmu_demo.json`
+- `ADR-045`: Decision 6 注解 — stall 机制 inert (canonical ordering 错误 + PADDR 未消费), 修复推迟 Wave 3
+- `openspec/` (gitignored): specs in `changes/soc-cpu-l1-mmu-demo/specs/` → `mmu-ptw-tlb-refill`, `soc-cpu-mmu-demo-topology`, `phase-1.5-wave1-retro`, `riscv-tests-fixture`
+
+### Verified
+- `./build/bin/chipforge_tests` → **397/397 = 386 passed, 11 failed** (unchanged pre-existing: 10 LOAD feature stub + 1 7stage superscalar segfault)
+- `[tlb-refill]` 2 tests → PASS; `[mmu]` 47 tests → PASS (110 assertions)
+- `[cpu-l1-mmu-demo]` 6 tests → PASS (40 assertions)
+- 4 architecture gates all PASS (verify_adr + verify_plugin_decision + check_plugin_portability + doc_link_check)
+
+### Known Limitations
+- MMU translation 在 CPU 流水线中装饰性 (IBus/DBus 不消费 PADDR, 无 issue_request 调用者) — Wave 3 real PADDR consumption + PTW real-memory wiring
+- Canonical stage ordering (R2) 不正确 — fetch 先于 tlb_lookup_ifetch — stall 机制 inert, 非原子非幂等指令不受保护 — Wave 3 cpu-pipeline-multi-cycle
+- L1CachePlugin 仅 JSON 声明不实例化 — Wave 3 cache-dse-sweep
+- LOAD width extraction 10 feature stub — follow-up `riscv-tests-rv32ui-load-width`
+- 7-stage superscalar segfault — follow-up `cpu-pipeline-7stage-superscalar-fix`
+
 ## v0.2.2 (2026-09-15) - riscv-tests-rv32ui ELF vendor + pipeline exec fixes
 
 > **目的**: 兑现 v0.2.1 记录的 follow-up —— vendor 实际 riscv-tests ELF 并跑通 Wave 1 合规基线。过程中暴露并修复 5 个 CPU pipeline 执行断链 bug（40/40 rv32ui timeout → 30 PASS）。
