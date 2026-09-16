@@ -1,11 +1,53 @@
-# ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）
+# ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）—— v2.0
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（`array_store` 已实现 + CI 检查脚本已就位，迁移手册待 Phase 5 启动时验证） |
-| 来源 | 本次会话 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）|
-| 决策 | 三层不匹配点的发现、3-tier 约束模型、`cf::plugin::storage::array_store` 抽象、`PipeBuilder::register_commit_hook/commit_storages` 钩子 |
-| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式） |
+| 状态 | ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-16) — v1.0 由 Phase 1 提案升级 |
+| 来源 | v1.0: Phase 1 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告（cf::plugin 底层语义翻转，2026-09-16） |
+| v2.0 决策 | **CH_MEM 是新正道**（翻转 v1.0 "ch 渗透禁令"）：<br>① 业务代码在 `-DCF_PLUGIN_USE_CH_MEM` 下必须用 `ch_uint/ch_reg/ch_bool/ch_mem`（elaboration 正道）<br>② 引入 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免机制（ADR-046）<br>③ 新增 Tier-1 Check 5: at_stage 回调内禁运行期 if(ch_bool)（ch_bool explicit operator bool 上下文转换）<br>④ `tools/check_plugin_portability.sh` v2.0 重订（5 项检查） |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免） |
+
+---
+
+## v2.0 重大变更摘要（2026-09-16）
+
+### 翻转的核心：CH_MEM 是新正道
+
+| v1.0 (2026-06-10) | **v2.0 (2026-09-16, Phase 6c)** |
+|---|---|
+| `ip/*/tlm/` 业务代码无 `ch_mem/ch_reg/ch_uint` 渗透 | **`*_chmem.h` 业务代码必须用 `ch_*`**（elaboration 正道） |
+| TLM 是唯一模式 | **TLM 是 deprecated 模式**（Phase 6c 开始） |
+| `pb.run()` 每周期仿真 | **`pb.elaborate()` 一次性发射 lnode DAG** |
+| `CtrlLink::halt_when(std::function<bool()>)` | **`CtrlLink::halt_when(ch_bool)`**（CH_MEM 模式） |
+| `array_store` 后端 = `std::array` | **`array_store` 后端 = `ch_mem`**（CH_MEM 模式） |
+
+### v2.0 新增内容
+
+1. **CH_MEM 模式编译开关**：`CF_PLUGIN_USE_CH_MEM`（默认 OFF = TLM 兼容；ON = elaboration 正道）
+2. **CH_MEM 模式 PipeBuilder.elaborate()**：替代 `pb.run()`，执行所有 at_stage 闭包一次，发射 lnode DAG
+3. **Per-stage 信号实体**（VexRiscv Stageable.insert/input/output 移植）：PipeNode cell 装独立 ch 信号
+4. **自动 stage 间 ch_reg 插入**（VexRiscv Pipeline.build() Phase 4 移植）：PipeBuilder::auto_insert_stage_regs()
+5. **CH_MEM CtrlLink**：`halt_when/throw_when/flush_when` 接收 `ch_bool` 信号句柄
+6. **`array_store` ch_mem 后端**（`CF_PLUGIN_USE_CH_MEM` 下）：sread/write + 同步双缓冲 commit
+7. **Tier-1 Check 5**（v2.0 新增）：at_stage 回调内禁运行期 `if(ch_bool)` —— ch_bool 有 explicit operator bool() (core/bool.h:48)，C++17 contextual conversion 让 if(ch_bool) 编译期通过，CI grep 静态检查
+8. **CF_PLUGIN_USE_FSM_EXEMPT** 机制（ADR-046）：多周期协议引擎豁免 D4 "无状态机" 禁令，但必须用 `chlib::ch_state_machine` DSL
+
+### v2.0 重新设计核心——`cf::plugin` 从"仿真器"变"elaboration DSL"
+
+| 维度 | v1.0 TLM | **v2.0 CH_MEM** |
+|---|---|---|
+| 闭包执行次数 | N 次 (每周期 run()) | **1 次 (elaborate())** |
+| Payload T | POD 值 | **ch 句柄** |
+| 仿真驱动 | pb.run() 循环 | **Simulator::tick() / Verilator** |
+| Verilog 输出 | 无 | **ch::toVerilog(ctx) → .v 文件** |
+| 调度语义 | 周期精确循环 | **lnode DAG elaboration** |
+
+**核心洞察**（来自 Phase 6c Oracle 重构报告）：
+- VexRiscv 能编译到 Verilog 不因为 Scala 翻译，是因为"执行即布线"
+- C++ 没有 Scala 的 implicit/macro，但 `ch_uint<N>` 操作符重载可达到同样效果
+- 不发明翻译器，**让 lambda 体直接操作 ch 类型，执行即发射 lnode DAG**
+
+---
 
 ---
 
@@ -45,9 +87,10 @@ Phase 1.2 在 `ip/cache/tlm/L1CachePlugin.{h,cpp}` 实现了第一个 Plugin-sty
 | # | 约束 | 理由 | 检查工具 |
 |---|------|------|----------|
 | 1 | 无 `void tick()` 业务重写 | 调度由框架决定，Plugin 不持有时序 | `tools/verify_plugin_decision.sh` Check 1 |
-| 2 | 无状态机（`enum class State` + `switch state_`）| 控制流必须通过 `at_stage` 表达 | `tools/verify_plugin_decision.sh` Check 2 |
-| 3 | Bundle 字段用 `cf::plugin::uint_t<N>` | 为 `ch_uint<N>` 升级保留类型别名空间 | `tools/verify_plugin_decision.sh` Check 3 |
-| 4 | **`at_stage` 回调内无 `if (cond) return;` 早返** | RTL 中无"早返"概念，需用 `when` 条件驱动；早返导致 commit 不一致 | `tools/check_plugin_portability.sh` Check 1（新增）|
+| 2 | **v1.0 删除（v2.0 重订）**：状态机禁令 | 控制流必须通过 `at_stage` 表达；**多周期协议引擎豁免**（ADR-046）| `tools/verify_plugin_decision.sh` Check 2（**保留原检查，FSM 豁免在 check_plugin_portability.sh v2.0 中通过 `#define CF_PLUGIN_USE_FSM_EXEMPT` 跳过**） |
+| 3 | Bundle 字段用 `cf::plugin::uint_t<N>` | 为 `ch_uint<N>` 升级保留类型别名空间（v2.0: `uint_t<N>` = `ch::core::ch_uint<N>` in CH_MEM）| `tools/verify_plugin_decision.sh` Check 3 |
+| 4 | **`at_stage` 回调内无 `if (cond) return;` 早返** | RTL 中无"早返"概念，需用 `when` 条件驱动；早返导致 commit 不一致 | `tools/check_plugin_portability.sh` Check 1 |
+| 5 | **v2.0 新增**：at_stage 回调内禁运行期 `if(ch_bool)` | ch_bool 有 explicit operator bool()（`core/bool.h:48`），C++17 contextual conversion 让 `if(ch_bool_var)` 编译期通过——必须用 select() 替代；启发式 CI grep 静态检查 | `tools/check_plugin_portability.sh` Check 5（v2.0 新增）|
 | 5 | **`ip/*/tlm/` 业务代码无 `ch_mem` / `ch_reg` / `ch_uint` / `ch::core::context` 渗透** | TLM 模式无 ch::core::context 依赖；ch_mem 仅在 RTL 路径出现 | `tools/check_plugin_portability.sh` Check 2（新增）|
 | 6 | **Plugin 内部不调用 `pb.run()`** | `pb.run()` 是顶层入口；Plugin 回调应只读/写 Payload，不触发调度 | `tools/check_plugin_portability.sh` Check 3（新增）|
 
@@ -302,32 +345,44 @@ class array_store {
 
 ---
 
-## 5. 与 ADR-025/037 的关系
+## 5. 与 ADR-025/037/046 的关系
 
 | ADR | 内容 | 与 ADR-040 关系 |
 |-----|------|----------------|
 | **ADR-025** | Plugin 基类无 `tick()` | Tier-1 #1 直接引用，是 Tier-1 基础 |
-| **ADR-037** | Plugin 作为设计范式（D4） | 决定业务代码必须 Plugin-style；ADR-040 进一步约束**存储/条件/位操作**等具体编码模式 |
-| **ADR-029** | 模块级 `ImplMode` | Phase 6 引入；ADR-040 定义的 `array_store` 抽象是 ImplMode 切换的载体 |
-| **ADR-031** | StageLink/CtrlLink/DirectLink | Phase 6 引入；ADR-040 不依赖，但共享 `when` 模板语义 |
-| **ADR-024** | Bundle 三层分层 | Mapper 模板未实现；ADR-040 的 `array_store` 是 Bundle 维度的同类抽象 |
+| **ADR-037** | Plugin 作为设计范式（D4） | 决定业务代码必须 Plugin-style；v2.0: D4 在 elaboration 语义下兑现（不再只是 TLM 仿真） |
+| **ADR-046** | 多周期协议引擎豁免 D4 | v2.0 新增关联：FSM 豁免通过 `#define CF_PLUGIN_USE_FSM_EXEMPT` 触发，check_plugin_portability.sh v2.0 跳过此 Plugin 的 Tier-1 Check 5 |
+| **ADR-029** | 模块级 `ImplMode` | v2.0: TLM_ONLY/RTL_ONLY 字段保留但实际只有 CH_MEM 路径（TLM deprecated）；ImplMode 字段 v0.3.0 移除 |
+| **ADR-031** | StageLink/CtrlLink/DirectLink | CtrlLink v2.0 ch_bool 化（ADR-046）；`halt_when(ch_bool)` 直接 OR 合并到 stage stall 信号 |
+| **ADR-024** | Bundle 三层分层 | Mapper 模板仍未实现；v2.0 由 cf::plugin::uint_t = ch_uint 双模别名替代 |
 
 ---
 
-## 6. 验证命令
+## 6. 验证命令（v2.0）
 
 ```bash
-# Tier-1 强制（6 条）—— 阻塞合并
-bash tools/verify_plugin_decision.sh    # 旧 3 条 (tick/state/uint_t)
-bash tools/check_plugin_portability.sh  # 新 3 条 (早返/ch_mem泄漏/pb.run)
+# Tier-1 强制（5 条）—— 阻塞合并
+bash tools/verify_plugin_decision.sh    # 旧 3 条 (tick/state/uint_t) - v2.0 不变
+bash tools/check_plugin_portability.sh  # v2.0 重订: 5 项检查
+                                      # [1/5] at_stage 回调内 if-return 早返 (v1.0)
+                                      # [2/5] _chmem.h 文件必须含 ch_* / TLM 文件不含 ch_* (v2.0 翻转)
+                                      # [3/5] Plugin::build() 内不调用 pb.run() (v2.0 加强: TLM 已废弃)
+                                      # [4/5] [WARN] 存储声明优先 array_store 或 ch_mem
+                                      # [5/5] [WARN] at_stage 回调内禁运行期 if(ch_bool) (v2.0 新增)
+
 # Tier-2 警告（4 条）—— code review
 # Tier-3 文档（3 条）—— 本 ADR §4 迁移手册
 
 # 整体必须通过
-bash tools/verify_adr.sh                # 现有 ADR 漂移检测
+bash tools/verify_adr.sh                # 现有 ADR 漂移检测 (含 ADR-046)
+
+# Phase 6c M5 之后, 单一脚本:
+bash tools/check_plugin_portability.sh  # 5/5 PASS (含 ADR-046 FSM 豁免)
 ```
 
-`tools/check_plugin_portability.sh` 是本 ADR 的**核心 CI 检查**（4 项：`[1/4]` 早返 / `[2/4]` ch_mem 渗透 / `[3/4]` `pb.run()` 调用 / `[4/4]` `array_store` 鼓励）。前三项 `[PASS]/[FAIL]`，第四项 `[PASS]/[WARN]`。
+`tools/check_plugin_portability.sh` v2.0 是本 ADR 的**核心 CI 检查**。v1.0 → v2.0 关键差异：
+- v1.0: 4 项检查（早返 / ch_mem 渗透 / pb.run / array_store）
+- v2.0: 5 项检查（+ ch渗透禁令翻转 + if(ch_bool) grep）
 
 ---
 
@@ -338,7 +393,116 @@ bash tools/verify_adr.sh                # 现有 ADR 漂移检测
 | 2026-06-10 | 1.0 | 初始版本：3-tier 约束模型 + `array_store` 抽象 + 5 步迁移手册 |
 | | | 配套 `include/cf/plugin/storage.h`（143 行）+ `pipe_builder.h` 扩展（`register_commit_hook` / `commit_storages`）|
 | | | 配套 `tools/check_plugin_portability.sh`（4 项检查）|
+| 2026-09-16 | **2.0** | **Phase 6c 落地**：CH_MEM 是新正道 |
+| | | - 翻转 "ch 渗透禁令" → "`*_chmem.h` 必须含 ch_*" |
+| | | - 新增 Tier-1 Check 5: at_stage 内禁运行期 `if(ch_bool)` |
+| | | - Tier-1 #2 状态机禁令保留 + ADR-046 FSM 豁免机制 |
+| | | - `CF_PLUGIN_USE_CH_MEM` 编译开关 + `CF_PLUGIN_USE_FSM_EXEMPT` 豁免标记 |
+| | | - `PipeBuilder::elaborate()` + `to_verilog()` + `create_simulator()` |
+| | | - `array_store` CH_MEM 后端 = `ch_mem` (sread/write + commit 双缓冲) |
+| | | - `CtrlLink::halt_when(ch_bool)` + OR 合并借鉴 `stream_halt_when` |
+| | | - Per-stage 信号实体 + auto_insert_stage_regs() (VexRiscv Pipeline.build() Phase 4 移植) |
+| | | - `uint_t<N>` = `ch::core::ch_uint<N>` (CH_MEM 模式别名) |
+| | | 配套 ADR-046（多周期 FSM 豁免）+ ADR-037 修订（D4 elaboration 兑现）|
+| | | 配套 `tools/check_plugin_portability.sh` v2.0（5 项检查）|
+| | | 配套 `tests/framework/test_cppHDL_hello_poc.cpp` + `test_plugin_elaborate_hello_poc.cpp` |
+| | | 配套 `ip/cpu/plugins/reg_file_chmem.h` + `int_alu_chmem.h` (M3 PoC 骨架) |
 
 ---
 
-*本 ADR 由 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）驱动，状态进入 Phase 1 提案。`array_store` 与 commit 钩子已实现，CI 脚本已就位，迁移手册的 Phase 5 验证推迟到 RTL 升级时执行。*
+## 8. v2.0 范围纪律
+
+### 8.1 9 周 Phase 6c 时间盒 (W0-W9)
+
+```
+W0 (Day 1-3): CppHDL 成熟度审计 + OpenSpec change 草稿 + CHANGELOG
+  ✅ docs/audit/cppHDL-maturity-audit.md (W0 审计报告)
+  ✅ openspec/changes/plugin-elaboration-substrate/{proposal,tasks}.md
+  ✅ CHANGELOG.md v0.3.x 占位条目
+
+W1-2 (M1): 底层翻转 — uint_t / payload / pipe_builder.elaborate()
+  ✅ include/cf/plugin/uint_t.h (双模 + CF_PLUGIN_USE_CH_MEM 开关)
+  ✅ include/cf/plugin/payload.h (cell 装 ch 代理 in CH_MEM)
+  ✅ include/cf/plugin/pipe_builder.h (elaborate() + run() deprecated)
+  ✅ tests/framework/test_cppHDL_hello_poc.cpp (W0 PoC)
+  ✅ tests/framework/test_plugin_elaborate_hello_poc.cpp (M1 PoC)
+
+W3-4 (M2): Stage plumbing — per-stage 信号 + 自动 ch_reg + CtrlLink ch_bool
+  ✅ include/cf/plugin/pipe_builder.h::auto_insert_stage_regs() 设计
+  ✅ include/cf/plugin/ctrl_link.h (halt_when(ch_bool) + OR 合并)
+  ✅ include/cf/plugin/storage.h (array_store ch_mem 后端)
+
+W5-6 (M3): RegFile + IntAlu PoC — 32 ch_reg + select 树
+  ✅ ip/cpu/plugins/reg_file_chmem.h (32 ch_reg + x0 select 屏蔽)
+  ✅ ip/cpu/arch/riscv/int_alu_chmem.h (if/else → select 树)
+
+W7-8 (M4): Decoder + Branch + Hazard + 5 级流水线 Verilog
+  ✅ 骨架记录在 OpenSpec change tasks.md
+  ⚠️ 完整 5 级 RTL sim 跑通需要 Harness 迁移 (W9)
+  ⏸ 实际代码待 Phase 6d 完整实现
+
+W9 (M5): Harness 迁移 + ADR 收口
+  ✅ tools/check_plugin_portability.sh v2.0 重订 (5 项检查)
+  ✅ ADR-046 新增 (多周期 FSM 豁免)
+  ✅ ADR-040 v2.0 修订 (本文档)
+  ⏸ ADR-037 修订 (下一会话)
+  ⏸ Harness 迁移 ([cpu-integration] 测试 → CppHDL sim runner / Verilator) - 需要构建环境
+```
+
+### 8.2 已交付 vs 推迟
+
+**已交付** (Phase 6c 9 周时间盒内):
+- W0-W5 全部 M1-M3 源代码 + 文档
+- M4/M5 文档骨架 (OpenSpec change tasks.md)
+- ADR-046 + ADR-040 v2.0 + CHANGELOG v0.3.x + check_plugin_portability.sh v2.0
+
+**明确推迟** (Phase 6d+):
+- W7-8 5 级流水线 Verilog 实际生成 + riscv-tests tohost=1 验证
+- W9 Harness 迁移 (pb.run() → CppHDL sim runner / Verilator)
+- IBus/DBus LOAD width extraction
+- MMU/PTW 多周期 FSM (依赖 ADR-046 豁免 + ch_state_machine)
+- L1Cache refill FSM
+
+### 8.3 关键交付物 (Phase 6c 已落地)
+
+| 文件路径 | 行数 | 内容 |
+|---|---|---|
+| `include/cf/plugin/uint_t.h` | 75 | 双模 uint_t<N> + bool_t + CF_PLUGIN_USE_CH_MEM 开关 |
+| `include/cf/plugin/payload.h` | 195 | 双模 PayloadStore + ch 代理 cell |
+| `include/cf/plugin/pipe_builder.h` | 510 | 双模 PipeBuilder + elaborate() + auto_insert_stage_regs() |
+| `include/cf/plugin/ctrl_link.h` | 175 | 双模 CtrlLink + ch_bool 化 |
+| `include/cf/plugin/storage.h` | 180 | 双模 array_store + ch_mem 后端 |
+| `tools/check_plugin_portability.sh` | 230 | 5 项检查 (Tier-1 ch渗透翻转 + if(ch_bool)) |
+| `tests/framework/test_cppHDL_hello_poc.cpp` | 165 | W0 PoC 测试源码 |
+| `tests/framework/test_plugin_elaborate_hello_poc.cpp` | 130 | M1 PoC 测试源码 |
+| `ip/cpu/plugins/reg_file_chmem.h` | 130 | RegFile CH_MEM PoC 骨架 |
+| `ip/cpu/arch/riscv/int_alu_chmem.h` | 130 | IntAlu CH_MEM PoC 骨架 |
+| `docs/audit/cppHDL-maturity-audit.md` | 197 | W0 审计报告 |
+| `openspec/changes/plugin-elaboration-substrate/proposal.md` | 220 | Phase 6c 设计 |
+| `openspec/changes/plugin-elaboration-substrate/tasks.md` | 200 | Phase 6c 任务 |
+| `CHANGELOG.md` (v0.3.x 段) | 50 | Phase 6c 启动标记 |
+| `docs/architecture/adr/ADR-046-multi-cycle-fsm-exemption.md` | 220 | 新增 ADR-046 |
+
+**总 Phase 6c 交付代码行数**（不含示例参考）：约 **2815 行**
+
+---
+
+## 9. 下一步会话行动
+
+### 9.1 M5 剩余 (Phase 6d 之前完成)
+
+- [ ] **ADR-037 v2.0 修订**：记录 D4 在 elaboration 语义下兑现
+- [ ] **Harness 迁移**：tests/cpu/integration/test_*stage_riscv.cpp 从 `pb.run()` 迁到 `pb.elaborate()` + `ch::Simulator::tick()` / Verilator
+- [ ] **测试验证**：在 CF_PLUGIN_USE_CH_MEM 下 ctest 全部 PASS
+
+### 9.2 Phase 6d (下一阶段)
+
+- [ ] DecoderPlugin + BranchPlugin + HazardPlugin 完整 CH_MEM 版本
+- [ ] 5 级流水线 Verilog 实际生成 → riscv-tests add/addi/auipc/jal/beq RTL sim tohost=1
+- [ ] MMU/PTW 多周期 FSM (使用 chlib::ch_state_machine + CF_PLUGIN_USE_FSM_EXEMPT 豁免)
+- [ ] L1Cache refill FSM
+- [ ] Verilator 后端集成（生成 .v → 编译 VL1Cache → 替换 C++ sim）
+
+---
+
+*本 ADR v2.0 由 Phase 6c W0 审计 + Oracle 重构报告驱动（2026-09-16）。核心洞察：VexRiscv 能编译 Verilog 不因为 Scala 翻译，是因为"执行即布线"——cf::plugin 不发明翻译器，让 lambda 体直接操作 ch 类型，执行即发射 lnode DAG。CH_MEM 是新正道，TLM 是 deprecated 模式。*

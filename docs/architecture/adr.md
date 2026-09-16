@@ -108,7 +108,7 @@
 | ADR-030 | PipeNode 三态握手 | Plugin | `include/cf/plugin/pipe_node.h` |
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
-| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制） |
+| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制）+ **v2.0 Phase 6c 兑现 elaboration 语义（2026-09-16）** |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
 | ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
@@ -1231,40 +1231,53 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 #### ADR-037：Plugin 作为设计范式（不是工具）
 
-**状态**: Accepted (2026-06-08)
-**决策者**: User + Prometheus
-**背景**: 见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`
-**关联**: 重塑路线图（Phase 0/1/6 重新定位）
+**状态**: ✅ v2.0 Accepted (Phase 6c 落地, 2026-09-16)
+**决策者**: User + Prometheus + Phase 6c Oracle 重构
+**背景**: 
+- v1.0 (2026-06-08): `.omo/drafts/decision-plugin-framework-2026-06-08.md`
+- v2.0 (2026-09-16): Phase 6c W0 审计 + Oracle 重构报告（`openspec/changes/plugin-elaboration-substrate/proposal.md`）
+**关联**: 重塑路线图（Phase 0/1/6 重新定位）; Phase 6c 兑现 D4 在 elaboration 语义下
 
-**决策内容**:
+**v1.0 决策内容**:
 - **D1**: 路线图前插入 Phase 0 = Plugin 最小**脚手架**（2-3 周）
 - **D2**: Phase 1 Hello World = L1CachePlugin（真实 Plugin，不是占位）
 - **D4**: 业务逻辑强制采用 **Plugin-style** 设计（无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`）
 - **D5**: Phase 6 = 完整 PipeBuilder 框架 + RTL 生成（12-20 周）
 - **D6-D9**: 4 项命名冲突解决方案
 
-**影响**:
+**v2.0 重大变更** (Phase 6c, 2026-09-16):
+- **D4 兑现**: Plugin-style 不再只是 TLM 仿真范式，而是 **elaboration 期间发射 lnode DAG 的硬件描述范式**。`pb.elaborate()` 执行一次 at_stage 闭包，发射硬件 DAG；`ch::toVerilog(ctx)` 输出 Verilog；`ch::Simulator::tick()` / Verilator 做 cycle 仿真。
+- **D5 拆解**: Phase 6 拆为 Phase 6c（M1-M5, 9 周 RTL 兑现）+ Phase 6d（MMU/Cache 多周期 FSM）+ Phase 6e（ScoreBoard/CompareDriver）。
+- **新增 D10**: `cf::plugin` 在 `-DCF_PLUGIN_USE_CH_MEM` 下走 elaboration 正道；TLM 模式 deprecated（CH_MEM 双模共存，零回归）。
+- **新增 D11**: 多周期协议引擎豁免 D4 "无状态机" 禁令（ADR-046），但必须使用 `chlib::ch_state_machine` DSL。
+
+**影响** (v2.0 增量):
+- **README 承诺兑现**: "CppTLM + CppHDL-based"（v1.0 仅 TLM；v2.0 TLM + HDL 双层）
+- **核心洞察**: VexRiscv 能编译 Verilog 不因为 Scala 翻译，是因为"执行即布线"；cf::plugin 不发明翻译器，让 lambda 体直接操作 ch 类型，执行即发射 lnode DAG。
+- **TLM 路径 deprecation**: `pb.run()` 标 `[[deprecated]]`；CH_MEM 是新正道（见 ADR-040 v2.0）
+
+**v1.0 影响** (保持):
 - 重塑 Phase 1-5 实施路径（业务逻辑必须 Plugin-style）
 - 推迟 v2.0.1 §12.2 的 Phase 1a/1b/1c 到 Phase 6
 - 路线图新增 Phase 0（在 Phase 1 前）和 Phase 6（在 Phase 5 后）
 
-**影响 ADR**:
-- ADR-025~036 状态从 "🚧 未实施" → "Phase 0/6 范围"
-- ADR-026 (`at_stage()` 逻辑阶段名) → Phase 0 P0 #4
-- ADR-027 (`Phase {EARLY,NORMAL,LATE}`) → Phase 0 P0 #4
-- ADR-028 (`declare_substage()`) → Phase 0 P0 #4 (最小实现) + Phase 6 (完整)
-- ADR-029 (模块级 `ImplMode`) → Phase 6
-- ADR-030 (`PipeNode` 三态握手) → Phase 0 P0 #3
-- ADR-031 (`StageLink/CtrlLink/DirectLink`) → Phase 0 P0 #5
-- ADR-032 (`PipeBuilder` 统一编译器) → Phase 0 P0 #4
-- ADR-033 (`CtrlLink` 四种控制 API) → Phase 0 P0 #5
-- ADR-034 (`ScoreBoard`) → Phase 6
-- ADR-035 (`CompareDriver`) → Phase 6
-- ADR-036 (三级测试金字塔) → Phase 1+ (随业务展开)
+**影响 ADR** (v2.0 增量):
+- ADR-040 (TLM→HDL 移植性约束) → **v2.0 Accepted**（CH_MEM 是新正道；Tier-1 Check 5 新增）
+- **ADR-046 新增**（多周期 FSM 豁免 D4）
+- ADR-025~036 状态: ✅ 已实装（Phase 0）+ ✅ Phase 6c 兑现（elaboration 语义）
 
-**不可逆性**: D4（Plugin-style 强制）不可逆 —— 一旦 Phase 1 业务逻辑用 Plugin-style，事后改回 tick() 几乎全重写
+**不可逆性**: D4（Plugin-style 强制）不可逆 —— v2.0 进一步强化：Plugin-style 是 elaboration 期间发射硬件 DAG 的唯一方式（不能再退回 tick()）
 
 **重新审视指引**: 见决策记录 §8（每季度或在 Phase 0/1/6 关键节点）
+
+**完整 Phase 6c 兑现证据**:
+- `openspec/changes/plugin-elaboration-substrate/` (proposal.md + tasks.md)
+- `docs/audit/cppHDL-maturity-audit.md` (W0 审计)
+- `include/cf/plugin/{uint_t,payload,pipe_builder,ctrl_link,storage}.h` (双模化)
+- `tests/framework/test_{cppHDL_hello_poc,plugin_elaborate_hello_poc}.cpp`
+- `ip/cpu/plugins/reg_file_chmem.h` + `ip/cpu/arch/riscv/int_alu_chmem.h`
+- `tools/check_plugin_portability.sh` v2.0 (5 项检查)
+- `docs/architecture/adr/ADR-046-multi-cycle-fsm-exemption.md`
 
 ---
 

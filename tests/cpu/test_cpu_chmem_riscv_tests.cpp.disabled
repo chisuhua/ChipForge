@@ -1,0 +1,213 @@
+// tests/cpu/test_cpu_chmem_riscv_tests.cpp
+//
+// Phase 6c W9/M5 Harness 迁移模板 + W7-8/M4 5 级流水线 Verilog 验证
+// 作者: ChipForge Plugin Team
+// 最后修改日期: 2026-09-16 (Phase 6c M4+M5 集成骨架)
+//
+// 目的:
+//   1. 演示 [cpu-integration] 测试从 pb.run() → pb.elaborate() + Simulator::tick() 迁移
+//   2. 验证 5 级流水线 CH_MEM 模式下 riscv-tests add/addi/auipc/jal/beq tohost=1
+//   3. 作为 Phase 6c 末尾验收: ch::toVerilog() 生成 cpu.v + ch::Simulator 跑 RTL sim
+//
+// 编译:
+//   - 必须 -DCF_PLUGIN_USE_CH_MEM 打开 CH_MEM 模式
+//   - 必须 -DCF_PLUGIN_USE_FSM_EXEMPT（PoC: 无 FSM）
+//   - 链接 CppHDL: cmake target_link_libraries(... cpp-hdl::ch)
+//
+// 关联:
+//   - openspec/changes/plugin-elaboration-substrate/{proposal,tasks}.md
+//   - docs/audit/cppHDL-maturity-audit.md
+//   - ip/cpu/cpu_factory_chmem.h (M4 集成骨架)
+//   - tests/framework/test_cppHDL_hello_poc.cpp (W0 PoC 参考)
+//
+// 注: 本文件是 M4+M5 集成骨架, 完整 build + Verilator 仿真需 build 环境.
+//      实际 M5 验证需在下次会话 (需 cmake 配置 + CppHDL link + Verilator).
+
+#define CF_PLUGIN_USE_CH_MEM
+// #define CF_PLUGIN_USE_FSM_EXEMPT  // PoC 阶段无 FSM, 不需要
+
+#include "catch_amalgamated.hpp"
+
+#include <cstdint>
+#include <fstream>
+#include <memory>
+#include <string>
+
+#include <ch.hpp>
+#include <component.h>
+#include <core/context.h>
+#include <core/reg.h>
+#include <core/uint.h>
+#include <core/bool.h>
+#include <core/operators.h>
+#include <codegen_verilog.h>
+#include <simulator.h>
+
+#include "cf/plugin/plugin_base.h"
+#include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/payload.h"
+#include "cf/plugin/uint_t.h"
+
+#include "ip/cpu/cpu_factory_chmem.h"
+#include "ip/cpu/plugins/reg_file_chmem.h"
+#include "ip/cpu/arch/riscv/int_alu_chmem.h"
+#include "ip/cpu/arch/riscv/payload_riscv.h"
+
+using namespace cf;
+using namespace cf::plugin;
+using namespace ch;
+using namespace ch::core;
+
+namespace {
+
+// ============================================================================
+// PoC 测试: 5 级流水线 CH_MEM 模式 riscv-tests 集成验证
+//
+// 流程 (Phase 6c M4+M5):
+//   1. 创建 ch::core::context (顶层 elaboration)
+//   2. CpuFactoryChmem<uint32>::build_cpu() 注册所有 Plugin
+//   3. pb.elaborate() 一次性发射 lnode DAG
+//   4. ch::toVerilog("cpu.v", ctx) 输出 Verilog
+//   5. ch::Simulator(ctx) 构造, tick() 驱动
+//   6. 加载 ELF 到 memory (PoC: 跳过, 由 testbench 加载)
+//   7. 跑 riscv-tests, 检查 tohost=1
+//
+// PoC 简化:
+//   - 实际 memory model 暂用 PicolibcHostMemory (在 cpu_factory.h 有完整版)
+//   - ELF 加载逻辑参考 tools/cpu_sim/main.cpp (load_elf_full)
+//   - 测试 5 个 riscv-tests 用例: add/addi/auipc/jal/beq
+// ============================================================================
+
+const char* kRiscVTestsElfDir = "riscv-tests/isa/elf/";  // Phase 6d 实装
+constexpr std::uint64_t kMaxCycles = 10000;
+
+template <typename T>
+struct CpuHarnessChmem {
+  ch::core::context elaboration_ctx;
+  std::unique_ptr<PipeBuilder> pb;
+
+  CpuHarnessChmem() : elaboration_ctx("cpu_5stage_chmem") {
+    pb = cf::cpu::CpuFactoryChmem<T>::build_cpu(&elaboration_ctx);
+  }
+
+  void elaborate() {
+    pb->elaborate();
+  }
+
+  void to_verilog(const std::string& filename) {
+    pb->to_verilog(filename);
+  }
+
+  ch::Simulator* create_simulator() {
+    return pb->create_simulator();
+  }
+};
+
+}  // namespace
+
+// ============================================================================
+// W7-8/M4: 5 级流水线 CH_MEM 集成测试 (PoC 骨架)
+// ============================================================================
+TEST_CASE("cpu_chmem_5stage_elaborate", "[cpu][chmem][m4][poc]") {
+  // 类型: uint32_t (RV32 PoC)
+  CpuHarnessChmem<std::uint32_t> harness;
+
+  // 1. elaborate() — 一次性发射所有 Plugin 的 lnode DAG
+  harness.elaborate();
+
+  SUCCEED("5-stage CPU CH_MEM elaborate 成功 (M4 PoC 骨架)");
+}
+
+// ============================================================================
+// W9/M5: Harness 迁移 — pb.run() → pb.elaborate() + Simulator::tick()
+// ============================================================================
+TEST_CASE("cpu_chmem_harness_to_verilog", "[cpu][chmem][m5][poc]") {
+  CpuHarnessChmem<std::uint32_t> harness;
+  harness.elaborate();
+
+  // 2. ch::toVerilog() 输出 Verilog
+  const std::string out_file = "/tmp/cpu_5stage_chmem.v";
+  harness.to_verilog(out_file);
+
+  std::ifstream f(out_file);
+  REQUIRE(f.is_open());
+  std::stringstream ss;
+  ss << f.rdbuf();
+  std::string verilog = ss.str();
+  REQUIRE(!verilog.empty());
+  REQUIRE(verilog.find("module") != std::string::npos);
+  REQUIRE(verilog.find("always") != std::string::npos);  // ch_reg → always_ff
+
+  SUCCEED("5-stage cpu.v 生成 (长度=" + std::to_string(verilog.size()) + ")");
+}
+
+// ============================================================================
+// W9/M5: Simulator::tick() 驱动 5-stage CPU
+//
+// 注: 完整执行 riscv-tests 需要 ELF 加载 + PicolibcHostMemory 注入 + tick() 循环
+//      Phase 6d M5 实装; PoC 阶段只验证 Simulator 创建 + 一次 tick 不 crash
+// ============================================================================
+TEST_CASE("cpu_chmem_simulator_tick_smoke", "[cpu][chmem][m5][poc]") {
+  CpuHarnessChmem<std::uint32_t> harness;
+  harness.elaborate();
+
+  // 3. Simulator 构造 + 一次 tick
+  std::unique_ptr<ch::Simulator> sim(harness.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+
+  // PoC: 一次 tick 不 crash 即可 (实际需要 memory model + PC 初始化)
+  sim->tick();
+
+  SUCCEED("Simulator::tick() 驱动 5-stage CPU CH_MEM (smoke test 通过)");
+}
+
+// ============================================================================
+// W7-8/M4: 5-stage Verilog 实际跑 riscv-tests (需要 Harness 迁移后跑)
+//
+// 注: 完整测试需要以下步骤:
+//   1. 加载 ELF 到 PicolibcHostMemory
+//   2. 把 memory 注入 5-stage CPU (替代 PoC 的 nullptr)
+//   3. 写 PC 到 fetch stage 的 PC Payload
+//   4. Simulator::tick() 循环直到 mem.exited() 或达到 kMaxCycles
+//   5. 检查 mem.exit_code() == 0
+//
+// PoC 阶段: 5 个 riscv-tests ELF 文件需在 build 环境 riscv-tests-rv32ui-p-* 目录
+// ============================================================================
+TEST_CASE("cpu_chmem_riscv_tests_add", "[cpu][chmem][m4][poc][harness]") {
+  // PoC 简化: 1 个 test case 演示 harness 迁移 (M5)
+  // 完整 5 个 test cases (add/addi/auipc/jal/beq) 待 Phase 6d build 环境实装
+  CpuHarnessChmem<std::uint32_t> harness;
+  harness.elaborate();
+
+  std::unique_ptr<ch::Simulator> sim(harness.create_simulator());
+  sim->reset();
+
+  // 注: 实际 riscv-tests 执行需要:
+  //   1. load_elf("riscv-tests/isa/elf/rv32ui-p-add") 加载到 memory
+  //   2. 注入 memory 到 CPU (CpuFactoryChmem 第二个参数)
+  //   3. for (i < kMaxCycles) sim->tick();
+  //   4. REQUIRE(mem.exited()); REQUIRE(mem.exit_code() == 0);
+  //
+  // PoC: 跳过 ELF 加载 (无 memory model), 只验证测试框架结构正确
+  (void)kRiscVTestsElfDir;
+
+  SUCCEED("riscv-tests add PoC 骨架 (M5 harness 迁移模板, 完整执行待 Phase 6d)");
+}
+
+// ============================================================================
+// 综合: 5-stage CPU CH_MEM 端到端 (PoC 集成测试)
+// ============================================================================
+TEST_CASE("cpu_chmem_5stage_e2e_pipeline", "[cpu][chmem][m4][m5][summary]") {
+  CpuHarnessChmem<std::uint32_t> harness;
+  harness.elaborate();
+
+  // 输出 Verilog
+  harness.to_verilog("/tmp/cpu_5stage_e2e.v");
+
+  // 创建 Simulator (验证 create_simulator() 不 crash)
+  std::unique_ptr<ch::Simulator> sim(harness.create_simulator());
+  REQUIRE(sim != nullptr);
+
+  SUCCEED("Phase 6c M4+M5 集成 PoC: 5-stage CPU CH_MEM elaborate + to_verilog + Simulator 全链路通过");
+}

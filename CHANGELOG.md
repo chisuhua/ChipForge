@@ -5,6 +5,35 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.3.x (WIP) - plugin-elaboration-substrate (Phase 6c)
+
+> **OpenSpec change (draft)**: `plugin-elaboration-substrate` (详见 `openspec/changes/plugin-elaboration-substrate/`)
+> **目的**: 把 cf::plugin 从"每周期仿真闭包执行器"改为"elaboration 一次即发射 lnode DAG"——兑现 README 承诺的"CppTLM + CppHDL-based"HDL 侧、把 D4 Plugin 范式从 TLM 仿真提升到 Verilog 综合。
+> **状态**: W0 审计完成（`docs/audit/cppHDL-maturity-audit.md`）；M1 底层翻转启动；9 周时间盒 (W0 门槛 + W1-2 M1 + W3-4 M2 + W5-6 M3 + W7-8 M4 + W9 M5)
+
+### Pending (W0 门槛已过, M1 启动中)
+- [x] W0/Day1 CppHDL 完整源码审计 (`ch::Component` + `ch_reg` + `ch_mem` + `ch_uint` + `Simulator` + `toVerilog` 全部 OK; `ch_state_machine` 是简化版但不影响单周期组件)
+- [x] W0/Day3 OpenSpec change `plugin-elaboration-substrate/` 创建 (proposal.md + tasks.md)
+- [x] M1/W1 `include/cf/plugin/uint_t.h` 翻转: 加 `CF_PLUGIN_USE_CH_MEM` 编译开关 (默认 OFF = TLM 兼容, ON = elaboration 模式 `uint_t<N> = ch::core::ch_uint<N>`)
+- [ ] W0/Day2 hello.v PoC (单 Component + 1 个 ch_reg → toVerilog 输出 + CppHDL sim 跑 + Verilator 编译)
+- [ ] M1/W2 PayloadStore cell 改造 + PipeBuilder::elaborate() 新增 + run() deprecated
+- [ ] M1/W2 第一个 hello.v PoC (10 行 at_stage lambda)
+- [ ] W3-8 M2-M4 (per-stage 信号实体 + RegFilePlugin + IntAluPlugin + Decoder + 5 级流水线)
+- [ ] W9 M5 (harness 迁移 + ADR-040/037 修订 + 新增"多周期豁免" ADR)
+
+### Breaking Changes (W9 完成后生效)
+- `cf::plugin::uint_t<N>` / `cf::plugin::bool_t` 在 CH_MEM 模式下从 POD typedef 变为 `ch::core::ch_uint<N>` / `ch::core::ch_bool` 别名 (语义: 不再是值类型, 是 lnode DAG 句柄)
+- `cf::plugin::PipeBuilder::run()` 改为 `elaborate()` (语义: elaboration 期一次执行 → 发射硬件 DAG; 运行期 cycle 仿真由 CppHDL simulator 或 Verilator 承担)
+- TLM 仿真层 (`pb.run() per cycle`) 废弃 (CHANGELOG v0.3.0 正式标记)
+- 多周期协议引擎 (MMU PTW / Cache refill FSM) 豁免 D4 "无状态机" 禁令 (新增 ADR-046), 但必须使用 `chlib::ch_state_machine` 而非手写 enum+switch
+
+### Out of Scope (Phase 6d+)
+- IBus/DBus LOAD width extraction (LOAD 测试用例继续走原路径)
+- MMU/PTW 多周期 FSM 仿真 (`ch_state_machine` 简化, 需 Verilator 后端)
+- L1Cache refill FSM
+- Branch predictor / OoO / ROB / LSQ (Phase 2+)
+- 完整 RV32GC 合规基线 / Linux 启动 (Phase 2+)
+
 ## v0.1.3 (2026-09-15) - plugin-framework-stall
 
 > **OpenSpec change**: `plugin-framework-stall` (详见 `openspec/changes/archive/2026-09-15-plugin-framework-stall/`)
