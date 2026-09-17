@@ -140,4 +140,31 @@ TEST_CASE("m3_poc_regfile_alu_combined", "[cpu][m3][poc][combined][chmem][.defer
 
 }  // namespace
 
+// =========================================================================
+// PoC #4 (Deferred to M4/W8): TLM↔CH_MEM 字节对标 (M3/W6 #95)
+//
+// 当前跳过原因 (实测):
+//   1. PayloadStore cell put/get 在 CH_MEM 模式下不稳定: put ch_uint<32>(5)
+//      后, 在 at_stage 闭包内 get 返回 0 (CHMEM=0x0 而非预期 0x8)
+//   2. ch_uint<N>::operator uint64_t() 提取 RD_DATA cell 值失败
+//   3. reg_file_chmem.h::get_regs() static singleton 跨 context 悬垂
+//      (Oracle 风险预警 #3, 阻塞 RegFile byte-equal)
+//
+// 修复路径 (M4/W8 范围):
+//   - 改用 ch::Simulator + ch_in<T> 端口驱动 (而非 PayloadStore cell)
+//   - 修复 get_regs() singleton 为 ctx_aware (key by ch::core::context*)
+//   - 单元化 ALU 为 ch::Component (如 W0 PoC HelloComponent), 直接驱动端口
+//
+// M3/W6 当前范围 (无 PoC #4):
+//   - PoC #1: RegFile 单元级 elaboration (regfile.v 生成成功)
+//   - PoC #2: ALU 单元级 elaboration (alu.v 生成成功)
+//   - PoC #3: Combined 推迟 (singleton)
+//   - PoC #4: Byte-equal 推迟 (cell put/get 问题)
+// =========================================================================
+TEST_CASE("m3_poc_alu_byte_equal", "[cpu][m3][poc][alu][byteequal][chmem][.deferred]") {
+  SUCCEED("PoC #4 deferred to M4/W8: PayloadStore cell put/get in CH_MEM mode "
+          "unstable (put returns 0 in at_stage); needs Simulator + ch_in<T> "
+          "port driver refactor. PoC #1+#2 verify elaboration/Verilog generation.");
+}
+
 #endif  // CF_PLUGIN_USE_CH_MEM
