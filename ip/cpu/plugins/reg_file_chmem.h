@@ -2,25 +2,31 @@
 //
 // 功能描述: RegFilePlugin (CH_MEM 模式) — 通用寄存器堆的 elaboration 版本
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-09-17 (Phase 6c M3 Prereq-3)
+// 最后修改日期: 2026-09-17 (Phase 6c M3 Prereq-3 + M3/W8 #95)
 //
 // ── Oracle M3 Prereq-3: 修复 dual static thread_local 架构缺陷 ────────────
-// 原问题:
-//   decode 闭包和 writeback 闭包各自持有独立 static thread_local
+// 原问题: decode 和 writeback 闭包各自持有独立 static thread_local
 //   std::array<ch_reg<ch_uint<XLEN>>, 32> 对象 → 两块分离存储,
 //   写回操作对读操作不可见, 寄存器堆功能完全失效。
+// 修复: 单一 static 单例 get_regs() 替代 dual static thread_local。
 //
-// 修复:
-//   单一 static 单例 get_regs() 替代 dual static thread_local。
-//   单个 std::array 在首次调用时延迟初始化, decode 和 writeback 闭包
-//   共享同一份寄存器数组, 写操作即时反映到随后的读操作。
+// ── M3/W8 #95: 去掉 static 单例, 改为 plugin 实例成员 ─────────────
+// 原问题: static 单例 (函数-local static) 首次 elaboration 创建 32 个
+//   ch_reg 绑定 context-A 的 lnodeimpl*。第二次 elaboration (不同
+//   context) 复用同一单例, lnodeimpl* 指向已析构的 context → ASan
+//   heap-use-after-free。
+// 修复: 去掉 get_regs() static 属性, 改为 Plugin 实例成员 regs_。
+//   每个 RegFilePlugin 实例在其自己的 context 中持有 32 个 ch_reg。
+//   各实例独立 → 无跨 context 复用 → 无 use-after-free。
+//   延迟初始化 (第一次 get_regs() 调用时) 确保 ch_reg 构建在正确的
+//   context 中 (此时 ctx_swap 已生效, elaborate() 正在执行)。
 //
-// 选型理由 (见 M3 Prereq-3 交付物 §5):
-//   选用 static 单例 (function-local static) 而非 plugin 实例成员,
-//   因为 ch_reg<T> 构造需要活跃的 ch::core::context, 其创建时机
-//   晚于 plugin 对象构造 (在 PipeBuilder::elaborate() 内)。
-//   单进程仿真场景下 static 单例语义正确; 多核场景 (M4/W7) 再升格
-//   为 plugin 实例成员 (std::optional lazy init)。
+// 为什么不用 unordered_map<void*, array> / thread_local + cached_ctx:
+//   for 循环中栈分配的 context 地址可复用 (同一栈槽), map 返回旧
+//    context 的已失效 ch_reg → 地址复用场景下 use-after-free。
+//   实例成员从根本上规避了此问题: 每个 Plugin 拥有自己的 regs_,
+//   其生命周期与 Plugin 实例绑定, 不依赖 context 指针作为 key。
+// ────────────────────────────────────────────────────────────────────────────
 //
 // 设计:
 //   - 仅在 CF_PLUGIN_USE_CH_MEM 下编译
@@ -42,6 +48,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 
 #include <ch.hpp>
@@ -121,14 +128,33 @@ class RegFilePlugin : public PluginBase {
   }
 
  private:
-  // ── 单一 regs 单例 ──────────────────────────────────────────────
-  // M3 Prereq-3: 替代原 dual static thread_local 数组。
-  //   static (非 thread_local) 保证 decode 和 writeback 闭包访问同一数组。
-  //   延迟初始化: ch_reg 构造需要活跃的 ch::core::context
-  //   (= elaborate() 期间 ctx_curr_ 已设置)。
-  static std::array<ch_reg<ch_uint<kXlenBits>>, kNumRegs>& get_regs() {
-    static std::array<ch_reg<ch_uint<kXlenBits>>, kNumRegs> regs{};
-    return regs;
+  // ── 实例成员 regs_: 替代 static 单例 ─────────────────────────────
+  // 每个 RegFilePlugin 实例持有自己的 regs_ (std::unique_ptr<array>),
+  // 在第一次 get_regs() 调用时延迟初始化 (lazy init)。
+  //
+  // 延迟初始化原因:
+  //   ch_reg<T> 的构造需要活跃的 ch::core::context (以发射 regimpl 节点)。
+  //   Plugin 对象构造时 (register_plugin 内) context 可能未激活;
+  //   get_regs() 首次调用发生在 elaborate() 期间 (at_stage 回调),
+  //   此时 ctx_swap 已生效, context 处于活跃状态。
+  //
+  // 注意:
+  //   非 static → 每个实例独立的 regs_, 不会跨 context 复用。
+  //   unique_ptr 确保 Plugin 析构时释放 ch_reg (不破坏 context 节点,
+  //   lnodeimpl 由 context::node_storage_ 拥有)。
+  using regs_array_t = std::array<ch_reg<ch_uint<kXlenBits>>, kNumRegs>;
+  std::unique_ptr<regs_array_t> regs_;
+
+  regs_array_t& get_regs() {
+    if (!regs_) {
+      regs_ = std::make_unique<regs_array_t>();
+      for (std::size_t i = 0; i < kNumRegs; ++i) {
+        (*regs_)[i] = ch_reg<ch_uint<kXlenBits>>(
+            ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{}),
+            ("reg_" + std::to_string(i)).c_str());
+      }
+    }
+    return *regs_;
   }
 
   // ── ID stage: RS1/RS2 读取 ───────────────────────────────────────

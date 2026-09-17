@@ -65,6 +65,7 @@
 using namespace cf::plugin;
 using namespace ch;
 using namespace ch::core;
+using namespace cf::cpu::arch::riscv;
 
 namespace cf {
 namespace cpu {
