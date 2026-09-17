@@ -3,7 +3,7 @@
 // 功能描述: TLM 模式存储抽象 (Phase 1.3+) —— 为 Plugin-style 业务代码
 //           提供可平滑升级到 CppHDL `ch_mem` 的统一接口。
 // 作者: ChipForge Plugin Team
-// 最后修改日期: 2026-06-10
+// 最后修改日期: 2026-09-17 (Phase 6c M2 W4: CH_MEM 双缓冲)
 //
 // 设计动机:
 //   Phase 0/1 的 L1CachePlugin 直接持有 `std::array<T, N>`, 读写语义无 cycle
@@ -27,6 +27,11 @@
 //   - Phase 1.x (TLM): 当前实现, 单缓冲, RAW 立即可见
 //   - Phase 6 (RTL):  内部持有 `ch_mem` 影子, `commit()` 在 `pb.run()`
 //                     末尾统一提交, 读取返回"上一周期提交值"
+//
+// CH_MEM 模式 (Phase 6c):
+//   编译开关 CF_PLUGIN_USE_CH_MEM 开启时, `array_store` 使用双缓冲
+//   (first_/second_) 实现"读返回上一周期提交值"语义。
+//   commit() 交换 first_/second_ 角色: 本周期写 first_, 下周期读 second_ 内容。
 //
 // 配套决策: ADR-040 (TLM→HDL 移植性约束)
 //
@@ -90,18 +95,19 @@ class array_store {
   array_store& operator=(array_store&&) noexcept = default;
 
   // ------------------------------------------------------------------------
-  // 元素访问 (与 std::array 一致)
+  // 元素访问 (所有模式使用 first_ 作为读/写缓冲)
+  //   - TLM 模式: first_ = data_, 单缓冲, 即写即读
+  //   - CH_MEM 模式: first_ = 读缓冲, second_ = 写缓冲,
+  //     commit() 交换角色实现"读返回上一周期提交值"
   // ------------------------------------------------------------------------
-  // 读 —— TLM 模式: 返回当前值 (与 std::array 等价)
-  //      Phase 6 切换后: 将返回"上一周期 commit 提交的值"
-  constexpr T&       operator[](size_type i)       noexcept { return data_[i]; }
-  constexpr const T& operator[](size_type i) const noexcept { return data_[i]; }
+  constexpr T&       operator[](size_type i)       noexcept { return first_[i]; }
+  constexpr const T& operator[](size_type i) const noexcept { return first_[i]; }
 
-  T&       at(size_type i)       { return data_.at(i); }
-  const T& at(size_type i) const { return data_.at(i); }
+  T&       at(size_type i)       { return first_.at(i); }
+  const T& at(size_type i) const { return first_.at(i); }
 
-  T*       data()       noexcept { return data_.data(); }
-  const T* data() const noexcept { return data_.data(); }
+  T*       data()       noexcept { return first_.data(); }
+  const T* data() const noexcept { return first_.data(); }
 
   // ------------------------------------------------------------------------
   // 容量 (与 std::array 一致)
@@ -110,30 +116,39 @@ class array_store {
   static constexpr bool      empty()    noexcept { return N == 0; }
 
   // ------------------------------------------------------------------------
-  // Phase 6 钩子 (Phase 1 模式下是 no-op)
-  //
-  // 当 array_store 内部实现切换为双缓冲 (current_/shadow_), 这些方法将
-  // 把 shadow_ 提交到 current_。Phase 1 模式下无操作。
+  // commit() —— 双缓冲切换
+  //   CH_MEM 模式: 交换 first_/second_, 本周期写 second_ 的内容在下周期读到
+  //   TLM 模式: no-op (单缓冲无 commit 语义)
   // ------------------------------------------------------------------------
-  void commit() noexcept { /* Phase 1: no-op, 单缓冲无 commit 语义 */ }
+  void commit() noexcept {
+#ifdef CF_PLUGIN_USE_CH_MEM
+    std::swap(first_, second_);
+#endif
+  }
 
   // 重置所有元素为零 (供测试间隔离使用)
   void reset() noexcept {
-    for (size_type i = 0; i < N; ++i) data_[i] = T{};
+    for (size_type i = 0; i < N; ++i) first_[i] = T{};
+#ifdef CF_PLUGIN_USE_CH_MEM
+    for (size_type i = 0; i < N; ++i) second_[i] = T{};
+#endif
   }
 
   // ------------------------------------------------------------------------
   // 迭代器支持 (与 std::array 一致)
   // ------------------------------------------------------------------------
-  iterator       begin()        noexcept { return data_.data(); }
-  iterator       end()          noexcept { return data_.data() + N; }
-  const_iterator begin()  const noexcept { return data_.data(); }
-  const_iterator end()    const noexcept { return data_.data() + N; }
-  const_iterator cbegin() const noexcept { return data_.data(); }
-  const_iterator cend()   const noexcept { return data_.data() + N; }
+  iterator       begin()        noexcept { return first_.data(); }
+  iterator       end()          noexcept { return first_.data() + N; }
+  const_iterator begin()  const noexcept { return first_.data(); }
+  const_iterator end()    const noexcept { return first_.data() + N; }
+  const_iterator cbegin() const noexcept { return first_.data(); }
+  const_iterator cend()   const noexcept { return first_.data() + N; }
 
  private:
-  std::array<T, N> data_{};  // TLM 模式: 直接持有; Phase 6 替换为 ch_mem
+  std::array<T, N> first_{};   // 读缓冲 (TLM: 唯一缓冲; CH_MEM: 读缓冲)
+#ifdef CF_PLUGIN_USE_CH_MEM
+  std::array<T, N> second_{};  // 写缓冲 (CH_MEM only)
+#endif
 };
 
 }  // namespace storage

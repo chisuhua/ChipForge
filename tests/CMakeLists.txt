@@ -109,6 +109,7 @@ set_tests_properties(chipforge_tests PROPERTIES
 set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_cppHDL_hello_poc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_elaborate_connector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_elaborate_pipeline2.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES
