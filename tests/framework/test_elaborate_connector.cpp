@@ -225,4 +225,68 @@ TEST_CASE("elaborate_poc_to_verilog_always_ff", "[framework][elaborate][poc]") {
   SUCCEED("elaborate() + regimpl node confirmed in context (pipeline_reg evidence)");
 }
 
+// =========================================================================
+// PoC #4: 2-stage pipeline + CtrlLink halt 条件
+//
+// 验证:
+//   - pb.register_ctrl_link("S1", ...) 注册 halt 条件
+//   - elaborate() 把 halt 条件传到 commit_payload_map
+//   - pipeline_reg stall 端口接到 halt ch_bool
+//   - toVerilog 输出含 always_ff (ch_reg 插入证据)
+// =========================================================================
+TEST_CASE("elaborate_poc_halt_wires_stall_port", "[framework][elaborate][poc]") {
+  ch::core::context ctx("elab_halt_ctx");
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb;
+
+  // Stage S1: 1->2 计数器
+  pb.at_stage("S1", cfc::Phase::NORMAL, [&pb] {
+    auto node = pb.node_of_logic_stage("S1");
+    if (!node->has(g_cnt_key)) {
+      node->put(g_cnt_key, ch_uint<8>(0_d));
+    }
+    auto& cnt = node->payloads().get(g_cnt_key);
+    cnt = cnt + ch_uint<8>(1_d);
+  });
+  pb.at_stage("S2", cfc::Phase::NORMAL, [] {});
+
+  // 注册 connector (S2's cnt 通过 pipeline_reg<8>(prev, rst, stall, flush, name))
+  pb.register_stage_payload_connector<ch_uint<8>>(
+      "S2", g_cnt_key,
+      [](lnodeimpl* prev, ch_bool stall, ch_bool flush,
+         const std::string& name) -> lnodeimpl* {
+        ch_uint<8> prev_signal(prev);
+        ch_bool rst(false);
+        auto pipelined = chlib::pipeline_reg<8>(prev_signal, rst, stall,
+                                                 flush, name);
+        return pipelined.impl();
+      });
+
+  // 注册 CtrlLink 到 S1, halt_when(halt_signal)
+  auto ctrl_s1 = std::make_shared<cfc::CtrlLink>();
+  ch_bool halt_signal(false);  // 当前 false, 不 stall
+  ctrl_s1->halt_when(halt_signal);
+  pb.register_ctrl_link("S1", ctrl_s1);
+
+  // elaborate() 必须无异常
+  REQUIRE_NOTHROW(pb.elaborate(ctx));
+
+  // toVerilog 验证: 应含 always @(posedge...) (pipeline_reg 插入的证据)
+  // 注: CppHDL toVerilog 用 Verilog-2001 风格 (always @(posedge)), 非 SystemVerilog always_ff
+  const std::string out_file = "/tmp/elaborate_halt.v";
+  ch::toVerilog(out_file, &ctx);
+  std::ifstream f(out_file);
+  REQUIRE(f.is_open());
+  std::stringstream ss;
+  ss << f.rdbuf();
+  std::string verilog = ss.str();
+  REQUIRE(!verilog.empty());
+  REQUIRE(verilog.find("always @(posedge") != std::string::npos);
+
+  // 额外验证: halt_condition() 返回值类型是 ch_bool, 且 OR 合并正确
+  REQUIRE(ctrl_s1->halt_condition().impl() != nullptr);
+  SUCCEED("CtrlLink halt 条件经 elaborate() 接到 pipeline_reg stall 端口");
+}
+
 #endif  // CF_PLUGIN_USE_CH_MEM

@@ -38,10 +38,11 @@
 
 #ifdef CF_PLUGIN_USE_CH_MEM
 // Forward declarations for CppHDL types (used in elaboration API only)
+// 注: ch_bool 在 core/bool.h:27 实际定义为 class ch_bool, 必须用 class 保持一致
 namespace ch::core {
 class context;
 class lnodeimpl;
-struct ch_bool;
+class ch_bool;
 }  // namespace ch::core
 #endif
 
@@ -368,7 +369,12 @@ class PipeBuilder {
   // Phase 6c M2 Spike 2: elaborate() — run at_stage() callbacks in
   // canonical order (same as run() but without TLM commit, CtrlLink
   // stall check, or commit_storages), then insert pipeline registers
-  // via commit_payload_map().
+  // with per-stage CtrlLink halt/flush conditions.
+  //
+  // W3-3: 从 CtrlLink 聚合 halt/flush 条件, 按 stage 分发.
+  //   每个 stage 的 stall = OR-merge of all registered CtrlLink halt_conds
+  //   每个 stage 的 flush = OR-merge of all registered CtrlLink flush_conds
+  //   缺省 stall/flush 由各 stage 的 CtrlLink 决定; 无 CtrlLink → ch_bool(false)
   void elaborate(ch::core::context& ctx) {
     const auto order = canonical_stage_order();
     for (const auto& stage_name : order) {
@@ -382,10 +388,25 @@ class PipeBuilder {
       }
     }
 
-    // Insert all registered pipeline registers (default stall=0, flush=0)
-    ch::core::ch_bool default_stall(false);
-    ch::core::ch_bool default_flush(false);
-    commit_payload_map(default_stall, default_flush);
+    // W3-3: per-stage CtrlLink halt/flush aggregation → commit_payload_map
+    for (auto& [stage_name, entries] : stage_payload_map_) {
+      ch::core::ch_bool stall(false);
+      ch::core::ch_bool flush(false);
+      auto cl_it = stage_ctrl_links_.find(stage_name);
+      if (cl_it != stage_ctrl_links_.end()) {
+        for (const auto& cl : cl_it->second) {
+          if (cl) {
+            stall = stall || cl->halt_condition();
+            flush = flush || cl->flush_condition();
+          }
+        }
+      }
+      for (auto& entry : entries) {
+        if (entry.applier) {
+          entry.applier(*this, stall, flush);
+        }
+      }
+    }
   }
 #endif
 

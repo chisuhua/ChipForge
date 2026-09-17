@@ -140,15 +140,27 @@ class CtrlLink {
     bypass_map_.clear();
   }
 
-  // PoC: M2 阶段实现 OR 合并方法, 返回 ch_bool 信号 (供 PipeBuilder 连线)
-  // ch_bool OR_combined_halt() const {
-  //   if (halt_conds_.empty()) return ch_bool(false);
-  //   ch_bool result = halt_conds_[0];
-  //   for (size_t i = 1; i < halt_conds_.size(); ++i) {
-  //     result = result || halt_conds_[i];
-  //   }
-  //   return result;
-  // }
+  // W3-1: halt_condition() — OR 合并 halt_conds_ 返回 ch_bool 信号
+  // 用 ch_bool::operator|| 直接建 OR 门 DAG (而非 chlib::stream_halt_when).
+  // 空 halt_conds_ 时返回 ch_bool(false) (no stall).
+  ch::core::ch_bool halt_condition() const {
+    if (halt_conds_.empty()) return ch::core::ch_bool(false);
+    ch::core::ch_bool result = halt_conds_[0];
+    for (std::size_t i = 1; i < halt_conds_.size(); ++i) {
+      result = result || halt_conds_[i];
+    }
+    return result;
+  }
+
+  // W3-2: flush_condition() — OR 合并 flush_conds_ 返回 ch_bool 信号
+  ch::core::ch_bool flush_condition() const {
+    if (flush_conds_.empty()) return ch::core::ch_bool(false);
+    ch::core::ch_bool result = flush_conds_[0];
+    for (std::size_t i = 1; i < flush_conds_.size(); ++i) {
+      result = result || flush_conds_[i];
+    }
+    return result;
+  }
 
  private:
   std::vector<Condition> halt_conds_;
