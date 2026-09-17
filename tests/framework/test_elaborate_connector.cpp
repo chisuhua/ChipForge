@@ -272,8 +272,8 @@ TEST_CASE("elaborate_poc_halt_wires_stall_port", "[framework][elaborate][poc]") 
   // elaborate() 必须无异常
   REQUIRE_NOTHROW(pb.elaborate(ctx));
 
-  // toVerilog 验证: 应含 always @(posedge...) (pipeline_reg 插入的证据)
-  // 注: CppHDL toVerilog 用 Verilog-2001 风格 (always @(posedge)), 非 SystemVerilog always_ff
+  // toVerilog 验证: 应含 always_ff @(posedge...) (pipeline_reg 插入的证据)
+  // 注: CppHDL toVerilog 用 SystemVerilog 风格 (always_ff @(posedge...))
   const std::string out_file = "/tmp/elaborate_halt.v";
   ch::toVerilog(out_file, &ctx);
   std::ifstream f(out_file);
@@ -282,7 +282,7 @@ TEST_CASE("elaborate_poc_halt_wires_stall_port", "[framework][elaborate][poc]") 
   ss << f.rdbuf();
   std::string verilog = ss.str();
   REQUIRE(!verilog.empty());
-  REQUIRE(verilog.find("always @(posedge") != std::string::npos);
+  REQUIRE(verilog.find("always_ff @(posedge") != std::string::npos);
 
   // 额外验证: halt_condition() 返回值类型是 ch_bool, 且 OR 合并正确
   REQUIRE(ctrl_s1->halt_condition().impl() != nullptr);

@@ -39,6 +39,10 @@
 #ifdef CF_PLUGIN_USE_CH_MEM
 // Forward declarations for CppHDL types (used in elaboration API only)
 // 注: ch_bool 在 core/bool.h:27 实际定义为 class ch_bool, 必须用 class 保持一致
+// Prereq-1: to_verilog/create_simulator 需要完整类型; 包含头文件确保 build 通过
+#include <codegen_verilog.h>
+#include <simulator.h>
+
 namespace ch::core {
 class context;
 class lnodeimpl;
@@ -408,6 +412,24 @@ class PipeBuilder {
       }
     }
   }
+
+  // ===== Prereq-1: pointer-based ctor + no-arg thin wrappers (M3 prerequisite) =====
+  explicit PipeBuilder(ch::core::context* ctx) : ctx_(ctx) {}
+
+  void elaborate() {
+    if (!ctx_) throw PluginException("PipeBuilder", "ctx_ is null, cannot elaborate");
+    elaborate(*ctx_);
+  }
+
+  void to_verilog(const std::string& filename) {
+    if (!ctx_) throw PluginException("PipeBuilder", "ctx_ is null, cannot toVerilog");
+    ch::toVerilog(filename, ctx_);
+  }
+
+  std::unique_ptr<ch::Simulator> create_simulator() {
+    if (!ctx_) throw PluginException("PipeBuilder", "ctx_ is null, cannot create simulator");
+    return std::make_unique<ch::Simulator>(ctx_);
+  }
 #endif
 
   // plugins() —— 返回 plugin 列表只读引用 (M4.12, 供 CpuFactory 测试断言)
@@ -448,6 +470,8 @@ class PipeBuilder {
   // Phase 6c M2 Spike 1: stage → vector<StagePayloadMapEntry>
   std::unordered_map<std::string, std::vector<StagePayloadMapEntry>>
       stage_payload_map_;
+  // Prereq-1: ctx pointer (lifecycle managed by caller, not PipeBuilder)
+  ch::core::context* ctx_ = nullptr;
 #endif
 };
 

@@ -364,7 +364,7 @@ class Pipeline2Device : public ch::Component {
   vss << vf.rdbuf();
   std::string verilog = vss.str();
   REQUIRE(!verilog.empty());
-  REQUIRE(verilog.find("always @(posedge") != std::string::npos);
+  REQUIRE(verilog.find("always_ff @(posedge") != std::string::npos);
 
   SUCCEED("pipeline2_stall_matrix OK: stall_hit=" << stall_hit_count
           << " ref_trace=" << ref_trace.size()
