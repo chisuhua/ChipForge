@@ -67,9 +67,11 @@ struct RiscvDecodeDetail {
 // ----------------------------------------------------------------------------
 template <typename T = std::uint32_t>
 struct payload_keys_riscv {
+#ifndef CF_PLUGIN_USE_CH_MEM
   static_assert(std::is_same<T, std::uint32_t>::value ||
                     std::is_same<T, std::uint64_t>::value,
                 "T must be uint32_t (RV32) or uint64_t (RV64)");
+#endif
 
   // RISCV_DETAIL —— RISC-V 译码结果细节 struct
   static inline cf::plugin::Payload<RiscvDecodeDetail> RISCV_DETAIL{"cpu.riscv_detail"};

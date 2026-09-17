@@ -78,9 +78,16 @@ namespace riscv {
 // ============================================================================
 template <typename T>
 class RiscvIntAluPlugin : public PluginBase {
+#ifndef CF_PLUGIN_USE_CH_MEM
   static_assert(std::is_unsigned<T>::value,
-                "RiscvIntAluPlugin<T>: T must be unsigned");
-  static constexpr std::size_t kXlenBits = sizeof(T) * 8;
+                "RiscvIntAluPlugin<T>: T must be unsigned (TLM mode)");
+#endif
+  static constexpr std::size_t kXlenBits =
+#ifdef CF_PLUGIN_USE_CH_MEM
+      32;  // CH_MEM PoC: 固定 RV32 (T=ch_uint<32> 时 sizeof(T)*8 ≠ 32)
+#else
+      sizeof(T) * 8;
+#endif
 
  public:
   RiscvIntAluPlugin() = default;
@@ -116,17 +123,7 @@ class RiscvIntAluPlugin : public PluginBase {
       auto is_lui   = ch_bool(rv.opcode == opcode::OP_LUI);
 
       // funct3/funct7 → ALU mux 选择
-      auto funct3 = ch_uint<3>(rv.funct3);
-      auto funct7 = ch_uint<7>(rv.funct7);
-
-      // 10 R-type ALU ops + implicit default = 11 层 select 树
-      ch_uint<kXlenBits> result(0_d, "alu_result");
-
-      // ── AUIPC / LUI ──┤ 顶层单独分支 (在 11 层外)
-      result = select(is_auipc, pc_val + imm, result);
-      result = select(is_lui, imm, result);
-
-      // ── R-type / I-type ALU ops (funct3 + funct7 解码) ──
+      // 注: C++ 比较 + ch_bool() 包装 (避免 ch_uint<N>(int) 重载歧义和字面值宽度问题)
       // ADD / ADDI: funct3 == 000, funct7 != 0100000
       // SUB:       funct3 == 000, funct7 == 0100000
       // SLL:       funct3 == 001
@@ -137,23 +134,32 @@ class RiscvIntAluPlugin : public PluginBase {
       // SRA:       funct3 == 101, funct7 == 0100000
       // OR:        funct3 == 110
       // AND:       funct3 == 111
-      auto is_add  = (funct3 == ch_uint<3>(0)) && (funct7 != ch_uint<7>(0x20));
-      auto is_sub  = (funct3 == ch_uint<3>(0)) && (funct7 == ch_uint<7>(0x20));
-      auto is_sll  = (funct3 == ch_uint<3>(1));
-      auto is_slt  = (funct3 == ch_uint<3>(2));
-      auto is_sltu = (funct3 == ch_uint<3>(3));
-      auto is_xor  = (funct3 == ch_uint<3>(4));
-      auto is_srl  = (funct3 == ch_uint<3>(5)) && (funct7 != ch_uint<7>(0x20));
-      auto is_sra  = (funct3 == ch_uint<3>(5)) && (funct7 == ch_uint<7>(0x20));
-      auto is_or   = (funct3 == ch_uint<3>(6));
-      auto is_and  = (funct3 == ch_uint<3>(7));
+      auto is_add  = ch_bool(rv.funct3 == 0)  && ch_bool(rv.funct7 != 0x20);
+      auto is_sub  = ch_bool(rv.funct3 == 0)  && ch_bool(rv.funct7 == 0x20);
+      auto is_sll  = ch_bool(rv.funct3 == 1);
+      auto is_slt  = ch_bool(rv.funct3 == 2);
+      auto is_sltu = ch_bool(rv.funct3 == 3);
+      auto is_xor  = ch_bool(rv.funct3 == 4);
+      auto is_srl  = ch_bool(rv.funct3 == 5) && ch_bool(rv.funct7 != 0x20);
+      auto is_sra  = ch_bool(rv.funct3 == 5) && ch_bool(rv.funct7 == 0x20);
+      auto is_or   = ch_bool(rv.funct3 == 6);
+      auto is_and  = ch_bool(rv.funct3 == 7);
+
+      // 10 R-type ALU ops + implicit default = 11 层 select 树
+      // 注: 用 ch_literal<V, W> 显式宽度, 避开 _d 后缀字面值的字符解析限制
+      ch_uint<kXlenBits> result(ch::core::ch_literal<0, 1>{}, "alu_result");
+
+      // ── AUIPC / LUI ──┤ 顶层单独分支 (在 11 层外)
+      result = select(is_auipc, pc_val + imm, result);
+      result = select(is_lui, imm, result);
 
       // I-type vs R-type: op2 = imm (I-type) or rs2_val (R-type)
       // ADDI 通过此 mux 与 ADD 共享 datapath
       auto op2 = select(ch_bool(dec.reads_rs2), rs2_val, imm);
 
       // ── 计算各 ALU 结果 ──
-      auto shift_amount = op2 & ch_uint<5>(0x1F);
+      // 注: ch_literal<V, W> 显式宽度构造, 避 _d 字面值的字符解析限制
+      auto shift_amount = op2 & ch_uint<5>(ch::core::ch_literal<0x1F, 5>{});
 
       auto r_add  = rs1_val + op2;
       auto r_sub  = rs1_val - op2;
@@ -166,7 +172,7 @@ class RiscvIntAluPlugin : public PluginBase {
       auto slt_sd     = ch_bool(a_sign != b_sign);
       auto slt_aneg   = ch_bool(a_sign == ch_bool(true));
       auto slt_borrow = ch_bool(bits<kXlenBits - 1, kXlenBits - 1>(r_sub) !=
-                                ch_uint<1>(0));
+                                ch_uint<1>(ch::core::ch_literal<0, 1>{}));
       auto lt_signed  = select(slt_sd, slt_aneg, slt_borrow);
       auto r_slt      = zext<kXlenBits>(lt_signed);
 
@@ -178,9 +184,10 @@ class RiscvIntAluPlugin : public PluginBase {
 
       // SRA: 算术右移 (符号扩展填充高位)
       auto sra_sign = bits<kXlenBits - 1, kXlenBits - 1>(rs1_val);
+      // 注: 用 ~ch_uint<N>(ch_literal<0,1>) 取反得到全 1, 避免 ch_uint<N>(~0ULL) 重载歧义
       auto sign_rep = select(ch_bool(sra_sign),
-                              ch_uint<kXlenBits>(~0ULL),
-                              ch_uint<kXlenBits>(0ULL));
+                              ~ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{}),
+                              ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{}));
       auto shift_wide = zext<kXlenBits>(shift_amount);
       auto sra_fill   = sign_rep >> shift_wide << shift_wide;
       auto r_sra = r_srl | sra_fill;

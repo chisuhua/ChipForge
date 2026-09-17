@@ -72,13 +72,20 @@ namespace plugins {
 // ============================================================================
 template <typename T, std::size_t N_REGS = 32, std::size_t N_THREADS = 1>
 class RegFilePlugin : public PluginBase {
+#ifndef CF_PLUGIN_USE_CH_MEM
   static_assert(std::is_unsigned<T>::value,
-                "RegFilePlugin<T>: T must be unsigned");
+                "RegFilePlugin<T>: T must be unsigned (TLM mode)");
+#endif
   static_assert(N_REGS == 32, "CH_MEM PoC: 固定 32 寄存器 (RISC-V spec)");
 
  public:
   static constexpr std::size_t kNumRegs = N_REGS;
-  static constexpr std::size_t kXlenBits = sizeof(T) * 8;
+  static constexpr std::size_t kXlenBits =
+#ifdef CF_PLUGIN_USE_CH_MEM
+      32;  // CH_MEM PoC: 固定 RV32 (T=ch_uint<32> 时 sizeof(T)*8 ≠ 32)
+#else
+      sizeof(T) * 8;
+#endif
   static constexpr std::size_t kAddrBits = 5;  // log2(32) = 5
 
   using addr_t = ch_uint<kAddrBits>;
@@ -136,7 +143,7 @@ class RegFilePlugin : public PluginBase {
       addr_t rs2_addr = static_cast<addr_t>(dec.rs2_idx);
 
       if (dec.reads_rs1) {
-        ch_uint<kXlenBits> rs1_data(0_d, "rs1_data");
+        ch_uint<kXlenBits> rs1_data(ch::core::ch_literal<0, 1>{}, "rs1_data");
         for (std::size_t i = 1; i < kNumRegs; ++i) {
           rs1_data = select(rs1_addr == addr_t(i), regs[i], rs1_data);
         }
@@ -144,7 +151,7 @@ class RegFilePlugin : public PluginBase {
       }
 
       if (dec.reads_rs2) {
-        ch_uint<kXlenBits> rs2_data(0_d, "rs2_data");
+        ch_uint<kXlenBits> rs2_data(ch::core::ch_literal<0, 1>{}, "rs2_data");
         for (std::size_t i = 1; i < kNumRegs; ++i) {
           rs2_data = select(rs2_addr == addr_t(i), regs[i], rs2_data);
         }
@@ -162,7 +169,8 @@ class RegFilePlugin : public PluginBase {
     if (n) {
       const auto& dec = n->operator()(KeyType::DECODE);
       addr_t rd_addr = static_cast<addr_t>(dec.rd_idx);
-      ch_bool we = dec.writes_rd && (rd_addr != addr_t(0));
+      // 注: ch_bool() 包装避免 operator&& 在 bool/ch_bool 之间歧义
+      ch_bool we = ch_bool(dec.writes_rd) && (rd_addr != addr_t(0));
 
       // 32 路条件写: reg[i]->next = select(we && rd_addr == i, rd_data, reg[i])
       for (std::size_t i = 1; i < kNumRegs; ++i) {

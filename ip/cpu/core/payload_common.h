@@ -113,9 +113,11 @@ template <typename T = std::uint32_t, unsigned XLEN = sizeof(T) * 8>
 struct keys {
   static_assert(XLEN == 32 || XLEN == 64,
                 "XLEN must be 32 or 64 (RISC-V only supports these)");
+#ifndef CF_PLUGIN_USE_CH_MEM
   static_assert(std::is_same<T, std::uint32_t>::value ||
                     std::is_same<T, std::uint64_t>::value,
                 "T must be uint32_t (RV32) or uint64_t (RV64)");
+#endif
 
   // 跨阶段 IPC Key (匿名 namespace 等价: 文件作用域静态全局对象, 跨 TU 共享)
   // 命名约定: "cpu.<key>" (模块名前缀, 避免与 cache.bundles 冲突)
