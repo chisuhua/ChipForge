@@ -242,6 +242,7 @@ ADR-040 Tier-1 #5 翻转：**CH_MEM 是新正道**——ch 渗透禁令变成"�
 |------|------|------|
 | 2026-09-16 | Proposed | Phase 6c W0 审计发现 ch_state_machine 简化 |
 | 2026-09-16 | Accepted | Phase 6c M5 落地：豁免范围明确 + DSL 强约束 |
+| 2026-09-17 | Verified | Phase 6c M5 完成: edad878 (M4/W7 BranchPlugin+HazardPlugin RAW) + b68996a (M4/W8 cpu_factory+PoC fix); 所有 8 commit 已推送; 前瞻锁定确认 |
 
 ---
 

@@ -11,7 +11,9 @@
 #      ip/*/plugins/*_chmem.h 文件存在性检查 + TLM-only 文件禁用 ch
 #   3. ip/*/plugins/**/*.cpp 中 Plugin::build() 内不调用 pb.run() (TLM 已废弃)
 #   4. [WARN] 存储声明优先 array_store 或 ch_mem (Phase 6c 双模)
-#   5. (NEW) at_stage 回调内禁运行期 if(ch_bool) (CH_MEM 纪律)
+#   5. at_stage 回调内禁运行期 if(ch_bool) (CH_MEM 纪律)
+#   6. 源/头文件内禁 #define CF_PLUGIN_USE_CH_MEM (仅在 CMake 命令行)
+#   7. TLM-only 文件不应含 ch 类型实例化 (ch_reg/ch_mem 只在 *_chmem.h)
 #
 # 退出码: 0 = 全部通过, 1 = 至少一项 FAIL
 #
@@ -31,7 +33,7 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 1: at_stage 回调内无 'if (cond) return;' 早返
 # ----------------------------------------------------------------------------
-echo "[1/6] 检查 at_stage 回调内 'if (cond) return;' 早返 ..."
+echo "[1/7] 检查 at_stage 回调内 'if (cond) return;' 早返 ..."
 EARLY_RETURN_FILES=$(grep -rlnE "at_stage" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null || true)
 EARLY_RETURN_VIOLATIONS=""
@@ -76,7 +78,7 @@ echo ""
 #   - 文件名以 _tlm.h 结尾 或 普通 ip/cpu/plugins/*.h → 可不含 ch_*
 #     (TLM 仿真路径, Phase 6c 标记 deprecated 但仍可用)
 # ----------------------------------------------------------------------------
-echo "[2/6] 检查 ip/*/plugins/ 业务代码的 ch_* 使用 (Phase 6c CH_MEM 是正道) ..."
+echo "[2/7] 检查 ip/*/plugins/ 业务代码的 ch_* 使用 (Phase 6c CH_MEM 是正道) ..."
 
 CHMEM_FILES=$(find ${TARGET_DIRS} -path "*/plugins/*_chmem.h" 2>/dev/null || true)
 CHMEM_MISSING=""
@@ -122,7 +124,7 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 3: Plugin::build() 内不调用 pb.run() (TLM 已废弃)
 # ----------------------------------------------------------------------------
-echo "[3/6] 检查 Plugin::build() 内调用 pb.run() (Phase 6c: TLM 废弃) ..."
+echo "[3/7] 检查 Plugin::build() 内调用 pb.run() (Phase 6c: TLM 废弃) ..."
 PB_B_VIOLATIONS=""
 PLUGIN_BUILD_FILES=$(grep -rlnE "::build\s*\(\s*cf::plugin::PipeBuilder|::build\s*\(\s*PipeBuilder" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null || true)
@@ -158,7 +160,7 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 4 [WARN]: 存储声明优先 array_store (TLM) 或 ch_mem (CH_MEM)
 # ----------------------------------------------------------------------------
-echo "[4/6] 检查存储声明 ([WARN] 鼓励但不强制) ..."
+echo "[4/7] 检查存储声明 ([WARN] 鼓励但不强制) ..."
 
 # TLM 模式: 鼓励 array_store
 TLM_STDLIB=$(grep -rlnE "std::array\s*<\s*(cf::plugin::)?(uint_t|bool_t)" ${TARGET_DIRS}/cpu/plugins/ \
@@ -190,7 +192,7 @@ echo ""
 # C++17 contextual conversion 允许 if(ch_bool) 编译期通过; 但运行期语义错误.
 # 编译期无法拦截, 必须 CI grep 静态检查.
 # ----------------------------------------------------------------------------
-echo "[5/6] 检查 at_stage 回调内禁运行期 if(ch_bool) ..."
+echo "[5/7] 检查 at_stage 回调内禁运行期 if(ch_bool) ..."
 IF_CHBOOL_VIOLATIONS=""
 AT_STAGE_FILES=$(grep -rlnE "at_stage\(" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" 2>/dev/null || true)
@@ -235,7 +237,7 @@ echo ""
 #   - 禁止 .h/.cpp 内 #define CF_PLUGIN_USE_CH_MEM (避免污染所有 includer)
 #   - 此项检查是 build 基础设施, 不限 ip/ 目录 (全工程扫描)
 # ----------------------------------------------------------------------------
-echo "[6/6] 检查源/头文件内禁 #define CF_PLUGIN_USE_CH_MEM ..."
+echo "[6/7] 检查源/头文件内禁 #define CF_PLUGIN_USE_CH_MEM ..."
 DEFINE_CHMEM_VIOLATIONS=""
 DEFINE_CHMEM_FILES=$(grep -rlnE "^\s*#\s*define\s+CF_PLUGIN_USE_CH_MEM" ${ROOT_DIR} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null \
@@ -256,13 +258,72 @@ fi
 echo ""
 
 # ----------------------------------------------------------------------------
+# Check 7 (NEW Phase 6c M5): TLM-only 文件不应含 ch 类型实例化
+#
+# 设计意图:
+#   - TLM-only 文件 (*_tlm.h, ip/*/tlm/*.h, ip/*/plugins/*.h 不含 _chmem 后缀)
+#     不应实例化 ch_reg<ch_uint<N>> / ch_mem<T,N> 等 ch 类型
+#   - ch 类型实例化只在 *_chmem.h 文件中出现
+#   - 避免混合编译模式污染 (CF_PLUGIN_USE_CH_MEM 未定义时 ch 类型不可用)
+# ----------------------------------------------------------------------------
+echo "[7/7] 检查 TLM-only 文件不应含 ch 类型实例化 ..."
+CH_INSTANCE_VIOLATIONS=""
+TLM_ONLY_FILES=$(find ${ROOT_DIR}/ip -type f \( -name "*.h" -o -name "*.hpp" -o -name "*.cpp" \) \
+  ! -name "*_chmem.h" ! -path "*/build/*" 2>/dev/null || true)
+if [ -n "${TLM_ONLY_FILES}" ]; then
+  for f in ${TLM_ONLY_FILES}; do
+    # 查找 ch_reg<ch_uint, ch_mem<, ch_reg<ch_bool 实例化
+    HITS=$(grep -nE "ch_reg<ch_uint|ch_mem<" "$f" \
+      | grep -vE "^\s*[0-9]+:\s*(//|/\*|\*)" || true)
+    if [ -n "${HITS}" ]; then
+      # 过滤掉注释行和字符串
+      REAL_HITS=$(echo "${HITS}" | grep -vE "^\s*[0-9]+:\s*//" || true)
+      if [ -n "${REAL_HITS}" ]; then
+        CH_INSTANCE_VIOLATIONS="${CH_INSTANCE_VIOLATIONS}${f}: ${REAL_HITS}"$'\n'
+      fi
+    fi
+  done
+fi
+if [ -z "${CH_INSTANCE_VIOLATIONS}" ]; then
+  echo "  [PASS] TLM-only 文件无 ch 类型实例化 (ch_reg/ch_mem 只在 *_chmem.h)"
+else
+  echo "  [WARN] TLM-only 文件疑似含 ch 类型实例化 (需 code review 确认):"
+  echo "${CH_INSTANCE_VIOLATIONS}" | sed 's/^/    /'
+  WARN_COUNT=$((WARN_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
+# Check 8 (Phase 6c M6): PayloadStore CH_MEM get-miss fail-fast 静态验证
+# 静态验证 payload.h 在 CH_MEM 模式下的 const T& get(key) 路径抛
+# std::runtime_error("PayloadStore cell missing: ...")，避免 ch 句柄默认
+# 构造产生 null impl 污染 DAG（5-stage Simulator SEGV 根因）
+# ----------------------------------------------------------------------------
+echo "[8/8] 检查 PayloadStore CH_MEM get-miss fail-fast ..."
+PAYLOAD_H="${ROOT_DIR}/include/cf/plugin/payload.h"
+if [ ! -f "${PAYLOAD_H}" ]; then
+  echo "  [FAIL] ${PAYLOAD_H} 不存在"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+elif ! grep -q "CF_PLUGIN_USE_CH_MEM" "${PAYLOAD_H}"; then
+  echo "  [FAIL] payload.h 不含 CF_PLUGIN_USE_CH_MEM 分支"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+elif ! grep -q "PayloadStore cell missing" "${PAYLOAD_H}"; then
+  echo "  [FAIL] payload.h CH_MEM 路径缺少 'PayloadStore cell missing' 抛异常"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+  PAYLOAD_MISS_LINES=$(grep -n "PayloadStore cell missing" "${PAYLOAD_H}" | wc -l)
+  echo "  [PASS] PayloadStore CH_MEM get-miss fail-fast 已就位 (${PAYLOAD_MISS_LINES} 处)"
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
 # 汇总
 # ----------------------------------------------------------------------------
 if [ ${FAIL_COUNT} -eq 0 ]; then
   if [ ${WARN_COUNT} -gt 0 ]; then
     echo "=== ADR-040 v2.0 移植性检查通过 (含 ${WARN_COUNT} 项 WARN) ==="
   else
-    echo "=== ADR-040 v2.0 移植性检查全部通过 (6/6) ==="
+    echo "=== ADR-040 v2.0 移植性检查全部通过 (8/8) ==="
   fi
   exit 0
 else

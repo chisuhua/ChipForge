@@ -2,18 +2,19 @@
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-16) — v1.0 由 Phase 1 提案升级 |
+| 状态 | ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17) — v1.0 由 Phase 1 提案升级 |
 | 来源 | v1.0: Phase 1 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告（cf::plugin 底层语义翻转，2026-09-16） |
 | v2.0 决策 | **CH_MEM 是新正道**（翻转 v1.0 "ch 渗透禁令"）：<br>① 业务代码在 `-DCF_PLUGIN_USE_CH_MEM` 下必须用 `ch_uint/ch_reg/ch_bool/ch_mem`（elaboration 正道）<br>② 引入 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免机制（ADR-046）<br>③ 新增 Tier-1 Check 5: at_stage 回调内禁运行期 if(ch_bool)（ch_bool explicit operator bool 上下文转换）<br>④ `tools/check_plugin_portability.sh` v2.0 重订（5 项检查） |
+| 实现 commit | **25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a** (2026-09-17, M1-M5 8+1 commit 全部推送) |
 | 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免） |
 
 ---
 
-## v2.0 重大变更摘要（2026-09-16）
+## v2.0 重大变更摘要（2026-09-17, Phase 6c M5 落地）
 
 ### 翻转的核心：CH_MEM 是新正道
 
-| v1.0 (2026-06-10) | **v2.0 (2026-09-16, Phase 6c)** |
+| v1.0 (2026-06-10) | **v2.0 (2026-09-17, Phase 6c M5)** |
 |---|---|
 | `ip/*/tlm/` 业务代码无 `ch_mem/ch_reg/ch_uint` 渗透 | **`*_chmem.h` 业务代码必须用 `ch_*`**（elaboration 正道） |
 | TLM 是唯一模式 | **TLM 是 deprecated 模式**（Phase 6c 开始） |

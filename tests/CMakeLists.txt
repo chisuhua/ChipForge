@@ -110,6 +110,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_cppHDL_hello_poc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_elaborate_connector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_elaborate_pipeline2.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_payload_store_miss_throws.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_rtl_regfile_alu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_5stage.cpp
 )

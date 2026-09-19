@@ -152,6 +152,34 @@ class CpuFactoryChmem {
     auto pb = std::make_unique<PipeBuilder>(elaboration_ctx);
 
     // ========================================================================
+    // 0. EARLY-stage payload pre-population (Phase 6c M6)
+    //    每个 stage(EARLY) 在 NORMAL 之前执行, 用 literal 0 / 默认 struct 占位,
+    //    防止阶段链接和插件从 null-impl cell 传播
+    //    (5-stage Simulator SEGV 根因之一: PayloadStore emplace-on-miss)
+    // ========================================================================
+    auto populate_stage = [pb_ptr = pb.get()](const char* stage_name) {
+      using KT = cf::cpu::core::payload::keys<T, kXlenBits>;
+      using RK = cf::cpu::arch::riscv::payload_keys_riscv<T>;
+      auto* n = pb_ptr->node_of_logic_stage(stage_name).get();
+      if (!n) return;
+      n->operator()(KT::RS1)     = T(ch::core::ch_literal<0, kXlenBits>{});
+      n->operator()(KT::RS2)     = T(ch::core::ch_literal<0, kXlenBits>{});
+      n->operator()(KT::PC)      = T(ch::core::ch_literal<0, kXlenBits>{});
+      n->operator()(KT::RESULT)  = T(ch::core::ch_literal<0, kXlenBits>{});
+      n->operator()(KT::RD_DATA) = T(ch::core::ch_literal<0, kXlenBits>{});
+      cf::cpu::core::payload::DecodePayload default_decode{};
+      n->payloads().put(KT::DECODE, default_decode);
+      cf::cpu::arch::riscv::RiscvDecodeDetail default_detail{};
+      n->payloads().put(RK::RISCV_DETAIL, default_detail);
+    };
+    pb->at_stage("fetch",     Phase::EARLY, [populate_stage]() { populate_stage("fetch"); });
+    pb->at_stage("decode",    Phase::EARLY, [populate_stage]() { populate_stage("decode"); });
+    pb->at_stage("execute",   Phase::EARLY, [populate_stage]() { populate_stage("execute"); });
+    pb->at_stage("memory",    Phase::EARLY, [populate_stage]() { populate_stage("memory"); });
+    pb->at_stage("writeback", Phase::EARLY, [populate_stage]() { populate_stage("writeback"); });
+    pb->at_stage("branch",    Phase::EARLY, [populate_stage]() { populate_stage("branch"); });
+
+    // ========================================================================
     // 1. 注册 4 个 CH_MEM Plugin
     //    顺序: Hazard (setup→ctrl_link) → RegFile (at_stage decode+writeback)
     //          → IntAlu (at_stage execute) → Branch (at_stage branch + ctrl_link)

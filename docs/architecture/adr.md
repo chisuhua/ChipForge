@@ -75,7 +75,7 @@
 
 > **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 34 条
+### 2.1 已实现决策（✅）— 36 条
 
 | ID | 标题 | 类别 | 验证路径 |
 |----|------|------|----------|
@@ -108,11 +108,13 @@
 | ADR-030 | PipeNode 三态握手 | Plugin | `include/cf/plugin/pipe_node.h` |
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
-| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制）+ **v2.0 Phase 6c 兑现 elaboration 语义（2026-09-16）** |
+| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制）+ **v2.0 Phase 6c M5 落地 (2026-09-17, D4 elaboration 语义兑现)** |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
+| ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ Phase 6c M5 落地 (2026-09-17, 含 M1-M5 8 commit) | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
 | ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
+| ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令 | Plugin | ✅ Phase 6c M5 落地 (2026-09-17, 前瞻锁定) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -120,7 +122,7 @@
 |----|------|------|------------|----------|
 | ADR-024 | Bundle 三层分层 | Bundle | Bundle + Protocol | Mapper 模板未实现 |
 
-### 2.3 Phase 1 提案决策（🚧）— 9 条
+### 2.3 Phase 1 提案决策（🚧）— 8 条
 
 | ID | 标题 | 类别 | 状态 | 备注 |
 |----|------|------|------|------|
@@ -131,7 +133,6 @@
 | ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
 | ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部; Phase 1.3d-extras L1Cache Adapter 已注册, 通用模板 Phase 5 实施） |
 | ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
-| ADR-040 | TLM→HDL 移植性约束 | 移植 | 🚧（`array_store` 已实现，迁移手册待 Phase 5 验证；2026-06-12 从 §2.1 移除, 实质仍为 Phase 1 提案） |
 | ADR-044 | L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 | IP 架构 | 🚧（设计方向已锁，实装推迟 mmu-tlb-ptw-impl 以后） | [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../../ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) |
 | ADR-045 | Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop | Plugin | ✅ Accepted (2026-09-15, plugin-framework-stall v0.1.3) | [`adr/ADR-045-plugin-ctrl-link-consumption.md`](adr/ADR-045-plugin-ctrl-link-consumption.md) |
 
@@ -147,16 +148,16 @@
 | 注册与发现 (D) | 3 | 0 | 0 | 3 |
 | 端口与信号 (E) | 3 | 0 | 0 | 3 |
 | Bundle 与协议 (F) | 3 | 1 | 0 | 4 |
-| 声明式 Plugin (G) | 6 | 0 | 1 | 7 |
+| 声明式 Plugin (G) | 7 | 0 | 1 | 8 |
 | 流水线抽象 (H) | 3 | 0 | 1 | 4 |
 | 验证框架 (I) | 0 | 0 | 3 | 3 |
 | 目录与组织 (J) | 2 | 0 | 1 | 3 |
 | 范式决策 (K) | 1 | 0 | 0 | 1 |
-| 可移植性约束 (L) | 0 | 0 | 1 | 1 |
+| 可移植性约束 (L) | 1 | 0 | 0 | 1 |
 | IP 架构 (M) | 0 | 0 | 1 | 1 |
-| **合计** | **34** | **1** | **9** | **44** |
+| **合计** | **36** | **1** | **8** | **45** |
 
-**实现率**：34/44 ≈ **77%**（含部分实现）
+**实现率**：36/45 ≈ **80%**（含部分实现）
 
 ---
 
@@ -1225,13 +1226,13 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 ---
 
-### K. 范式决策（1 条）
+### K. 范式决策（2 条）
 
 ---
 
 #### ADR-037：Plugin 作为设计范式（不是工具）
 
-**状态**: ✅ v2.0 Accepted (Phase 6c 落地, 2026-09-16)
+**状态**: ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17)
 **决策者**: User + Prometheus + Phase 6c Oracle 重构
 **背景**: 
 - v1.0 (2026-06-08): `.omo/drafts/decision-plugin-framework-2026-06-08.md`
@@ -1250,6 +1251,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 - **D5 拆解**: Phase 6 拆为 Phase 6c（M1-M5, 9 周 RTL 兑现）+ Phase 6d（MMU/Cache 多周期 FSM）+ Phase 6e（ScoreBoard/CompareDriver）。
 - **新增 D10**: `cf::plugin` 在 `-DCF_PLUGIN_USE_CH_MEM` 下走 elaboration 正道；TLM 模式 deprecated（CH_MEM 双模共存，零回归）。
 - **新增 D11**: 多周期协议引擎豁免 D4 "无状态机" 禁令（ADR-046），但必须使用 `chlib::ch_state_machine` DSL。
+- **新增 D12** (Phase 6c M5, 2026-09-17): D4 elaboration 语义经 M1-M5 **8 commit** 验证（25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a）。CH_MEM 双模零回归，PoC #1-#4 全部 PASS。TLM deprecated 标记生效，`ip/*/tlm/` 仅遗留测试用途。
 
 **影响** (v2.0 增量):
 - **README 承诺兑现**: "CppTLM + CppHDL-based"（v1.0 仅 TLM；v2.0 TLM + HDL 双层）
@@ -1285,14 +1287,15 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 ---
 
-#### ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）
+#### ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）— v2.0
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | 🚧 Phase 1 提案（`array_store` 已实现 + CI 检查脚本已就位，迁移手册待 Phase 5 启动时验证） |
-| 来源 | Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10） |
-| 决策 | 三层不匹配点的发现、3-tier 约束模型、`cf::plugin::storage::array_store` 抽象、`PipeBuilder::register_commit_hook/commit_storages` 钩子 |
-| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式） |
+| 状态 | ✅ Phase 6c M5 落地 (2026-09-17, 含 M1-M5 9 commit) — v2.0 Accepted (翻转 CH_MEM 是新正道) |
+| 来源 | v1.0: Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告（cf::plugin 底层语义翻转，2026-09-16） |
+| v2.0 决策 | **CH_MEM 是新正道**（翻转 v1.0 "ch 渗透禁令"）：业务代码在 `-DCF_PLUGIN_USE_CH_MEM` 下必须用 `ch_*`（elaboration 正道） |
+| 实现 commit | **25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a** (2026-09-17) |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免） |
 
 **完整内容见** [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md)（含 5 步迁移手册与 `array_store` API 文档）。
 
@@ -1328,7 +1331,9 @@ bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
 - `include/cf/plugin/pipe_builder.h:101` — `PipeBuilder::run()` 末尾 `commit_storages()`
 - `tools/check_plugin_portability.sh` — 4 项 Tier-1/Tier-2 检查
 
-**§2.1/§2.3 分类调整 (2026-06-12)**: 此 ADR 实质为 Phase 1 提案 (`array_store` 已实现但迁移手册待 Phase 5),不应在 §2.1 (✅ 已实现) 出现。已从 §2.1 移除,仅保留在 §2.3 (🚧 Phase 1 提案)。参见 `docs/roadmap/roadmap-status.md` §6 活动日志 2026-06-10 条目。
+**§2.1/§2.3 分类调整历史**:
+- 2026-06-12: v1.0 从 §2.1 (✅) 移至 §2.3 (🚧 Phase 1 提案)，因 `array_store` 已实现但迁移手册待 Phase 5
+- **2026-09-17 (Phase 6c M5)**: v2.0 回到 §2.1 (✅) — CH_MEM 翻转 v1.0 禁令，M1-M5 9 commit 证明 elaboration 路径可用。TLM 标 deprecated，CH_MEM 是新正道。
 
 ---
 

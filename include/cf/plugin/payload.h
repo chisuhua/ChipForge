@@ -127,21 +127,25 @@ class PayloadStore {
     cell = std::move(value);
   }
 
-  // 读取: type-checked; 缺失时返回默认构造 T{} (空 ch 信号句柄)
-  template <typename T>
-  const T& get(const Payload<T>& key) const {
-    auto it = cells_.find(&key);
-    if (it == cells_.end()) {
-      // 默认构造并插入 (便于 `n(key) = value` 直接写)
-      it = cells_.emplace(&key, T{}).first;
+// 读取: type-checked; const 路径缺失时抛异常 (const 正确性要求，不能 emplace)
+    // Phase 6c M6: 原代码 cells_.emplace 在 const 方法中编译通过但因 const 正确性
+    // 漏洞未被检出。改为 throw-on-miss 使其变为真正的只读方法，
+    // 同时避免 ch_uint<N>/ch_bool 默认构造生成 null impl 污染 DAG。
+    template <typename T>
+    const T& get(const Payload<T>& key) const {
+      auto it = cells_.find(&key);
+      if (it == cells_.end()) {
+        throw std::runtime_error(
+            "PayloadStore cell missing: " + key.name() +
+            " (CH_MEM elaboration: populate before at_stage accesses)");
+      }
+      if (it->second.type() != typeid(T)) {
+        throw std::runtime_error("Payload type mismatch: " + key.name() +
+                                 " (expected " + typeid(T).name() +
+                                 ", got " + it->second.type().name() + ")");
+      }
+      return std::any_cast<const T&>(it->second);
     }
-    if (it->second.type() != typeid(T)) {
-      throw std::runtime_error("Payload type mismatch: " + key.name() +
-                               " (expected " + typeid(T).name() +
-                               ", got " + it->second.type().name() + ")");
-    }
-    return std::any_cast<const T&>(it->second);
-  }
 
   // 可变读取 (用于修改); 缺失时默认构造
   template <typename T>

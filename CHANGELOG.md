@@ -5,34 +5,97 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.3.x (WIP) - plugin-elaboration-substrate (Phase 6c)
+## v0.3.1 (2026-09-20) — 5-stage Simulator SEGV 修复 (Phase 6c M6)
 
-> **OpenSpec change (draft)**: `plugin-elaboration-substrate` (详见 `openspec/changes/plugin-elaboration-substrate/`)
-> **目的**: 把 cf::plugin 从"每周期仿真闭包执行器"改为"elaboration 一次即发射 lnode DAG"——兑现 README 承诺的"CppTLM + CppHDL-based"HDL 侧、把 D4 Plugin 范式从 TLM 仿真提升到 Verilog 综合。
-> **状态**: W0 审计完成（`docs/audit/cppHDL-maturity-audit.md`）；M1 底层翻转启动；9 周时间盒 (W0 门槛 + W1-2 M1 + W3-4 M2 + W5-6 M3 + W7-8 M4 + W9 M5)
+> **OpenSpec change**: `fix-5stage-mux-segv-elaboration`
+> **目的**: 修复 `m4_poc_5stage_simulator_tick` 的 SIGSEGV（`muximpl::create_instruction` 第 13 行 `false_value()->id()` 解引用 nullptr）
 
-### Pending (W0 门槛已过, M1 启动中)
-- [x] W0/Day1 CppHDL 完整源码审计 (`ch::Component` + `ch_reg` + `ch_mem` + `ch_uint` + `Simulator` + `toVerilog` 全部 OK; `ch_state_machine` 是简化版但不影响单周期组件)
-- [x] W0/Day3 OpenSpec change `plugin-elaboration-substrate/` 创建 (proposal.md + tasks.md)
-- [x] M1/W1 `include/cf/plugin/uint_t.h` 翻转: 加 `CF_PLUGIN_USE_CH_MEM` 编译开关 (默认 OFF = TLM 兼容, ON = elaboration 模式 `uint_t<N> = ch::core::ch_uint<N>`)
-- [ ] W0/Day2 hello.v PoC (单 Component + 1 个 ch_reg → toVerilog 输出 + CppHDL sim 跑 + Verilator 编译)
-- [ ] M1/W2 PayloadStore cell 改造 + PipeBuilder::elaborate() 新增 + run() deprecated
-- [ ] M1/W2 第一个 hello.v PoC (10 行 at_stage lambda)
-- [ ] W3-8 M2-M4 (per-stage 信号实体 + RegFilePlugin + IntAluPlugin + Decoder + 5 级流水线)
-- [ ] W9 M5 (harness 迁移 + ADR-040/037 修订 + 新增"多周期豁免" ADR)
+### 根因（双层）
+1. **CppHDL nullptr hijack（已上游修复）**: `ch_uint<N>(0)` 和 `ch_bool(0)` 由于 `int 0 → lnodeimpl* nullptr` 是标准转换序列（优先级高于用户定义的 `int → ch_literal_runtime` 链），匹配到了继承的 `logic_buffer(lnodeimpl *node)` ctor，导致 `node_impl_ = nullptr`。
+   - 上游 commit `47af57f fix(core): prevent null pointer hijack in ch_uint/ch_bool integer ctors`
+   - 同样的 bug 也存在于 `bundle_base`，上游 commit `f6b0081 fix(core): prevent null pointer hijack in bundle_base integer ctor`
+   - 修复：SFINAE-restricted template ctor with identity match for integral types
+2. **PayloadStore emplace-on-miss（chipforge 端修复）**: `n->operator()(KeyType::*)`（非 const get）在 cell 缺失时 emplace `T{}`（对 ch_uint<N>/ch_bool 产生 null impl）。Stage linking 的拷贝操作把这个 null 传播到所有下游 stage。
 
-### Breaking Changes (W9 完成后生效)
-- `cf::plugin::uint_t<N>` / `cf::plugin::bool_t` 在 CH_MEM 模式下从 POD typedef 变为 `ch::core::ch_uint<N>` / `ch::core::ch_bool` 别名 (语义: 不再是值类型, 是 lnode DAG 句柄)
-- `cf::plugin::PipeBuilder::run()` 改为 `elaborate()` (语义: elaboration 期一次执行 → 发射硬件 DAG; 运行期 cycle 仿真由 CppHDL simulator 或 Verilator 承担)
-- TLM 仿真层 (`pb.run() per cycle`) 废弃 (CHANGELOG v0.3.0 正式标记)
-- 多周期协议引擎 (MMU PTW / Cache refill FSM) 豁免 D4 "无状态机" 禁令 (新增 ADR-046), 但必须使用 `chlib::ch_state_machine` 而非手写 enum+switch
+### 新增
+- `tests/framework/test_payload_store_miss_throws.cpp`: CH_MEM 模式下验证 `const T& get(key)` 读未填充 cell 抛异常
+- `cpu_factory_chmem.h::build_cpu()`: EARLY-stage payload pre-population (6 stages × 5 cells + DECODE/RISCV_DETAIL struct 占位)
+- Check 8: `check_plugin_portability.sh` 验证 `payload.h` CH_MEM 路径含 `PayloadStore cell missing` 抛异常
 
-### Out of Scope (Phase 6d+)
-- IBus/DBus LOAD width extraction (LOAD 测试用例继续走原路径)
-- MMU/PTW 多周期 FSM 仿真 (`ch_state_machine` 简化, 需 Verilator 后端)
-- L1Cache refill FSM
-- Branch predictor / OoO / ROB / LSQ (Phase 2+)
-- 完整 RV32GC 合规基线 / Linux 启动 (Phase 2+)
+### 已修复
+- `include/cf/plugin/payload.h`: `const T& get(key) const` 改 throw-on-miss（顺便修复 const-correctness 漏洞——原 emplace-on-const 不应该编译通过）
+- `tests/framework/test_payload_store_miss_throws.cpp`: 新增 CH_MEM fail-fast 测试
+- `check_plugin_portability.sh`: 7/7 → 8/8 PASS
+- `m4_poc_5stage_simulator_tick`: **从 SEGV 修复为 PASS**（10 个 tick 全部成功）
+
+### 验证
+- `m4_poc_5stage_build`: PASS
+- `m4_poc_5stage_elaborate_verilog`: PASS
+- `m4_poc_5stage_simulator_tick`: **PASS** ✅
+- `[framework]` 全部 PASS（含新增 fail-fast 测试）
+- `verify_adr.sh`: 0 FAILED
+- `verify_plugin_decision.sh`: PASS
+- `check_plugin_portability.sh`: **8/8 PASS**
+- TLM baseline (`chipforge_tests`): 391 PASS / 12 FAIL（pre-existing, 10 [riscv-tests] LOAD + 1 superscalar + 1 SEGV 均为预先存在，未回归）
+
+### 上游依赖升级
+- `CppHDL` submodule: 包含 `47af57f` 和 `f6b0081`（nullptr hijack 修复）
+
+## v0.3.0 (2026-09-17) — plugin-elaboration-substrate (Phase 6c)
+
+> **OpenSpec change**: `plugin-elaboration-substrate`
+> **目的**: cf::plugin 从"每周期仿真闭包执行器"改为"elaboration 一次即发射 lnode DAG"——兑现 README "CppTLM + CppHDL-based" HDL 侧承诺。
+
+### 新增
+- CH_MEM 编译开关 (`-DCF_PLUGIN_USE_CH_MEM`): uint_t<N>/bool_t/PayloadStore/CtrlLink 双模 (TLM compat + CH_MEM elaboration)
+- PipeBuilder::elaborate(ch::core::context& ctx) + 无参重载 + to_verilog() + create_simulator() (Prereq-1)
+- Stage plumbing: type-erased stage_payload_map_ + register_stage_payload_connector<T>() + commit_payload_map()
+- CtrlLink::halt_condition() / flush_condition() OR 合并 + W3 per-stage stall wiring
+- storage.h::array_store 双缓冲 (CH_MEM: first_/second_ commit swap)
+- chipforge_tests_chmem 第二测试 target + Check 6 (禁 .h/.cpp #define CF_PLUGIN_USE_CH_MEM)
+- RegFilePlugin CH_MEM (32 ch_reg, x0 select 屏蔽, singleton ctx_aware fix)
+- RiscvIntAluPlugin CH_MEM (11 op select 树: ADD/SUB/SLL/SLT/SLTU/XOR/SRL/SRA/OR/AND)
+- BranchPlugin CH_MEM (6-op B-type select 树: BEQ/BNE/BLT/BGE/BLTU/BGEU)
+- HazardPlugin CH_MEM (REAL RAW 检测: id_rs1/rs2 vs ex/mem/wb rd, 6 条件 OR 合并)
+- CpuFactoryChmem 5-stage 集成 (4 plugin 注册 + stage linking connectors)
+- M3-PoC 41 assertions (RegFile + ALU + Combined + Byte-equal)
+- PoC 测试文件: test_cpu_rtl_regfile_alu.cpp (3+1 deferred + byte-equal)
+- ADR-046: 多周期协议引擎豁免 D4 无状态机禁令
+
+### 已修改
+- uint_t.h: 翻转 v1.0 ch 渗透禁令 (CH_MEM 是新正道)
+- PayloadStore: CH_MEM 模式下 cell 装 ch 代理对象
+- ctrl_link.h: CH_MEM halt_when(ch_bool) / flush_when(ch_bool) 取代 std::function<bool()>
+- pipe_builder.h: +138 lines (stage_payload_map_ + elaborate + Prereq-1 4 API)
+- array_store: CH_MEM 双缓冲 (first_/second_ commit swap)
+- reg_file_chmem.h: 32 独立 ch_reg + singleton ctx_aware fix
+- payload_common.h/payload_riscv.h: TLM static_assert wrap for CH_MEM ch_uint<N> parameter
+
+### 已废弃 (Phase 6c 起)
+- TLM 仿真层 (`pb.run()` per cycle) 标记 deprecated
+- `ip/*/tlm/` 目录仅用于 Phase 1-4 遗留测试 (CH_MEM 是新正道)
+- `tools/cpu_sim/main.cpp` TLM 入口等待 M5 Harness 迁移到 CppHDL sim
+
+### 依赖项
+- CppTLM: v2.1.0 (unchanged)
+- CppHDL: v1.0.0 (unchanged, chlib 基础设施完整)
+
+### Commit 清单 (Phase 6c M1-M5)
+- `25e2672` W0 + M1 框架双模化 + ADR-046 stub
+- `9a03bb2` M2 Spike 1-3 plumbing skeleton + chmem target + Check 6
+- `918e577` M2 W3 halt/flush OR + per-stage stall wiring
+- `baa504b` M2 W4 array_store 双缓冲 + PoC #2
+- `3e8ada2` M3 Prereq-1..6 + HazardPlugin 骨架
+- `a38a1e4` M3/W5 reg_file/alu + PoC + CH_MEM workarounds
+- `19d4f5d` M3/W6 #95 byte-equal defer
+- `edad878` M4/W7 BranchPlugin + HazardPlugin RAW
+- `b68996a` M4/W8 cpu_factory 4-plugin + PoC #3+#4 fix
+
+### M5 已知剩余问题（Phase 6d+）
+- 5-stage Simulator tick: SEGV (lnodeimpl::id(), stage linking connector nullptr) — 需 M6 修复
+- riscv-tests tohost=1: 缺 RISC-V toolchain (riscv64-unknown-elf-gcc) → ELF 无法编译
+- 工具链: 无 verilator/yosys/iverilog → 综合验证不可行
+- M5 计划原含 "riscv-tests tohost=1" 作为最终硬证据, 因环境限制推迟
 
 ## v0.1.3 (2026-09-15) - plugin-framework-stall
 
