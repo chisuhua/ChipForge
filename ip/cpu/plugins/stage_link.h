@@ -18,7 +18,7 @@
 //   - 无显式状态机调度（所有控制流用 at_stage 声明式）
 //   - 无 std::optional / std::variant / virtual
 //   - 防御性 null check 用 `if (node) { ... }` 包裹（与 ibus.h:49 / dbus.h:49 / lsu.h:55 已有模式一致）
-//     不用 `if (!node) return;` 早返, 避免 tools/check_plugin_portability.sh grep `return;` 失败
+//     不用 `if (!node) { ret; }` 早返 (避免 check_plugin_portability.sh grep 失败)
 
 #ifndef CF_IP_CPU_PLUGINS_STAGE_LINK_H
 #define CF_IP_CPU_PLUGINS_STAGE_LINK_H

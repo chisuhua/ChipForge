@@ -33,6 +33,8 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 1: at_stage 回调内无 'if (cond) return;' 早返
 # ----------------------------------------------------------------------------
+# 注: 不使用 `next` (跳过 at_stage 同行剩余), 而是处理整行 (含同行的 lambda 闭包),
+#      brace 计数从 at_stage( 同行开始, 遇到 }); 才退出 at_stage 状态。
 echo "[1/7] 检查 at_stage 回调内 'if (cond) return;' 早返 ..."
 EARLY_RETURN_FILES=$(grep -rlnE "at_stage" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null || true)
@@ -40,12 +42,22 @@ EARLY_RETURN_VIOLATIONS=""
 if [ -n "${EARLY_RETURN_FILES}" ]; then
   for f in ${EARLY_RETURN_FILES}; do
     AWK_OUT=$(awk '
-      /at_stage\(/ { in_at_stage = 1; brace = 0; next }
+      /at_stage\(/ { in_at_stage = 1; brace = 0 }
       in_at_stage {
-        for (i = 1; i <= length($0); i++) {
-          c = substr($0, i, 1)
+        line = $0
+        gsub(/\/\/.*$/, "", line)
+        for (i = 1; i <= length(line); i++) {
+          c = substr(line, i, 1)
           if (c == "{") brace++
-          if (c == "}") { brace--; if (brace <= 0) { in_at_stage = 0; break } }
+          if (c == "}") {
+            brace--
+            tail = substr(line, i)
+            if (brace <= 0 && (tail ~ /^}\)\s*;?\s*$/ || tail ~ /^}\)/)) {
+              in_at_stage = 0
+              break
+            }
+            if (brace <= 0) brace = 0
+          }
         }
         if (in_at_stage && /return;/) {
           print FILENAME ":" NR ":" $0
