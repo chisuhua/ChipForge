@@ -116,6 +116,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoder_chmem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_memory_model_chmem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoded_inst_migration.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_vendored_elf.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

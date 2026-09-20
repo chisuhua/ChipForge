@@ -65,14 +65,18 @@
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/arch/riscv/decoder_table.h"
 #include "ip/cpu/plugins/decode_chmem.h"
+#include "ip/cpu/plugins/ibus_chmem.h"
 
 using namespace cf::plugin;
 using namespace ch;
 using namespace ch::core;
 
-namespace cf {
+ namespace cf {
 namespace cpu {
 namespace plugins {
+
+template <typename T>
+class IBusPlugin;
 
 // ============================================================================
 // RegFilePlugin (CH_MEM): 32 个 ch_reg<ch_uint<XLEN>> + x0 select 屏蔽
@@ -207,6 +211,11 @@ class RegFilePlugin : public PluginBase {
     auto* n = pb.node_of_logic_stage("writeback").get();
     if (n) {
       using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+      // Phase 6d.4: branch flush — suppress register writes of the wrong-path
+      // fall-through instruction fetched right after a taken branch.
+      auto* fch = pb.node_of_logic_stage("fetch").get();
+      auto flush = fch ? fch->operator()(cf::cpu::plugins::IBusPlugin<T>::FLUSH)
+                       : ch_bool(false);
       // 缺省 we: DECODED_INST 缺失时全禁用写 (单元级 PoC 无译码信号)
       ch_bool we = ch_bool(false);
       addr_t rd_addr = addr_t(0);
@@ -214,8 +223,8 @@ class RegFilePlugin : public PluginBase {
           n->payloads().has(KeyType::RD_DATA)) {
         const auto& decoded = n->operator()(DecodePlugin::DECODED_INST);
         rd_addr = decoded.rd_idx;  // 已 ch_uint<5>
-        // x0 屏蔽: writes_rd (ch_bool) && rd != 0
-        we = decoded.writes_rd && (rd_addr != addr_t(0));
+        // x0 屏蔽: writes_rd (ch_bool) && rd != 0; flush 抑制误取写回
+        we = decoded.writes_rd && (rd_addr != addr_t(0)) && !flush;
       }
 
       // 32 路条件写: reg[i]->next = select(we && rd_addr == i, rd_data, reg[i])

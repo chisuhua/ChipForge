@@ -20,6 +20,7 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/plugins/ibus_chmem.h"
 
 using namespace cf::plugin;
 using namespace ch;
@@ -41,6 +42,21 @@ class DMemPlugin : public PluginBase {
 
   void preload(const std::vector<uint8_t>& bytes) { preload_bytes_ = bytes; }
   void preload_words(const std::vector<uint32_t>& words) { preload_words_ = words; }
+  // Phase 6d.4: merge words into preload buffer at given word offset
+  void preload_segment(std::size_t offset_words, const std::vector<uint32_t>& words) {
+    if (preload_words_.size() < offset_words + words.size()) {
+      preload_words_.resize(offset_words + words.size(), 0);
+    }
+    for (std::size_t i = 0; i < words.size(); ++i) {
+      preload_words_[offset_words + i] = words[i];
+    }
+  }
+  // Phase 6d.4: add always-on async read port at fixed word offset
+  // so tests can probe dmem[tohost_word] from outside the simulator.
+  void set_tohost_probe_word(std::size_t word) {
+    tohost_probe_word_ = word;
+    tohost_probe_enabled_ = true;
+  }
 
   void setup(PipeBuilder& pb) override {
     pb.at_stage("memory", Phase::NORMAL, [this, &pb]{ this->mem_access(pb); });
@@ -50,7 +66,10 @@ class DMemPlugin : public PluginBase {
  private:
   std::vector<uint8_t>  preload_bytes_;
   std::vector<uint32_t> preload_words_;
+  std::size_t tohost_probe_word_ = 0;
+  bool tohost_probe_enabled_ = false;
   std::unique_ptr<ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>> mem_;
+  std::unique_ptr<ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>::read_port> tohost_probe_port_;
 
   ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>& get_mem() {
     if (!mem_) {
@@ -91,6 +110,13 @@ class DMemPlugin : public PluginBase {
     auto is_sw = is_store && ch::core::ch_bool(funct3 == f3_010);
     auto is_lw = is_load  && ch::core::ch_bool(funct3 == f3_010);
 
+    // Phase 6d.4: branch flush — suppress stores from the wrong-path
+    // fall-through instruction fetched right after a taken branch.
+    auto* fch = pb.node_of_logic_stage("fetch").get();
+    auto flush = fch ? fch->operator()(IBusPlugin<T>::FLUSH)
+                     : ch::core::ch_bool(false);
+    is_sw = is_sw && !flush;
+
     auto byte_addr = n->operator()(KT::RESULT);
     auto word_addr = bits<15, 2>(byte_addr);
 
@@ -102,6 +128,16 @@ class DMemPlugin : public PluginBase {
 
     n->operator()(LOAD_DATA) = rdata;
     n->operator()(KT::RD_DATA) = select(is_lw, rdata, n->operator()(KT::RD_DATA));
+
+    // Phase 6d.4: tohost probe — always-on async read at fixed word offset.
+    // Emits a named proxy node ("tohost_probe_data_proxy") so the test can
+    // verify RVTEST_PASS wrote dmem[tohost] == 1 from outside the simulator.
+    if (tohost_probe_enabled_ && !tohost_probe_port_) {
+      auto probe_addr = ch::core::ch_uint<15>(static_cast<std::uint32_t>(tohost_probe_word_));
+      tohost_probe_port_ = std::make_unique<
+          ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>::read_port>(
+          mem.aread(probe_addr, "tohost_probe"));
+    }
   }
 };
 

@@ -142,8 +142,10 @@ class RiscvIntAluPlugin : public PluginBase {
       auto f7_00 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x00, 7>{}));
       auto f7_20 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x20, 7>{}));
 
-      // ADD/ADDI: funct3=000, funct7=0x00 (ADDI 经 op2 mux: reads_rs2=false → op2=imm)
-      auto is_add  = is_op_or_opimm && f3_0 && f7_00;
+      // ADD/ADDI: funct3=000. OP (R-type) requires funct7=0x00 (SUB uses
+      // 0x20); OPIMM (ADDI) must NOT check funct7 — bits[31:25] hold the
+      // immediate's [11:5], which is non-zero for negative immediates.
+      auto is_add  = (is_op && f3_0 && f7_00) || (is_opimm && f3_0);
       // SUB: OP only, funct3=000, funct7=0x20
       auto is_sub  = is_op && f3_0 && f7_20;
       // SLL/SLLI: funct3=001

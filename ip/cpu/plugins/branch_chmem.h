@@ -71,6 +71,9 @@ namespace cf {
 namespace cpu {
 namespace plugins {
 
+template <typename T>
+class IBusPlugin;
+
 // ============================================================================
 // BranchPlugin (CH_MEM): 6-op B-type select 树 + CtrlLink flush
 //
@@ -217,6 +220,13 @@ class BranchPlugin : public PluginBase {
       // JALR: 推迟 (defer for now — 需 rs1 值计算 target = (rs1 + imm) & ~1)
 
       // ── 4. 写 PayloadStore ──
+      // Phase 6d.4: 分支 flush — 上一周期 branch taken 时, 当前指令是
+      // fall-through 误取, 其分支决策必须抑制 (否则误取指令再次跳转, 覆盖
+      // 正确的 branch target). flush = fetch.FLUSH (IBusPlugin br_taken_buf).
+      auto* fch = pb.node_of_logic_stage("fetch").get();
+      auto flush = fch ? fch->operator()(IBusPlugin<T>::FLUSH)
+                       : ch::core::ch_bool(false);
+      taken = taken && !flush;
       n->operator()(BRANCH_TAKEN) = taken;
       n->operator()(RvKey::BRANCH_TARGET) = branch_target;
 

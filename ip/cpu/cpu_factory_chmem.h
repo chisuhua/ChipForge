@@ -106,6 +106,12 @@ class CpuFactoryChmem {
       n->operator()(KT::RESULT)     = T(ch::core::ch_literal<0, 32>{});
       n->operator()(KT::RD_DATA)    = T(ch::core::ch_literal<0, 32>{});
       n->operator()(KT::INSTRUCTION)= T(ch::core::ch_literal<0, 32>{});
+      // Phase 6d.4: fetch.FLUSH must exist before branch NORMAL reads it
+      // (branch_compute gates its decision on the previous cycle's branch).
+      if (std::string(stage_name) == "fetch") {
+        n->operator()(cf::cpu::plugins::IBusPlugin<T>::FLUSH) =
+            ch::core::ch_bool(false);
+      }
       cf::cpu::core::payload::DecodePayload default_decode{};
       n->payloads().put(KT::DECODE, default_decode);
       cf::cpu::arch::riscv::RiscvDecodeDetail default_detail{};
@@ -161,17 +167,90 @@ class CpuFactoryChmem {
     // ======================================================================
     // 构建 IBusPlugin（可选预载 ELF）
     auto ibus = std::make_unique<IBus>();
+    ibus->set_initial_pc(initial_pc);
+
+    // DMemPlugin（可选预载 ELF）
+    auto dmem = std::make_unique<DMem>();
+
+    // Phase 6d.4: ELF 解析 + PT_LOAD segment 路由
+    //   解析 ELF32 header + program headers, 把 PT_LOAD (p_flags&1=PF_X) 段
+    //   写入 IBus, (p_flags&2=PF_W) 段写入 DMem, 偏移 = (p_vaddr-0x80000000)/4.
+    //   非 ELF 原始字节 (mock 测试) 回退到旧 preload_words 行为.
     if (preload_elf && !elf_image.empty()) {
-      std::vector<uint32_t> words;
-      words.reserve(elf_image.size() / 4);
-      for (std::size_t i = 0; i + 4 <= elf_image.size(); i += 4) {
-        uint32_t w = static_cast<uint32_t>(elf_image[i])
-                   | (static_cast<uint32_t>(elf_image[i+1]) << 8)
-                   | (static_cast<uint32_t>(elf_image[i+2]) << 16)
-                   | (static_cast<uint32_t>(elf_image[i+3]) << 24);
-        words.push_back(w);
+      bool is_elf = elf_image.size() >= 52 && elf_image[0] == 0x7F &&
+                    elf_image[1] == 'E' && elf_image[2] == 'L' &&
+                    elf_image[3] == 'F' && elf_image[4] == 1;
+      if (is_elf) {
+        std::uint32_t phoff = static_cast<std::uint32_t>(elf_image[28])
+                            | (static_cast<std::uint32_t>(elf_image[29]) << 8)
+                            | (static_cast<std::uint32_t>(elf_image[30]) << 16)
+                            | (static_cast<std::uint32_t>(elf_image[31]) << 24);
+        std::uint16_t phentsize = static_cast<std::uint16_t>(elf_image[42])
+                                | (static_cast<std::uint16_t>(elf_image[43]) << 8);
+        std::uint16_t phnum = static_cast<std::uint16_t>(elf_image[44])
+                            | (static_cast<std::uint16_t>(elf_image[45]) << 8);
+        constexpr std::uint32_t kElfBase = 0x80000000;
+        for (std::uint16_t i = 0; i < phnum; ++i) {
+          std::size_t off = phoff + static_cast<std::size_t>(i) * phentsize;
+          if (off + 32 > elf_image.size()) continue;
+          std::uint32_t p_type = static_cast<std::uint32_t>(elf_image[off])
+                               | (static_cast<std::uint32_t>(elf_image[off+1]) << 8)
+                               | (static_cast<std::uint32_t>(elf_image[off+2]) << 16)
+                               | (static_cast<std::uint32_t>(elf_image[off+3]) << 24);
+          std::uint32_t p_offset = static_cast<std::uint32_t>(elf_image[off+4])
+                                 | (static_cast<std::uint32_t>(elf_image[off+5]) << 8)
+                                 | (static_cast<std::uint32_t>(elf_image[off+6]) << 16)
+                                 | (static_cast<std::uint32_t>(elf_image[off+7]) << 24);
+          std::uint32_t p_vaddr = static_cast<std::uint32_t>(elf_image[off+8])
+                                | (static_cast<std::uint32_t>(elf_image[off+9]) << 8)
+                                | (static_cast<std::uint32_t>(elf_image[off+10]) << 16)
+                                | (static_cast<std::uint32_t>(elf_image[off+11]) << 24);
+          std::uint32_t p_filesz = static_cast<std::uint32_t>(elf_image[off+16])
+                                 | (static_cast<std::uint32_t>(elf_image[off+17]) << 8)
+                                 | (static_cast<std::uint32_t>(elf_image[off+18]) << 16)
+                                 | (static_cast<std::uint32_t>(elf_image[off+19]) << 24);
+          std::uint32_t p_flags = static_cast<std::uint32_t>(elf_image[off+24])
+                                | (static_cast<std::uint32_t>(elf_image[off+25]) << 8)
+                                | (static_cast<std::uint32_t>(elf_image[off+26]) << 16)
+                                | (static_cast<std::uint32_t>(elf_image[off+27]) << 24);
+          if (p_type != 1) continue;
+          if (p_vaddr < kElfBase) continue;
+          std::size_t word_offset = static_cast<std::size_t>(p_vaddr - kElfBase) / 4;
+          std::size_t nwords = p_filesz / 4;
+          if (nwords == 0) continue;
+          std::vector<uint32_t> words;
+          words.reserve(nwords);
+          for (std::size_t j = 0; j < nwords; ++j) {
+            std::size_t bo = static_cast<std::size_t>(p_offset) + j * 4;
+            if (bo + 4 > elf_image.size()) { words.clear(); break; }
+            words.push_back(static_cast<std::uint32_t>(elf_image[bo])
+                          | (static_cast<std::uint32_t>(elf_image[bo+1]) << 8)
+                          | (static_cast<std::uint32_t>(elf_image[bo+2]) << 16)
+                          | (static_cast<std::uint32_t>(elf_image[bo+3]) << 24));
+          }
+          bool is_exec = (p_flags & 1u) != 0u;
+          bool is_writable = (p_flags & 2u) != 0u;
+          if (is_exec && !is_writable) {
+            ibus->preload_segment(word_offset, words);
+          } else if (is_writable) {
+            dmem->preload_segment(word_offset, words);
+          }
+        }
+        // 6d.4: tohost 固定位于 dmem word 0x1000/4 = 0x400 (0x80001000)
+        dmem->set_tohost_probe_word(0x400);
+      } else {
+        // legacy: mock add.elf 原始指令字节 (无 ELF header)
+        std::vector<uint32_t> words;
+        words.reserve(elf_image.size() / 4);
+        for (std::size_t i = 0; i + 4 <= elf_image.size(); i += 4) {
+          words.push_back(static_cast<std::uint32_t>(elf_image[i])
+                        | (static_cast<std::uint32_t>(elf_image[i+1]) << 8)
+                        | (static_cast<std::uint32_t>(elf_image[i+2]) << 16)
+                        | (static_cast<std::uint32_t>(elf_image[i+3]) << 24));
+        }
+        ibus->preload_words(words);
+        dmem->preload(elf_image);
       }
-      ibus->preload_words(words);
     }
 
     pb->register_plugin(std::make_unique<Decoder>());
@@ -180,12 +259,6 @@ class CpuFactoryChmem {
     pb->register_plugin(std::make_unique<RegFile>());
     pb->register_plugin(std::make_unique<IntAlu>());
     pb->register_plugin(std::make_unique<Branch>());
-
-    // DMemPlugin（可选预载 ELF）
-    auto dmem = std::make_unique<DMem>();
-    if (preload_elf && !elf_image.empty()) {
-      dmem->preload(elf_image);
-    }
     pb->register_plugin(std::move(dmem));
 
     // ======================================================================
@@ -236,6 +309,15 @@ class CpuFactoryChmem {
         mem->operator()(KT::INSTRUCTION) = exe->operator()(KT::INSTRUCTION);
         mem->operator()(KT::RS2)         = exe->operator()(KT::RS2);
         mem->operator()(DecodePlugin::DECODED_INST) = exe->operator()(DecodePlugin::DECODED_INST);
+        // Phase 6d.4: JAL link — rd = pc+4 (return address). The ALU does
+        // not match JAL's opcode, so RD_DATA defaults to 0; override it here
+        // using the execute stage's PC.
+        const auto& exe_dec = exe->operator()(DecodePlugin::DECODED_INST);
+        auto is_jal = (exe_dec.opcode ==
+                       ch::core::ch_uint<7>(ch::core::ch_literal<0x6F, 7>{}));
+        auto link = exe->operator()(KT::PC) +
+                    ch::core::ch_uint<32>(ch::core::ch_literal<4, 32>{});
+        mem->operator()(KT::RD_DATA) = select(is_jal, link, mem->operator()(KT::RD_DATA));
       }
     });
 
@@ -270,12 +352,13 @@ class CpuFactoryChmem {
           };
         };
 
-    pb->register_stage_payload_connector<T>("execute", KT::RS1,         make_connector("id_ex_rs1"));
-    pb->register_stage_payload_connector<T>("execute", KT::RS2,         make_connector("id_ex_rs2"));
-    pb->register_stage_payload_connector<T>("execute", KT::PC,          make_connector("id_ex_pc"));
-    pb->register_stage_payload_connector<T>("execute", KT::INSTRUCTION, make_connector("id_ex_instr"));
-    pb->register_stage_payload_connector<T>("writeback", KT::RESULT,    make_connector("ex_wb_result"));
-    pb->register_stage_payload_connector<T>("writeback", KT::RD_DATA,   make_connector("ex_wb_rd_data"));
+    // Phase 6d.4: fetch.PC exposes pc_lag (previous cycle's PC) to stay
+    // aligned with the 1-cycle-latent imem aread (see IBusPlugin). All
+    // stages then share the same instruction in the same cycle, so the
+    // datapath must be fully combinational (no stage pipeline registers):
+    // a reg written at cycle N's writeback is read at cycle N+1's decode,
+    // giving correct 1-cycle-latency dependencies (AUIPC, ADDI t5,t5,...).
+    (void)make_connector;
 
     pb->build();
     return pb;
