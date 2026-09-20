@@ -157,6 +157,17 @@ TEST_CASE("cpphdl_poc_simulator_tick", "[framework][cpphdl][poc]") {
 // 本 PoC 故意写 if(ch_bool_var) 验证: (a) 编译期通过 (b) 运行期语义正确
 // =========================================================================
 TEST_CASE("cpphdl_poc_chbool_contextual_conversion", "[framework][cpphdl][poc]") {
+  // 每个 leaf SECTION 都会重新跑这段 body, 因此 setup 在每个 SECTION 入口
+  // 各建一个 fresh context (W0 PoC 阶段无 CppHDL fixture, 直接裸 ctx).
+  // Phase 6c W0 已知问题修复: 无 setup 时 SECTION 1/2 进入后 ctx_curr_=nullptr
+  // (前一个 TEST_CASE 的 ch_device 析构时 ctx_swap 还原为 null),
+  // ch_bool ctor 调用 build_literal 报 "No active context" 并返回 nullptr,
+  // 导致 if(b)/static_cast<bool>(x) 拿到的是 false 而非字面值.
+  // SECTION 3 "ch_bool = ch_bool" 因不读 to_bool, 反而偶然 PASS.
+  // 修复: 每个 SECTION 入口前 set_as_current_context() 提供 active ctx.
+  ch::core::context chbool_ctx("chbool_poc_ctx");
+  chbool_ctx.set_as_current_context();
+
   SECTION("ch_bool to bool in if (contextual conversion)") {
     ch_bool a(false, "a_bool");
     ch_bool b(true, "b_bool");
