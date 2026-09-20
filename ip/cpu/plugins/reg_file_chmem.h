@@ -152,14 +152,19 @@ class RegFilePlugin : public PluginBase {
   //   非 static → 每个实例独立的 regs_, 不会跨 context 复用。
   //   unique_ptr 确保 Plugin 析构时释放 ch_reg (不破坏 context 节点,
   //   lnodeimpl 由 context::node_storage_ 拥有)。
-  using regs_array_t = std::array<ch_reg<ch_uint<kXlenBits>>, kNumRegs>;
+  using regs_array_t = std::vector<ch_reg<ch_uint<kXlenBits>>>;
   std::unique_ptr<regs_array_t> regs_;
 
   regs_array_t& get_regs() {
     if (!regs_) {
+      // 关键: 用 vector 逐个 push_back 显式命名的 ch_reg, 而非
+      // std::array 默认构造 (默认名 "reg" 会泄漏 32 对孤儿 regimpl/proxy
+      // 节点进 context, 与显式命名的 reg_0..reg_31 撞名 → Verilator
+      // Duplicate declaration of signal '_reg_N' 错误).
       regs_ = std::make_unique<regs_array_t>();
+      regs_->reserve(kNumRegs);
       for (std::size_t i = 0; i < kNumRegs; ++i) {
-        (*regs_)[i] = ch_reg<ch_uint<kXlenBits>>(
+        regs_->emplace_back(
             ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{}),
             ("reg_" + std::to_string(i)).c_str());
       }
