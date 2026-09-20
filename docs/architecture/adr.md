@@ -1307,7 +1307,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 | # | 检查 | 通过条件 |
 |---|------|---------|
-| 1 | at_stage 回调内无 early return | 不用 `if (cond) return;` 包裹主逻辑 |
+| 1 | at_stage 回调内无 early return | 不用 `if (cond) return;` 包裹主逻辑。**例外**: 成员函数内 elaboration-time null guard (e.g. `if (!n) return;` 在 IBusPlugin::fetch / DMemPlugin::mem_access / cpu_factory populate lambda) — 这些是 at_stage lambda 调用的普通 C++ 函数, 不在 at_stage 闭包顶层, 词法检查器天然不抓, 语义上是惰性初始化防御 |
 | 2 | `_chmem.h` 必须含 `ch_*`; TLM 文件不含 `ch_*` | 双文件物理分离 + `#ifdef CF_PLUGIN_USE_CH_MEM` |
 | 3 | `Plugin::build()` 内不调用 `pb.run()` | CH_MEM 模式走 `pb.elaborate(ctx)` |
 | 4 | 存储优先 `array_store` / `ch_mem` | 替代裸 `std::array` (ADR-040 Tier-2 推荐) |

@@ -335,30 +335,11 @@ class CpuFactoryChmem {
       }
     });
 
-    // ======================================================================
-    // 3. Pipeline register connectors
-    //    ID/EX: RS1, RS2, PC, INSTRUCTION
-    //    EX/WB: RESULT, RD_DATA
-    // ======================================================================
-    auto make_connector =
-        [](const std::string& suf) {
-          return [suf](lnodeimpl* prev, ch_bool stall, ch_bool flush,
-                       const std::string& name) -> lnodeimpl* {
-            T prev_signal(prev);
-            ch_bool rst(false);
-            auto pipelined = chlib::pipeline_reg<kXlenBits>(
-                prev_signal, rst, stall, flush, name + "_" + suf);
-            return pipelined.impl();
-          };
-        };
-
-    // Phase 6d.4: fetch.PC exposes pc_lag (previous cycle's PC) to stay
-    // aligned with the 1-cycle-latent imem aread (see IBusPlugin). All
-    // stages then share the same instruction in the same cycle, so the
-    // datapath must be fully combinational (no stage pipeline registers):
-    // a reg written at cycle N's writeback is read at cycle N+1's decode,
-    // giving correct 1-cycle-latency dependencies (AUIPC, ADDI t5,t5,...).
-    (void)make_connector;
+    // Phase 6d.4: datapath is fully combinational (no stage pipeline
+    // registers); a reg written at cycle N's writeback is read at cycle
+    // N+1's decode, giving correct 1-cycle-latency dependencies (AUIPC,
+    // ADDI t5, t5, ...). See hazard_chmem.h / ibus_chmem.h for the
+    // pc_lag + FLUSH + JAL link mechanisms that make this correct.
 
     pb->build();
     return pb;
@@ -379,12 +360,6 @@ class CpuFactoryChmem {
     pb->to_verilog(verilog_path);
     return pb;
   }
-
-  struct Config {
-    T initial_pc = T{0x80000000};
-    std::size_t pipeline_stages = 5;
-    bool enable_mmu = false;
-  };
 };
 
 }  // namespace cpu

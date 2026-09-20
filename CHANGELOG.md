@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verilator 5.052 `--cc --build`: Vtop compile 成功
 - `check_plugin_portability.sh`: 8/8 PASS
 - `verify_adr.sh`: 0 FAILED
-- TLM baseline (`chipforge_tests`): 386 PASS / 17 FAIL（17 pre-existing, 0 回归）
+- TLM baseline (`chipforge_tests`): 392 PASS / 11 FAIL（10 [riscv-tests] LOAD stub + 1 7stage superscalar segfault, 全部 pre-existing, 0 回归）
 
 ### 待完成 (E8 — CppHDL VerilatorBackend follow-up)
 
