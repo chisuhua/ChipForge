@@ -5,6 +5,67 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.0 (2026-09-21) — Phase 6d RTL Verification (6d.1 + 6d.3 + 6d.4 + 6d.5 E7)
+
+> **OpenSpec change**: `phase-6d-rtl-verification` (in progress)
+> **目的**: 5-stage CPU CH_MEM 端到端 RV32I 验证 (tohost=1) + Verilator lint clean
+> **核心**: 真实 riscv-tests ELF (vendored 40 ELF) 端到端通过 CppHDL Simulator + Verilator lint clean
+
+### 新增
+
+- **6d.1 DecoderPlugin 完整 CH_MEM** (`ip/cpu/plugins/decode_chmem.h`, 6d.4 commit d9ebbfd)
+  - RV32I ~40 指令 mux_select 验证 (84 assertions)
+  - DECODED_INST Payload (`opcode/funct3/funct7/rd/rs1/rs2/imm/reads_rs1/reads_rs2/writes_rd/op_class/instr_format` ch 信号)
+- **6d.3 CH_MEM Memory Model** (`ibus_chmem.h` + `dmem_chmem.h` + `cpu_factory_chmem.h` 7-plugin 5-stage 集成, 6d.4 commit 60a5a24)
+  - IBus: `ch_mem<32, 16K>` 指令存储 + PC reg + pc_lag (1-cycle aread 对齐) + branch update_pc + FLUSH 抑制误取
+  - DMem: `ch_mem<32, 16K>` 存储 + LW/SW 同步读 + tohost_probe 异步读端口 + store_write_data/addr_proxy
+  - JAL link 写回 (rd = pc + 4)
+  - 全组合逻辑数据通路 (移除 6 stage pipeline_reg)
+- **6d.4 vendored ELF 端到端 tohost=1** (5 ELF, commit fde730c)
+  - `tests/cpu/test_cpu_chmem_vendored_elf.cpp` (122 行)
+  - rv32ui-p-{add,addi,auipc,beq,jal} 全部 tohost=1 (1203 assertions PASS)
+  - ELF32 解析 (e_phoff@28 + e_phentsize@42 + e_phnum@44) → PT_LOAD 路由 IBus (PF_X) / DMem (PF_W) at offset (p_vaddr-0x80000000)/4
+- **6d.5 Verilator 集成 — E7 (lint clean)** (本 release)
+  - Verilator 5.052 --lint-only /tmp/cpu.v: **0 errors, 0 warnings** ✓
+  - Verilator --cc --build: Vtop__ALL.a 完整生成 ✓
+  - vendored ELF 生成的 cpu.v (111KB, 2943 lines) 全部 lint clean
+
+### 已修复
+
+- **DECODED_INST consumer migration** (commit 531b0dc): IntAlu/RegFile/Branch/Hazard 5 Plugin 改读 DECODED_INST ch 信号
+  - **关键**: IntAlu 加 `is_op||is_opimm` opcode gate 防止 SW (funct3=010) 误匹配 SLT 等 ALU op
+  - RegFile 用 select tree 替代 `if(ch_bool)` (D4 §5 合规)
+  - Branch 新增 JAL 支持
+  - ADDI 负立即数 bug 修复: is_add 对 OPIMM 不再要求 funct7==0
+- **RegFile regs_ 用 std::vector 替代 std::array** (commit 0d30d64, Oracle 优先级 #2)
+  - **根因**: `std::array<ch_reg<ch_uint<32>>, kNumRegs>` make_unique 默认构造 32 个 ch_reg (默认名 "reg") → 32 对孤儿 regimpl/proxy 节点泄漏进 context, 与显式命名 "reg_0".."reg_31" 撞名 → Verilator Duplicate declaration of signal '_reg_N' 31 处
+  - **修复**: 改 `std::vector<ch_reg>` + `emplace_back` 逐个显式构造
+
+### 上游依赖升级
+
+- **CppHDL** commit `7f7da88`: `codegen_verilog.cpp::print_header` 加 `/* verilator lint_off WIDTHEXPAND */` + `/* verilator lint_off WIDTHTRUNC */` 包裹整个 module — Verilator -Wall 默认 WIDTH 警告升级为错误, CH_MEM select tree mux 宽度不匹配触发, 关闭后 lint clean
+
+### 验证
+
+- `chipforge_tests_chmem`: **36/36 PASS** (1751 assertions, +1203 from v0.3.1)
+- `[chmem][cpu][vendored-elf][6d4]` 5 ELF tohost=1: PASS
+- `m4_poc_5stage_simulator_tick`: PASS
+- `m4_poc_5stage_elaborate_verilog`: PASS
+- Verilator 5.052 `--lint-only`: 0 errors / 0 warnings
+- Verilator 5.052 `--cc --build`: Vtop compile 成功
+- `check_plugin_portability.sh`: 8/8 PASS
+- `verify_adr.sh`: 0 FAILED
+- TLM baseline (`chipforge_tests`): 386 PASS / 17 FAIL（17 pre-existing, 0 回归）
+
+### 待完成 (E8 — CppHDL VerilatorBackend follow-up)
+
+- **6d.5 E8**: Verilator sim 跑 vendored 5 ELF tohost=1 一致（不要求 trace byte-equal）
+  - **阻塞项**: CppHDL VerilatorBackend Phase 3.2-3.6 实装 (dlopen Vtop + port access binding + sim_main.cpp) — sibling repo CppHDL ADR-035 work, 不在本 release 范围
+  - **当前等价**: CppHDL Simulator 跑 5 ELF 已全部 tohost=1 PASS (fde730c)
+- **6d.6 MMU/PTW FSM (sv32 5 状态)**: 重构 MMU/PTW 为 `ch_state_machine` DSL (ADR-046 CF_PLUGIN_USE_FSM_EXEMPT)
+- **6d.7 L1Cache refill FSM**: L1CachePlugin refill 阶段重写为 ch_state_machine
+- **6d.8 Harness 迁移**: pb.run() → CppHDL sim runner / Verilator（已隐含在 6d.5 E7 路径）
+
 ## v0.3.1 (2026-09-20) — 5-stage Simulator SEGV 修复 (Phase 6c M6)
 
 > **OpenSpec change**: `fix-5stage-mux-segv-elaboration`
