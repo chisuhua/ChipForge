@@ -178,7 +178,7 @@ ip/{name}/
 | **ADR-040 v2.0** | TLM→HDL 移植性约束 | **CH_MEM 是新正道** (翻转 v1.0 ch 渗透禁令); `array_store` 双缓冲; `CtrlLink::halt_when(ch_bool)` |
 | **ADR-046** | 多周期协议引擎豁免 D4 无状态机禁令 | `CF_PLUGIN_USE_FSM_EXEMPT` 标记 + `chlib::ch_state_machine` DSL |
 
-**ADR-037 v2.0 状态 (Oracle 2026-09-20 发现)**: `docs/architecture/adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17, D4 elaboration 语义兑现)`。Phase 6d prereqs change 仅验证内容完整性 + 修正 adr.md:1251 拆分描述不一致 (原 6c/6d/6e 与现行 6a/6b/6c/6d), 不重新写 v2.0。
+**ADR-037 v2.0 状态 (Oracle 2026-09-20 确认)**: `docs/architecture/adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17, D4 elaboration 语义兑现)`。Phase 6d prereqs change 仅验证内容完整性 + 修正 adr.md:1251 拆分描述不一致 (原 6c/6d/6e 与现行 6a/6b/6c/6d), 不重新写 v2.0。
 
 ---
 

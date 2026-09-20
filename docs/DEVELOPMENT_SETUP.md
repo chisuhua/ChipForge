@@ -195,7 +195,7 @@ ctest --test-dir build-cpphdl -L base --output-on-failure
 
 ## 6. Phase 6d 工具链安装 (RISC-V + Verilator)
 
-> **Phase 6d 启动前置** ([`openspec/changes/phase-6d-prerequisites/`](../openspec/changes/phase-6d-prerequisites/proposal.md), Oracle 2026-09-20 修订)
+> **Phase 6d 启动前置** ([openspec archive `phase-6d-prerequisites`](../openspec/changes/archive/2026-09-20-phase-6d-prerequisites/proposal.md), Oracle 2026-09-20 修订)
 > **当前 build env 状态** (实测 2026-09-20): riscv64 16.1.0 + Verilator 5.052 已预装; yosys/iverilog 缺失 (Oracle descope 为 optional, 非阻塞)
 
 ### 6.1 RISC-V 工具链 (riscv64-unknown-elf-gcc)
