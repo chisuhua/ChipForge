@@ -258,11 +258,26 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 6. ⏸ **测试 ELF 获取** (Oracle 新增: `tests/cpu/manual_elf/` 仅含 add, 缺 addi/auipc/jal/beq 4 条, 阻塞 6d.4)
 
 **Phase 6d 关键交付**:
-- 6d.1: DecoderPlugin 完整 CH_MEM (新建 `decode_chmem.h`, Oracle 修正: 原"重启用 disabled"措辞错误, 该文件不存在)
+- 6d.1: DecoderPlugin 完整 CH_MEM (新建 `decode_chmem.h`, Oracle 修正: 原"重启用 disabled"措辞错误, 该文件不存在; 估时 1.5 周)
 - 6d.2: BranchPlugin + HazardPlugin 完整 CH_MEM
-- 6d.3: CpuFactoryChmem 5-stage 集成
-- 6d.4: riscv-tests RV32I 5 指令 (add/addi/auipc/jal/beq) `tohost=1` 端到端 CppHDL sim PASS
-- 6d.5: Verilator 集成 (Verilog → VL1Cache/VRegFile 替代 C++ sim)
-- 6d.6: MMU/PTW FSM (Oracle 修正: sv32 对齐现有 MMUPlugin, 不是 sv39)
+- 6d.3: CpuFactoryChmem 5-stage 集成 **+ Oracle 关键新增: CH_MEM fetch/memory model** (`ibus_chmem.h` + `dmem_chmem.h` 缺失, 估时 2 周)
+- 6d.4: riscv-tests RV32I 5 指令 (add/addi/auipc/jal/beq) `tohost=1` 端到端 CppHDL sim PASS (**接受路径放宽**: 实际 ~8-9 指令路径, 含 lui/sw/bne)
+- 6d.5: Verilator 集成 (Verilog → VL1Cache/VRegFile 替代 C++ sim; **E8 降级**: tohost=1 一致, 不强求 trace byte-equal)
+- 6d.6: MMU/PTW FSM (**sv32 5 状态** `IDLE/L0_WAIT/L1_WAIT/DONE/FAULT`, Oracle 修正: 不是 sv39 3-level)
 - 6d.7: L1Cache refill FSM (同 ch_state_machine)
-- 6d.8: Harness 迁移 (`pb.run()` → CppHDL sim runner / Verilator)
+- 6d.8: Harness 迁移 (`pb.run()` → CppHDL sim runner / Verilator; 显式排除 7stage superscalar config)
+
+**Phase 6d 启动依赖图 (Oracle 2026-09-20 修订)**:
+```
+build env (GNU 16.1.0 + Verilator 5.052 已预装, yosys/iverilog optional)
+  ↓
+poc-follow-up-fixes ──┐  并行启动 (Oracle 2026-09-20 修订, 不串行)
+phase-6d-prerequisites ─┘
+       ↓
+phase-6d-rtl-verification (硬门 = poc-follow-up-fixes archive)
+```
+
+**6d main 硬前置 (修订后)**:
+1. `openspec/changes/poc-follow-up-fixes/` 已 archive (含 M3 HazardPlugin 完整 + byte-equal + chbool)
+2. `openspec/changes/phase-6d-prerequisites/` 已 archive (CI 集成 + ADR-037 v2.0 验证)
+3. `tests/cpu/manual_elf` + `tests/cpu/riscv_tests/elf/` 测试 ELF 就绪 (已 vendor 40 ELF, 无需重写)

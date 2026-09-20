@@ -107,7 +107,7 @@ Phase 6d 的所有设计决策来源于:
 - **ADR-046** (2026-09-16): 多周期协议引擎豁免 (`CF_PLUGIN_USE_FSM_EXEMPT` 机制, `chlib::ch_state_machine` DSL)
 - **Phase 6c 研究文档**: [`docs/research/phase6c-elaboration-pattern-study.md`](../../research/phase6c-elaboration-pattern-study.md) §11-13 (SpinalHDL/VexRiscv/CppHDL elaboration 原理 + cf::plugin 映射)
 - **DECISION-2026-06-13-02 F1.A** (Phase 1.4): L1CachePlugin 设计方法学基线
-- **待修订**: ADR-037 v2.0 (D4 范式在 elaboration 语义下兑现, 推迟自 Phase 6c W9, 6d 启动前必做)
+- **待修订**: ~~ADR-037 v2.0 (D4 范式在 elaboration 语义下兑现, 推迟自 Phase 6c W9, 6d 启动前必做)~~ → **Oracle 2026-09-20 修正**: `adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17)`, D10/D11/D12 已写完。`phase-6d-prerequisites` Prereq #3 仅验证内容完整 + 修 `adr.md:1251` 拆分描述不一致, 无新撰写。
 
 任何对 Phase 6d 范围/接口的修改, **必须**同步更新决策记录 + ADR。
 
@@ -197,12 +197,13 @@ Phase 6d 的所有设计决策来源于:
 | 6d.1 | DecoderPlugin 完整 (Oracle: 从零建, 估时 1.5 周) | 1.5 周 | ⏸ 待启 |
 | 6d.2 | Branch + Hazard 完整 | 1.5 周 | ⏸ 待启 |
 | 6d.3 | CpuFactoryChmem 完整集成 | 1.5 周 | ⏸ 待启 |
-| 6d.4 | riscv-tests 端到端 (Oracle: 4 ELF 待编 `tests/cpu/manual_elf/`) | 2 周 | ⏸ 待启 |
-| 6d.5 | Verilator 集成 (Oracle: jammy 22.04 verilator 4.038 不足, 需源码 build) | 1.5 周 | ⏸ 待启 |
-| 6d.6 | MMU/PTW FSM (Oracle: 改 sv32 对齐现有 MMUPlugin) | 1 周 | ⏸ 待启 |
+| 6d.3 + memory model | CpuFactoryChmem 5-stage + CH_MEM fetch/memory (`ibus_chmem.h` + `dmem_chmem.h`) | **2 周** | ⏸ 待启 |
+| 6d.4 | riscv-tests 端到端 (~8-9 指令路径, 复用 `tests/cpu/riscv_tests/elf/` 40 vendored ELF) | 2 周 | ⏸ 待启 |
+| 6d.5 | Verilator 集成 (E8 降级 tohost=1 一致; 不强求 trace byte-equal) | 1.5 周 | ⏸ 待启 |
+| 6d.6 | MMU/PTW FSM (sv32 5 状态, Oracle 修正: 不是 sv39 3-level) | 1 周 | ⏸ 待启 |
 | 6d.7 | L1Cache refill FSM | 0.5 周 | ⏸ 待启 |
-| 6d.8 | Harness 迁移 | 1 周 | ⏸ 待启 |
-| **总计** | — | **10-12 周** | — |
+| 6d.8 | Harness 迁移 (排除 7stage superscalar config) | 1 周 | ⏸ 待启 |
+| **总计** | — | **~11.5-12.5 周** | — |
 
 ---
 
@@ -211,6 +212,7 @@ Phase 6d 的所有设计决策来源于:
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0 | 2026-09-20 | 初版: 从 Phase 6c v2.0.2 拆分, 独立 phase doc |
+| 1.1 | 2026-09-20 | Oracle 修订: (a) ADR-037 v2.0 标 Accepted, Prereq #3 仅验证+修正; (b) 6d.3 显式吸收 memory model 任务; (c) E8 降级 tohost=1 一致; (d) 6d.6 sv32 5 状态; (e) 复用 `tests/cpu/riscv_tests/elf/` 40 vendored ELF (Prereq #6 改写); (f) 时间盒 11.5-12.5 周 |
 
 ---
 
