@@ -124,6 +124,7 @@ target_compile_features(chipforge_tests_chmem PRIVATE cxx_std_20)
 target_compile_definitions(chipforge_tests_chmem PRIVATE
     CF_PLUGIN_USE_CH_MEM
     CHIPFORGE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
 )
 target_include_directories(chipforge_tests_chmem PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

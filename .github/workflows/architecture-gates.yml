@@ -21,6 +21,69 @@ on:
       - 'docs/roadmap/**'
 
 jobs:
+  toolchain-sanity:
+    runs-on: ubuntu-latest
+    name: Phase 6d Toolchain Sanity (RISC-V + Verilator)
+    # Phase 6d prereqs (Oracle 2026-09-20 修订): 与 architecture-gates 并行运行
+    # 仅 warn-only (默认), 不阻塞 PR; Phase 6d.5 Verilator 集成是真正阻断点
+    env:
+      CHIPFORGE_ROOT: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect distribution
+        id: distro
+        run: |
+          DISTRO_VERSION=$(lsb_release -rs 2>/dev/null || grep -oP 'VERSION_ID="\K[^"]+' /etc/os-release)
+          echo "VERSION_ID=$DISTRO_VERSION" >> $GITHUB_OUTPUT
+          echo "Detected Ubuntu $DISTRO_VERSION"
+
+      # RISC-V 工具链 (所有发行版)
+      - name: Install RISC-V toolchain (gcc-riscv64-unknown-elf)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-riscv64-unknown-elf
+          riscv64-unknown-elf-gcc --version | head -1
+
+      # Verilator: noble apt 直接装; jammy 源码 build ≥5.020
+      - name: Install Verilator (Ubuntu 24.04 noble)
+        if: steps.distro.outputs.VERSION_ID == '24.04'
+        run: |
+          sudo apt-get install -y verilator
+          verilator --version | head -1
+
+      - name: Build Verilator from source (Ubuntu 22.04 jammy)
+        if: steps.distro.outputs.VERSION_ID == '22.04'
+        run: |
+          sudo apt-get install -y git cmake make flex bison
+          git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
+          cd /tmp/verilator && cmake -B build && cmake --build build -j$(nproc) && sudo make install
+          verilator --version | head -1
+
+      # yosys/iverilog 标 optional, 不阻塞 (Oracle descope)
+      # Sanity 1: RISC-V 编译 trivial .S
+      - name: Sanity — RISC-V cross-compile manual_elf/add.S
+        run: |
+          riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib \
+            -o /tmp/add.elf tests/cpu/manual_elf/add.S
+          file /tmp/add.elf
+
+      # Sanity 2: Verilator lint 一个 minimal stub (Phase 6d.5 真正集成时改为真 .v)
+      - name: Sanity — Verilator lint minimal stub
+        run: |
+          printf 'module hello(input wire a, input wire b, output wire sum);\n  assign sum = a ^ b;\nendmodule\n' > /tmp/hello.v
+          verilator --lint-only /tmp/hello.v
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "=== Toolchain Sanity Summary ==="
+          echo "OS: Ubuntu ${{ steps.distro.outputs.VERSION_ID }}"
+          echo "riscv64-unknown-elf-gcc: $(riscv64-unknown-elf-gcc --version 2>&1 | head -1 || echo 'NOT INSTALLED')"
+          echo "verilator: $(verilator --version 2>&1 | head -1 || echo 'NOT INSTALLED')"
+
   architecture-gates:
     runs-on: ubuntu-latest
     name: Architecture Compliance Gates (4 scripts)

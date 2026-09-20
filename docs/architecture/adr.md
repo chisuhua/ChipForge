@@ -1248,7 +1248,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 **v2.0 重大变更** (Phase 6c, 2026-09-16):
 - **D4 兑现**: Plugin-style 不再只是 TLM 仿真范式，而是 **elaboration 期间发射 lnode DAG 的硬件描述范式**。`pb.elaborate()` 执行一次 at_stage 闭包，发射硬件 DAG；`ch::toVerilog(ctx)` 输出 Verilog；`ch::Simulator::tick()` / Verilator 做 cycle 仿真。
-- **D5 拆解**: Phase 6 拆为 Phase 6c（M1-M5, 9 周 RTL 兑现）+ Phase 6d（MMU/Cache 多周期 FSM）+ Phase 6e（ScoreBoard/CompareDriver）。
+- **D5 拆解**: Phase 6 拆为 Phase 6a（PipeBuilder::auto_schedule, 待 Phase 6d 端到端验证后启动）+ Phase 6b（CompareDriver + ScoreBoard, 依赖 Phase 6a）+ Phase 6c（✅ M1-M5 RTL 兑现, 已 archive 2026-09-20）+ Phase 6d（5-stage Pipeline CH_MEM + Verilator + MMU/PTW FSM, 11-13 周, 待启动）。
 - **新增 D10**: `cf::plugin` 在 `-DCF_PLUGIN_USE_CH_MEM` 下走 elaboration 正道；TLM 模式 deprecated（CH_MEM 双模共存，零回归）。
 - **新增 D11**: 多周期协议引擎豁免 D4 "无状态机" 禁令（ADR-046），但必须使用 `chlib::ch_state_machine` DSL。
 - **新增 D12** (Phase 6c M5, 2026-09-17): D4 elaboration 语义经 M1-M5 **8 commit** 验证（25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a）。CH_MEM 双模零回归，PoC #1-#4 全部 PASS。TLM deprecated 标记生效，`ip/*/tlm/` 仅遗留测试用途。
@@ -1280,6 +1280,41 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 - `ip/cpu/plugins/reg_file_chmem.h` + `ip/cpu/arch/riscv/int_alu_chmem.h`
 - `tools/check_plugin_portability.sh` v2.0 (5 项检查)
 - `docs/architecture/adr/ADR-046-multi-cycle-fsm-exemption.md`
+
+**CH_MEM 模式契约** (v2.0, Phase 6c M5 落地):
+
+| 契约 | TLM 模式 | CH_MEM 模式 (`-DCF_PLUGIN_USE_CH_MEM`) |
+|------|----------|---------------------------------------|
+| `uint_t<N>` 类型 | POD (`uint8_t`/`uint16_t`/`uint32_t`/`uint64_t`) | `ch::core::ch_uint<N>` (硬件类) |
+| `array_store<T, N>::commit()` | no-op (单缓冲, 即写即读) | 双缓冲 commit/swap (读返回上一周期值) |
+| `CtrlLink::halt_when(ch_bool)` | 利用 `explicit operator bool()` 上下文敏感 halt | 同上 (elaboration 期发 lnode OR-merge) |
+| `Plugin::build()` 主体 | 调 `pb.run()` 每周期仿真 | 调 `pb.elaborate(ctx)` 一次性发射 lnode DAG |
+| `at_stage` 闭包 | 周期驱动, run 期间执行 N 次 | elaboration 期执行 1 次 |
+| `ch_reg / ch_mem` 初值 | N/A | 必须 `ch::core::ch_literal<0, N>{}` (v0.3.1 M6 上游修复后避免 null impl) |
+| `if (ch_bool)` 运行期条件 | 编译期通过 + 静默取 false (靠 CI grep 兜底) | 同上 (at_stage 闭包内禁运行期 `if(ch_bool)`) |
+
+**7 大借鉴点** (来自 [`docs/methodology/plugin-style-design-methodology-v1.md` §8.3](../methodology/plugin-style-design-methodology-v1.md), Phase 6c W0-M5 落地):
+
+1. `uint_t<N> = ch::core::ch_uint<N>` — 模板切换实现 TLM/CH_MEM 双类型 (`include/cf/plugin/uint_t.h:42-44`)
+2. `PayloadStore` cell 装 ch 代理 — CH_MEM 分支 (`include/cf/plugin/payload.h:99-178`)
+3. `PipeBuilder::elaborate(ctx)` 替代 `run()` — Prereq-1 (`include/cf/plugin/pipe_builder.h:382-432`)
+4. Stage plumbing 自动插 `ch_reg` (M2S) — `include/cf/plugin/pipe_builder.h:313-371` `register_stage_payload_connector`
+5. VexRiscv service 系统简化版 — M2 Spike 1-7 (`pipe_builder.h:313-371`)
+6. `CtrlLink` ch_bool 化 + per-stage OR-merge — `include/cf/plugin/pipe_builder.h:382-414` `CtrlLink::halt_when`
+7. `array_store<T, N>` 后端切 `ch_mem` 编译开关 — `include/cf/plugin/storage.h:124-127`
+
+**8 项 CI 检查** (`tools/check_plugin_portability.sh` 8/8 全列表):
+
+| # | 检查 | 通过条件 |
+|---|------|---------|
+| 1 | at_stage 回调内无 early return | 不用 `if (cond) return;` 包裹主逻辑 |
+| 2 | `_chmem.h` 必须含 `ch_*`; TLM 文件不含 `ch_*` | 双文件物理分离 + `#ifdef CF_PLUGIN_USE_CH_MEM` |
+| 3 | `Plugin::build()` 内不调用 `pb.run()` | CH_MEM 模式走 `pb.elaborate(ctx)` |
+| 4 | 存储优先 `array_store` / `ch_mem` | 替代裸 `std::array` (ADR-040 Tier-2 推荐) |
+| 5 | at_stage 回调内禁 `if(ch_bool)` | C++17 contextual conversion 静默取 false, 靠 CI grep 兜底 |
+| 6 | 源文件禁 `#define CF_PLUGIN_USE_CH_MEM` | 编译开关统一在 CMake `target_compile_definitions` |
+| 7 | TLM-only 文件不含 ch 实例化 | 物理分离 + TLM 模式编时不触碰 ch 类型 |
+| 8 | `PayloadStore` CH_MEM get-miss 抛异常 | `const T& get(key)` fail-fast (v0.3.1 M6 修复) |
 
 ---
 

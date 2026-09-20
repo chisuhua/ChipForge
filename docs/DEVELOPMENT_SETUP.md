@@ -193,6 +193,72 @@ ctest --test-dir build-cpphdl -L base --output-on-failure
 | git status 显示 CppTLM | .gitignore 未配置 | 确认 .gitignore 包含 `/CppTLM` |
 | 跨设备链接失败 | 不同文件系统 | 考虑使用 bind mount 或改用 submodule |
 
+## 6. Phase 6d 工具链安装 (RISC-V + Verilator)
+
+> **Phase 6d 启动前置** ([`openspec/changes/phase-6d-prerequisites/`](../openspec/changes/phase-6d-prerequisites/proposal.md), Oracle 2026-09-20 修订)
+> **当前 build env 状态** (实测 2026-09-20): riscv64 16.1.0 + Verilator 5.052 已预装; yosys/iverilog 缺失 (Oracle descope 为 optional, 非阻塞)
+
+### 6.1 RISC-V 工具链 (riscv64-unknown-elf-gcc)
+
+用于编译 riscv-tests ELF + manual_elf/*.S sanity check:
+
+```bash
+# Ubuntu 24.04 noble / Ubuntu 22.04 jammy (apt 直接装)
+sudo apt-get update
+sudo apt-get install -y gcc-riscv64-unknown-elf
+
+# 验证
+riscv64-unknown-elf-gcc --version  # 期望 GNU 12+ (apt 默认)
+which riscv64-unknown-elf-gcc       # /usr/bin/riscv64-unknown-elf-gcc
+
+# Sanity: 编译 manual_elf/add.S
+riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib \
+  -o /tmp/add.elf tests/cpu/manual_elf/add.S
+file /tmp/add.elf                   # 期望 ELF 32-bit LSB executable, UCB RISC-V
+```
+
+> **注意**: 现有 vendored ELFs (`tests/cpu/riscv_tests/elf/`) 用 GCC 15.2.0 构建, 6d.4 测试**不需要重新编译**, 但 Phase 6d.5+ 新增测试需要 apt 工具链可编译。
+
+### 6.2 Verilator (综合验证工具链)
+
+6d.5 Verilator 集成硬前置; **E7 最小退出标准仅需 `verilator --lint-only`** (无需 yosys):
+
+```bash
+# Ubuntu 24.04 noble (apt 直接装, ≥5.020)
+sudo apt-get install -y verilator
+
+# Ubuntu 22.04 jammy (apt verilator 4.038 < 5.020, 必须源码 build)
+sudo apt-get install -y git cmake make flex bison
+git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
+cd /tmp/verilator && cmake -B build && cmake --build build -j$(nproc) && sudo make install
+
+# 验证
+verilator --version  # 期望 Verilator 5.020+
+which verilator      # /usr/bin/verilator
+
+# Sanity: lint minimal stub
+cat > /tmp/hello.v <<'VEND'
+module hello(input wire a, input wire b, output wire sum);
+  assign sum = a ^ b;
+endmodule
+VEND
+verilator --lint-only /tmp/hello.v
+```
+
+### 6.3 yosys / iverilog (Oracle descope 为 optional)
+
+**不阻塞 Phase 6d 启动**。`tasks.md 5.6` 已标 yosys 可选, iverilog 6d 全部任务中**零引用**。E1-E6 (最小退出) 不依赖, E7 (标准退出) 仅需 Verilator。
+
+### 6.4 故障排查 (Phase 6d 工具链)
+
+| 问题 | 原因 | 解决方案 |
+|------|------|---------|
+| apt 源无 `gcc-riscv64-unknown-elf` | universe 未启用 | `sudo add-apt-repository universe && sudo apt-get update` |
+| jammy verilator 4.038 < 5.020 | apt 版本太老 | 源码 build Verilator v5.020 (见 §6.2) |
+| `verilator --lint-only` 报 UNOPTFLAT | Verilog stub 太简单 | 添加 `/* verilator lint_off */` 或扩充 stub |
+| riscv64 工具链编译失败 (对齐问题) | -march 错误 | 强制 `-march=rv32i -mabi=ilp32`, 不用 `-march=rv32imac` |
+
+
 ## 6. 相关文档
 - [项目架构总览](architecture/overview.md)
 - [核心技术选型](architecture/tech-selection.md)

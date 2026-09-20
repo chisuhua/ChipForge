@@ -107,7 +107,7 @@ Phase 6d 的所有设计决策来源于:
 - **ADR-046** (2026-09-16): 多周期协议引擎豁免 (`CF_PLUGIN_USE_FSM_EXEMPT` 机制, `chlib::ch_state_machine` DSL)
 - **Phase 6c 研究文档**: [`docs/research/phase6c-elaboration-pattern-study.md`](../../research/phase6c-elaboration-pattern-study.md) §11-13 (SpinalHDL/VexRiscv/CppHDL elaboration 原理 + cf::plugin 映射)
 - **DECISION-2026-06-13-02 F1.A** (Phase 1.4): L1CachePlugin 设计方法学基线
-- **待修订**: ~~ADR-037 v2.0 (D4 范式在 elaboration 语义下兑现, 推迟自 Phase 6c W9, 6d 启动前必做)~~ → **Oracle 2026-09-20 修正**: `adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17)`, D10/D11/D12 已写完。`phase-6d-prerequisites` Prereq #3 仅验证内容完整 + 修 `adr.md:1251` 拆分描述不一致, 无新撰写。
+- **Oracle 2026-09-20 确认**: ~~ADR-037 v2.0 (D4 范式在 elaboration 语义下兑现, 推迟自 Phase 6c W9, 6d 启动前必做)~~ → `adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17)`, D10/D11/D12 已写完。`phase-6d-prerequisites` Prereq #3 仅验证内容完整 + 修 `adr.md:1251` 拆分描述不一致, 无新撰写。
 
 任何对 Phase 6d 范围/接口的修改, **必须**同步更新决策记录 + ADR。
 
