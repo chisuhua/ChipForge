@@ -27,7 +27,8 @@
 | Phase 3 | [RTOS 测试套件](../../soc/cpu/docs/roadmap/phase-3-rtos.md) | Not Started | FreeRTOS + Zephyr |
 | Phase 4 | [Linux 启动支持](../../soc/cpu/docs/roadmap/phase-4-linux.md) | Not Started | OpenSBI + Linux Kernel |
 | Phase 5 | [RTL 协同验证 + Verilog 生成](../../soc/cpu/docs/roadmap/phase-5-rtl.md) | Not Started | CppHDL RTL 与 TLM 对比 |
-| **Phase 6** | [完整 PipeBuilder 框架 + RTL 生成](phases/phase-6-declarative.md) | Not Started | 完整调度算法 + RTL 生成（推迟的 Phase 1a/1b/1c）|
+| **Phase 6** | [完整 PipeBuilder 框架 + RTL 生成](phases/phase-6-declarative.md) | ✅ 6c Completed (2026-09-20) / ⏸ 6d 待启动 | **CH_MEM 是新正道** (ADR-040 v2.0), 端到端 PoC 16/16 PASS |
+| **Phase 6d** | **[5-stage Pipeline CH_MEM + Verilator + MMU FSM](phases/phase-6d-rtl-verification.md)** | **⏸ Not Started** | **riscv-tests RV32I 5 指令 tohost=1 + Verilator 集成 + 多周期 FSM** (依赖 prereqs: 工具链 + ADR-037 v2.0) |
 
 ### 其他
 
