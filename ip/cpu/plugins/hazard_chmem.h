@@ -188,61 +188,57 @@ class HazardPlugin : public cf::plugin::PluginBase {
   void detect_raw_hazard(cf::plugin::PipeBuilder& pb) {
     using KeyType = cf::cpu::core::payload::keys<T, XLEN>;
 
-    // ── Step 1: ID/decode stage rs1/rs2 ─────────────────────────────────
-    auto* id_node = pb.node_of_logic_stage("decode").get();
-    if (!id_node) {
+    if (auto* id_node = pb.node_of_logic_stage("decode").get()) {
+      const auto& dec = id_node->operator()(KeyType::DECODE);
+
+      // 5-bit 源寄存器索引 (从 DecodePayload uint8_t 字段转换)
+      auto id_rs1 = static_cast<ch::core::ch_uint<5>>(
+          static_cast<std::uint32_t>(dec.rs1_idx));
+      auto id_rs2 = static_cast<ch::core::ch_uint<5>>(
+          static_cast<std::uint32_t>(dec.rs2_idx));
+      bool id_reads_rs1 = dec.reads_rs1;
+      bool id_reads_rs2 = dec.reads_rs2;
+
+      // ── Step 2: EX/MEM/WB stage rd ──────────────────────────────
+      // 辅助 lambda: 读某 stage 的 rd_idx + writes_rd
+      auto get_stage_rd = [&](const std::string& stage_name)
+          -> std::pair<ch::core::ch_uint<5>, bool> {
+        if (auto* n = pb.node_of_logic_stage(stage_name).get()) {
+          const auto& d = n->operator()(KeyType::DECODE);
+          return {static_cast<ch::core::ch_uint<5>>(
+                      static_cast<std::uint32_t>(d.rd_idx)),
+                  d.writes_rd};
+        }
+        return {ch::core::ch_uint<5>(ch::core::ch_literal<0, 5>{}), false};
+      };
+
+      auto [ex_rd,  ex_writes]  = get_stage_rd("execute");
+      auto [mem_rd, mem_writes] = get_stage_rd("memory");
+      auto [wb_rd,  wb_writes]  = get_stage_rd("writeback");
+
+      // ── Step 3: RAW detection via raw_hazard_complete ──────────────
+      // raw_hazard_complete 提供 9 条件 (6 数据 + 3 x0 屏蔽)
+      ch::core::ch_bool raw =
+          raw_hazard_complete(id_rs1, id_rs2, ex_rd, mem_rd, wb_rd);
+
+      // Writes_rd 过滤: 仅当飞行中指令确实写 rd 才 stall
+      ch::core::ch_bool writes_any =
+          ch::core::ch_bool(ex_writes)  ||
+          ch::core::ch_bool(mem_writes) ||
+          ch::core::ch_bool(wb_writes);
+
+      // Reads_rs 过滤: 仅当 decode 指令确实读 rs 才 stall
+      ch::core::ch_bool reads_any =
+          ch::core::ch_bool(id_reads_rs1 || id_reads_rs2);
+
+      ch::core::ch_bool result = raw && writes_any && reads_any;
+
+      if (stall_ctrl_) {
+        stall_ctrl_->halt_when(result);
+      }
+    } else {
       // Node 不存在 (3-stage 等场景): 无操作, halt_when(false)
       if (stall_ctrl_) stall_ctrl_->halt_when(ch::core::ch_bool(false));
-      return;
-    }
-
-    const auto& dec = id_node->operator()(KeyType::DECODE);
-
-    // 5-bit 源寄存器索引 (从 DecodePayload uint8_t 字段转换)
-    auto id_rs1 = static_cast<ch::core::ch_uint<5>>(
-        static_cast<std::uint32_t>(dec.rs1_idx));
-    auto id_rs2 = static_cast<ch::core::ch_uint<5>>(
-        static_cast<std::uint32_t>(dec.rs2_idx));
-    bool id_reads_rs1 = dec.reads_rs1;
-    bool id_reads_rs2 = dec.reads_rs2;
-
-    // ── Step 2: EX/MEM/WB stage rd ─────────────────────────────────────
-    // 辅助 lambda: 读某 stage 的 rd_idx + writes_rd
-    auto get_stage_rd = [&](const std::string& stage_name)
-        -> std::pair<ch::core::ch_uint<5>, bool> {
-      auto* n = pb.node_of_logic_stage(stage_name).get();
-      if (!n) {
-        return {ch::core::ch_uint<5>(ch::core::ch_literal<0, 5>{}), false};
-      }
-      const auto& d = n->operator()(KeyType::DECODE);
-      return {static_cast<ch::core::ch_uint<5>>(
-                  static_cast<std::uint32_t>(d.rd_idx)),
-              d.writes_rd};
-    };
-
-    auto [ex_rd,  ex_writes]  = get_stage_rd("execute");
-    auto [mem_rd, mem_writes] = get_stage_rd("memory");
-    auto [wb_rd,  wb_writes]  = get_stage_rd("writeback");
-
-    // ── Step 3: RAW detection via raw_hazard_complete ──────────────────
-    // raw_hazard_complete 提供 9 条件 (6 数据 + 3 x0 屏蔽)
-    ch::core::ch_bool raw =
-        raw_hazard_complete(id_rs1, id_rs2, ex_rd, mem_rd, wb_rd);
-
-    // Writes_rd 过滤: 仅当飞行中指令确实写 rd 才 stall
-    ch::core::ch_bool writes_any =
-        ch::core::ch_bool(ex_writes)  ||
-        ch::core::ch_bool(mem_writes) ||
-        ch::core::ch_bool(wb_writes);
-
-    // Reads_rs 过滤: 仅当 decode 指令确实读 rs 才 stall
-    ch::core::ch_bool reads_any =
-        ch::core::ch_bool(id_reads_rs1 || id_reads_rs2);
-
-    ch::core::ch_bool result = raw && writes_any && reads_any;
-
-    if (stall_ctrl_) {
-      stall_ctrl_->halt_when(result);
     }
   }
 
