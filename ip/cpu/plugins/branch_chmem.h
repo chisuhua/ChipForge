@@ -109,6 +109,9 @@ class BranchPlugin : public PluginBase {
   BranchPlugin(const BranchPlugin&) = delete;
   BranchPlugin& operator=(const BranchPlugin&) = delete;
 
+  // 公开 BRANCH_TAKEN key getter (Phase 6d 6d.3: 供 IBusPlugin/Factory 读取分支结果)
+  static const Payload<ch::core::ch_bool>& get_branch_taken_key() { return BRANCH_TAKEN; }
+
   // --------------------------------------------------------------------------
   // setup — 创建 CtrlLink 并注册 at_stage("branch") 回调
   //

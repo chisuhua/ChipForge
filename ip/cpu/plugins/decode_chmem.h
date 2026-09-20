@@ -404,16 +404,18 @@ class RiscvDecodePluginChmem : public PluginBase {
       n->operator()(RiscvDecodePluginChmem::DECODED_INST) = decoded;
 
       // ---------------------------------------------------------------
-      // Step 13: 同步填充 DecodePayload + RiscvDecodeDetail (elaboration-time)
-      //   供现有 IntAluPlugin / BranchPlugin / HazardPlugin 读取 POD 字段
-      //   Phase 6d.3 迁移到 DECODED_INST 后此项可简化
+      // Step 13: 保留 DECODE + RISCV_DETAIL 默认值 (elaboration-time static)
+      //   供旧 Plugin (RegFile/Hazard/IntAlu/Branch) 读 POD 字段.
+      //   CH_MEM 运行期译码以 DECODED_INST (ch 信号) 为准;
+      //   旧 Plugin 读 POD 字段, 值恒为 EARLY-populate 的默认值.
+      //   Phase 6d.5+ 迁移到 DECODED_INST 后此步可删除.
       // ---------------------------------------------------------------
-      auto& dec = n->operator()(KT::DECODE);
-      auto& rv  = n->operator()(RvKey::RISCV_DETAIL);
-      // CH_MEM 运行期译码值以 DECODED_INST (ch 信号) 为准
-      // DecodePayload POD 字段保留默认值 (elaboration-time 不会导致 miss)
-      (void)dec;
-      (void)rv;
+      {
+        auto& dec = n->operator()(KT::DECODE);
+        auto& rv  = n->operator()(RvKey::RISCV_DETAIL);
+        (void)dec;
+        (void)rv;
+      }
       }  // end if (n)
     });
   }
