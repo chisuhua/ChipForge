@@ -58,6 +58,8 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/arch/riscv/decoder_table.h"
+#include "ip/cpu/plugins/decode_chmem.h"
 
 // 注: ctrl_link.h 在 CH_MEM 模式下已包含 <ch.hpp> + <core/bool.h>,
 //     因此 ch::core::ch_bool / ch::core::ch_uint / ch::core::ch_literal 在此可用.
@@ -186,30 +188,26 @@ class HazardPlugin : public cf::plugin::PluginBase {
   //   - ch::core::ch_literal<V, W> 构造字面值, 不使用 _d 后缀
   // --------------------------------------------------------------------------
   void detect_raw_hazard(cf::plugin::PipeBuilder& pb) {
-    using KeyType = cf::cpu::core::payload::keys<T, XLEN>;
-
     if (auto* id_node = pb.node_of_logic_stage("decode").get()) {
-      const auto& dec = id_node->operator()(KeyType::DECODE);
+      using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+      const auto& decoded = id_node->operator()(DecodePlugin::DECODED_INST);
 
-      // 5-bit 源寄存器索引 (从 DecodePayload uint8_t 字段转换)
-      auto id_rs1 = static_cast<ch::core::ch_uint<5>>(
-          static_cast<std::uint32_t>(dec.rs1_idx));
-      auto id_rs2 = static_cast<ch::core::ch_uint<5>>(
-          static_cast<std::uint32_t>(dec.rs2_idx));
-      bool id_reads_rs1 = dec.reads_rs1;
-      bool id_reads_rs2 = dec.reads_rs2;
+      // 5-bit 源寄存器索引 (已 ch_uint<5>, 无需 POD→ch 转换)
+      auto id_rs1 = decoded.rs1_idx;
+      auto id_rs2 = decoded.rs2_idx;
+      auto id_reads_rs1 = decoded.reads_rs1;  // ch_bool
+      auto id_reads_rs2 = decoded.reads_rs2;  // ch_bool
 
       // ── Step 2: EX/MEM/WB stage rd ──────────────────────────────
-      // 辅助 lambda: 读某 stage 的 rd_idx + writes_rd
+      // 辅助 lambda: 读某 stage 的 rd_idx + writes_rd (从 DECODED_INST)
       auto get_stage_rd = [&](const std::string& stage_name)
-          -> std::pair<ch::core::ch_uint<5>, bool> {
+          -> std::pair<ch::core::ch_uint<5>, ch::core::ch_bool> {
         if (auto* n = pb.node_of_logic_stage(stage_name).get()) {
-          const auto& d = n->operator()(KeyType::DECODE);
-          return {static_cast<ch::core::ch_uint<5>>(
-                      static_cast<std::uint32_t>(d.rd_idx)),
-                  d.writes_rd};
+          using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+          const auto& d = n->operator()(DecodePlugin::DECODED_INST);
+          return {d.rd_idx, d.writes_rd};
         }
-        return {ch::core::ch_uint<5>(ch::core::ch_literal<0, 5>{}), false};
+        return {ch::core::ch_uint<5>(ch::core::ch_literal<0, 5>{}), ch::core::ch_bool(false)};
       };
 
       auto [ex_rd,  ex_writes]  = get_stage_rd("execute");
@@ -221,15 +219,11 @@ class HazardPlugin : public cf::plugin::PluginBase {
       ch::core::ch_bool raw =
           raw_hazard_complete(id_rs1, id_rs2, ex_rd, mem_rd, wb_rd);
 
-      // Writes_rd 过滤: 仅当飞行中指令确实写 rd 才 stall
-      ch::core::ch_bool writes_any =
-          ch::core::ch_bool(ex_writes)  ||
-          ch::core::ch_bool(mem_writes) ||
-          ch::core::ch_bool(wb_writes);
+      // Writes_rd 过滤: 仅当飞行中指令确实写 rd 才 stall (已 ch_bool)
+      ch::core::ch_bool writes_any = ex_writes || mem_writes || wb_writes;
 
-      // Reads_rs 过滤: 仅当 decode 指令确实读 rs 才 stall
-      ch::core::ch_bool reads_any =
-          ch::core::ch_bool(id_reads_rs1 || id_reads_rs2);
+      // Reads_rs 过滤: 仅当 decode 指令确实读 rs 才 stall (已 ch_bool)
+      ch::core::ch_bool reads_any = id_reads_rs1 || id_reads_rs2;
 
       ch::core::ch_bool result = raw && writes_any && reads_any;
 

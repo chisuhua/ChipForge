@@ -63,6 +63,8 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/arch/riscv/decoder_table.h"
+#include "ip/cpu/plugins/decode_chmem.h"
 
 using namespace cf::plugin;
 using namespace ch;
@@ -103,16 +105,20 @@ class RegFilePlugin : public PluginBase {
   RegFilePlugin(const RegFilePlugin&) = delete;
   RegFilePlugin& operator=(const RegFilePlugin&) = delete;
 
-  // setup — 注册 at_stage 回调 (M3 Prereq-3: 从 build 移到 setup)
+  // setup — 注册 writeback 回调 (M3 Prereq-3)
   void setup(PipeBuilder& pb) override {
-    pb.at_stage("decode", Phase::NORMAL,
-                [this, &pb] { this->id_decode(pb); });
     pb.at_stage("writeback", Phase::LATE,
                 [this, &pb] { this->wb_writeback(pb); });
   }
 
-  // build — 空 (所有闭包在 setup 注册)
-  void build(PipeBuilder&) override {}
+  // build — 注册 id_decode (decode NORMAL)
+  // 注意: id_decode 必须在 Decoder::build 注册的 decode_closure 之后,
+  // 因此不能放 setup (setup 在所有 build 之前执行). 工厂侧需将 Decoder
+  // 注册在 RegFile 之前 (见 cpu_factory_chmem.h).
+  void build(PipeBuilder& pb) override {
+    pb.at_stage("decode", Phase::NORMAL,
+                [this, &pb] { this->id_decode(pb); });
+  }
 
   // 单元测试辅助 API (PoC: 与 TLM 版本接口一致)
   T read_reg(std::size_t idx, std::uint8_t /*tid*/ = 0) const {
@@ -164,24 +170,31 @@ class RegFilePlugin : public PluginBase {
 
     auto* n = pb.node_of_logic_stage("decode").get();
     if (n) {
-      const auto& dec = n->operator()(KeyType::DECODE);
-      addr_t rs1_addr = static_cast<addr_t>(dec.rs1_idx);
-      addr_t rs2_addr = static_cast<addr_t>(dec.rs2_idx);
+      using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+      if (n->payloads().has(DecodePlugin::DECODED_INST)) {
+        const auto& decoded = n->operator()(DecodePlugin::DECODED_INST);
+        addr_t rs1_addr = decoded.rs1_idx;  // 已 ch_uint<5>
+        addr_t rs2_addr = decoded.rs2_idx;
 
-      if (dec.reads_rs1) {
+        // Select tree for RS1 (无运行期 if(ch_bool), D4 合规)
         ch_uint<kXlenBits> rs1_data(ch::core::ch_literal<0, 1>{}, "rs1_data");
         for (std::size_t i = 1; i < kNumRegs; ++i) {
-          rs1_data = select(rs1_addr == addr_t(i), regs[i], rs1_data);
+          auto sel = (rs1_addr == addr_t(i)) && decoded.reads_rs1;
+          rs1_data = select(sel, regs[i], rs1_data);
         }
         n->operator()(KeyType::RS1) = rs1_data;
-      }
 
-      if (dec.reads_rs2) {
+        // Select tree for RS2
         ch_uint<kXlenBits> rs2_data(ch::core::ch_literal<0, 1>{}, "rs2_data");
         for (std::size_t i = 1; i < kNumRegs; ++i) {
-          rs2_data = select(rs2_addr == addr_t(i), regs[i], rs2_data);
+          auto sel = (rs2_addr == addr_t(i)) && decoded.reads_rs2;
+          rs2_data = select(sel, regs[i], rs2_data);
         }
         n->operator()(KeyType::RS2) = rs2_data;
+      } else {
+        // 无 DECODED_INST (单元级 PoC 测试): 输出零值, 防 null handle SEGV
+        n->operator()(KeyType::RS1) = T(ch::core::ch_literal<0, 32>{});
+        n->operator()(KeyType::RS2) = T(ch::core::ch_literal<0, 32>{});
       }
     }
   }
@@ -193,10 +206,17 @@ class RegFilePlugin : public PluginBase {
 
     auto* n = pb.node_of_logic_stage("writeback").get();
     if (n) {
-      const auto& dec = n->operator()(KeyType::DECODE);
-      addr_t rd_addr = static_cast<addr_t>(dec.rd_idx);
-      // 注: ch_bool() 包装避免 operator&& 在 bool/ch_bool 之间歧义
-      ch_bool we = ch_bool(dec.writes_rd) && (rd_addr != addr_t(0));
+      using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+      // 缺省 we: DECODED_INST 缺失时全禁用写 (单元级 PoC 无译码信号)
+      ch_bool we = ch_bool(false);
+      addr_t rd_addr = addr_t(0);
+      if (n->payloads().has(DecodePlugin::DECODED_INST) &&
+          n->payloads().has(KeyType::RD_DATA)) {
+        const auto& decoded = n->operator()(DecodePlugin::DECODED_INST);
+        rd_addr = decoded.rd_idx;  // 已 ch_uint<5>
+        // x0 屏蔽: writes_rd (ch_bool) && rd != 0
+        we = decoded.writes_rd && (rd_addr != addr_t(0));
+      }
 
       // 32 路条件写: reg[i]->next = select(we && rd_addr == i, rd_data, reg[i])
       for (std::size_t i = 1; i < kNumRegs; ++i) {

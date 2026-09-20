@@ -61,7 +61,7 @@
 #include "ip/cpu/arch/riscv/decoder_table.h"
 #include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/core/payload_common.h"
-
+#include "ip/cpu/plugins/decode_chmem.h"
 using namespace cf::plugin;
 using namespace ch;
 using namespace ch::core;
@@ -162,20 +162,22 @@ class BranchPlugin : public PluginBase {
       auto rs1_val = n->operator()(KeyType::RS1);
       auto rs2_val = n->operator()(KeyType::RS2);
       auto pc_val  = n->operator()(KeyType::PC);
-      const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+      using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+      const auto& decoded = n->operator()(DecodePlugin::DECODED_INST);
 
       // ── 2. branch_target = pc + imm (pc-relative, always for B-type) ──
-      auto branch_target = pc_val + static_cast<T>(rv.imm);
+      auto branch_target = pc_val + decoded.imm;
 
-      // ── 3. B-type funct3 判别 (6 op) ──
-      // 注: C++ 比较 + ch_bool() 包装 (避免 ch_uint<N>(int) 重载歧义和字面值宽度问题)
-      auto is_branch = ch_bool(rv.opcode == opcode::OP_BRANCH);
-      auto is_beq   = is_branch && ch_bool(rv.funct3 == 0);
-      auto is_bne   = is_branch && ch_bool(rv.funct3 == 1);
-      auto is_blt   = is_branch && ch_bool(rv.funct3 == 4);
-      auto is_bge   = is_branch && ch_bool(rv.funct3 == 5);
-      auto is_bltu  = is_branch && ch_bool(rv.funct3 == 6);
-      auto is_bgeu  = is_branch && ch_bool(rv.funct3 == 7);
+      // ── 3. opcode 判别 (ch 信号, DECODED_INST) ──
+      auto is_branch = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_BRANCH, 7>{}));
+      auto is_jal    = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_JAL, 7>{}));
+      // JALR 支持推迟 (Phase 6d follow-up): 需 rs1 + imm 目标计算 + rd 写回
+      auto is_beq   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<0, 3>{}));
+      auto is_bne   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<1, 3>{}));
+      auto is_blt   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<4, 3>{}));
+      auto is_bge   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<5, 3>{}));
+      auto is_bltu  = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<6, 3>{}));
+      auto is_bgeu  = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<7, 3>{}));
 
       // BEQ: rs1 == rs2
       auto beq_taken = ch_bool(rs1_val == rs2_val);
@@ -209,6 +211,10 @@ class BranchPlugin : public PluginBase {
       taken = select(is_bge,   ge_signed,   taken);
       taken = select(is_bltu,  lt_unsigned, taken);
       taken = select(is_bgeu,  ge_unsigned, taken);
+
+      // ── JAL: 无条件跳转 (pc + imm) ──
+      taken = select(is_jal, ch::core::ch_bool(true), taken);
+      // JALR: 推迟 (defer for now — 需 rs1 值计算 target = (rs1 + imm) & ~1)
 
       // ── 4. 写 PayloadStore ──
       n->operator()(BRANCH_TAKEN) = taken;

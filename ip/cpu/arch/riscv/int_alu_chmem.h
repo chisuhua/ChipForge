@@ -63,6 +63,7 @@
 #include "ip/cpu/arch/riscv/decoder_table.h"
 #include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/plugins/decode_chmem.h"
 
 using namespace cf::plugin;
 using namespace ch;
@@ -100,7 +101,6 @@ class RiscvIntAluPlugin : public PluginBase {
 
   void build(PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, kXlenBits>;
-    using RvKey = payload_keys_riscv<T>;
 
     pb.at_stage("execute", Phase::NORMAL, [&pb]() {
       auto* n = pb.node_of_logic_stage("execute").get();
@@ -108,8 +108,9 @@ class RiscvIntAluPlugin : public PluginBase {
         // 读输入信号 (ch 类型, elaboration 期 DAG 节点)
       auto rs1_val = n->operator()(KeyType::RS1);
       auto rs2_val = n->operator()(KeyType::RS2);
-      const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
-      const auto& dec = n->operator()(KeyType::DECODE);
+      using DecodePlugin = cf::cpu::plugins::RiscvDecodePluginChmem<T>;
+      if (n->payloads().has(DecodePlugin::DECODED_INST)) {
+      const auto& decoded = n->operator()(DecodePlugin::DECODED_INST);
 
       // ===============================================================
       // CH_MEM 版本: select() 树替代 if/else
@@ -118,32 +119,49 @@ class RiscvIntAluPlugin : public PluginBase {
       // ADDI 不占独立分支 — 与 ADD 共享 datapath, 经 op2 mux 免费获得
       // ===============================================================
       auto pc_val = n->operator()(KeyType::PC);
-      auto imm = static_cast<T>(rv.imm);
-      auto is_auipc = ch_bool(rv.opcode == opcode::OP_AUIPC);
-      auto is_lui   = ch_bool(rv.opcode == opcode::OP_LUI);
+      auto imm = decoded.imm;
+      auto is_auipc = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_AUIPC, 7>{}));
+      auto is_lui   = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_LUI, 7>{}));
 
-      // funct3/funct7 → ALU mux 选择
-      // 注: C++ 比较 + ch_bool() 包装 (避免 ch_uint<N>(int) 重载歧义和字面值宽度问题)
-      // ADD / ADDI: funct3 == 000, funct7 != 0100000
-      // SUB:       funct3 == 000, funct7 == 0100000
-      // SLL:       funct3 == 001
-      // SLT:       funct3 == 010
-      // SLTU:      funct3 == 011
-      // XOR:       funct3 == 100
-      // SRL:       funct3 == 101, funct7 != 0100000
-      // SRA:       funct3 == 101, funct7 == 0100000
-      // OR:        funct3 == 110
-      // AND:       funct3 == 111
-      auto is_add  = ch_bool(rv.funct3 == 0)  && ch_bool(rv.funct7 != 0x20);
-      auto is_sub  = ch_bool(rv.funct3 == 0)  && ch_bool(rv.funct7 == 0x20);
-      auto is_sll  = ch_bool(rv.funct3 == 1);
-      auto is_slt  = ch_bool(rv.funct3 == 2);
-      auto is_sltu = ch_bool(rv.funct3 == 3);
-      auto is_xor  = ch_bool(rv.funct3 == 4);
-      auto is_srl  = ch_bool(rv.funct3 == 5) && ch_bool(rv.funct7 != 0x20);
-      auto is_sra  = ch_bool(rv.funct3 == 5) && ch_bool(rv.funct7 == 0x20);
-      auto is_or   = ch_bool(rv.funct3 == 6);
-      auto is_and  = ch_bool(rv.funct3 == 7);
+      // funct3/funct7 → ALU mux 选择 (ch 信号比较, DECODED_INST)
+      // Opcode gate — 防止 SW (funct3=010) / BEQ (funct3=000) / JAL 等
+      // 误匹配 ALU funct3 判别 (RESULT 恒 0, tohost=1 正确路径)
+      auto is_op    = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_OP,    7>{}));
+      auto is_opimm = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_OPIMM, 7>{}));
+      auto is_op_or_opimm = is_op || is_opimm;
+
+      auto f3_0 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<0, 3>{}));
+      auto f3_1 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<1, 3>{}));
+      auto f3_2 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<2, 3>{}));
+      auto f3_3 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<3, 3>{}));
+      auto f3_4 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<4, 3>{}));
+      auto f3_5 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<5, 3>{}));
+      auto f3_6 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<6, 3>{}));
+      auto f3_7 = (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<7, 3>{}));
+
+      auto f7_00 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x00, 7>{}));
+      auto f7_20 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x20, 7>{}));
+
+      // ADD/ADDI: funct3=000, funct7=0x00 (ADDI 经 op2 mux: reads_rs2=false → op2=imm)
+      auto is_add  = is_op_or_opimm && f3_0 && f7_00;
+      // SUB: OP only, funct3=000, funct7=0x20
+      auto is_sub  = is_op && f3_0 && f7_20;
+      // SLL/SLLI: funct3=001
+      auto is_sll  = is_op_or_opimm && f3_1;
+      // SLT/SLTI: funct3=010
+      auto is_slt  = is_op_or_opimm && f3_2;
+      // SLTU/SLTIU: funct3=011
+      auto is_sltu = is_op_or_opimm && f3_3;
+      // XOR/XORI: funct3=100
+      auto is_xor  = is_op_or_opimm && f3_4;
+      // SRL/SRLI: funct3=101, funct7=0x00
+      auto is_srl  = is_op_or_opimm && f3_5 && f7_00;
+      // SRA/SRAI: funct3=101, funct7=0x20
+      auto is_sra  = is_op_or_opimm && f3_5 && f7_20;
+      // OR/ORI: funct3=110
+      auto is_or   = is_op_or_opimm && f3_6;
+      // AND/ANDI: funct3=111
+      auto is_and  = is_op_or_opimm && f3_7;
 
       // 10 R-type ALU ops + implicit default = 11 层 select 树
       // 注: 用 ch_literal<V, W> 显式宽度, 避开 _d 后缀字面值的字符解析限制
@@ -153,9 +171,15 @@ class RiscvIntAluPlugin : public PluginBase {
       result = select(is_auipc, pc_val + imm, result);
       result = select(is_lui, imm, result);
 
+      // ── STORE / LOAD: 有效地址 = rs1 + imm (DMem 用 RESULT 作字节地址) ──
+      // SW x4,0(x0) → addr = x0 + 0 = 0 (tohost 正确路径)
+      auto is_store = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_STORE, 7>{}));
+      auto is_load  = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_LOAD,  7>{}));
+      result = select(is_store || is_load, rs1_val + imm, result);
+
       // I-type vs R-type: op2 = imm (I-type) or rs2_val (R-type)
       // ADDI 通过此 mux 与 ADD 共享 datapath
-      auto op2 = select(ch_bool(dec.reads_rs2), rs2_val, imm);
+      auto op2 = select(decoded.reads_rs2, rs2_val, imm);
 
       // ── 计算各 ALU 结果 ──
       // 注: ch_literal<V, W> 显式宽度构造, 避 _d 字面值的字符解析限制
@@ -212,6 +236,11 @@ class RiscvIntAluPlugin : public PluginBase {
       // CH_MEM: 赋值即发射 lnode DAG assign 节点
       n->operator()(KeyType::RD_DATA) = result;
       n->operator()(KeyType::RESULT)  = result;
+      } else {
+        // 单元级 PoC (m3_poc_alu_elaborate): 无 DECODED_INST → 输出零值
+        n->operator()(KeyType::RD_DATA) = T(ch::core::ch_literal<0, 32>{});
+        n->operator()(KeyType::RESULT)  = T(ch::core::ch_literal<0, 32>{});
+      }
       }  // end if (n)
     });
   }
