@@ -84,12 +84,31 @@ class HelloComponent : public ch::Component {
   }
 };
 
+// =========================================================================
+// ChmemPocFixture: CH_MEM PoC 测试隔离 fixture (Phase 6c PoC Follow-up Fix #2)
+//   - 每个 TEST_CASE_METHOD 构造时创建 fresh context 并 set_as_current_context
+//   - 析构时 reset() 触发 ctx_swap 还原 ctx_curr_ 到 nullptr
+//   - 解决全量跑 chipforge_tests_chmem 时 thread_local ctx_curr_ 污染问题
+// =========================================================================
+class ChmemPocFixture {
+ public:
+  ChmemPocFixture() {
+    ctx_ = std::make_unique<ch::core::context>("chmem_poc_ctx");
+    ctx_->set_as_current_context();
+  }
+  ~ChmemPocFixture() {
+    ctx_.reset();  // ctx_curr_ 还原 (nullptr)
+  }
+ private:
+  std::unique_ptr<ch::core::context> ctx_;
+};
+
 }  // namespace
 
 // =========================================================================
 // PoC #1: ch::ch_device 顶层组装
 // =========================================================================
-TEST_CASE("cpphdl_poc_ch_device_construct", "[framework][cpphdl][poc]") {
+TEST_CASE_METHOD(ChmemPocFixture, "cpphdl_poc_ch_device_construct", "[framework][cpphdl][poc]") {
   // ch::ch_device<HelloComponent> 自动 build() on construction
   ch::ch_device<HelloComponent> dev;
   REQUIRE(dev.instance().context() != nullptr);
@@ -99,7 +118,7 @@ TEST_CASE("cpphdl_poc_ch_device_construct", "[framework][cpphdl][poc]") {
 // =========================================================================
 // PoC #2: ch::toVerilog 输出 Verilog
 // =========================================================================
-TEST_CASE("cpphdl_poc_to_verilog", "[framework][cpphdl][poc]") {
+TEST_CASE_METHOD(ChmemPocFixture, "cpphdl_poc_to_verilog", "[framework][cpphdl][poc]") {
   // Top-level component with its own context
   ch::ch_device<HelloComponent> dev;
 
@@ -124,7 +143,7 @@ TEST_CASE("cpphdl_poc_to_verilog", "[framework][cpphdl][poc]") {
 // =========================================================================
 // PoC #3: Simulator tick + set_input_value + get_value 驱动 ch_reg
 // =========================================================================
-TEST_CASE("cpphdl_poc_simulator_tick", "[framework][cpphdl][poc]") {
+TEST_CASE_METHOD(ChmemPocFixture, "cpphdl_poc_simulator_tick", "[framework][cpphdl][poc]") {
   ch::ch_device<HelloComponent> dev;
   ch::Simulator sim(dev.instance().context());
   sim.reset();
@@ -156,17 +175,10 @@ TEST_CASE("cpphdl_poc_simulator_tick", "[framework][cpphdl][poc]") {
 //
 // 本 PoC 故意写 if(ch_bool_var) 验证: (a) 编译期通过 (b) 运行期语义正确
 // =========================================================================
-TEST_CASE("cpphdl_poc_chbool_contextual_conversion", "[framework][cpphdl][poc]") {
-  // 每个 leaf SECTION 都会重新跑这段 body, 因此 setup 在每个 SECTION 入口
-  // 各建一个 fresh context (W0 PoC 阶段无 CppHDL fixture, 直接裸 ctx).
-  // Phase 6c W0 已知问题修复: 无 setup 时 SECTION 1/2 进入后 ctx_curr_=nullptr
-  // (前一个 TEST_CASE 的 ch_device 析构时 ctx_swap 还原为 null),
-  // ch_bool ctor 调用 build_literal 报 "No active context" 并返回 nullptr,
-  // 导致 if(b)/static_cast<bool>(x) 拿到的是 false 而非字面值.
-  // SECTION 3 "ch_bool = ch_bool" 因不读 to_bool, 反而偶然 PASS.
-  // 修复: 每个 SECTION 入口前 set_as_current_context() 提供 active ctx.
-  ch::core::context chbool_ctx("chbool_poc_ctx");
-  chbool_ctx.set_as_current_context();
+TEST_CASE_METHOD(ChmemPocFixture, "cpphdl_poc_chbool_contextual_conversion", "[framework][cpphdl][poc]") {
+  // Phase 6c PoC Follow-up Fix #2: 由 ChmemPocFixture 在 TEST_CASE_METHOD 构造时
+  //   创建 fresh context 并 set_as_current_context, 析构时 reset 还原 ctx_curr_
+  // 不再需要手动 ch::core::context + set_as_current_context() (旧代码已删除).
 
   SECTION("ch_bool to bool in if (contextual conversion)") {
     ch_bool a(false, "a_bool");
@@ -197,7 +209,7 @@ TEST_CASE("cpphdl_poc_chbool_contextual_conversion", "[framework][cpphdl][poc]")
 // =========================================================================
 // PoC #5: ch_uint<N> 算术 (a + b) 通过 node_builder 发射 lnode add
 // =========================================================================
-TEST_CASE("cpphdl_poc_chuint_arith", "[framework][cpphdl][poc]") {
+TEST_CASE_METHOD(ChmemPocFixture, "cpphdl_poc_chuint_arith", "[framework][cpphdl][poc]") {
   ch::ch_device<HelloComponent> dev;
   ch::Simulator sim(dev.instance().context());
   sim.reset();
@@ -215,7 +227,7 @@ TEST_CASE("cpphdl_poc_chuint_arith", "[framework][cpphdl][poc]") {
 // =========================================================================
 // 综合验证
 // =========================================================================
-TEST_CASE("cpphdl_poc_full_chain", "[framework][cpphdl][poc][summary]") {
+TEST_CASE_METHOD(ChmemPocFixture, "cpphdl_poc_full_chain", "[framework][cpphdl][poc][summary]") {
   // 完整链路: ch_device → toVerilog → Simulator → tick
   ch::ch_device<HelloComponent> dev;
   ch::toVerilog("/tmp/cpphdl_poc_full.v", dev.instance().context());

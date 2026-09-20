@@ -98,6 +98,53 @@ class HazardPlugin : public cf::plugin::PluginBase {
   HazardPlugin& operator=(const HazardPlugin&) = delete;
 
   // --------------------------------------------------------------------------
+  // raw_hazard — PoC 6 条件 RAW 检测 (向后兼容)
+  //
+  // 检查 id_rs1/id_rs2 是否与 ex/mem/wb 任何阶段 rd 匹配.
+  // 不含 x0 屏蔽 — 调用方自己处理 x0 排除.
+  // --------------------------------------------------------------------------
+  static ch::core::ch_bool raw_hazard(
+      ch::core::ch_uint<5> id_rs1, ch::core::ch_uint<5> id_rs2,
+      ch::core::ch_uint<5> ex_rd,
+      ch::core::ch_uint<5> mem_rd,
+      ch::core::ch_uint<5> wb_rd) {
+    return (id_rs1 == ex_rd)  || (id_rs2 == ex_rd)  ||
+           (id_rs1 == mem_rd) || (id_rs2 == mem_rd) ||
+           (id_rs1 == wb_rd)  || (id_rs2 == wb_rd);
+  }
+
+  // --------------------------------------------------------------------------
+  // raw_hazard_complete — 完整 9 条件 RAW 检测 (v0.3.2+)
+  //
+  // 6 数据条件 + 3 x0 屏蔽:
+  //   ex_match  = (id_rs1 || id_rs2) == ex_rd  →  && ex_rd  != 0
+  //   mem_match = (id_rs1 || id_rs2) == mem_rd →  && mem_rd != 0
+  //   wb_match  = (id_rs1 || id_rs2) == wb_rd  →  && wb_rd  != 0
+  //
+  // x0 语义: RISC-V x0 始终为 0, 写 x0 是 noop, 不算 RAW.
+  // ch_literal<0,5>{} 使用 v0.3.1 M6 上游修复, 避免 null impl.
+  // --------------------------------------------------------------------------
+  static ch::core::ch_bool raw_hazard_complete(
+      ch::core::ch_uint<5> id_rs1, ch::core::ch_uint<5> id_rs2,
+      ch::core::ch_uint<5> ex_rd,
+      ch::core::ch_uint<5> mem_rd,
+      ch::core::ch_uint<5> wb_rd) {
+    // 数据路径 RAW 检测 (6 条件)
+    ch::core::ch_bool ex_match  = (id_rs1 == ex_rd)  || (id_rs2 == ex_rd);
+    ch::core::ch_bool mem_match = (id_rs1 == mem_rd) || (id_rs2 == mem_rd);
+    ch::core::ch_bool wb_match  = (id_rs1 == wb_rd)  || (id_rs2 == wb_rd);
+
+    // x0 屏蔽 (3 条件): 写 x0 是 noop, 不算 RAW
+    auto zero5 = ch::core::ch_uint<5>(ch::core::ch_literal<0, 5>{});
+    ch::core::ch_bool ex_valid  = (ex_rd  != zero5);
+    ch::core::ch_bool mem_valid = (mem_rd != zero5);
+    ch::core::ch_bool wb_valid  = (wb_rd  != zero5);
+
+    // OR-merge: 任一阶段 RAW 且目的非 x0
+    return (ex_match && ex_valid) || (mem_match && mem_valid) || (wb_match && wb_valid);
+  }
+
+  // --------------------------------------------------------------------------
   // setup — 创建 CtrlLink 并注册到 decode stage
   //
   // CH_MEM 模式: CtrlLink 的 halt_when(ch_bool) 会在 elaboration 期
@@ -177,35 +224,25 @@ class HazardPlugin : public cf::plugin::PluginBase {
     auto [mem_rd, mem_writes] = get_stage_rd("memory");
     auto [wb_rd,  wb_writes]  = get_stage_rd("writeback");
 
-    // ── Step 3: 6 路 RAW detection ─────────────────────────────────────
-    // x0 排除常数 (RISC-V: x0 始终保持 0, stall x0 无意义)
-    auto zero5 = ch::core::ch_uint<5>(ch::core::ch_literal<0, 5>{});
+    // ── Step 3: RAW detection via raw_hazard_complete ──────────────────
+    // raw_hazard_complete 提供 9 条件 (6 数据 + 3 x0 屏蔽)
+    ch::core::ch_bool raw =
+        raw_hazard_complete(id_rs1, id_rs2, ex_rd, mem_rd, wb_rd);
 
-    // 非零写回检测 (rd != 0)
-    ch::core::ch_bool ex_ok  = ch::core::ch_bool(ex_writes)  && (ex_rd  != zero5);
-    ch::core::ch_bool mem_ok = ch::core::ch_bool(mem_writes) && (mem_rd != zero5);
-    ch::core::ch_bool wb_ok  = ch::core::ch_bool(wb_writes)  && (wb_rd  != zero5);
+    // Writes_rd 过滤: 仅当飞行中指令确实写 rd 才 stall
+    ch::core::ch_bool writes_any =
+        ch::core::ch_bool(ex_writes)  ||
+        ch::core::ch_bool(mem_writes) ||
+        ch::core::ch_bool(wb_writes);
 
-    // rs1/match: reads_rs1 && writes_rd && rd != 0 && rs_idx == rd_idx
-    ch::core::ch_bool ex_rs1  = ex_ok  && (id_rs1 == ex_rd)
-                                         && ch::core::ch_bool(id_reads_rs1);
-    ch::core::ch_bool ex_rs2  = ex_ok  && (id_rs2 == ex_rd)
-                                         && ch::core::ch_bool(id_reads_rs2);
-    ch::core::ch_bool mem_rs1 = mem_ok && (id_rs1 == mem_rd)
-                                         && ch::core::ch_bool(id_reads_rs1);
-    ch::core::ch_bool mem_rs2 = mem_ok && (id_rs2 == mem_rd)
-                                         && ch::core::ch_bool(id_reads_rs2);
-    ch::core::ch_bool wb_rs1  = wb_ok  && (id_rs1 == wb_rd)
-                                         && ch::core::ch_bool(id_reads_rs1);
-    ch::core::ch_bool wb_rs2  = wb_ok  && (id_rs2 == wb_rd)
-                                         && ch::core::ch_bool(id_reads_rs2);
+    // Reads_rs 过滤: 仅当 decode 指令确实读 rs 才 stall
+    ch::core::ch_bool reads_any =
+        ch::core::ch_bool(id_reads_rs1 || id_reads_rs2);
 
-    // ── OR 合并 → 任意条件满足则产生 RAW hazard ─────────────────────────
-    ch::core::ch_bool raw_hazard =
-        ex_rs1 || ex_rs2 || mem_rs1 || mem_rs2 || wb_rs1 || wb_rs2;
+    ch::core::ch_bool result = raw && writes_any && reads_any;
 
     if (stall_ctrl_) {
-      stall_ctrl_->halt_when(raw_hazard);
+      stall_ctrl_->halt_when(result);
     }
   }
 

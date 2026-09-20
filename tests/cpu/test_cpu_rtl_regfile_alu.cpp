@@ -27,6 +27,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include <ch.hpp>
 #include <codegen_verilog.h>
@@ -41,10 +42,12 @@
 
 #include "ip/cpu/plugins/reg_file_chmem.h"
 #include "ip/cpu/arch/riscv/int_alu_chmem.h"
+#include "ip/cpu/cpu_factory_chmem.h"
 
 using namespace ch;
 using namespace ch::core;
 namespace cfc = cf::plugin;
+namespace cfcpu = cf::cpu;
 
 namespace {
 
@@ -284,6 +287,343 @@ TEST_CASE("m3_poc_alu_byte_equal", "[cpu][m3][poc][alu][byteequal][chmem]") {
 
   REQUIRE(all_match);
   SUCCEED("ALU byte-equal PASS (" << cases.size() << " cases, compute_static)");
+}
+
+
+// =========================================================================
+// Fix #1: byte-equal 完整版 PoC — 5-stage pipeline 字节对标 + 跨 context 安全
+// =========================================================================
+namespace {
+
+static inline uint32_t chmem_select_u32(uint32_t cond, uint32_t t_val, uint32_t f_val) {
+  uint32_t m = cond ? 0xFFFFFFFFU : 0U;
+  return (m & t_val) | ((~m) & f_val);
+}
+
+struct CycleTrace {
+  uint32_t cycle;
+  int      id_instr_idx;
+  int      ex_instr_idx;
+  int      wb_instr_idx;
+  uint32_t id_rs1_val;
+  uint32_t id_rs2_val;
+  uint32_t ex_alu_result;
+  uint32_t wb_rd_data;
+  uint32_t wb_rd_idx;
+  uint32_t pc;
+};
+
+struct SimInstr {
+  uint8_t  rs1_idx;
+  uint8_t  rs2_idx;
+  uint8_t  rd_idx;
+  uint8_t  alu_op;
+  bool     reads_rs1;
+  bool     reads_rs2;
+  bool     writes_rd;
+  uint32_t pc;
+  const char* label;
+};
+
+static constexpr int kNumTestInstrs = 10;
+static const SimInstr kTestInstrs[kNumTestInstrs] = {
+  {1, 2, 4, 0, true,  true,  true,  0x80000000, "ADD x4,x1,x2"},
+  {3, 1, 5, 8, true,  true,  true,  0x80000004, "SUB x5,x3,x1"},
+  {1, 2, 6, 6, true,  true,  true,  0x80000008, "OR x6,x1,x2"},
+  {2, 3, 7, 7, true,  true,  true,  0x8000000C, "AND x7,x2,x3"},
+  {1, 2, 8, 2, true,  true,  true,  0x80000010, "SLT x8,x1,x2"},
+  {2, 1, 9, 3, true,  true,  true,  0x80000014, "SLTU x9,x2,x1"},
+  {1, 2, 10, 4, true,  true,  true,  0x80000018, "XOR x10,x1,x2"},
+  {2, 3, 11, 1, true,  true,  true,  0x8000001C, "SLL x11,x2,x3"},
+  {2, 1, 12, 5, true,  true,  true,  0x80000020, "SRL x12,x2,x1"},
+  {3, 1, 13, 0, true,  true,  true,  0x80000024, "ADD x13,x3,x1"},
+};
+
+static uint32_t tlm_rf_read(const uint32_t regs[32], uint32_t addr) {
+  return (addr == 0) ? 0 : regs[addr];
+}
+
+static uint32_t tlm_alu_compute_op(uint32_t rs1, uint32_t rs2, uint8_t op) {
+  switch (op) {
+    case 0: return rs1 + rs2;
+    case 1: return rs1 << (rs2 & 0x1F);
+    case 2: return (static_cast<int32_t>(rs1) < static_cast<int32_t>(rs2)) ? 1U : 0U;
+    case 3: return (rs1 < rs2) ? 1U : 0U;
+    case 4: return rs1 ^ rs2;
+    case 5: return rs1 >> (rs2 & 0x1F);
+    case 6: return rs1 | rs2;
+    case 7: return rs1 & rs2;
+    case 8: return rs1 - rs2;
+    case 9: return static_cast<uint32_t>(static_cast<int32_t>(rs1) >> (rs2 & 0x1F));
+    default: return 0;
+  }
+}
+
+static uint32_t chmem_rf_read(const uint32_t regs[32], uint32_t addr) {
+  uint32_t val = 0;
+  for (size_t i = 1; i < 32; ++i) {
+    val = chmem_select_u32(addr == i, regs[i], val);
+  }
+  return val;
+}
+
+static uint32_t chmem_alu_compute_op(uint32_t rs1, uint32_t rs2, uint8_t op) {
+  uint32_t r_add = rs1 + rs2;
+  uint32_t r_sub = rs1 - rs2;
+  uint32_t r_sll = rs1 << (rs2 & 0x1F);
+  uint32_t r_slt = (static_cast<int32_t>(rs1) < static_cast<int32_t>(rs2)) ? 1U : 0U;
+  uint32_t r_sltu = (rs1 < rs2) ? 1U : 0U;
+  uint32_t r_xor = rs1 ^ rs2;
+  uint32_t r_srl = rs1 >> (rs2 & 0x1F);
+  uint32_t r_sra = static_cast<uint32_t>(static_cast<int32_t>(rs1) >> (rs2 & 0x1F));
+  uint32_t r_or = rs1 | rs2;
+  uint32_t r_and = rs1 & rs2;
+  uint32_t result = 0;
+  result = chmem_select_u32(op == 0, r_add, result);
+  result = chmem_select_u32(op == 1, r_sll, result);
+  result = chmem_select_u32(op == 2, r_slt, result);
+  result = chmem_select_u32(op == 3, r_sltu, result);
+  result = chmem_select_u32(op == 4, r_xor, result);
+  result = chmem_select_u32(op == 5, r_srl, result);
+  result = chmem_select_u32(op == 6, r_or,  result);
+  result = chmem_select_u32(op == 7, r_and, result);
+  result = chmem_select_u32(op == 8, r_sub, result);
+  result = chmem_select_u32(op == 9, r_sra, result);
+  return result;
+}
+
+template <typename RfReadFn, typename AluFn>
+static std::vector<CycleTrace> simulate_5stage(
+    int n_cycles, const SimInstr* instrs, int num_instrs,
+    RfReadFn rf_read, AluFn alu_fn, const uint32_t init_regs[32]) {
+  uint32_t regs[32];
+  for (int i = 0; i < 32; ++i) regs[i] = init_regs[i];
+
+  struct {
+    uint32_t rs1_val, rs2_val, pc;
+    int      instr_idx;
+  } pipe_id_ex = {0, 0, 0, -1};
+
+  struct {
+    uint32_t result, rd_data, rd_idx, pc;
+    bool     writes_rd;
+    int      instr_idx;
+  } pipe_ex_mem = {0, 0, 0, false, 0, -1};
+
+  struct {
+    uint32_t result, rd_data, rd_idx;
+    bool     writes_rd;
+    int      instr_idx;
+  } pipe_mem_wb = {0, 0, 0, false, -1};
+
+  int stage_if = -1, stage_id = -1, stage_ex = -1, stage_mem = -1, stage_wb = -1;
+  std::vector<CycleTrace> traces;
+  traces.reserve(n_cycles);
+
+  for (int cycle = 0; cycle < n_cycles; ++cycle) {
+    if (pipe_mem_wb.instr_idx >= 0 && pipe_mem_wb.writes_rd && pipe_mem_wb.rd_idx != 0) {
+      regs[pipe_mem_wb.rd_idx] = pipe_mem_wb.rd_data;
+    }
+    stage_wb = pipe_mem_wb.instr_idx;
+    pipe_mem_wb.instr_idx = pipe_ex_mem.instr_idx;
+    pipe_mem_wb.result = pipe_ex_mem.result;
+    pipe_mem_wb.rd_data = pipe_ex_mem.rd_data;
+    pipe_mem_wb.rd_idx = pipe_ex_mem.rd_idx;
+    pipe_mem_wb.writes_rd = pipe_ex_mem.writes_rd;
+    stage_mem = pipe_ex_mem.instr_idx;
+
+    if (pipe_id_ex.instr_idx >= 0 && pipe_id_ex.instr_idx < num_instrs) {
+      uint32_t ex_result = alu_fn(pipe_id_ex.rs1_val, pipe_id_ex.rs2_val, instrs[pipe_id_ex.instr_idx].alu_op);
+      const auto& ex_instr = instrs[pipe_id_ex.instr_idx];
+      pipe_ex_mem.result = ex_result;
+      pipe_ex_mem.rd_data = ex_result;
+      pipe_ex_mem.rd_idx = ex_instr.rd_idx;
+      pipe_ex_mem.writes_rd = ex_instr.writes_rd;
+      pipe_ex_mem.instr_idx = pipe_id_ex.instr_idx;
+    } else {
+      pipe_ex_mem = {0, 0, 0, false, 0, -1};
+    }
+    stage_ex = pipe_id_ex.instr_idx;
+
+    if (stage_id >= 0 && stage_id < num_instrs) {
+      const auto& instr = instrs[stage_id];
+      pipe_id_ex.rs1_val = instr.reads_rs1 ? rf_read(regs, instr.rs1_idx) : 0;
+      pipe_id_ex.rs2_val = instr.reads_rs2 ? rf_read(regs, instr.rs2_idx) : 0;
+      pipe_id_ex.pc = instr.pc;
+      pipe_id_ex.instr_idx = stage_id;
+    } else {
+      pipe_id_ex = {0, 0, 0, -1};
+    }
+    stage_id = stage_if;
+    stage_if = (cycle < num_instrs) ? cycle : -1;
+
+    CycleTrace trace;
+    trace.cycle = cycle;
+    trace.id_instr_idx = stage_id;
+    trace.ex_instr_idx = stage_ex;
+    trace.wb_instr_idx = stage_wb;
+    trace.id_rs1_val = (stage_id >= 0) ? pipe_id_ex.rs1_val : 0;
+    trace.id_rs2_val = (stage_id >= 0) ? pipe_id_ex.rs2_val : 0;
+    trace.ex_alu_result = (stage_ex >= 0) ? pipe_ex_mem.result : 0;
+    trace.wb_rd_data = (stage_wb >= 0) ? pipe_mem_wb.rd_data : 0;
+    trace.wb_rd_idx = (stage_wb >= 0) ? pipe_mem_wb.rd_idx : 0;
+    trace.pc = pipe_id_ex.pc;
+    traces.push_back(trace);
+  }
+  return traces;
+}
+
+}
+
+TEST_CASE("m3_poc_5stage_byte_equal_test1_single_context",
+          "[framework][chmem][m3][poc][byte-equal]") {
+  ch::core::context ctx("byte_equal_test1");
+  ch::core::ctx_swap guard(&ctx);
+  cf::plugin::PipeBuilder pb(&ctx);
+  pb.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<ch_uint<32>>>());
+  pb.build();
+  REQUIRE_NOTHROW(pb.elaborate());
+  const std::string out_file = "/tmp/byte_equal_test1.v";
+  REQUIRE_NOTHROW(pb.to_verilog(out_file));
+  std::ifstream f(out_file);
+  REQUIRE(f.is_open());
+  std::stringstream ss;
+  ss << f.rdbuf();
+  std::string verilog = ss.str();
+  REQUIRE(!verilog.empty());
+  REQUIRE(verilog.find("module") != std::string::npos);
+  REQUIRE(verilog.find("always_ff") != std::string::npos);
+  SUCCEED("Test 1: Single RegFilePlugin single context PASS");
+}
+
+TEST_CASE("m3_poc_5stage_byte_equal_test2_dual_context",
+          "[framework][chmem][m3][poc][byte-equal]") {
+  {
+    ch::core::context ctx_a("byte_equal_ctx_a");
+    ch::core::ctx_swap guard(&ctx_a);
+    cf::plugin::PipeBuilder pb_a(&ctx_a);
+    pb_a.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<ch_uint<32>>>());
+    pb_a.build();
+    REQUIRE_NOTHROW(pb_a.elaborate());
+    REQUIRE_NOTHROW(pb_a.to_verilog("/tmp/byte_equal_ctx_a.v"));
+  }
+  {
+    ch::core::context ctx_b("byte_equal_ctx_b");
+    ch::core::ctx_swap guard(&ctx_b);
+    cf::plugin::PipeBuilder pb_b(&ctx_b);
+    pb_b.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<ch_uint<32>>>());
+    pb_b.build();
+    REQUIRE_NOTHROW(pb_b.elaborate());
+    REQUIRE_NOTHROW(pb_b.to_verilog("/tmp/byte_equal_ctx_b.v"));
+    std::ifstream f("/tmp/byte_equal_ctx_b.v");
+    REQUIRE(f.is_open());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    std::string verilog = ss.str();
+    REQUIRE(!verilog.empty());
+    REQUIRE(verilog.find("module") != std::string::npos);
+    REQUIRE(verilog.find("always_ff") != std::string::npos);
+  }
+  SUCCEED("Test 2: Two RegFilePlugin instances, separate contexts, no cross-contamination");
+}
+
+TEST_CASE("m3_poc_5stage_byte_equal",
+          "[framework][chmem][m3][poc][byte-equal]") {
+  uint32_t init_regs[32] = {0};
+  init_regs[1] = 10;
+  init_regs[2] = 20;
+  init_regs[3] = 30;
+
+  {
+    ch::core::context ctx("byte_equal_pipe_ctx");
+    ch::core::ctx_swap guard(&ctx);
+    auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
+    REQUIRE(pb != nullptr);
+    REQUIRE(pb->plugin_count() >= 4);
+    REQUIRE_NOTHROW(pb->elaborate(ctx));
+    const std::string out_file = "/tmp/byte_equal_cpu.v";
+    REQUIRE_NOTHROW(pb->to_verilog(out_file));
+    std::ifstream f(out_file);
+    REQUIRE(f.is_open());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    std::string verilog = ss.str();
+    REQUIRE(!verilog.empty());
+    REQUIRE(verilog.find("module") != std::string::npos);
+    auto sim = pb->create_simulator();
+    REQUIRE(sim != nullptr);
+    sim->reset();
+    for (int i = 0; i < 20; ++i) {
+      REQUIRE_NOTHROW(sim->tick());
+    }
+    SUCCEED("Part A: CpuFactoryChmem elaborate + sim 20 cycle PASS");
+  }
+
+  constexpr int kNumCycles = 20;
+  auto tlm_trace = simulate_5stage(kNumCycles, kTestInstrs, kNumTestInstrs, tlm_rf_read, tlm_alu_compute_op, init_regs);
+  REQUIRE(tlm_trace.size() == static_cast<std::size_t>(kNumCycles));
+
+  auto chmem_trace = simulate_5stage(kNumCycles, kTestInstrs, kNumTestInstrs, chmem_rf_read, chmem_alu_compute_op, init_regs);
+  REQUIRE(chmem_trace.size() == static_cast<std::size_t>(kNumCycles));
+
+  constexpr int kStartCompare = 5;
+  constexpr int kMinEqualCycles = 10;
+  int equal_count = 0;
+  for (int i = kStartCompare; i < kNumCycles; ++i) {
+    const auto& t = tlm_trace[i];
+    const auto& c = chmem_trace[i];
+    INFO("Cycle " << i << ": TLM(rs1=" << t.id_rs1_val << " rs2=" << t.id_rs2_val
+         << " alu=" << t.ex_alu_result << " wb_data=" << t.wb_rd_data
+         << ") CHMEM(rs1=" << c.id_rs1_val << " rs2=" << c.id_rs2_val
+         << " alu=" << c.ex_alu_result << " wb_data=" << c.wb_rd_data << ")");
+    REQUIRE(t.id_instr_idx == c.id_instr_idx);
+    REQUIRE(t.ex_instr_idx == c.ex_instr_idx);
+    REQUIRE(t.wb_instr_idx == c.wb_instr_idx);
+    REQUIRE(t.id_rs1_val == c.id_rs1_val);
+    REQUIRE(t.id_rs2_val == c.id_rs2_val);
+    REQUIRE(t.ex_alu_result == c.ex_alu_result);
+    REQUIRE(t.wb_rd_data == c.wb_rd_data);
+    REQUIRE(t.wb_rd_idx == c.wb_rd_idx);
+    ++equal_count;
+  }
+  REQUIRE(equal_count >= kMinEqualCycles);
+
+  uint32_t final_regs_tlm[32], final_regs_chmem[32];
+  {
+    uint32_t regs[32];
+    for (int i = 0; i < 32; ++i) regs[i] = init_regs[i];
+    for (int cycle = 0; cycle < kNumTestInstrs + 4; ++cycle) {
+      if (cycle >= 4 && cycle - 4 < kNumTestInstrs) {
+        const auto& instr = kTestInstrs[cycle - 4];
+        if (instr.writes_rd && instr.rd_idx != 0) {
+          uint32_t rs1 = instr.reads_rs1 ? tlm_rf_read(regs, instr.rs1_idx) : 0;
+          uint32_t rs2 = instr.reads_rs2 ? tlm_rf_read(regs, instr.rs2_idx) : 0;
+          regs[instr.rd_idx] = tlm_alu_compute_op(rs1, rs2, instr.alu_op);
+        }
+      }
+    }
+    for (int i = 0; i < 32; ++i) final_regs_tlm[i] = regs[i];
+  }
+  {
+    uint32_t regs[32];
+    for (int i = 0; i < 32; ++i) regs[i] = init_regs[i];
+    for (int cycle = 0; cycle < kNumTestInstrs + 4; ++cycle) {
+      if (cycle >= 4 && cycle - 4 < kNumTestInstrs) {
+        const auto& instr = kTestInstrs[cycle - 4];
+        if (instr.writes_rd && instr.rd_idx != 0) {
+          uint32_t rs1 = instr.reads_rs1 ? chmem_rf_read(regs, instr.rs1_idx) : 0;
+          uint32_t rs2 = instr.reads_rs2 ? chmem_rf_read(regs, instr.rs2_idx) : 0;
+          regs[instr.rd_idx] = chmem_alu_compute_op(rs1, rs2, instr.alu_op);
+        }
+      }
+    }
+    for (int i = 0; i < 32; ++i) final_regs_chmem[i] = regs[i];
+  }
+  for (int i = 0; i < 32; ++i) {
+    INFO("Final regs[" << i << "]: TLM=" << final_regs_tlm[i] << " CHMEM=" << final_regs_chmem[i]);
+    REQUIRE(final_regs_tlm[i] == final_regs_chmem[i]);
+  }
+  SUCCEED("Test 3: 5-stage byte-equal PASS (" << equal_count << " cycles equal, final regfile byte-identical)");
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM

@@ -132,4 +132,75 @@ TEST_CASE("m4_poc_5stage_simulator_tick", "[cpu][m4][poc][5stage][chmem]") {
   SUCCEED("5-stage Simulator tick 10 周期无 crash");
 }
 
+// =========================================================================
+// PoC #4: HazardPlugin 完整 9 条件 RAW 检测 — elaborate + Verilog 验证
+//
+// 验证:
+//   - CpuFactoryChmem 含 HazardPlugin, elaborate 不抛异常
+//   - toVerilog("/tmp/hazard_complete.v") 输出 Verilog
+//   - Verilog 含 >= 9 mux_select (6 数据 + 3 x0 屏蔽的比较器)
+//
+// 原理: detect_raw_hazard() 使用 raw_hazard_complete() 建立 9 条件 DAG,
+//       6 个 == 比较 + 3 个 != 比较, 每个在 CppHDL Verilog codegen 生成
+//       mux_select 节点。
+// =========================================================================
+TEST_CASE("hazard_chmem_complete_elaborate", "[cpu][chmem][hazard][poc]") {
+  ch::core::context ctx("hazard_complete_elab_ctx");
+  ch::core::ctx_swap guard(&ctx);
+
+  auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
+  REQUIRE(pb != nullptr);
+
+  REQUIRE_NOTHROW(pb->elaborate(ctx));
+
+  const std::string out_file = "/tmp/hazard_complete.v";
+  REQUIRE_NOTHROW(pb->to_verilog(out_file));
+
+  std::ifstream f(out_file);
+  REQUIRE(f.is_open());
+  std::stringstream ss;
+  ss << f.rdbuf();
+  std::string verilog = ss.str();
+  REQUIRE(!verilog.empty());
+
+  // 计数 mux_select: 至少 9 (6 数据 == 比较 + 3 x0 != 比较)
+  std::size_t pos = 0;
+  int mux_select_count = 0;
+  while ((pos = verilog.find("mux_select", pos)) != std::string::npos) {
+    ++mux_select_count;
+    pos += 10;
+  }
+  INFO("mux_select count = " << mux_select_count);
+  REQUIRE(mux_select_count >= 9);
+
+  SUCCEED("HazardPlugin complete: " << mux_select_count
+          << " mux_select (>= 9 = 6 data + 3 x0 shield)");
+}
+
+// =========================================================================
+// PoC #5: HazardPlugin 完整版 Simulator tick 10 周期不 crash
+//
+// 验证:
+//   - create_simulator() 返回非空
+//   - tick() 10 周期无异常
+//   - RAW 检测 halt 信号通过 CtrlLink 接入 decode stage stall, 不导致 SEGV
+// =========================================================================
+TEST_CASE("hazard_chmem_complete_simulator_tick", "[cpu][chmem][hazard][poc]") {
+  ch::core::context ctx("hazard_complete_sim_ctx");
+  ch::core::ctx_swap guard(&ctx);
+
+  auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
+  pb->elaborate(ctx);
+
+  auto sim = pb->create_simulator();
+  REQUIRE(sim != nullptr);
+
+  sim->reset();
+  for (int i = 0; i < 10; ++i) {
+    REQUIRE_NOTHROW(sim->tick());
+  }
+
+  SUCCEED("HazardPlugin complete Simulator tick 10 周期无 crash");
+}
+
 #endif  // CF_PLUGIN_USE_CH_MEM
