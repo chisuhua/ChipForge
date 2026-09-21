@@ -117,6 +117,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_memory_model_chmem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoded_inst_migration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_vendored_elf.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_verilator_sim.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES
@@ -129,6 +130,7 @@ target_compile_definitions(chipforge_tests_chmem PRIVATE
     CF_PLUGIN_USE_CH_MEM
     CHIPFORGE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
     TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
+    CF_VERILATOR_SIM_BIN="${CMAKE_BINARY_DIR}/bin/cpu_verilator_sim"
 )
 target_include_directories(chipforge_tests_chmem PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

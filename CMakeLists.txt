@@ -220,6 +220,12 @@ add_subdirectory(src/cf_plugin)   # Phase 0  ✅ 已就位 (空占位)
 # add_subdirectory(ip)              # Phase 1+  待 ip/{cache,cpu,...} 内容填充后启用
 # add_subdirectory(soc)             # Phase 1+  待 SoC 集成代码后启用
 
+# Phase 6d.5 E8: standalone Verilator runner (chipforge_tests 之外的可执行文件)
+option(CHIPFORGE_BUILD_VERILATOR_RUNNER "Build tools/verilator_runner/cpu_verilator_sim" ON)
+if(CHIPFORGE_BUILD_VERILATOR_RUNNER)
+    add_subdirectory(tools/verilator_runner)
+endif()
+
 # CTest 聚合: 根级 enable_testing() 使 ctest 收集所有子目录的 add_test
 # (子目录 src/cf_plugin/CMakeLists.txt 自身有 enable_testing(), 此处冗余声明为安全)
 enable_testing()
