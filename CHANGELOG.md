@@ -5,6 +5,90 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.5.0 (2026-09-22) — Phase 6d 完整收官 (6d.6 + 6d.7 + Check 9 + ADR-040 v3.0)
+
+> **OpenSpec change**: `phase-6d-fsm-chmem` (in progress)
+> **目的**: 多周期协议引擎 (MMU/PTW, L1Cache refill) 用 ch_state_machine DSL 实装 + ADR-040 v3.0
+> **核心**: 6d.6 MMU/PTW sv32 5 状态 + 6d.7 L1Cache refill 4 状态 + Check 9 FSM 豁免白名单 + ADR-040 v3.0
+
+### 新增
+
+- **6d.6 MMU/PTW sv32 5 状态 FSM** (`ip/cpu/plugins/mmu_ptw_chmem.h`, 314 行, commit 09c9d23)
+  - 顶部 `#define CF_PLUGIN_USE_FSM_EXEMPT` (ADR-046 豁免)
+  - `chlib::ch_state_machine<PTW_State, 5>` DSL：IDLE → L0_WAIT → L1_WAIT → DONE / FAULT
+  - sv32 2-level walk (RISC-V Privileged Spec v1.12 §5.3)：root = satp.ppn << 12, pte1/pte0 via VPN[1]/VPN[0] 索引
+  - PTE 类型判定 {R,W,X}：{0,0,0} 非叶, {1,0,0} reserved encoding → FAULT, 含 R/X (megapage 叶) → DONE
+  - `transition_when(ch_bool, target)` select-tree（sibling CppHDL 5af3e40 cycle-accurate）
+- **6d.7 L1Cache refill 4 状态 FSM** (`ip/cache/tlm/l1_cache_refill_fsm_chmem.h`, 228 行, commit 09c9d23)
+  - 顶部 `#define CF_PLUGIN_USE_FSM_EXEMPT`
+  - `chlib::ch_state_machine<CacheState, 4>` DSL：IDLE → LOOKUP → MISS → REFILL_WAIT
+  - lookup hit → IDLE；miss → 发 refill 请求 → REFILL_WAIT；mem_rdata_valid 写回 cache → IDLE
+  - 并发 race 语义：REFILL_WAIT 期间新 lookup_request 不中断
+- **Check 9** (`tools/check_plugin_portability.sh`, commit 09c9d23): FSM 豁免白名单验证
+  - 声明 `CF_PLUGIN_USE_FSM_EXEMPT` 的文件必须使用 `chlib::ch_state_machine` DSL（非裸 enum + switch）
+  - 8 → 9 checks
+- **ADR-040 v3.0** + **ADR-046 v1.0** (`docs/architecture/adr.md` + `docs/architecture/adr/ADR-046-multi-cycle-fsm-exemption.md`, commit 09c9d23)
+  - D13: 多周期协议引擎 FSM 豁免 (ADR-046 + ch_state_machine DSL)
+  - D14: Verilator sim cycle-identical (5 ELF 0% diff)
+  - `ch_state_machine::build()` 增强：select-tree 发射 → CppHDL Simulator cycle-accurate
+  - ADR-046 v1.0 Accepted（6d.6 + 6d.7 FSM 实装证明）
+
+### Tests
+
+- `tests/cpu/test_mmu_ptw_fsm_chmem.cpp` (191 行, commit 09c9d23)：3 PoC
+  - `mmu_ptw_fsm_sv32_walk_success`：known vaddr + satp.ppn → DONE + PPN
+  - `mmu_ptw_fsm_sv32_reserved_encoding_fault`：{R,W,X}={1,0,0} → FAULT
+  - `mmu_ptw_fsm_sv32_invalid_pte_fault`：V=0 → FAULT
+- `tests/cache/test_l1cache_refill_fsm_chmem.cpp` (189 行, commit 09c9d23)：3 PoC
+  - `l1cache_refill_fsm_hit`：lookup hit → IDLE, 数据可用
+  - `l1cache_refill_fsm_miss_refill`：miss → REFILL_WAIT → IDLE
+  - `l1cache_refill_fsm_concurrent_race`：REFILL_WAIT 期间不中断
+
+### Sibling commits（CppHDL 协同）
+
+- **CppHDL `5af3e40`**: `chlib/state_machine.h` ch_state_machine cycle-accurate via `transition_when` select-tree
+  - 新增 `transition_when(ch_bool cond, StateEnum target)` API
+  - `transition_to(s)` 等价 `transition_when(ch_bool(true), s)`（向后兼容）
+  - `build()` 对每个 state 调用 on_active 闭包，累加 select-tree：
+    `state_reg->next = select(in_state(S) && cond, target, hold)`
+  - ADR-046 §2.3 "仿真限制" 解除（之前 ch_state_machine 不能在 CppHDL Simulator 跑 cycle-accurate）
+
+### 验证
+
+- `chipforge_tests_chmem`: **43/43 PASS** (1804 assertions, +43 from v0.4.1)
+- `mmu_ptw_fsm`: 24 assertions PASS
+- `l1cache_refill_fsm`: 28 assertions PASS
+- `check_plugin_portability.sh`: **9/9 PASS**（含 Check 9 "FSM 豁免白名单"）
+- `verify_adr.sh`: 0 FAILED
+- `verify_plugin_decision.sh`: 3+4/3 PASS（含 Check 2 FSM 豁免文件过滤）
+- Verilator `--lint-only`: 0 errors / 0 warnings
+- TLM baseline: 386 PASS / 17 FAIL（pre-existing, 0 回归）
+
+### Phase 6d 收官总览
+
+| 子阶段 | 内容 | Commit | 状态 |
+|--------|------|--------|------|
+| 6d.1 | DecoderPlugin 完整 CH_MEM (RV32I ~80 指令) | `d9ebbfd` | ✅ |
+| 6d.2 | BranchPlugin + HazardPlugin + DECODED_INST consumer migration | `5ab7f93` / `531b0dc` | ✅ |
+| 6d.3 | CH_MEM Memory Model + 7-plugin 5-stage 集成 | `60a5a24` | ✅ |
+| 6d.4 | vendored ELF 端到端 tohost=1 (5 ELF) | `fde730c` | ✅ |
+| 6d.5 E7 | Verilator lint clean + Verilator compile Vtop | `0d30d64` + CppHDL `7f7da88` | ✅ |
+| 6d.5 E8 | Verilator sim cycle-identical (5 ELF 0% diff) | `1a99ed3` + CppHDL `3a5284d` | ✅ |
+| 6d.6 | MMU/PTW sv32 5 状态 ch_state_machine | `09c9d23` + CppHDL `5af3e40` | ✅ |
+| 6d.7 | L1Cache refill 4 状态 ch_state_machine | `09c9d23` | ✅ |
+| 6d.8 | Harness 迁移 (cpu_verilator_sim) | `1a99ed3` | ✅ |
+| Check 9 | FSM 豁免白名单 | `09c9d23` | ✅ |
+| ADR-040 v3.0 | CH_MEM + FSM + Verilator 三段 | `09c9d23` | ✅ |
+| ADR-046 v1.0 | 多周期 FSM 豁免 Accepted | `09c9d23` | ✅ |
+
+### 待完成（v0.5.0+ 后续）
+
+- `phase-6d-rtl-verification` change archive 已 done (Oracle hygiene `7d310c6` 后 archive `2026-09-20-phase-6d-rtl-verification`)
+- `phase-6d-verilator-sim` change archive 已 done (commit `1a99ed3` + CppHDL `3a5284d` 后 archive `2026-09-21-phase-6d-verilator-sim`)
+- `phase-6d-fsm-chmem` change archive（本次）
+
+---
+
 ## v0.4.1 (2026-09-22) — Phase 6d 6d.5 E8 + 6d.8 Verilator sim (cycle-identical)
 
 > **OpenSpec change**: `phase-6d-verilator-sim` (in progress)
