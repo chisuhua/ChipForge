@@ -1316,6 +1316,20 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 | 7 | TLM-only 文件不含 ch 实例化 | 物理分离 + TLM 模式编时不触碰 ch 类型 |
 | 8 | `PayloadStore` CH_MEM get-miss 抛异常 | `const T& get(key)` fail-fast (v0.3.1 M6 修复) |
 
+**v3.0 增量** (Phase 6d, 2026-09-22):
+- **新增 D13**: 多周期协议引擎 (MMU/PTW、L1Cache refill 等) 用 `ch_state_machine` DSL (ADR-046) 实装,
+  文件顶部声明 `#define CF_PLUGIN_USE_FSM_EXEMPT`. Check 9 验证豁免白名单
+  (`tools/check_plugin_portability.sh` 8→9 检查).
+- **新增 D14**: Verilator sim 跑 vendored ELF cycle-identical (5 ELF 0% diff vs CppHDL sim).
+  CppHDL VerilatorBackend Phase 3 + codegen 完整发射 ch_mem/lit/reg-init 修复就绪.
+- **CH_MEM 双模 0 回归**: 37/37 PASS (含 5 ELF tohost=1 + 10 新 verilator e2e).
+- **ch_state_machine DSL 增强** (Phase 6d.6): `build()` 现发射 select-tree
+  `state_reg->next` (每个 `transition_when(ch_bool, target)` 累加为
+  `select(is_in(S) && cond, target, hold)`), CppHDL Simulator 可 cycle-accurate
+  推进多周期 FSM (ADR-046 §2.3 "仿真限制" 解除). 新增 `transition_when()` API;
+  `transition_to()` 等价 `transition_when(ch_bool(true), target)`. 既有
+  `if(ch_bool)` 运行期条件仍禁止 (编译期静默 false).
+
 ---
 
 ### L. 可移植性约束（1 条）
@@ -1369,6 +1383,25 @@ bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
 **§2.1/§2.3 分类调整历史**:
 - 2026-06-12: v1.0 从 §2.1 (✅) 移至 §2.3 (🚧 Phase 1 提案)，因 `array_store` 已实现但迁移手册待 Phase 5
 - **2026-09-17 (Phase 6c M5)**: v2.0 回到 §2.1 (✅) — CH_MEM 翻转 v1.0 禁令，M1-M5 9 commit 证明 elaboration 路径可用。TLM 标 deprecated，CH_MEM 是新正道。
+- **2026-09-22 (Phase 6d)**: v3.0 增量 — Check 9 (FSM 豁免白名单) 实装, `ch_state_machine` DSL 增强 (select-tree cycle-accurate).
+
+---
+
+#### ADR-046：多周期协议引擎豁免 D4 无状态机禁令 — v1.0
+
+| 字段 | 值 |
+|------|-----|
+| 状态 | ✅ Phase 6d 落地 (2026-09-22, 6d.6 MMU/PTW + 6d.7 L1Cache refill FSM 实装) |
+| 文件 | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
+
+**v1.0 增量**:
+- 豁免机制已激活: `mmu_ptw_chmem.h` + `l1_cache_refill_fsm_chmem.h` 顶部声明
+  `#define CF_PLUGIN_USE_FSM_EXEMPT` + 使用 `chlib::ch_state_machine` DSL
+- Check 9 (check_plugin_portability.sh): grep 验证豁免白名单使用 ch_state_machine 而非裸 switch
+- `verify_plugin_decision.sh` Check 2: 过滤声明 `CF_PLUGIN_USE_FSM_EXEMPT` 的文件
+  (ADR-046 豁免 enum class State 状态机检查)
+- `ch_state_machine::build()` 增强: select-tree `state_reg->next` 发射,
+  CppHDL Simulator cycle-accurate 推进 (ADR-046 §2.3 仿真限制解除)
 
 ---
 

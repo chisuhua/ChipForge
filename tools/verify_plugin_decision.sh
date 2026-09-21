@@ -51,11 +51,24 @@ echo ""
 # ----------------------------------------------------------------------------
 # Check 2: 业务代码无状态机 (enum class State + switch state_)
 # D4 要求所有控制流用 at_stage + Payload, 不允许显式状态机
+# ADR-046 豁免: 多周期协议引擎 (*_chmem.h 声明 CF_PLUGIN_USE_FSM_EXEMPT)
+# 豁免后必须使用 ch_state_machine DSL (check_plugin_portability.sh Check 9 验证)
 # ----------------------------------------------------------------------------
 echo "[2/3] 检查业务代码中状态机模式 ..."
 STATE_MACHINE=$(grep -rlnE "enum class.*State|switch \(state_?\)" ${TARGET_DIRS} \
   --include="*.cpp" --include="*.h" --include="*.hpp" --include="*.cc" --include="*.cxx" 2>/dev/null || true)
 STATE_MACHINE=$(echo "${STATE_MACHINE}" | grep -v "src/cf_plugin" || true)
+# ADR-046: 过滤声明 FSM 豁免的多周期协议引擎文件 (文件内容含
+# CF_PLUGIN_USE_FSM_EXEMPT → 用 ch_state_machine DSL, 非裸 enum+switch)
+if [ -n "${STATE_MACHINE}" ]; then
+  FILTERED=""
+  for f in ${STATE_MACHINE}; do
+    if ! grep -q "CF_PLUGIN_USE_FSM_EXEMPT" "$f" 2>/dev/null; then
+      FILTERED="${FILTERED}${f}"$'\n'
+    fi
+  done
+  STATE_MACHINE="${FILTERED}"
+fi
 if [ -z "${STATE_MACHINE}" ]; then
   echo "  [PASS] 无业务状态机 (enum class State / switch state_)"
 else

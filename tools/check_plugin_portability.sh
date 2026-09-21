@@ -329,13 +329,40 @@ fi
 echo ""
 
 # ----------------------------------------------------------------------------
+# Check 9 (Phase 6d.6, ADR-046): CF_PLUGIN_USE_FSM_EXEMPT 豁免白名单
+#
+# ADR-046 豁免多周期协议引擎 (MMU/PTW, L1Cache refill) 的 D4 无状态机禁令,
+# 但强制要求使用 chlib::ch_state_machine DSL (非裸 enum + switch).
+# 本检查验证声明 #define CF_PLUGIN_USE_FSM_EXEMPT 的文件确实使用了 DSL.
+# ----------------------------------------------------------------------------
+echo "[9/9] 检查 CF_PLUGIN_USE_FSM_EXEMPT 豁免白名单 (ADR-046) ..."
+FSM_FILES=$(git grep -l "CF_PLUGIN_USE_FSM_EXEMPT" -- 'ip/**/*.h' 'ip/**/**/*.h' 'ip/**/**/**/*.h' 2>/dev/null || true)
+FSM_VIOLATIONS=""
+if [ -n "${FSM_FILES}" ]; then
+  for f in ${FSM_FILES}; do
+    if ! git grep -q "ch_state_machine\|chlib::ch_state_machine" "$f" 2>/dev/null; then
+      FSM_VIOLATIONS="${FSM_VIOLATIONS}${f}"$'\n'
+    fi
+  done
+fi
+if [ -z "${FSM_VIOLATIONS}" ]; then
+  echo "  [PASS] FSM 豁免白名单全部使用 ch_state_machine DSL (ADR-046)"
+else
+  echo "  [FAIL] 声明 CF_PLUGIN_USE_FSM_EXEMPT 但未使用 ch_state_machine DSL:"
+  echo "${FSM_VIOLATIONS}" | sed 's/^/    /'
+  echo "       (ADR-046 要求 ch_state_machine DSL, 非裸 enum+switch)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
 # 汇总
 # ----------------------------------------------------------------------------
 if [ ${FAIL_COUNT} -eq 0 ]; then
   if [ ${WARN_COUNT} -gt 0 ]; then
     echo "=== ADR-040 v2.0 移植性检查通过 (含 ${WARN_COUNT} 项 WARN) ==="
   else
-    echo "=== ADR-040 v2.0 移植性检查全部通过 (8/8) ==="
+    echo "=== ADR-040 v2.0 移植性检查全部通过 (9/9) ==="
   fi
   exit 0
 else

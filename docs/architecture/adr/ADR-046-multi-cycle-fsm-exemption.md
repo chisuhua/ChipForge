@@ -104,18 +104,30 @@ class PTWFSM : public ch::Component {
 
 ### 2.3 仿真限制（必须文档化）
 
-**关键约束**（`chlib/state_machine.h:226-227`）：
+**历史关键约束**（`chlib/state_machine.h:226-227`，Phase 6c W0 审计发现）：
 ```
 // This is a simplified implementation - full implementation would
 // need to generate proper combinational logic for state transitions
 ```
 
-`ch_state_machine` 的仿真需要 **Verilator 后端**（生成 Verilog + Verilator 编译），不能依赖 CppHDL native simulator。CH_MEM 模式下 cycle-accurate 仿真仅对**单周期组合 + 寄存器**组件可靠，对**多周期 FSM** 必须用：
+**Phase 6d.6 解除** (2026-09-22)：`ch_state_machine::build()` 现发射 select-tree
+`state_reg->next` — 每个 `transition_when(ch_bool, target)` 累加为
+`select(is_in(S) && cond, target, hold)`，CppHDL Simulator 可 **cycle-accurate**
+推进多周期 FSM（经 `mmu_ptw_fsm_sv32_walk_success` / `l1cache_refill_fsm_hit`
+等 PoC 验证）。
 
 | 仿真路径 | 适用范围 |
 |---|---|
-| `ch::Simulator::tick()` | 单周期组件（RegFile/ALU/Decoder 等） |
-| **Verilator 编译 + run** | **多周期 FSM**（MMU PTW/Cache refill/I/O 握手） |
+| `ch::Simulator::tick()` | 单周期组件（RegFile/ALU/Decoder 等）+ **多周期 FSM**（MMU PTW/Cache refill，transition_when select-tree） |
+| **Verilator 编译 + run** | 端到端 SoC 级验证（5 ELF tohost=1，性能对比） |
+
+**API 约束**（使用 DSL 时）：
+- 用 `transition_when(ch_bool, target)` 或 `transition_to(target)` 声明转移，
+  **禁止**在 `on_active` 闭包内用 `if (ch_bool)` 做运行期分支（contextual
+  conversion 静默取 false）。
+- `set_entry(state)` 只记录 entry 状态；state_reg 初值在 ch_state_machine
+  构造时固定 (0_d)，因此 **entry 状态 enum 值必须为 0**（ChipForge 两个 FSM
+  均满足）。
 
 ### 2.4 与 D4 的兼容性
 
@@ -215,13 +227,13 @@ ADR-040 Tier-1 #5 翻转：**CH_MEM 是新正道**——ch 渗透禁令变成"�
 
 ### 6.2 中期验证（Phase 6d MMU PTW 实装）
 
-- [ ] `ip/cpu/plugins/mmu_ptw_chmem.h` 使用 `ch_state_machine` 实装 sv39 3-level walk
+- [x] `ip/cpu/plugins/mmu_ptw_chmem.h` 使用 `ch_state_machine` 实装 sv32 5-状态 walk（2026-09-22, Phase 6d.6 PoC）
 - [ ] Verilator 仿真跑 riscv-tests `rv32ui-p-*` 在 MMU enable 模式下 tohost=1
 - [ ] 与 TLM 模式 MMU 行为对齐（**重新基线化**：Phase 6c dual-buffer commit 改变时序）
 
 ### 6.3 长期验证（Phase 6d+ Cache refill 实装）
 
-- [ ] `ip/cache/tlm/l1_cache_refill_fsm_chmem.h` 使用 `ch_state_machine`
+- [x] `ip/cache/tlm/l1_cache_refill_fsm_chmem.h` 使用 `ch_state_machine`（2026-09-22, Phase 6d.7 PoC）
 - [ ] L1Cache 端到端 Verilator sim 跑 l1_cache_minimal.json
 
 ---
@@ -230,7 +242,7 @@ ADR-040 Tier-1 #5 翻转：**CH_MEM 是新正道**——ch 渗透禁令变成"�
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| **`ch_state_machine` 简化实现** | CppHDL simulator 不能 cycle-accurate 仿真多周期 FSM | Phase 6d 必须依赖 Verilator（`build/_deps/verilator/` 已 vendored） |
+| ~~**`ch_state_machine` 简化实现**~~ | ~~CppHDL simulator 不能 cycle-accurate 仿真多周期 FSM~~ | ~~Phase 6d 必须依赖 Verilator（`build/_deps/verilator/` 已 vendored）~~ **已解除** (Phase 6d.6): `build()` 发射 select-tree `state_reg->next`, `transition_when(ch_bool, target)` API, native Simulator cycle-accurate（PoC 6/6 PASS） |
 | **业务代码风格分裂** | Pipeline Plugin 用 at_stage，FSM Plugin 用 ch_state_machine | 文档化 + ADR-046 + CF_PLUGIN_USE_FSM_EXEMPT 标记 |
 | **VexRiscv 不完全对应** | VexRiscv 用 Scala state machine + SpinalHDL，与 C++ chlib 实现不同 | PoC 验证后写白皮书 |
 
@@ -243,6 +255,7 @@ ADR-040 Tier-1 #5 翻转：**CH_MEM 是新正道**——ch 渗透禁令变成"�
 | 2026-09-16 | Proposed | Phase 6c W0 审计发现 ch_state_machine 简化 |
 | 2026-09-16 | Accepted | Phase 6c M5 落地：豁免范围明确 + DSL 强约束 |
 | 2026-09-17 | Verified | Phase 6c M5 完成: edad878 (M4/W7 BranchPlugin+HazardPlugin RAW) + b68996a (M4/W8 cpu_factory+PoC fix); 所有 8 commit 已推送; 前瞻锁定确认 |
+| 2026-09-22 | Verified | Phase 6d.6/6d.7 落地: `mmu_ptw_chmem.h` + `l1_cache_refill_fsm_chmem.h` 用 ch_state_machine DSL 实装; DSL `build()` select-tree 增强 (transition_when API); Check 9 豁免白名单 (check_plugin_portability.sh 9/9); PoC 6/6 PASS (mmu 3 + cache 3) |
 
 ---
 

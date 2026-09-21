@@ -118,6 +118,8 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoded_inst_migration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_vendored_elf.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_verilator_sim.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_mmu_ptw_fsm_chmem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cache/test_l1cache_refill_fsm_chmem.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

@@ -42,7 +42,7 @@ ctest --test-dir build --output-on-failure
 
 ## 架构核心约束（D4 / ADR-040 v2.0）
 
-**所有业务 Plugin 必须遵守**（CI 强制执行，`tools/verify_plugin_decision.sh` + `tools/check_plugin_portability.sh` 8/8 PASS）：
+**所有业务 Plugin 必须遵守**（CI 强制执行，`tools/verify_plugin_decision.sh` + `tools/check_plugin_portability.sh` 9/9 PASS）：
 
 1. **无 `void tick()`** — `PluginBase::tick() = delete`，bridge 适配层例外（`src/cf_plugin/bridge/`）
 2. **无状态机** — 禁止 `enum class State` + `switch(state_)`；**多周期协议引擎**豁免（ADR-046：`CF_PLUGIN_USE_FSM_EXEMPT` + `chlib::ch_state_machine` DSL）
