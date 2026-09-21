@@ -5,11 +5,62 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.4.0 (2026-09-21) — Phase 6d RTL Verification (6d.1 + 6d.3 + 6d.4 + 6d.5 E7)
+## v0.4.1 (2026-09-22) — Phase 6d 6d.5 E8 + 6d.8 Verilator sim (cycle-identical)
 
-> **OpenSpec change**: `phase-6d-rtl-verification` (in progress)
-> **目的**: 5-stage CPU CH_MEM 端到端 RV32I 验证 (tohost=1) + Verilator lint clean
-> **核心**: 真实 riscv-tests ELF (vendored 40 ELF) 端到端通过 CppHDL Simulator + Verilator lint clean
+> **OpenSpec change**: `phase-6d-verilator-sim` (in progress)
+> **目的**: Verilator sim 跑 vendored ELF tohost=1 + Harness 迁移
+> **核心**: CppHDL VerilatorBackend Phase 3 启用 + codegen 修复 + dlopen runner + 5 ELF cycle-identical
+
+### 新增
+
+- **`tools/verilator_runner/sim_main.cpp`** (89 行): dlopen Vtop__ALL.so + Verilator port access + `cf_run_sim()` 入口
+- **`tools/verilator_runner/cpu_verilator_sim.cpp`** (221 行): CLI (`--elf/--verilog/--cycles/--work-dir`)；两阶段编译 (verilator --cc + g++ -shared) → dlopen → run → 输出 `TOHOST=1 CYCLES=N ELF=name PASS/FAIL`
+- **`tools/verilator_runner/CMakeLists.txt`** (60 行): `cpu_verilator_sim` target，CF_PLUGIN_USE_CH_MEM
+- **`tests/cpu/test_cpu_verilator_sim.cpp`** (92 行): 5 ELF × tohost=1，DYNAMIC_SECTION，graceful skip 当 verilator 缺失
+
+### 上游依赖（CppHDL sibling commit 3a5284d）
+
+**Codegen 三大缺失修复**（`src/codegen_verilog.cpp`）：
+
+| 缺失 | 症状 | 修复 |
+|------|------|------|
+| `type_mem` 未处理 | ch_mem 数组不出现在 Verilog，无存储 | `logic [N-1:0] name [0:depth-1]` 数组 + initial 零填充 |
+| `type_lit` 声明未赋值 | 398 个字面量值是 X | `assign lit = 常量` |
+| `ch_reg init` 未作复位 | PC 复位到 0 | 同步复位值 (e.g. PC → 0x80000000) |
+
+`type_mem_read_port` → `always_ff @(posedge)` 寄存读（1-cycle latency 与 pc_lag 语义一致）
+`type_mem_write_port` → `always_ff @(posedge)` 写（**无复位分支**，preload ELF 必须跨复位存活 = RISC-V boot ROM 语义）
+
+### cycle-identical 验证（Oracle E8 阈值 ±10% → 实际 0% 差异）
+
+| ELF | CppHDL cycle | Verilator cycle | diff |
+|-----|-------------|-----------------|------|
+| rv32ui-p-add   | 478 | 478 | **0%** |
+| rv32ui-p-addi  | 246 | 246 | **0%** |
+| rv32ui-p-auipc | 59  | 59  | **0%** |
+| rv32ui-p-beq   | 315 | 315 | **0%** |
+| rv32ui-p-jal   | 55  | 55  | **0%** |
+
+### 验证
+
+- `chipforge_tests_chmem`: **37/37 PASS** (1761 assertions, +10 新 verilator e2e)
+- `chipforge_tests` (TLM): 392 PASS / 11 FAIL（pre-existing, 0 回归）
+- Verilator 5.052 `--lint-only`: 0 errors / 0 warnings
+- Verilator 5.052 `--cc --public-flat-rw`: Vtop__ALL.a 完整生成 + dlopen 成功
+- `check_plugin_portability.sh`: 8/8 PASS
+- `verify_adr.sh`: 0 FAILED
+
+### 待完成（follow-up `phase-6d-fsm-chmem`）
+
+- 6d.6 MMU/PTW sv32 5 状态 ch_state_machine（ADR-046 CF_PLUGIN_USE_FSM_EXEMPT）
+- 6d.7 L1Cache refill 4 状态 ch_state_machine
+- Check 9 `check_plugin_portability.sh` FSM 豁免 grep
+- ADR-040 v3.0（FSM 段 + Verilator 段）
+- ADR-046 验证
+
+---
+
+## v0.4.0 (2026-09-21) — Phase 6d RTL Verification (6d.1 + 6d.3 + 6d.4 + 6d.5 E7)
 
 ### 新增
 
