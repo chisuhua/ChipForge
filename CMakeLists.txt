@@ -17,11 +17,11 @@ project(ChipForge
 
 # ════════════════════════════════════════════════════════════════════
 # C++ 标准
-# - 父项目用 C++17 (CppTLM 兼容; Phase 0 业务代码用 C++17 足够)
-# - CppTLM 内部用 C++17
-# - CppHDL 集成后,父项目将升级到 C++20
+# - 父项目用 C++23 (v0.6 ADR-047: std::expected<T, PluginError> 静态配置 Result 范式)
+# - CppTLM 内部用 C++17 (Itanium ABI 兼容父项目)
+# - CppHDL 已是 C++23
 # ════════════════════════════════════════════════════════════════════
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

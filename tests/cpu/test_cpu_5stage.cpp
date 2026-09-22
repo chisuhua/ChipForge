@@ -29,6 +29,7 @@
 #include <simulator.h>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
 #include "ip/cpu/cpu_factory_chmem.h"
@@ -121,7 +122,7 @@ TEST_CASE("m4_poc_5stage_simulator_tick", "[cpu][m4][poc][5stage][chmem]") {
   auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
   pb->elaborate(ctx);
 
-  auto sim = pb->create_simulator();
+  auto sim = cf::plugin::auto_throw(pb->create_simulator());
   REQUIRE(sim != nullptr);
 
   sim->reset();
@@ -192,7 +193,7 @@ TEST_CASE("hazard_chmem_complete_simulator_tick", "[cpu][chmem][hazard][poc]") {
   auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
   pb->elaborate(ctx);
 
-  auto sim = pb->create_simulator();
+  auto sim = cf::plugin::auto_throw(pb->create_simulator());
   REQUIRE(sim != nullptr);
 
   sim->reset();

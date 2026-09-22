@@ -30,7 +30,7 @@ endif()
 add_executable(cpu_verilator_sim
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_verilator_sim.cpp
 )
-target_compile_features(cpu_verilator_sim PRIVATE cxx_std_20)
+target_compile_features(cpu_verilator_sim PRIVATE cxx_std_23)
 target_compile_definitions(cpu_verilator_sim PRIVATE
     CF_PLUGIN_USE_CH_MEM
     CHIPFORGE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"

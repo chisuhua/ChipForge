@@ -42,9 +42,10 @@ target_include_directories(cf_plugin
     $<INSTALL_INTERFACE:include>
 )
 
-target_compile_features(cf_plugin INTERFACE cxx_std_17)
+target_compile_features(cf_plugin INTERFACE cxx_std_23)
 
 # 严格警告: Phase 0 自身代码遵循
+# -Wno-unused-result 已在 P1 完成时移除 (v0.6 ADR-047 P0 后 CpuFactory PB_TRY 化已完成)
 target_compile_options(cf_plugin INTERFACE
   $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
 )

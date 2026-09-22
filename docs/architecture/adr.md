@@ -115,6 +115,7 @@
 | ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
 | ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令 | Plugin | ✅ Phase 6c M5 落地 (2026-09-17, 前瞻锁定) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
+| ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 

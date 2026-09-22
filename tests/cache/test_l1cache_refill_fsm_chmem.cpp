@@ -30,6 +30,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
 #include "ip/cache/tlm/l1_cache_refill_fsm_chmem.h"
@@ -60,7 +61,7 @@ struct RefillFixture {
     pb->register_plugin(std::move(p));
     pb->build();
     pb->elaborate();
-    sim = pb->create_simulator();
+    sim = cf::plugin::auto_throw(pb->create_simulator());
     sim->reset();
   }
 

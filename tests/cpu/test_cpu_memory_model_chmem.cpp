@@ -27,6 +27,7 @@
 #include <simulator.h>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
 #include "ip/cpu/cpu_factory_chmem.h"
@@ -186,7 +187,7 @@ TEST_CASE("cpu_memory_model_chmem_elf_preload", "[cpu][chmem][poc][memory-model]
     REQUIRE(count_in_verilog(out_file, "module") >= 1);
 
     // Step 3: Simulator tick
-    auto sim = pb->create_simulator();
+    auto sim = cf::plugin::auto_throw(pb->create_simulator());
     REQUIRE(sim != nullptr);
 
     sim->reset();
@@ -399,7 +400,7 @@ TEST_CASE("cpu_5stage_byte_equal_with_mem", "[cpu][chmem][poc][memory-model][byt
         const std::string out_file = "/tmp/byte_equal_mem.v";
         REQUIRE_NOTHROW(pb->to_verilog(out_file));
 
-        auto sim = pb->create_simulator();
+        auto sim = cf::plugin::auto_throw(pb->create_simulator());
         REQUIRE(sim != nullptr);
         sim->reset();
         for (int i = 0; i < 10; ++i) {

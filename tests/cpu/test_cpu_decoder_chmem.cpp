@@ -29,6 +29,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
 #include "ip/cpu/arch/riscv/decoder_table.h"
@@ -268,7 +269,7 @@ TEST_CASE("decoder_complete_simulator_tick", "[cpu][chmem][decoder][poc]") {
   pb.build();
   pb.elaborate();
 
-  auto sim = pb.create_simulator();
+  auto sim = cf::plugin::auto_throw(pb.create_simulator());
   REQUIRE(sim != nullptr);
 
   sim->reset();

@@ -26,6 +26,7 @@
 #include <simulator.h>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
 #include "ip/cpu/cpu_factory_chmem.h"
@@ -130,7 +131,7 @@ TEST_CASE("decoded_inst_intalu", "[cpu][chmem][poc][decoded-inst]") {
         pb.build();
         REQUIRE_NOTHROW(pb.elaborate(ctx));
 
-        auto sim = pb.create_simulator();
+        auto sim = cf::plugin::auto_throw(pb.create_simulator());
         REQUIRE(sim != nullptr);
         sim->reset();
         REQUIRE_NOTHROW(sim->tick());
@@ -193,7 +194,7 @@ TEST_CASE("decoded_inst_regfile", "[cpu][chmem][poc][decoded-inst]") {
     pb.build();
     REQUIRE_NOTHROW(pb.elaborate(ctx));
 
-    auto sim = pb.create_simulator();
+    auto sim = cf::plugin::auto_throw(pb.create_simulator());
     REQUIRE(sim != nullptr);
     sim->reset();
 
@@ -226,7 +227,7 @@ TEST_CASE("decoded_inst_regfile", "[cpu][chmem][poc][decoded-inst]") {
 
         pb2.build();
         REQUIRE_NOTHROW(pb2.elaborate(ctx2));
-        auto sim2 = pb2.create_simulator();
+        auto sim2 = cf::plugin::auto_throw(pb2.create_simulator());
         REQUIRE(sim2 != nullptr);
         sim2->reset();
         REQUIRE_NOTHROW(sim2->tick());
@@ -290,7 +291,7 @@ TEST_CASE("decoded_inst_branch", "[cpu][chmem][poc][decoded-inst]") {
         pb.build();
         REQUIRE_NOTHROW(pb.elaborate(ctx));
 
-        auto sim = pb.create_simulator();
+        auto sim = cf::plugin::auto_throw(pb.create_simulator());
         REQUIRE(sim != nullptr);
         sim->reset();
         REQUIRE_NOTHROW(sim->tick());
@@ -325,7 +326,7 @@ TEST_CASE("cpu_5stage_full_pipeline_tohost1", "[cpu][chmem][poc][decoded-inst][5
 
     REQUIRE_NOTHROW(pb->elaborate(ctx));
 
-    auto sim = pb->create_simulator();
+    auto sim = cf::plugin::auto_throw(pb->create_simulator());
     REQUIRE(sim != nullptr);
     sim->reset();
     for (int i = 0; i < 30; ++i) {

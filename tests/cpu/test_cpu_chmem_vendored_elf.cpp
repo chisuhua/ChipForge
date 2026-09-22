@@ -26,6 +26,7 @@
 #include <simulator.h>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/cpu_factory_chmem.h"
 
@@ -97,7 +98,7 @@ TEST_CASE("chmem_vendored_elf_tohost1", "[cpu][chmem][6d4][vendored-elf]") {
 
       REQUIRE_NOTHROW(pb->elaborate(ctx));
 
-      auto sim = pb->create_simulator();
+      auto sim = cf::plugin::auto_throw(pb->create_simulator());
       REQUIRE(sim != nullptr);
 
       // Note: sim->reset() is intentionally NOT called. The CppHDL

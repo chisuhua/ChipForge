@@ -34,6 +34,7 @@
 #include "cf/plugin/ctrl_link.h"
 #include "cf/plugin/pipe_node.h"
 #include "cf/plugin/plugin_base.h"
+#include "cf/plugin/plugin_error.h"
 #include "cf/plugin/plugin_exception.h"
 
 #ifdef CF_PLUGIN_USE_CH_MEM
@@ -102,21 +103,24 @@ class PipeBuilder {
   PipeBuilder(const PipeBuilder&) = delete;
   PipeBuilder& operator=(const PipeBuilder&) = delete;
 
-  void register_plugin(std::unique_ptr<PluginBase> plugin) {
-    if (!plugin) throw std::invalid_argument("plugin is null");
+  Result<void> register_plugin(std::unique_ptr<PluginBase> plugin) {
+    if (!plugin) return std::unexpected(PluginError::NullPlugin);
     plugins_.push_back(std::move(plugin));
+    return {};
   }
 
-  void at_stage(const std::string& stage_name, Phase phase, StageCallback cb) {
-    if (stage_name.empty()) throw std::invalid_argument("empty stage name");
-    if (!cb) throw std::invalid_argument("null callback");
+  Result<void> at_stage(const std::string& stage_name, Phase phase, StageCallback cb) {
+    if (stage_name.empty()) return std::unexpected(PluginError::EmptyStageName);
+    if (!cb) return std::unexpected(PluginError::NullCallback);
     stages_.push_back(StageEntry{stage_name, phase, std::move(cb)});
     if (nodes_.find(stage_name) == nodes_.end()) {
       nodes_.emplace(stage_name, std::make_shared<PipeNode>(stage_name));
     }
+    return {};
   }
 
-  void declare_substage(const std::string& parent, const std::string& sub, int /*depth*/ = 0) {
+  Result<void> declare_substage(const std::string& parent, const std::string& sub, int /*depth*/ = 0) {
+    if (parent.empty()) return std::unexpected(PluginError::EmptyParentStageName);
     substage_parent_[sub] = parent;
     if (nodes_.find(parent) == nodes_.end()) {
       nodes_.emplace(parent, std::make_shared<PipeNode>(parent));
@@ -124,6 +128,7 @@ class PipeBuilder {
     if (nodes_.find(sub) == nodes_.end()) {
       nodes_.emplace(sub, std::make_shared<PipeNode>(sub));
     }
+    return {};
   }
 
   std::shared_ptr<PipeNode> node_of_logic_stage(const std::string& stage_name) const {
@@ -132,9 +137,18 @@ class PipeBuilder {
     return it->second;
   }
 
-  void build() {
-    for (auto& p : plugins_) p->setup(*this);
-    for (auto& p : plugins_) p->build(*this);
+  Result<void> build() {
+    try {
+      for (auto& p : plugins_) p->setup(*this);
+      for (auto& p : plugins_) p->build(*this);
+    } catch (const PluginException& /*e*/) {
+      return std::unexpected(PluginError::PluginBuildFailed);
+    } catch (const std::exception& /*e*/) {
+      return std::unexpected(PluginError::BuildFailed);
+    } catch (...) {
+      return std::unexpected(PluginError::BuildFailed);
+    }
+    return {};
   }
 
   void run() {
@@ -233,9 +247,10 @@ class PipeBuilder {
   // ------------------------------------------------------------------------
   using CommitHook = std::function<void()>;
 
-  void register_commit_hook(CommitHook hook) {
-    if (!hook) throw std::invalid_argument("null commit hook");
+  Result<void> register_commit_hook(CommitHook hook) {
+    if (!hook) return std::unexpected(PluginError::NullCommitHook);
     commit_hooks_.push_back(std::move(hook));
+    return {};
   }
 
   std::size_t commit_hook_count() const noexcept { return commit_hooks_.size(); }
@@ -263,11 +278,12 @@ class PipeBuilder {
   //
   // 注: flush_when / bypass 不框架自动消费 (推迟到 cpu-pipeline-mispredict)
   // ------------------------------------------------------------------------
-  void register_ctrl_link(const std::string& stage_name,
-                          std::shared_ptr<CtrlLink> ctrl) {
-    if (stage_name.empty()) throw std::invalid_argument("empty stage name");
-    if (!ctrl) throw std::invalid_argument("null ctrl_link");
+  Result<void> register_ctrl_link(const std::string& stage_name,
+                                  std::shared_ptr<CtrlLink> ctrl) {
+    if (stage_name.empty()) return std::unexpected(PluginError::EmptyStageName);
+    if (!ctrl) return std::unexpected(PluginError::NullCtrlLink);
     stage_ctrl_links_[stage_name].push_back(std::move(ctrl));
+    return {};
   }
 
   bool should_stall_stage(const std::string& stage_name) const {
@@ -311,7 +327,7 @@ class PipeBuilder {
   // ------------------------------------------------------------------------
 
   template <typename T>
-  void register_stage_payload_connector(
+  Result<void> register_stage_payload_connector(
       const std::string& stage_name,
       const Payload<T>& key,
       std::function<
@@ -319,8 +335,8 @@ class PipeBuilder {
                               ch::core::ch_bool /*stall*/,
                               ch::core::ch_bool /*flush*/,
                               const std::string& /*name*/)> connector) {
-    if (stage_name.empty()) throw std::invalid_argument("empty stage name");
-    if (!connector) throw std::invalid_argument("null connector");
+    if (stage_name.empty()) return std::unexpected(PluginError::EmptyStageName);
+    if (!connector) return std::unexpected(PluginError::NullConnector);
 
     // Capture stable global pointer (Payload<T> is a global static)
     const auto* key_ptr = &key;
@@ -348,6 +364,7 @@ class PipeBuilder {
     };
 
     stage_payload_map_[stage_name].push_back(std::move(entry));
+    return {};
   }
 
   std::size_t stage_payload_count() const noexcept {
@@ -379,7 +396,7 @@ class PipeBuilder {
   //   每个 stage 的 stall = OR-merge of all registered CtrlLink halt_conds
   //   每个 stage 的 flush = OR-merge of all registered CtrlLink flush_conds
   //   缺省 stall/flush 由各 stage 的 CtrlLink 决定; 无 CtrlLink → ch_bool(false)
-  void elaborate(ch::core::context& ctx) {
+  Result<void> elaborate(ch::core::context& ctx) {
     const auto order = canonical_stage_order();
     for (const auto& stage_name : order) {
       for (int p_idx = 0; p_idx < 3; ++p_idx) {
@@ -411,23 +428,25 @@ class PipeBuilder {
         }
       }
     }
+    return {};
   }
 
   // ===== Prereq-1: pointer-based ctor + no-arg thin wrappers (M3 prerequisite) =====
   explicit PipeBuilder(ch::core::context* ctx) : ctx_(ctx) {}
 
-  void elaborate() {
-    if (!ctx_) throw PluginException("PipeBuilder", "ctx_ is null, cannot elaborate");
-    elaborate(*ctx_);
+  Result<void> elaborate() {
+    if (!ctx_) return std::unexpected(PluginError::NullContextPtr);
+    return elaborate(*ctx_);
   }
 
-  void to_verilog(const std::string& filename) {
-    if (!ctx_) throw PluginException("PipeBuilder", "ctx_ is null, cannot toVerilog");
+  Result<void> to_verilog(const std::string& filename) {
+    if (!ctx_) return std::unexpected(PluginError::NullContextPtr);
     ch::toVerilog(filename, ctx_);
+    return {};
   }
 
-  std::unique_ptr<ch::Simulator> create_simulator() {
-    if (!ctx_) throw PluginException("PipeBuilder", "ctx_ is null, cannot create simulator");
+  Result<std::unique_ptr<ch::Simulator>> create_simulator() {
+    if (!ctx_) return std::unexpected(PluginError::NullContextPtr);
     return std::make_unique<ch::Simulator>(ctx_);
   }
 #endif

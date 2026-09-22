@@ -38,6 +38,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
+#include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
 #include "ip/cpu/plugins/reg_file_chmem.h"
@@ -550,7 +551,7 @@ TEST_CASE("m3_poc_5stage_byte_equal",
     std::string verilog = ss.str();
     REQUIRE(!verilog.empty());
     REQUIRE(verilog.find("module") != std::string::npos);
-    auto sim = pb->create_simulator();
+    auto sim = cf::plugin::auto_throw(pb->create_simulator());
     REQUIRE(sim != nullptr);
     sim->reset();
     for (int i = 0; i < 20; ++i) {

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/result_macros.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/cpu_factory.h"
 #include "ip/cpu/picolibc_host_memory.h"
@@ -187,8 +188,10 @@ int main(int argc, char** argv) {
   // --------------------------------------------------------------------------
   std::unique_ptr<cf::plugin::PipeBuilder> pb;
   try {
-    pb = cf::cpu::CpuFactory<std::uint32_t>::build_cpu(
-        cfg, elf_loaded ? &mem : nullptr);
+    // v0.6 ADR-047: 通过 build_cpu_impl() 获取 Result, auto_throw 抹平 throw PluginException
+    pb = cf::plugin::auto_throw(
+        cf::cpu::CpuFactory<std::uint32_t>::build_cpu_impl(
+            cfg, elf_loaded ? &mem : nullptr));
   } catch (const std::exception& e) {
     std::cerr << "FAIL: build_cpu: " << e.what() << "\n";
     return 1;

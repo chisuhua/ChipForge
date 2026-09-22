@@ -45,9 +45,9 @@ list(APPEND TEST_SOURCES
 
 # 单二进制 chipforge_tests
 add_executable(chipforge_tests ${TEST_SOURCES})
-# CppHDL 使用 C++20 特性 (std::source_location, std::bit_width, consteval)
-# chipforge_tests 通过 cf_plugin_link_cpphdl 链接 CppHDL 头, 所以本 target 需 C++20
-target_compile_features(chipforge_tests PRIVATE cxx_std_20)
+# CppHDL 使用 C++20+ 特性 (std::source_location, std::bit_width, consteval)
+# chipforge_tests 通过 cf_plugin_link_cpphdl 链接 CppHDL 头, 所以本 target 需 C++23 (v0.6 ADR-047)
+target_compile_features(chipforge_tests PRIVATE cxx_std_23)
 target_compile_definitions(chipforge_tests PRIVATE
     TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
     RV32UI_CSV_PATH="${CMAKE_SOURCE_DIR}/soc/cpu/docs/dse/rv32ui-baseline-matrix.csv"
@@ -127,7 +127,7 @@ list(APPEND CHMEM_TEST_SOURCES
 )
 
 add_executable(chipforge_tests_chmem ${CHMEM_TEST_SOURCES})
-target_compile_features(chipforge_tests_chmem PRIVATE cxx_std_20)
+target_compile_features(chipforge_tests_chmem PRIVATE cxx_std_23)
 target_compile_definitions(chipforge_tests_chmem PRIVATE
     CF_PLUGIN_USE_CH_MEM
     CHIPFORGE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"

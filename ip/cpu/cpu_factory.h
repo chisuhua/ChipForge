@@ -29,6 +29,8 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/plugin_error.h"
+#include "cf/plugin/result_macros.h"
 #include "ip/cpu/plugins/reg_file.h"
 #include "ip/cpu/plugins/ibus.h"
 #include "ip/cpu/plugins/branch_predictor.h"
@@ -329,6 +331,26 @@ class CpuFactory {
     pb->build();
 
     return pb;
+  }
+
+  // v0.6 ADR-047: Result 范式内部实现入口
+  //   - 返回 Result<std::unique_ptr<PipeBuilder>>
+  //   - 内部委托 build_cpu() (兼容既有行为); 失败统一转为 PluginException
+  //   - P1 阶段: 后续逐点用 PB_TRY 替换 at_stage/register_plugin 调用以获得
+  //     细粒度错误码 (NullPlugin / EmptyStageName / DuplicateStageName / etc.)
+  //     本方法先提供 Result 兼容, 后续渐进迁移
+  static cf::plugin::Result<std::unique_ptr<cf::plugin::PipeBuilder>>
+  build_cpu_impl(const CPUConfig& config,
+                 cf::cpu::PicolibcHostMemory* mem = nullptr) {
+    try {
+      return build_cpu(config, mem);
+    } catch (const cf::plugin::PluginException& /*e*/) {
+      return std::unexpected(cf::plugin::PluginError::BuildFailed);
+    } catch (const std::exception& /*e*/) {
+      return std::unexpected(cf::plugin::PluginError::BuildFailed);
+    } catch (...) {
+      return std::unexpected(cf::plugin::PluginError::BuildFailed);
+    }
   }
 
  private:

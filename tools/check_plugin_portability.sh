@@ -354,18 +354,115 @@ else
   FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 echo ""
+echo ""
+
+# ----------------------------------------------------------------------------
+# Check 10 (v0.6, ADR-047): 禁止静态配置头文件 throw std::*/PluginException
+# ----------------------------------------------------------------------------
+echo "[10/12] 检查静态配置头文件 throw std::*/PluginException (ADR-047) ..."
+THROW_VIOLATIONS=""
+THROW_HEADERS="${ROOT_DIR}/include/cf/plugin/pipe_builder.h ${ROOT_DIR}/include/cf/plugin/plugin_base.h ${ROOT_DIR}/include/cf/plugin/plugin_error.h"
+for f in ${THROW_HEADERS}; do
+  if [ -f "$f" ]; then
+    HITS=$(grep -nE "throw std::|throw PluginException" "$f" \
+      | grep -vE "^\s*[0-9]+:\s*(//|/\*|\*)" \
+      | grep -v "throw_when" || true)
+    if [ -n "${HITS}" ]; then
+      THROW_VIOLATIONS="${THROW_VIOLATIONS}${f}: ${HITS}"$'\n'
+    fi
+  fi
+done
+if [ -z "${THROW_VIOLATIONS}" ]; then
+  echo "  [PASS] 静态配置头文件无 throw (ADR-047 禁止)"
+else
+  echo "  [FAIL] 静态配置头文件发现 throw:"
+  echo "${THROW_VIOLATIONS}" | sed 's/^/    /'
+  echo "  [FIX] 用 return std::unexpected(PluginError::Xxx) 替换"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
+# Check 11 (v0.6, ADR-047): P0 API 签名同步 (10 API 必须含 Result/expected)
+# ----------------------------------------------------------------------------
+echo "[11/12] 检查 P0 API 签名同步 (10 API 必须含 Result) ..."
+SIGNATURE_VIOLATIONS=""
+declare -a RESULT_APIS=(
+  "register_plugin"
+  "at_stage"
+  "declare_substage"
+  "register_commit_hook"
+  "register_ctrl_link"
+  "register_stage_payload_connector"
+  "build"
+  "elaborate"
+  "to_verilog"
+  "create_simulator"
+)
+PIPEBUILDER_H="${ROOT_DIR}/include/cf/plugin/pipe_builder.h"
+for api in "${RESULT_APIS[@]}"; do
+  if grep -qE "(Result<void>|Result<std)" "${PIPEBUILDER_H}" 2>/dev/null; then
+    continue
+  fi
+  if ! grep -qE "[[:space:]]${api}\s*\(" "${PIPEBUILDER_H}" 2>/dev/null; then
+    continue
+  fi
+  # Check the API signature line
+  API_LINE=$(grep -nE "[[:space:]]${api}\s*\(" "${PIPEBUILDER_H}" | head -1)
+  if echo "${API_LINE}" | grep -qE "(void|Result)"; then
+    if ! echo "${API_LINE}" | grep -q "Result"; then
+      SIGNATURE_VIOLATIONS="${SIGNATURE_VIOLATIONS}  ${API_LINE}"$'\n'
+    fi
+  fi
+done
+if [ -z "${SIGNATURE_VIOLATIONS}" ]; then
+  echo "  [PASS] 10 个 P0 API 均包含 Result 返回类型"
+else
+  echo "  [FAIL] P0 API 缺少 Result 返回类型:"
+  echo "${SIGNATURE_VIOLATIONS}" | sed 's/^/    /'
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
+# Check 12 (v0.6, ADR-047): C++23 编译标志强制
+# ----------------------------------------------------------------------------
+echo "[12/12] 检查 C++23 编译标志强制 (4 CMake 文件不能出现 cxx_std_17|20) ..."
+CMAKE_VIOLATIONS=""
+declare -a CMAKE_FILES=(
+  "${ROOT_DIR}/CMakeLists.txt"
+  "${ROOT_DIR}/src/cf_plugin/CMakeLists.txt"
+  "${ROOT_DIR}/tests/CMakeLists.txt"
+  "${ROOT_DIR}/tools/verilator_runner/CMakeLists.txt"
+)
+for f in "${CMAKE_FILES[@]}"; do
+  if [ ! -f "$f" ]; then continue; fi
+  HITS=$(grep -nE "cxx_std_(17|20)" "$f" || true)
+  if [ -n "${HITS}" ]; then
+    CMAKE_VIOLATIONS="${CMAKE_VIOLATIONS}${f}: ${HITS}"$'\n'
+  fi
+done
+if [ -z "${CMAKE_VIOLATIONS}" ]; then
+  echo "  [PASS] 4 个 CMake 文件 无 cxx_std_17/20 (全部已升级至 cxx_std_23)"
+else
+  echo "  [FAIL] 下列 CMake 文件仍含 cxx_std_17/20:"
+  echo "${CMAKE_VIOLATIONS}" | sed 's/^/    /'
+  echo "  [FIX] 升级至 cxx_std_23 (ADR-047)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+echo ""
 
 # ----------------------------------------------------------------------------
 # 汇总
 # ----------------------------------------------------------------------------
 if [ ${FAIL_COUNT} -eq 0 ]; then
   if [ ${WARN_COUNT} -gt 0 ]; then
-    echo "=== ADR-040 v2.0 移植性检查通过 (含 ${WARN_COUNT} 项 WARN) ==="
+    echo "=== ADR-040 v2.0 + ADR-047 移植性检查通过 (12/12, 含 ${WARN_COUNT} 项 WARN) ==="
   else
-    echo "=== ADR-040 v2.0 移植性检查全部通过 (9/9) ==="
+    echo "=== ADR-040 v2.0 + ADR-047 移植性检查全部通过 (12/12) ==="
   fi
   exit 0
 else
-  echo "=== ADR-040 v2.0 移植性检查失败 (${FAIL_COUNT} FAIL, ${WARN_COUNT} WARN) ==="
+  echo "=== ADR-040 v2.0 + ADR-047 移植性检查失败 (${FAIL_COUNT} FAIL, ${WARN_COUNT} WARN) ==="
   exit 1
 fi

@@ -41,8 +41,9 @@ declare -A CATEGORY_NAMES=(
   [F]="Bundle 与协议"
   [G]="声明式 Plugin 模型"
   [H]="流水线抽象"
-  [I]="验证框架"
-  [J]="目录与组织"
+[I]="验证框架"
+   [J]="目录与组织"
+   [K]="Plugin 迁移/演进"
 )
 
 # 颜色（仅在 TTY 时启用）
@@ -182,8 +183,9 @@ category_of_adr() {
     ADR-021|ADR-022|ADR-023|ADR-024) echo F ;;
     ADR-025|ADR-026|ADR-027|ADR-028|ADR-029) echo G ;;
     ADR-030|ADR-031|ADR-032|ADR-033) echo H ;;
-    ADR-034|ADR-035|ADR-036) echo I ;;
-    ADR-037|ADR-038) echo J ;;
+ADR-034|ADR-035|ADR-036) echo I ;;
+ADR-037|ADR-038) echo J ;;
+ADR-040|ADR-041|ADR-042|ADR-043|ADR-045|ADR-046|ADR-047) echo K ;;
     *) echo "?" ;;
   esac
 }
@@ -787,6 +789,16 @@ verify_adr_038() {
   fi
 }
 
+verify_adr_039() {
+  should_run ADR-047 || return
+  local f="$CHIPFORGE_ROOT/docs/architecture/adr/ADR-047-static-config-result-paradigm.md"
+  if [[ -e "$f" ]] && file_contains "Result" "$f" && file_contains "PluginError" "$f"; then
+    log_pass "ADR-047" "静态配置期错误处理 Result 范式"
+  else
+    log_failed "ADR-047" "静态配置期错误处理 Result 范式" "missing or malformed: $f"
+  fi
+}
+
 # ----------------------------------------------------------------------------
 # 主循环
 # ----------------------------------------------------------------------------
@@ -809,7 +821,7 @@ main() {
   echo ""
 
   # 按类别执行
-  for cat in A B C D E F G H I J; do
+  for cat in A B C D E F G H I J K; do
     if [[ -n "$CATEGORY_FILTER" && "$CATEGORY_FILTER" != "$cat" ]]; then
       continue
     fi
@@ -857,6 +869,7 @@ main() {
   verify_adr_036
   verify_adr_037
   verify_adr_038
+  verify_adr_039
 
   # 汇总
   echo ""
