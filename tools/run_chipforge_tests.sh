@@ -153,7 +153,7 @@ CATCH2_FILTERS=()
 cd "$PROJECT_ROOT"  # Catch2 binary 用相对路径读 SoC JSON, 需在 project root
 
 # 摘要打印 (用 --list-tests 拿总数, 不实际运行)
-TOTAL_CASES=$(./build/bin/chipforge_tests --list-tests 2>&1 | grep -cE "^  [a-z]")
+TOTAL_CASES=$(./build/bin/chipforge_tests --list-tests 2>&1 | grep -cE "^  [A-Za-z0-9]")
 echo "[run_chipforge_tests] Running Catch2 binary: $TEST_BINARY"
 echo "[run_chipforge_tests] Total registered test cases: $TOTAL_CASES"
 if [[ ${#CATCH2_FILTERS[@]} -gt 0 ]]; then
