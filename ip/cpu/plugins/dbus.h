@@ -51,29 +51,61 @@ class DBusPlugin : public cf::plugin::PluginBase {
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
     using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<T>;
-    constexpr std::uint8_t kFunct3SB = 0;  // RISC-V spec: SB=000
-    constexpr std::uint8_t kFunct3SH = 1;  // SH=001
-    constexpr std::uint8_t kFunct3SW = 2;  // SW=010
+    constexpr std::uint8_t kFunct3LB  = 0;  // RISC-V spec: LB =000
+    constexpr std::uint8_t kFunct3LH  = 1;  //                LH =001
+    constexpr std::uint8_t kFunct3LW  = 2;  //                LW =010
+    constexpr std::uint8_t kFunct3LBU = 4;  //                LBU=100
+    constexpr std::uint8_t kFunct3LHU = 5;  //                LHU=101
+    constexpr std::uint8_t kFunct3SB  = 0;  // RISC-V spec: SB =000
+    constexpr std::uint8_t kFunct3SH  = 1;  //                SH =001
+    constexpr std::uint8_t kFunct3SW  = 2;  //                SW =010
 
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
+        const auto& rv  = n->operator()(RvKey::RISCV_DETAIL);
 
-      // LOAD 路径: LOAD width extraction (LB/LH/LBU/LHU) 是 Wave 2 候选,
-      // 当前一律 read_word; lb/lh 系失败预期分类 feature stub/真 bug.
+      // LOAD: funct3 分发 width extraction; LB/LH 需符号扩展.
       if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::LOAD) {
         T addr = n->operator()(KeyType::MEM_ADDR);
         if (mem_) {
-          n->operator()(KeyType::MEM_DATA) = T(mem_->read_word(static_cast<std::uint64_t>(addr)));
+          T result = T{0};
+          switch (rv.funct3) {
+            case kFunct3LB:
+              result = static_cast<T>(static_cast<std::int8_t>(
+                  mem_->read_byte(static_cast<std::uint64_t>(addr))));
+              break;
+            case kFunct3LH:
+              result = static_cast<T>(static_cast<std::int16_t>(
+                  mem_->read_half(static_cast<std::uint64_t>(addr))));
+              break;
+            case kFunct3LW:
+              result = static_cast<T>(mem_->read_word(static_cast<std::uint64_t>(addr)));
+              break;
+            case kFunct3LBU:
+              result = static_cast<T>(
+                  mem_->read_byte(static_cast<std::uint64_t>(addr)));
+              break;
+            case kFunct3LHU:
+              result = static_cast<T>(
+                  mem_->read_half(static_cast<std::uint64_t>(addr)));
+              break;
+            default:
+              result = T{0};
+              break;
+          }
+          n->operator()(KeyType::MEM_DATA) = result;
+          // Forward load value to RD_DATA so RegFile writeback picks it up.
+          n->operator()(KeyType::RD_DATA) = result;
         } else {
           n->operator()(KeyType::MEM_DATA) = T{0};
+          n->operator()(KeyType::RD_DATA) = T{0};
         }
       } else if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::STORE) {
         // STORE 路径按 funct3 分发 (SB/SH/SW); 用 if-else 链, 无早返 — ADR-040 Tier-1 #4.
         T addr = n->operator()(KeyType::MEM_ADDR);
         T data = n->operator()(KeyType::MEM_DATA);
-        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
         if (mem_) {
           if (rv.funct3 == kFunct3SB) {
             mem_->write_byte(static_cast<std::uint64_t>(addr), static_cast<std::uint8_t>(data));
