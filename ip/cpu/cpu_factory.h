@@ -280,19 +280,20 @@ class CpuFactory {
     //   fetch_add(1) % n_lanes 决定 lane 0/1, 写到 node_of_logic_stage
     //   的 set_lane() 字段. per-build_cpu 栈帧, 闭包持有指针.
     if (config.dispatch_width > 1 && config.pipeline_stages == 7) {
-      std::vector<std::atomic<std::uint8_t>> lane_counters(
+      // Heap-allocate counters: lambdas outlive build_cpu's stack frame.
+      auto lane_counters = std::make_shared<std::vector<std::atomic<std::uint8_t>>>(
           config.pipeline_stages);
       for (std::size_t s = 0; s < config.pipeline_stages; ++s) {
-        lane_counters[s].store(0);
+        (*lane_counters)[s].store(0);
       }
       for (std::size_t s = 0; s < 7; ++s) {
         const char* stage_name = stage_name_at_7(s);
         pb->at_stage(stage_name, cf::plugin::Phase::NORMAL,
-                     [pb_ptr = pb.get(), lane_ptr = &lane_counters[s],
-                      n = config.n_lanes, stage_name]() {
+                     [pb_ptr = pb.get(), counters = lane_counters,
+                      n = config.n_lanes, stage_name, s]() {
                        const std::uint8_t my_lane =
                            static_cast<std::uint8_t>(
-                               lane_ptr->fetch_add(1) % n);
+                               (*counters)[s].fetch_add(1) % n);
                        pb_ptr->node_of_logic_stage(stage_name)
                            ->set_lane(my_lane);
                      });
