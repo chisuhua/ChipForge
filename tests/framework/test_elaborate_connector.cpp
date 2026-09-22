@@ -123,7 +123,7 @@ TEST_CASE("elaborate_poc_run_callback_and_commit", "[framework][elaborate][poc]"
       });
 
   // elaborate() 运行 at_stage + commit_payload_map
-  REQUIRE_NOTHROW(pb.elaborate(ctx));
+  REQUIRE((pb.elaborate(ctx)).has_value());
 
   // S1 node 的 cnt cell 应有非空 lnodeimpl
   auto s1_node = pb.node_of_logic_stage("S1");
@@ -270,7 +270,7 @@ TEST_CASE("elaborate_poc_halt_wires_stall_port", "[framework][elaborate][poc]") 
   pb.register_ctrl_link("S1", ctrl_s1);
 
   // elaborate() 必须无异常
-  REQUIRE_NOTHROW(pb.elaborate(ctx));
+  REQUIRE((pb.elaborate(ctx)).has_value());
 
   // toVerilog 验证: 应含 always_ff @(posedge...) (pipeline_reg 插入的证据)
   // 注: CppHDL toVerilog 用 SystemVerilog 风格 (always_ff @(posedge...))

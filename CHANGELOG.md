@@ -5,6 +5,54 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.0 (2026-09-22) — 静态配置期错误处理 Result 范式 (ADR-047)
+
+> **OpenSpec change**: `v06-static-config-result` (已 archive)
+> **目的**: 修复 Phase 6d 验证报告标记的唯一 Critical P1 项（应用层错误处理缺失）
+> **核心**: 主项目升 C++23 + 10 个 PipeBuilder 静态配置 API 迁移到 `std::expected<T, PluginError>` + ADR-047 + CI Check 10/11/12
+
+### Breaking
+
+- **`PipeBuilder` 10 个静态配置 API 改为 `Result<void>` / `Result<T>` 返回**（`std::expected<T, PluginError>`）：
+  `register_plugin` / `at_stage` / `declare_substage` / `register_commit_hook` /
+  `register_ctrl_link` / `register_stage_payload_connector` / `build` /
+  `elaborate` / `to_verilog` / `create_simulator`（原 `void` / 裸指针返回）
+- **主项目 C++ 标准升级**：`CMAKE_CXX_STANDARD 17 → 23`（`cf_plugin` INTERFACE + tests + verilator_runner 同步 `cxx_std_23`）
+- CppTLM (C++17) / CppHDL (C++23) 子仓库**不修改**，通过 Itanium ABI 兼容
+
+### 新增
+
+- **`include/cf/plugin/plugin_error.h`**（112 行）：`enum class PluginError`（20 字段）+ `Result<T>` 别名 + `plugin_error_message()` 工厂 + `to_exception()` 转换
+- **`include/cf/plugin/result_macros.h`**（95 行）：`PB_TRY` / `PB_EXPECT` / `auto_throw` 宏族
+- **`docs/architecture/adr/ADR-047-static-config-result-paradigm.md`**（152 行）：静态配置期错误处理 Result 范式（含 4 项热路径例外清单）
+- **CI Check 10/11/12**（`tools/check_plugin_portability.sh`，8→12 checks）：禁止静态配置头文件 throw / API 签名同步 / C++23 强制
+
+### 修改
+
+- **`include/cf/plugin/plugin_exception.h`**：新增 `PluginException(PluginError, std::string stage = "")` 构造重载（向后兼容）
+- **`ip/cpu/cpu_factory.h`**：新增 `build_cpu_impl()` 内部 Result 化（`PB_TRY` 包裹所有 register/at_stage/build），对外 `build_cpu()` 保留 throw 包装层
+- **`tools/cpu_sim/main.cpp`**：用 `auto_throw(build_cpu_impl(...))` 抹平（CLI 接口不变）
+- **`docs/architecture/adr.md`**：ADR-047 表项 + K 类别 + ADR-040 v3.0 行末引用
+
+### 保留 throw（ADR-047 例外）
+
+- `PipeBuilder::run()` — CtrlLink `throw_when` 运行时语义（`REQUIRE_THROWS_AS(pb.run(), PluginException)` 不变）
+- `PayloadStore::get()` — at_stage 回调内热路径 fail-fast
+- `PluginBase` 虚函数 / 业务回调体 — 自由选择
+
+### Tests
+
+- 34 个 `REQUIRE_NOTHROW(pb.*elaborate|to_verilog)` 改为 `REQUIRE((...).has_value())`（Result 值类型语义）
+- 5 个 throw 断言（`run()`×2 / `PayloadStore::get` / `TLBFactory::create`×2）**保留**（ADR-047 例外）
+- `chipforge_tests` + `chipforge_tests_chmem` 全部 PASS（零回归）
+
+### 验证
+
+- `ctest`: **3/3 PASS**（TLM + CH_MEM + verify_plugin_decision）
+- `check_plugin_portability.sh`: **12/12 PASS**（含新 Check 10/11/12）
+- `verify_adr.sh`: **32/32 PASS**（31 旧 + 新 ADR-047）
+- `verify_plugin_decision.sh`: PASS
+
 ## v0.5.0 (2026-09-22) — Phase 6d 完整收官 (6d.6 + 6d.7 + Check 9 + ADR-040 v3.0)
 
 > **OpenSpec change**: `phase-6d-fsm-chmem` (in progress)

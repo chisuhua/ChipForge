@@ -96,7 +96,7 @@ TEST_CASE("chmem_vendored_elf_tohost1", "[cpu][chmem][6d4][vendored-elf]") {
       REQUIRE(pb != nullptr);
       REQUIRE(pb->plugin_count() >= 7);
 
-      REQUIRE_NOTHROW(pb->elaborate(ctx));
+      REQUIRE((pb->elaborate(ctx)).has_value());
 
       auto sim = cf::plugin::auto_throw(pb->create_simulator());
       REQUIRE(sim != nullptr);

@@ -129,7 +129,7 @@ TEST_CASE("decoded_inst_intalu", "[cpu][chmem][poc][decoded-inst]") {
         });
 
         pb.build();
-        REQUIRE_NOTHROW(pb.elaborate(ctx));
+        REQUIRE((pb.elaborate(ctx)).has_value());
 
         auto sim = cf::plugin::auto_throw(pb.create_simulator());
         REQUIRE(sim != nullptr);
@@ -192,7 +192,7 @@ TEST_CASE("decoded_inst_regfile", "[cpu][chmem][poc][decoded-inst]") {
     });
 
     pb.build();
-    REQUIRE_NOTHROW(pb.elaborate(ctx));
+    REQUIRE((pb.elaborate(ctx)).has_value());
 
     auto sim = cf::plugin::auto_throw(pb.create_simulator());
     REQUIRE(sim != nullptr);
@@ -226,7 +226,7 @@ TEST_CASE("decoded_inst_regfile", "[cpu][chmem][poc][decoded-inst]") {
         });
 
         pb2.build();
-        REQUIRE_NOTHROW(pb2.elaborate(ctx2));
+        REQUIRE((pb2.elaborate(ctx2)).has_value());
         auto sim2 = cf::plugin::auto_throw(pb2.create_simulator());
         REQUIRE(sim2 != nullptr);
         sim2->reset();
@@ -289,7 +289,7 @@ TEST_CASE("decoded_inst_branch", "[cpu][chmem][poc][decoded-inst]") {
         });
 
         pb.build();
-        REQUIRE_NOTHROW(pb.elaborate(ctx));
+        REQUIRE((pb.elaborate(ctx)).has_value());
 
         auto sim = cf::plugin::auto_throw(pb.create_simulator());
         REQUIRE(sim != nullptr);
@@ -324,7 +324,7 @@ TEST_CASE("cpu_5stage_full_pipeline_tohost1", "[cpu][chmem][poc][decoded-inst][5
     REQUIRE(pb != nullptr);
     REQUIRE(pb->plugin_count() >= 7);
 
-    REQUIRE_NOTHROW(pb->elaborate(ctx));
+    REQUIRE((pb->elaborate(ctx)).has_value());
 
     auto sim = cf::plugin::auto_throw(pb->create_simulator());
     REQUIRE(sim != nullptr);

@@ -128,10 +128,10 @@ TEST_CASE("cpu_memory_model_chmem_elaborate", "[cpu][chmem][poc][memory-model]")
     REQUIRE(pb != nullptr);
     REQUIRE(pb->plugin_count() >= 7);
 
-    REQUIRE_NOTHROW(pb->elaborate(ctx));
+    REQUIRE((pb->elaborate(ctx)).has_value());
 
     const std::string out_file = "/tmp/cpu_mem_model.v";
-    REQUIRE_NOTHROW(pb->to_verilog(out_file));
+    REQUIRE((pb->to_verilog(out_file)).has_value());
 
     std::ifstream f(out_file);
     REQUIRE(f.is_open());
@@ -180,10 +180,10 @@ TEST_CASE("cpu_memory_model_chmem_elf_preload", "[cpu][chmem][poc][memory-model]
     REQUIRE(pb->plugin_count() >= 7);
 
     // Step 2: elaborate + toVerilog
-    REQUIRE_NOTHROW(pb->elaborate(ctx));
+    REQUIRE((pb->elaborate(ctx)).has_value());
 
     const std::string out_file = "/tmp/cpu_elf_preload.v";
-    REQUIRE_NOTHROW(pb->to_verilog(out_file));
+    REQUIRE((pb->to_verilog(out_file)).has_value());
     REQUIRE(count_in_verilog(out_file, "module") >= 1);
 
     // Step 3: Simulator tick
@@ -395,10 +395,10 @@ TEST_CASE("cpu_5stage_byte_equal_with_mem", "[cpu][chmem][poc][memory-model][byt
         auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
         REQUIRE(pb != nullptr);
         REQUIRE(pb->plugin_count() >= 7);
-        REQUIRE_NOTHROW(pb->elaborate(ctx));
+        REQUIRE((pb->elaborate(ctx)).has_value());
 
         const std::string out_file = "/tmp/byte_equal_mem.v";
-        REQUIRE_NOTHROW(pb->to_verilog(out_file));
+        REQUIRE((pb->to_verilog(out_file)).has_value());
 
         auto sim = cf::plugin::auto_throw(pb->create_simulator());
         REQUIRE(sim != nullptr);

@@ -70,11 +70,11 @@ TEST_CASE("m3_poc_regfile_elaborate", "[cpu][m3][poc][regfile][chmem]") {
   pb.build();
 
   // Prereq-1: elaborate() 无参重载 (委托 elaborate(*ctx_))
-  REQUIRE_NOTHROW(pb.elaborate());
+  REQUIRE((pb.elaborate()).has_value());
 
   // Prereq-1: to_verilog 薄封装
   const std::string out_file = "/tmp/regfile.v";
-  REQUIRE_NOTHROW(pb.to_verilog(out_file));
+  REQUIRE((pb.to_verilog(out_file)).has_value());
 
   std::ifstream f(out_file);
   REQUIRE(f.is_open());
@@ -105,10 +105,10 @@ TEST_CASE("m3_poc_alu_elaborate", "[cpu][m3][poc][alu][chmem]") {
       std::make_unique<cf::cpu::arch::riscv::RiscvIntAluPlugin<ch_uint<32>>>());
   pb.build();
 
-  REQUIRE_NOTHROW(pb.elaborate());
+  REQUIRE((pb.elaborate()).has_value());
 
   const std::string out_file = "/tmp/alu.v";
-  REQUIRE_NOTHROW(pb.to_verilog(out_file));
+  REQUIRE((pb.to_verilog(out_file)).has_value());
 
   std::ifstream f(out_file);
   REQUIRE(f.is_open());
@@ -146,11 +146,11 @@ TEST_CASE("m3_poc_regfile_alu_combined", "[cpu][m3][poc][combined][chmem]") {
         std::make_unique<cf::cpu::arch::riscv::RiscvIntAluPlugin<ch_uint<32>>>());
     pb.build();
 
-    REQUIRE_NOTHROW(pb.elaborate());
+    REQUIRE((pb.elaborate()).has_value());
 
     const std::string out_file =
         "/tmp/regfile_alu_" + std::to_string(trial) + ".v";
-    REQUIRE_NOTHROW(pb.to_verilog(out_file));
+    REQUIRE((pb.to_verilog(out_file)).has_value());
 
     std::ifstream f(out_file);
     REQUIRE(f.is_open());
@@ -483,9 +483,9 @@ TEST_CASE("m3_poc_5stage_byte_equal_test1_single_context",
   cf::plugin::PipeBuilder pb(&ctx);
   pb.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<ch_uint<32>>>());
   pb.build();
-  REQUIRE_NOTHROW(pb.elaborate());
+  REQUIRE((pb.elaborate()).has_value());
   const std::string out_file = "/tmp/byte_equal_test1.v";
-  REQUIRE_NOTHROW(pb.to_verilog(out_file));
+  REQUIRE((pb.to_verilog(out_file)).has_value());
   std::ifstream f(out_file);
   REQUIRE(f.is_open());
   std::stringstream ss;
@@ -505,8 +505,8 @@ TEST_CASE("m3_poc_5stage_byte_equal_test2_dual_context",
     cf::plugin::PipeBuilder pb_a(&ctx_a);
     pb_a.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<ch_uint<32>>>());
     pb_a.build();
-    REQUIRE_NOTHROW(pb_a.elaborate());
-    REQUIRE_NOTHROW(pb_a.to_verilog("/tmp/byte_equal_ctx_a.v"));
+    REQUIRE((pb_a.elaborate()).has_value());
+    REQUIRE((pb_a.to_verilog("/tmp/byte_equal_ctx_a.v")).has_value());
   }
   {
     ch::core::context ctx_b("byte_equal_ctx_b");
@@ -514,8 +514,8 @@ TEST_CASE("m3_poc_5stage_byte_equal_test2_dual_context",
     cf::plugin::PipeBuilder pb_b(&ctx_b);
     pb_b.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<ch_uint<32>>>());
     pb_b.build();
-    REQUIRE_NOTHROW(pb_b.elaborate());
-    REQUIRE_NOTHROW(pb_b.to_verilog("/tmp/byte_equal_ctx_b.v"));
+    REQUIRE((pb_b.elaborate()).has_value());
+    REQUIRE((pb_b.to_verilog("/tmp/byte_equal_ctx_b.v")).has_value());
     std::ifstream f("/tmp/byte_equal_ctx_b.v");
     REQUIRE(f.is_open());
     std::stringstream ss;
@@ -541,9 +541,9 @@ TEST_CASE("m3_poc_5stage_byte_equal",
     auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
     REQUIRE(pb != nullptr);
     REQUIRE(pb->plugin_count() >= 4);
-    REQUIRE_NOTHROW(pb->elaborate(ctx));
+    REQUIRE((pb->elaborate(ctx)).has_value());
     const std::string out_file = "/tmp/byte_equal_cpu.v";
-    REQUIRE_NOTHROW(pb->to_verilog(out_file));
+    REQUIRE((pb->to_verilog(out_file)).has_value());
     std::ifstream f(out_file);
     REQUIRE(f.is_open());
     std::stringstream ss;

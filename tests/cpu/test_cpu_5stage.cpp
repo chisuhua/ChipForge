@@ -76,11 +76,11 @@ TEST_CASE("m4_poc_5stage_elaborate_verilog", "[cpu][m4][poc][5stage][chmem]") {
   REQUIRE(pb != nullptr);
 
   // Step 1: elaborate — 运行所有 at_stage 闭包 + commit_payload_map
-  REQUIRE_NOTHROW(pb->elaborate(ctx));
+  REQUIRE((pb->elaborate(ctx)).has_value());
 
   // Step 2: toVerilog
   const std::string out_file = "/tmp/cpu.v";
-  REQUIRE_NOTHROW(pb->to_verilog(out_file));
+  REQUIRE((pb->to_verilog(out_file)).has_value());
 
   // Step 3: 验证 Verilog 文件
   std::ifstream f(out_file);
@@ -152,10 +152,10 @@ TEST_CASE("hazard_chmem_complete_elaborate", "[cpu][chmem][hazard][poc]") {
   auto pb = cfcpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx);
   REQUIRE(pb != nullptr);
 
-  REQUIRE_NOTHROW(pb->elaborate(ctx));
+  REQUIRE((pb->elaborate(ctx)).has_value());
 
   const std::string out_file = "/tmp/hazard_complete.v";
-  REQUIRE_NOTHROW(pb->to_verilog(out_file));
+  REQUIRE((pb->to_verilog(out_file)).has_value());
 
   std::ifstream f(out_file);
   REQUIRE(f.is_open());

@@ -192,10 +192,10 @@ TEST_CASE("decoder_complete_elaborate", "[cpu][chmem][decoder][poc]") {
 
   pb.build();
 
-  REQUIRE_NOTHROW(pb.elaborate());
+  REQUIRE((pb.elaborate()).has_value());
 
   const std::string out_file = "/tmp/decoder_complete.v";
-  REQUIRE_NOTHROW(pb.to_verilog(out_file));
+  REQUIRE((pb.to_verilog(out_file)).has_value());
 
   std::ifstream f(out_file);
   REQUIRE(f.is_open());
