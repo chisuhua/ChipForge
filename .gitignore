@@ -62,7 +62,9 @@ worktrees/
 .opencode/
 .opencode.json
 .mcp.json
-openspec/
+# openspec/ 是设计/协作工件（changes + archive），与 docs/ 并列需团队可见；
+# XDG context-store 隔离在 ~/.local/share/openspec/context-stores/，不会污染 git。
+# 2026-09-24 A+C Hybrid 战略落地时移除 gitignore（决策详见 commit message + strategy §1）
 
 # .omo/ workflow subdirs are transient workspace state (boulder/notepad/evidence/run-continuation),
 # and decision/plan drafts are intentionally untracked — see docs/architecture/adr.md and

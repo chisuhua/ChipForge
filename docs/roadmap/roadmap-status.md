@@ -1,10 +1,19 @@
 # 路线图执行状态跟踪
 
-> **最后更新**: 2026-09-20 (本次会话: **Phase 6c plugin-elaboration-substrate 完整收官 + M6 5-stage Simulator SEGV 修复 + 验证报告 + 路线图同步 + Phase 6d 拆分为独立 phase doc + Oracle/Metis 审查修订**; 距上次更新 ~3 个月)
-> **当前可启动**: ① **Phase 6d 启动前 Prerequisites** (`openspec/changes/phase-6d-prerequisites/`, 见本文件 §2.6) ② **PoC Follow-up Tasks** (`openspec/changes/poc-follow-up-fixes/`, 小范围修复合并) ③ **Phase 6d 主 change** (`openspec/changes/phase-6d-rtl-verification/`, 待 prereqs 完成后)
+> **最后更新**: 2026-09-24 (本次会话: **A+C Hybrid 战略落地 + 3 个 OpenSpec initiative 创立 + 7 个 openspec change proposals 落地 + sync_strategy_status.sh 实装 (替代 stub) + strategy §7 自动派生 + Phase 1.5 Wave 3-4 债务清理路径锁定**)
+> **战略入口**: [`docs/roadmap/strategy/a-plus-c-hybrid.md`](strategy/a-plus-c-hybrid.md) — A+C Hybrid 战略 (Phase 1.5 Wave 3-4 清债 → Phase 2 产品化前置)
+> **当前可启动**: ① **P0#1 cpu-pipeline-canonical-ordering-assert** (P0 即时启动, 1-2 周) ② **P1#3 mmu-paddr-consume-and-real-memory** (P1 一月内, 依赖 P0#1) ③ **P1#4 plugin-framework-cycle-precision** (独立, 可并行)
 > **更新时机**: 每周一 / 阶段切换时 / 重大决策落地后
 > **权威源**: `docs/roadmap/phases/*.md` (框架级 Phase 0/6/6d) + `soc/cpu/docs/roadmap/*.md` (CPU SoC Phase 1-5) + `.omo/plans/*.md` + `.omo/drafts/*.md` + `openspec/changes/*/proposal.md`
 > **本文件目的**: 不重复阶段文档的任务清单,只跟踪执行状态、阻塞和下一步
+
+> **A+C Hybrid 战略落地摘要 (2026-09-24)**:
+> - **战略选择**: A+C 混合 (Wave 3-4 清债 → Phase 2 产品化前置), 否决 B 工具化 (过早) / 否决纯 A (不清债会重复踩坑)
+> - **3 个 OpenSpec initiative**: `wave3-cpu-pipeline-debt` (v0.4.0) + `wave3-mmu-real-memory-and-cycle` (v0.5.0) + `wave4-csr-cache-dse` (v0.6.0, 占位)
+> - **7 个 openspec change proposals**: P0#1 canonical-ordering-assert + P0#2 fix-rv32ui-load-width (回顾性: v0.6.0 commit 8909165 已完成) + P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + P2#6 phase-1.5-wave-4 + P2#7 cache-phase1.5-4way
+> - **`tools/sync_strategy_status.sh` 实装**: 从 openspec changes + initiative YAML 派生 strategy §7 表格 (替代 stub), `--dry-run` / `--json` 双模式
+> - **3 个版本节点**: v0.4.0 (P0 清债) → v0.5.0 (P1 MMU 真端到端) → v0.6.0 (P2 Phase 1.5 毕业 → Phase 2 启动前置)
+> - **Phase 6c/v0.6.0 验收报告引用**: Phase 6d 完整收官 (v0.5.0) + v0.6.0 静态配置 Result 范式 (ADR-047) 均已落地, Wave 3 启动门槛已就位
 
 > **Phase 6c 完整收官摘要 (2026-09-16 → 2026-09-20)**:
 > - **Phase 6c 完整落地**: `plugin-elaboration-substrate` OpenSpec change 已归档 (2026-09-17), `fix-5stage-mux-segv-elaboration` OpenSpec change 已归档 (2026-09-20)。CHANGELOG v0.3.0 (2026-09-17) + v0.3.1 (2026-09-20) 已发布。
@@ -38,16 +47,18 @@
 | 阶段 | 里程碑 | 状态 | 进度 | 阻塞项 | 下一交付物 |
 |------|--------|------|------|--------|----------|
 | Phase 0 | M0 - 脚手架可运行 | ✅ Completed | 100% (5/5 P0) | 无 | Phase 1 启动 |
-| Phase 1 | M1 - L1CachePlugin Hello World | In Progress | ~95% (1.1+1.2+1.3全部子任务+1.4方法学复盘+**M4G-extend 2026-06-21**完成+**M4G 8/8**完成+**M4-DSE 7/8 2026-06-24**完成, M4.13 absorbed 推迟 Phase 5+) | 无 | Phase 1 退出标准全部达成, M5-DSE 硬前置已就位 |
+| Phase 1 | M1 - L1CachePlugin Hello World | ✅ 核心 | 100% (1.1+1.2+1.3全部+1.4方法学复盘+M4G-extend+M4-DSE 7/8 完成, MMU/VIPT/CPU Pipeline 4 change 归档) | 无 | Phase 1.5 启动 |
+| Phase 1.5 | Wave 1+2 已完成 + Wave 3+4 待 | 🚧 In Progress | Wave 1 (riscv-tests 30/40 PASS, v0.2.2 修真至 40/40) + Wave 2 (soc-cpu-l1-mmu-demo 6/6 PASS + 4 hidden bug 修复) ✅; Wave 3+4 见 [strategy](strategy/a-plus-c-hybrid.md) | 无 | A+C Hybrid 战略: 3 initiative + 7 change proposals 2026-09-24 落地 |
 | Phase 1* | M1 (legacy, 已取代) | Superseded | - | 无 | 已删除 (2026-06-09) |
-| Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1 | riscv-tests 集成 |
+| **A+C Hybrid Initiative** | **Wave 3-4 清债 → Phase 2 产品化前置** | **🚀 Launched** | **3/3 initiative 创立 + 7/7 change proposals 落地** (2026-09-24) | 无 | P0#1 canonical-ordering-assert 立即启动 |
+| Phase 2 | M2 - ISA 全覆盖 | Not Started | 0% | 依赖 Phase 1.5 Wave 4 archive (CSR/exception 落地) + RV64 切换 | riscv-tests RV64GC + RISCOF |
 | Phase 3 | M3/M4 - FreeRTOS/Zephyr | Not Started | 0% | 依赖 Phase 2 | CLINT/PLIC IP 完善 |
 | Phase 4 | M5 - Linux 启动 | Not Started | 0% | 依赖 Phase 3 | Sv39 + VirtIO Block |
 | Phase 5 | M6/M7/M8/M10 - RTL | Not Started | 0% | 依赖 Phase 4 | L1CacheRtl (CppHDL) |
 | Phase 6a | M6a - 调度算法 + JSON 解析 | Not Started | 0% | 依赖 Phase 6d 部分验证 | `PipeBuilder::auto_schedule` |
 | Phase 6b | M6b - CompareDriver + ScoreBoard | Not Started | 0% | 依赖 Phase 6d 端到端 | TLM↔RTL 对比基线 |
-| **Phase 6c** | **M6c - 完整 RTL 生成 (VerilogCodeGen 集成)** | **✅ Completed** | **100% (M1-M5 + M6)** | **无** | **None — 已发布 v0.3.0 + v0.3.1** |
-| Phase 6d | M6d - 5-stage Pipeline CH_MEM + Verilator + MMU FSM | Not Started | 0% | 依赖 prereqs (toolchain + ADR-037 v2.0) | riscv-tests RV32I 5 指令 tohost=1 |
+| **Phase 6c** | **M6c - 完整 RTL 生成 (VerilogCodeGen 集成)** | **✅ Completed** | **100% (M1-M5 + M6)** | **无** | **已发布 v0.3.0 + v0.3.1** |
+| Phase 6d | M6d - 5-stage Pipeline CH_MEM + Verilator + MMU FSM | ✅ Completed (v0.5.0) | 100% (6d.1-6d.8 全完成) | 无 | Wave 3 P1#3 mmu-paddr-consume 验证 Phase 6d 端到端 |
 
 > *Phase 1* = 旧 `phase-1-foundation.md` (已于 2026-06-09 PA-3 git rm, 仅在此处作历史记录), 现使用 `phase-1-tlm-foundation.md`
 
@@ -269,38 +280,57 @@
 > Phase 1.3 全部子任务完成 (1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f, commits `26fe7d2`..`387b8ca`)。
 > PA-6 (1.3d-extras) 与 PA-8 (决策草案) 已于 2026-06-13 完成。当前仅剩 PA-7 与 PA-9 待启动。
 
-### 建议 1:Phase 1.4 — L1CachePlugin 设计方法学复盘 v1 (1-2 天) — ✅ Completed (本次会话十)
+### 建议 1:A+C Hybrid 战略 P0#1 — cpu-pipeline-canonical-ordering-assert (1-2 周) — 🚀 Ready to Launch (2026-09-24)
+
+**战略入口**: [`strategy/a-plus-c-hybrid.md`](strategy/a-plus-c-hybrid.md) — A+C Hybrid (Wave 3-4 清债 → Phase 2 产品化前置)
 
 **前置条件** (全部已就绪):
-- ✅ Phase 1.3 全部子任务完成 (含 1.3d-extras, 16/16 ctest PASS, 2026-06-13)
-- ✅ D4 + ADR-040 静态检查 3+4/3 全部 PASS (T1.3 evidence)
-- ✅ DECISION-2026-06-13-02 决策草案 (PA-9) F1-F5 决议, 6 维度 × 3 边界标注
+- ✅ Phase 6c + 6d + v0.6.0 release 完成 (技术框架就位)
+- ✅ A+C Hybrid 战略 3 initiative + 7 change proposals 落地 (战略层面就位)
+- ✅ `tools/sync_strategy_status.sh` 实装 (状态自动派生)
+- ✅ 当前 v0.6.0 测试基线: TLM 386/17 (pre-existing fail) + CH_MEM 43/43
 
-**任务** (全部完成, 详见 `docs/methodology/plugin-style-design-methodology-v1.md` + `.omo/drafts/phase-1.4-d*-notes.md`):
-- 1.4.1 ✅ 起草决策草案 (PA-9): DECISION-2026-06-13-02 F1-F5 (E1=A 复盘对象 / E2=6 维度 / E3=5 类输入 / E4=3 类边界 / E5=单例子深复盘)
-- 1.4.2 ✅ 6 维度评估 (D1-D6): 41 评估点, 78% B1 接受 / 15% B2 摩擦 / 7% B3 局限
-- 1.4.3 ✅ 6 个 B2 模式代码示例 (friend class 隔离 / 显式 if/else / array_store 命名接口 / 位提取封装 / 模式 #5 #6)
-- 1.4.4 ✅ 3 个 B3 局限明确链接 Phase 6 任务 (B3-L1 multi-cycle scheduling / B3-P1 plugin_payload 命名空间)
+**任务** (详见 [change proposal](../../openspec/changes/cpu-pipeline-canonical-ordering-assert/proposal.md)):
+- 1.1 在 `ip/cpu/cpu_factory.h::register_early_plugins` 加 canonical-ordering static_assert
+- 1.2 新建 `tests/cpu/integration/test_canonical_ordering.cpp` (故意错序注册触发 compile error)
+- 1.3 新建 ADR-048 plugin-registration-canonical-order
+- 1.4 4 个 `[cpu-integration]` test_*stage_riscv.cpp 加 expected_canonical_order 钩子
+- 1.5 3 门禁全 PASS + openspec archive
 
-**价值** (本次落地):
-- **Plugin 范式反思的起点**: 6 维度方法学评估 + 3 类边界标注, 替代 lessons 文档的"踩坑清单"视角
-- **Phase 6 完整框架的信心保障**: 33 个 B1 接受点 + 6 个 B2 摩擦点(有模式) + 3 个 B3 局限(显式 Phase 6 任务) = 78% 范式通过率
-- **未来 IP 写作者指南**: v1 文档作为 L2 / ICache / Interconnect 实施时的"范式使用指南", v2 推迟到 Phase 2+ 横向对比
+**价值**:
+- **解锁 MMU stall 真生效**: 当前 stall 机制依赖隐式调用顺序, 升级为显式契约
+- **解锁 Wave 3 P1#3 mmu-paddr-consume-and-real-memory**: IBus/DBus 真消费 PADDR 有 stall 链保护前提
+- **解锁 Wave 4 P2#6 phase-1.5-wave-4 (CSR/exception/mispredict)**: 路径无 canonical ordering 风险
 
-### 建议 2:Phase 2 — bare-metal 测试套件 (5-7 天) — ⏳ P2
+### 建议 2:A+C Hybrid 战略 P1#3 — mmu-paddr-consume-and-real-memory (4-6 周, 依赖 P0#1)
 
 **前置条件**:
-- ✅ Phase 1.3 全部子任务完成 (含 1.3d-extras)
-- ⚠️ Phase 1.4 baseline 对比可并行 (验证 Plugin-style 等价性)
+- ⏸ P0#1 cpu-pipeline-canonical-ordering-assert archive (依赖)
 
-**任务** (详见 `phase-2-baremetal.md`):
+**任务** (详见 [change proposal](../../openspec/changes/mmu-paddr-consume-and-real-memory/proposal.md)):
+- 1.1 IBusPlugin/DBusPlugin 真消费 `pl::PADDR` (PADDR-first pattern)
+- 1.2 PTW `advance_from_real_memory()` 替换 stub (新 `MemoryInterface` 抽象)
+- 1.3 `[cpu-l1-mmu-demo]` 升级 8 用例 (含 PADDR 翻译验证)
+- 1.4 新建 ADR-049 mmu-paddr-consumption-contract
+
+**价值**:
+- **SoC demo "真跑" 名副实**: MMU 翻译 → PADDR → 真实物理内存 (非 stub)
+- **解锁 Wave 4 P2#6**: mmu_exit hook 真生效, exception 12/13/15 路由完整
+
+### 建议 3:Phase 2 — bare-metal RV64GC 测试套件 (5-7 周, 依赖 Wave 4 archive)
+
+**前置条件**:
+- ⏸ Wave 4 (CSR/exception/mispredict) archive (预计 v0.6.0 ~2027-01)
+- ⏸ RV64 切换工作量新评估 (XLEN=64)
+
+**任务** (详见 `soc/cpu/docs/roadmap/phase-2-baremetal.md`):
 - 2.1 riscv-tests RV64GC 集成 (`git submodule add riscv-tests`)
 - 2.2 Spike co-simulation 接口 (`SpikeBridge`)
 - 2.3 RISCOF 合规认证框架
 - 2.4 最小 HTIF 接口 (tohost/fromhost)
-- 2.5 Phase 1.3 SoC JSON 在真实 RV64 binary 上端到端运行
+- 2.5 Phase 1.5 SoC JSON 在真实 RV64 binary 上端到端运行
 
-**价值**: 验证 L1CachePlugin 在真实 RISC-V 工作负载下正确性; 启动 ChipForge 从 "TLM 验证" 到 "软件栈验证" 的转折点
+**价值**: 启动 ChipForge 从 "TLM 验证" → "RV64 软件栈验证" 的转折点
 
 ---
 
@@ -308,6 +338,8 @@
 
 | 日期 | 事件 |
 |------|------|
+| 2026-09-24 | **本次会话 (A+C Hybrid 战略落地)**: 战略选择 A+C Hybrid (Wave 3-4 清债 → Phase 2 产品化前置), 否决 B 工具化 / 否决纯 A (不清债会重复踩坑)。3 个 OpenSpec initiative 创立 (wave3-cpu-pipeline-debt v0.4.0 + wave3-mmu-real-memory-and-cycle v0.5.0 + wave4-csr-cache-dse v0.6.0)。7 个 openspec change proposals 落地 (P0#1 canonical-ordering-assert + P0#2 fix-rv32ui-load-width 回顾性: v0.6.0 commit 8909165 已完成 + P1#3 mmu-paddr-consume-and-real-memory + P1#4 plugin-framework-cycle-precision + P1#5 cpu-pipeline-multi-cycle + P2#6 phase-1.5-wave-4 + P2#7 cache-phase1.5-4way)。`tools/sync_strategy_status.sh` 实装: 从 openspec changes + initiative YAML 派生 strategy §7 表格, `--dry-run` / `--json` 双模式, 替代原 stub。`docs/roadmap/strategy/a-plus-c-hybrid.md` §7 已自动派生 (7 行真实状态)。`docs/roadmap/roadmap-status.md` §1/§5 同步反映 A+C Hybrid 战略入口。3 个版本节点锁定: v0.7.0 (P0 清债, 2026-10) → v0.8.0 (P1 MMU 真端到端, 2026-12) → v0.9.0 (P2 Phase 1.5 毕业, 2027-02)。 |
+| 2026-09-20 | **本次会话**: Phase 6c plugin-elaboration-substrate 完整收官。11 commits (`25e2672`/`9a03bb2`/`918e577`/`baa504b`/`3e8ada2`/`a38a1e4`/`19d4f5d`/`edad878`/`b68996a`/`61a642d`/`5fe72fe`) + v0.3.0 + v0.3.1 发布 + 验证报告。`roadmap-status.md` 头部摘要 + §1 状态总览 + §2 Phase 6 详细状态 + 推迟到 Phase 6d 项全部更新。新增 `docs/roadmap/phases/phase-6d-rtl-verification.md` (Phase 6d 独立 phase doc)。3 个 openspec change 创建 (PoC follow-up + Phase 6d prereqs + Phase 6d main, 全部 4/4 artifacts complete + `openspec validate` PASS)。`docs/methodology/plugin-style-design-methodology-v1.md` 添加 Phase 6c elaboration chapter。`docs/lessons/phase-6c-elaboration-substrate.md` 创建 (15 类踩坑)。AGENTS.md 添加 Phase 6c 纪律 + 速查表。<br>**本次会话 (Oracle/Metis 审查修订, 2026-09-20)**: commit 计数统一为 11 (CHANGELOG 权威源); 修 §2.6 失效引用 → §2 Phase 6 节; 修 E12 基线表述 (391 PASS / 12 known FAIL); PoC follow-up-fixes Fix #2 改用方案 B (TEST_CASE_METHOD fixture); phase-6d-rtl-verification 6d.1 估时 1w → 1.5w (decode_chmem.h 从零建, 修正"重启用 disabled"措辞); 6d.6 改 sv32 (对齐现有 MMUPlugin, 估时保留 1w); Prereq #2 按发行版分支 (jammy 22.04 = verilator 4.038 不足 5.020, 需源码 build; noble 24.04 OK); prerequisites 增加测试 ELF 获取项 (为 addi/auipc/jal/beq 编写 `tests/cpu/manual_elf/*.S`)。 |
 | 2026-09-20 | **本次会话**: Phase 6c plugin-elaboration-substrate 完整收官。11 commits (`25e2672`/`9a03bb2`/`918e577`/`baa504b`/`3e8ada2`/`a38a1e4`/`19d4f5d`/`edad878`/`b68996a`/`61a642d`/`5fe72fe`) + v0.3.0 + v0.3.1 发布 + 验证报告。`roadmap-status.md` 头部摘要 + §1 状态总览 + §2 Phase 6 详细状态 + 推迟到 Phase 6d 项全部更新。新增 `docs/roadmap/phases/phase-6d-rtl-verification.md` (Phase 6d 独立 phase doc)。3 个 openspec change 创建 (PoC follow-up + Phase 6d prereqs + Phase 6d main, 全部 4/4 artifacts complete + `openspec validate` PASS)。`docs/methodology/plugin-style-design-methodology-v1.md` 添加 Phase 6c elaboration chapter。`docs/lessons/phase-6c-elaboration-substrate.md` 创建 (15 类踩坑)。AGENTS.md 添加 Phase 6c 纪律 + 速查表。<br>**本次会话 (Oracle/Metis 审查修订, 2026-09-20)**: commit 计数统一为 11 (CHANGELOG 权威源); 修 §2.6 失效引用 → §2 Phase 6 节; 修 E12 基线表述 (391 PASS / 12 known FAIL); PoC follow-up-fixes Fix #2 改用方案 B (TEST_CASE_METHOD fixture); phase-6d-rtl-verification 6d.1 估时 1w → 1.5w (decode_chmem.h 从零建, 修正"重启用 disabled"措辞); 6d.6 改 sv32 (对齐现有 MMUPlugin, 估时保留 1w); Prereq #2 按发行版分支 (jammy 22.04 = verilator 4.038 不足 5.020, 需源码 build; noble 24.04 OK); prerequisites 增加测试 ELF 获取项 (为 addi/auipc/jal/beq 编写 `tests/cpu/manual_elf/*.S`)。 |
 | 2026-06-13 | **本次会话十**: Phase 1.4 L1CachePlugin 设计方法学复盘 v1 落地, PA-7 + PA-9 + R7 闭环, 18/18 ctest PASS。 |PA-9 决策草案 (`.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md`, DECISION-2026-06-13-02) F1-F5 决议, E1-E5 重解读 (复盘对象 → 6 维度 → 3 边界 → 单例子深复盘)。T1 输入材料消化 (12 文件, 3560 行) + D4+ADR-040 静态检查 3+4/3 PASS 基线。T2/T3 6 维度评估笔记 (`.omo/drafts/phase-1.4-d1-d2-notes.md` 324 行 + `.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md` 555 行) — 41 评估点, 78% B1 接受 (32) / 15% B2 摩擦 (6) / 7% B3 局限 (3)。T4 整合 v1 文档 (`docs/methodology/plugin-style-design-methodology-v1.md`, 352 行) — 6 维度 × 3 边界 + 6 B2 模式 + 3 B3 局限 + 5 Phase 6 任务链接 (B3-L1/L2/L3 + B3-P1/P2)。T4.3 lessons 文档 supersede 注释。T5 roadmap 同步 (§1/§3/§4/§5 全部更新 + 范围修正 banner)。子代理事故恢复: 19 openspec mirror 目录 + 2 root config 已清理, 2 tracked workflow (.github/workflows/architecture-gates.yml + doc_check.yml) 已 `git restore`。`docs/roadmap/roadmap-status.md` 头部 "最后更新" 改 2026-06-13 本次会话十, §1 状态总览更新, §3 PA-7/PA-9 状态 ⏳ → ✅, §4 R7 ⏳ → ✅ 闭环 (E1 重解读: 不做性能基线, 改做方法学复盘), §5 建议 1 状态 ⏳ → ✅ Completed (本次会话十)。Phase 1 进度 75% → 85% (方法学复盘 +10%)。1 个原子 commit (T6)。Phase 1 退出标准全部达成, Phase 2 启动门槛就绪 (PA-1 ~ PA-9 全部 ✅)。 |
 | 2026-06-10 | **本次会话八**: Phase 1.3 全部 6 子任务落地 + 归档指引更新。v2 决策草案 (`8d80fd3` DECISION-2026-06-10-02 v2) 5 项决议 (D1=C POD+窄桥 / D1'=末尾调 pb.run / D1''=不实现+drift 防护 / D2=B 框架层 / D3=A 仅最小 e2e) 全部落地。1.3a L1CacheTLMBridge 框架层 (`26fe7d2`, D1' 末尾挂载契约) + 1.3e BundleMapper drift 防护 (`18418ac`, D1'' `verify_adr.sh` ADR-024 拒绝 `bundles/bundle_mapper.h` 提前实现) + 1.3b `soc/l1_cache_minimal.json` 拓扑 spec (`3dbe058`) + 1.3c `ip/cache/configs/params_schema.json` (`3b6fc27`) + 1.3f `ip/cache/README.md` §9 使用指南 (`e5d865a`) + 1.3d `L1CacheTLMBridgeAdapter` cpptlm ModuleFactory 兼容层 (`c8d1dd1`, 解决 Bridge 构造签名 `(unique_ptr<L1CachePlugin>)` 与 `registerObject<T>(string, EventQueue*)` 不兼容)。14/14 ChipForge ctest PASS in 4.41s; `verify_adr.sh --only=ADR-024` 2/2 PASS (含 drift 防护)。roadmap-status.md §3 PA-6/PA-7/PA-8/PA-9 新增 (Phase 1.3d-extras + Phase 1.4 baseline 启动入口); §4 R6/R7 新增 (ch_stream 协议转换不确定性 + baseline 选型不确定性); §5 Top3 重写 (1.3d-extras → 1.4 → Phase 2); §6 活动日志追加本次会话八条目。6 个原子 commit (Phase 1.3a/1.3b/1.3c/1.3d/1.3e/1.3f)。Phase 1 进度 30% → 65%。**Phase 1.3 全部子任务完成, 新 session 可启动 PA-6/PA-7/PA-8/PA-9 任意顺序**。 |

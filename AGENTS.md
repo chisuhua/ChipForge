@@ -195,6 +195,34 @@ skill(name="openspec-apply-change")
 skill(name="openspec-archive-change")
 ```
 
+### Strategy / Initiative 工作流（2026-09-24 新增, A+C Hybrid 战略落地）
+
+战略入口: [`docs/roadmap/strategy/a-plus-c-hybrid.md`](docs/roadmap/strategy/a-plus-c-hybrid.md)
+
+```bash
+# 查看当前 initiative 状态 (auto-derived from openspec changes)
+bash tools/sync_strategy_status.sh --dry-run          # 仅打印 diff
+bash tools/sync_strategy_status.sh                      # atomic 写入 strategy §7
+bash tools/sync_strategy_status.sh --json               # 输出 JSON (供其他脚本消费)
+
+# 查看 initiative 内容 (XDG managed)
+openspec initiative list --store chipforge
+openspec initiative show wave3-cpu-pipeline-debt --store chipforge
+
+# Active changes → 提案 → 实施 → 归档
+openspec list                                          # 列 active changes
+openspec change validate <change-name>                 # 验证 change artifacts
+openspec change show <change-name>                     # 查看 change 内容
+openspec archive <change-name> -y                      # 归档到 openspec/changes/archive/
+```
+
+**当前活跃 initiatives** (2026-09-24):
+- `wave3-cpu-pipeline-debt` (v0.4.0) — 2 changes (P0#1 canonical-ordering + P0#2 load-width 回顾性)
+- `wave3-mmu-real-memory-and-cycle` (v0.5.0) — 3 changes (P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle)
+- `wave4-csr-cache-dse` (v0.6.0 占位) — 2 changes (P2#6 phase-1.5-wave-4 + P2#7 cache-phase1.5-4way)
+
+**Change proposal 关联**: 每个 change 的 `proposal.md` 必须含 frontmatter `initiative:` 字段, sync_strategy_status.sh 据此派生 §7。
+
 ### 验证命令
 
 ```bash

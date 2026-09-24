@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-06-20
+goal: Lock OoO/Superscalar/SMT forward-compatibility hooks at marginal cost (~80
+  LOC) before M5-DSE 2-wide superscalar work exposes the gaps
