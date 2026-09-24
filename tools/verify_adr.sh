@@ -185,7 +185,7 @@ category_of_adr() {
     ADR-030|ADR-031|ADR-032|ADR-033) echo H ;;
 ADR-034|ADR-035|ADR-036) echo I ;;
 ADR-037|ADR-038) echo J ;;
-ADR-040|ADR-041|ADR-042|ADR-043|ADR-045|ADR-046|ADR-047) echo K ;;
+ADR-040|ADR-041|ADR-042|ADR-043|ADR-045|ADR-046|ADR-047|ADR-048) echo K ;;
     *) echo "?" ;;
   esac
 }
@@ -799,6 +799,18 @@ verify_adr_039() {
   fi
 }
 
+verify_adr_048() {
+  should_run ADR-048 || return
+  local f="$CHIPFORGE_ROOT/docs/architecture/adr/ADR-048-plugin-registration-canonical-order.md"
+  local cf="$CHIPFORGE_ROOT/ip/cpu/cpu_factory.h"
+  if [[ -e "$f" ]] && file_contains "check_canonical_ordering" "$cf"; then
+    log_pass "ADR-048" "Plugin 注册规范序 (MMU before IBus/DBus)"
+  else
+    log_failed "ADR-048" "Plugin 注册规范序 (MMU before IBus/DBus)" \
+      "missing: $f or check_canonical_ordering() not in cpu_factory.h"
+  fi
+}
+
 # ----------------------------------------------------------------------------
 # 主循环
 # ----------------------------------------------------------------------------
@@ -870,6 +882,7 @@ main() {
   verify_adr_037
   verify_adr_038
   verify_adr_039
+  verify_adr_048
 
   # 汇总
   echo ""

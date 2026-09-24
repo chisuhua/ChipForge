@@ -27,6 +27,7 @@ ctest --test-dir build --output-on-failure
 - **`7stage_add_elf_end_to_end` 预先存在失败**（`tests/cpu/integration/test_7stage_riscv.cpp`）：superscalar 路径 cpu_sim segfault（`--config cpu_superscalar.json`），与代码逻辑无关的既有问题（v0.2.2 stash 验证非本次修复引入）。其余 4 个 RISC-V 仿真测试（3/5/10-stage + `test_cpu_sim_real_tohost`）已随 v0.2.2 CPU pipeline 修复转绿。
 - **`[riscv-tests]` 10 个 LOAD-family 用例失败**（`test_rv32ui_runner.cpp`，category=feature stub）：DBusPlugin LOAD width extraction（LB/LH/LBU/LHU）显式 OUT OF SCOPE，follow-up change `riscv-tests-rv32ui-load-width` 路由；`[riscv-tests]` 其余 30 个 PASS（基线 `soc/cpu/docs/dse/rv32ui-baseline-matrix.csv`）。
 - **`[cpu-l1-mmu-demo]` 6 个用例 PASS**（`tests/soc/test_cpu_l1_mmu_demo.cpp`，v0.2.3）：CPU+MMU+Memory 结构验证 demo（enable_mmu=true, sv32），5 个 riscv-tests（add/addi/auipc/jal/beq）端到端 tohost=1；L1CachePlugin 仅 JSON 声明不实例化（deferred to Wave 3 cache-dse-sweep）。
+- **P0#1 `cpu-pipeline-canonical-ordering-assert` 已落地**（v0.7.0, ADR-048）：`register_early_plugins()` 现在在 IBusPlugin 之前注册 MMUPlugin，并通过 `check_canonical_ordering()` 运行时断言验证。4 个 `[cpu-integration]` canonical_ordering 测试 PASS。
 
 ### 构建模式
 

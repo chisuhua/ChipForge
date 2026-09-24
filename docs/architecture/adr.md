@@ -75,7 +75,7 @@
 
 > **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 36 条
+### 2.1 已实现决策（✅）— 37 条
 
 | ID | 标题 | 类别 | 验证路径 |
 |----|------|------|----------|
@@ -116,6 +116,7 @@
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
 | ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令 | Plugin | ✅ Phase 6c M5 落地 (2026-09-17, 前瞻锁定) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
+| ADR-048 | Plugin 注册规范序 (MMU before IBus/DBus, C++17 inline int 计数器) | Plugin | ✅ v0.7.0 落地 (2026-09-24) | [`adr/ADR-048-plugin-registration-canonical-order.md`](./adr/ADR-048-plugin-registration-canonical-order.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -149,14 +150,14 @@
 | 注册与发现 (D) | 3 | 0 | 0 | 3 |
 | 端口与信号 (E) | 3 | 0 | 0 | 3 |
 | Bundle 与协议 (F) | 3 | 1 | 0 | 4 |
-| 声明式 Plugin (G) | 7 | 0 | 1 | 8 |
+| 声明式 Plugin (G) | 8 | 0 | 1 | 9 |
 | 流水线抽象 (H) | 3 | 0 | 1 | 4 |
 | 验证框架 (I) | 0 | 0 | 3 | 3 |
 | 目录与组织 (J) | 2 | 0 | 1 | 3 |
 | 范式决策 (K) | 1 | 0 | 0 | 1 |
 | 可移植性约束 (L) | 1 | 0 | 0 | 1 |
 | IP 架构 (M) | 0 | 0 | 1 | 1 |
-| **合计** | **36** | **1** | **8** | **45** |
+| **合计** | **37** | **1** | **8** | **46** |
 
 **实现率**：36/45 ≈ **80%**（含部分实现）
 

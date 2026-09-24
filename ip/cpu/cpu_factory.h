@@ -45,6 +45,33 @@
 #include "ip/cpu/arch/riscv/csr.h"
 #include "ip/cpu/plugins/mmu.h"  // mmu-cache-integration commit 6/9: RiscVMMUPlugin 接入 CPU pipeline
 
+// ===== ADR-048: Plugin canonical ordering counters (C++17 inline variable) =====
+// PLUGIN_SEQ increments at each register_plugin call site in build_cpu().
+// MMU/IBUS/DBUS_REG_ORDER record each plugin's slot (0 = not registered).
+// reset_canonical_counters() is called at the top of build_cpu().
+// check_canonical_ordering() validates MMU < IBUS (unless MMU disabled).
+namespace cf { namespace cpu { namespace detail {
+inline int PLUGIN_SEQ = 0;
+inline int MMU_REG_ORDER = 0;
+inline int IBUS_REG_ORDER = 0;
+inline int DBUS_REG_ORDER = 0;
+inline void reset_canonical_counters() {
+  PLUGIN_SEQ = 0;
+  MMU_REG_ORDER = 0;
+  IBUS_REG_ORDER = 0;
+  DBUS_REG_ORDER = 0;
+}
+inline void check_canonical_ordering() {
+  if (MMU_REG_ORDER == 0) return;  // MMU not enabled → no constraint
+  if (MMU_REG_ORDER >= IBUS_REG_ORDER) {
+    throw std::logic_error("MMUPlugin(seq=" + std::to_string(MMU_REG_ORDER) +
+                           ") must be registered before IBusPlugin(seq=" +
+                           std::to_string(IBUS_REG_ORDER) +
+                           ") — ADR-048 canonical ordering violation");
+  }
+}
+}}}  // namespace cf::cpu::detail
+
 namespace cf {
 namespace cpu {
 
@@ -236,12 +263,15 @@ class CpuFactory {
   static std::unique_ptr<cf::plugin::PipeBuilder> build_cpu(
       const CPUConfig& config,
       cf::cpu::PicolibcHostMemory* mem = nullptr) {
+    // ADR-048: reset canonical ordering counters at each build_cpu entry
+    cf::cpu::detail::reset_canonical_counters();
     auto pb = std::make_unique<cf::plugin::PipeBuilder>();
 
     // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 必须在 register_early_plugins 之前注册,
     // 保证 StageLinkPlugin 的 4 个 EARLY 闭包在所有业务 plugin 之前跑.
     pb->register_plugin(std::make_unique<cf::cpu::plugins::StageLinkPlugin<T>>());
 
+    // ADR-048: MMUPlugin registered inside register_early_plugins, BEFORE IBusPlugin
     register_early_plugins<T>(*pb, config, mem);
 
     // 2. NORMAL 阶段: decode + execute
@@ -302,27 +332,8 @@ class CpuFactory {
       }
     }
 
-// cpu-mmu-integration commit 1/6: 条件注册 RiscvMMUPlugin (仅 enable_mmu=true)
-    // mmu-cache-integration commit 7 + 8 已实装 MMU 核心算法 + 14 Payload Key
-    // 这里把 RiscV hook (csr_write_satp/sfence_vma/exception) 接到 CPU pipeline
-    // (commit 2/6 实装 at_stage 闭包; commit 1 仅注册 plugin + substage 声明)
-    if (config.enable_mmu) {
-      // 映射 mmu_mode 字符串到 SvMode 枚举
-      cf::ip::mmu::SvMode sv_mode = cf::ip::mmu::SvMode::Sv39;
-      if (config.mmu_mode == "sv32")      sv_mode = cf::ip::mmu::SvMode::Sv32;
-      else if (config.mmu_mode == "sv48") sv_mode = cf::ip::mmu::SvMode::Sv48;
-
-      // 默认 TLB 几何: 2-level 8/8 + LRU + ptw_max_inflight=2
-      // 与 mmu-cache-integration commit 5 SoC JSON 一致
-      using mmu_cfg_t = cf::cpu::plugins::RiscvMMUPlugin::TLBConfig;
-      std::vector<mmu_cfg_t> mmu_levels = {
-        {"L0", 8, 8, 1, 1, "LRU"},
-        {"L1", 8, 8, 1, 2, "LRU"}
-      };
-      pb->register_plugin(std::make_unique<cf::cpu::plugins::RiscvMMUPlugin>(
-          sv_mode, mmu_levels, cf::ip::mmu::MMUPlugin::PTWConfig{2},
-          /*satp_value=*/0));
-    }
+// ADR-048: canonical ordering check (MMUPlugin must register before IBusPlugin)
+    cf::cpu::detail::check_canonical_ordering();
 
     // cpu-mmu-integration commit 1/6: 调 pb.build() 触发所有 plugin 的 setup() + build()
     // 此调用前 cpu_factory 只 调了 TopologyBuilder::expand 和 lane dispatch at_stage,
@@ -354,11 +365,28 @@ class CpuFactory {
   }
 
  private:
-  // EARLY 阶段: fetch
+// EARLY 阶段: fetch (ADR-048: MMUPlugin MUST register before IBusPlugin)
   template <typename U>
   static void register_early_plugins(cf::plugin::PipeBuilder& pb,
-                                     const CPUConfig& config,
-                                     PicolibcHostMemory* mem = nullptr) {
+                                      const CPUConfig& config,
+                                      PicolibcHostMemory* mem = nullptr) {
+    // ADR-048: MMUPlugin 必须在 IBusPlugin 之前注册（canonical stall ordering）
+    if (config.enable_mmu) {
+      cf::ip::mmu::SvMode sv_mode = cf::ip::mmu::SvMode::Sv39;
+      if (config.mmu_mode == "sv32")      sv_mode = cf::ip::mmu::SvMode::Sv32;
+      else if (config.mmu_mode == "sv48") sv_mode = cf::ip::mmu::SvMode::Sv48;
+      using mmu_cfg_t = cf::cpu::plugins::RiscvMMUPlugin::TLBConfig;
+      std::vector<mmu_cfg_t> mmu_levels = {
+        {"L0", 8, 8, 1, 1, "LRU"},
+        {"L1", 8, 8, 1, 2, "LRU"}
+      };
+      cf::cpu::detail::MMU_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
+      pb.register_plugin(std::make_unique<cf::cpu::plugins::RiscvMMUPlugin>(
+          sv_mode, mmu_levels, cf::ip::mmu::MMUPlugin::PTWConfig{2},
+          /*satp_value=*/0));
+    }
+
+    cf::cpu::detail::IBUS_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
     pb.register_plugin(
         std::make_unique<cf::cpu::plugins::IBusPlugin<U> >(mem));
     pb.register_plugin(
@@ -401,11 +429,12 @@ class CpuFactory {
     (void)sizeof(U);
   }
 
-  // LATE 阶段: writeback
+// LATE 阶段: writeback
   template <typename U>
   static void register_late_plugins(cf::plugin::PipeBuilder& pb,
-                                    const CPUConfig& /*config*/,
-                                    PicolibcHostMemory* mem = nullptr) {
+                                     const CPUConfig& /*config*/,
+                                     PicolibcHostMemory* mem = nullptr) {
+    cf::cpu::detail::DBUS_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
     pb.register_plugin(std::make_unique<cf::cpu::plugins::DBusPlugin<U> >(mem));
     pb.register_plugin(std::make_unique<cf::cpu::plugins::RegFilePlugin<U> >());
     (void)sizeof(U);

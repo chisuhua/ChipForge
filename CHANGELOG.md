@@ -5,6 +5,37 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.7.0 (2026-09-24) — Plugin 注册规范序 + A+C Hybrid 战略启动 (ADR-048)
+
+> **OpenSpec changes**: `cpu-pipeline-canonical-ordering-assert` (active, v0.7.0) + `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` (archive)
+> **Initiative**: `wave3-cpu-pipeline-debt` P0
+> **Purpose**: 修复 MMU stall 隐式契约 + 正式启动 A+C Hybrid 战略 (Wave 3 清债 → Phase 2)
+
+### Added
+
+- **ADR-048 Plugin 注册规范序**：`cpu_factory.h::register_early_plugins()` 新增运行时断言检查 MMUPlugin 注册在 IBusPlugin 之前
+- **计数器机制**：3 个 `inline int` 跨 TU 计数器 (`PLUGIN_SEQ`, `MMU_REG_ORDER`, `IBUS_REG_ORDER`, `DBUS_REG_ORDER`) 跟踪注册序列
+- **`tests/cpu/integration/test_canonical_ordering.cpp`**：4 个测试用例验证正确顺序(RED)和错误检测(GREEN)双路径
+- **A+C Hybrid 战略文档**：`docs/roadmap/strategy/a-plus-c-hybrid.md` (138 行)
+- **`tools/sync_strategy_status.sh`**：从 openspec changes + initiative YAML 派生 strategy §7 状态表
+- **AGENTS.md**: 新增 Strategy/Initiative 工作流小节
+- **openspec changes 进入版本控制**：从 .gitignore 移除 openspec/，7 个 active/archive changes 可团队协作
+
+### Changed
+
+- **注册顺序调整**：MMUPlugin (if enable_mmu) 从 `build_cpu()` 尾部移入 `register_early_plugins()` 头部，保证在 IBusPlugin 之前注册
+- **版本号声明**：Wave 3 从 v0.7.0 起 (Phase 6d 已消费 v0.4.0-v0.6.0)
+- **`docs/roadmap/roadmap-status.md`**：路线图同步 A+C Hybrid 战略入口
+
+### Fixed
+
+- **MMU stall 隐式契约**：原依赖 `CpuFactory` 调用顺序的正确性，现升格为运行时断言，防止静默回归
+- **P0#1 tasks.md v0.4.0 → v0.7.0** (Oracle/Metis 审查修订遗漏)
+
+### Removed
+
+- **`.gitignore` `openspec/` 行**：openspec changes 是协作工件，XDG context-store 已隔离在 `~/.local/share/`
+
 ## v0.6.0 (2026-09-22) — 静态配置期错误处理 Result 范式 (ADR-047)
 
 > **OpenSpec change**: `v06-static-config-result` (已 archive)

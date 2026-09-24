@@ -61,6 +61,14 @@ version_target: v0.8.0
 - [ ] 9.2 `soc/cpu/docs/architecture.md` §3 MMU 状态更新（"装饰性" → "真集成"）
 - [ ] 9.3 `ip/mmu/STATUS.md` "deferred 承诺" 段划掉 (`advance_from_real_memory()` 已实装)
 
+## Design Notes (P0#1 传递)
+
+> **MMU 配置 JSON 驱动** (P0#1 实施后记录, 2026-09-24):
+> - 当前 `register_early_plugins()` 中 TLB 几何 (`{"L0", 8, 8, 1, 1, "LRU"}`, `{"L1", 8, 8, 1, 2, "LRU"}`) 和 `SvMode` 枚举映射由字符串 switch 完成, 三层都是 C++ 硬编码
+> - `ip/mmu/configs/params_schema.json` 已存在, 但未在 `CPUConfig` / MMUPlugin 构造处数据化
+> - ADR-048 §后续项: 建议 P1#3 或 P1#4 时改为从 `soc/*.json` 配置读取 TLB 层级数/每级大小/替换策略/`ptw_max_inflight`
+> - 预期收益: 消除 C++ 中的配置描述代码, 支持 DSE 参数扫描
+
 ## 10. commit + archive
 
 - [ ] 10.1 1 个原子 commit (含 test + ADR + MemoryInterface + PTW 改造 + IBus/DBus 改造 + SoC JSON + 文档)
