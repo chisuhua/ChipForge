@@ -120,7 +120,7 @@ graph TD
 
 | # | 缺漏 | 影响 | 处理 |
 |---|------|------|------|
-| **L1** | `7stage_add_elf_end_to_end` superscalar cpu_sim segfault (v0.2.2 起 pre-existing) | M5-DSE superscalar 路径阻塞, 但 wave3-4 范围仅 5-stage | 推迟 Phase 5+ (`cpu-superscalar-segfault-investigation` 独立 change) |
+| **L1** | ~~`7stage_add_elf_end_to_end` superscalar cpu_sim segfault (v0.2.2 起 pre-existing)~~ | **已修复** (`b82af0f` CpuFactory 7stage superscalar `lane_counters` use-after-free + v0.7.0 P0#1 canonical-ordering 沉淀); [cpu-integration] 5 个 case 含 "7stage" 全 PASS | 闭合 (无后续 action) |
 | **L2** | `ip/cpu` 老 IP 不遵守标准 IP 文档结构 (无 `ip/cpu/docs/` 等) | 文档债务累积 | 推迟 wave4 完成后 cleanup change (1 天) |
 | **L3** | TLM deprecation 路径不清晰 (ADR-040 v3.0 §1260 已标 `pb.run()` deprecated, 但 wave3 全基于 TLM) | 用户预期混乱 | 战略级澄清: TLM 与 CH_MEM 并存**至少到 v1.0.0**, CH_MEM 是 Phase 6d+ 主路径, TLM 是兼容基线 |
 | **L4** | MUL/DIV riscv-tests ELF 完全缺失 (Metis #4) | P1#5 测试基线缺 | wave3 P1#5 启动前 vendor `tests/cpu/riscv_tests/build_rv32m.sh` |
