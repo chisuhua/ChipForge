@@ -136,3 +136,13 @@ graph TD
 | v0.7.0 archive | P0#1 canonical-ordering PASS + 0 新 fail | 暂停, 修复 P0#1 后重试 |
 | v0.8.0 中间检查 | P1#3 PADDR 真消费 + cycle-precision 实装 + multi-cycle stall 注 | **如果评估显示剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) |
 | v0.9.0 archive | Phase 1.5 毕业标准达成 (RV32I ≥85%, SoC demo ≥5 ELF tohost=1, cache-dse-sweep CSV, D4+ADR-040+ADR-044+ADR-045 全合规) | 推迟 1 个 wave, 回填 Open Questions, 重审 |
+
+---
+
+## 11. 执行分解
+
+> 战略 §1-§10 是**为什么/做什么**（稳定）。本文档之外的执行拆解（阶段 / 依赖 / 并行轨道 / 阻塞 / 待启动决策点）见:
+>
+> 📍 **[`execution-roadmap.md`](./execution-roadmap.md)** — 动态执行分解, v0.7.0 archive 后启动 v0.8.0 路径分解
+>
+> 关联: `docs/roadmap/roadmap-status.md` (滚动状态简报) · `openspec/changes/*/p-*` (具体 changes) · `tools/sync_strategy_status.sh` (§7 SSOT 派生)
