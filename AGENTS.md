@@ -24,10 +24,10 @@ ctest --test-dir build --output-on-failure
 ### 已知测试状态
 
 - **MMU 测试已重新启用**（`tests/CMakeLists.txt`，mmu-tlb-ptw-impl commit 10）：47 个 `[mmu]` 测试全部 PASS（110 assertions），含新增 `[tlb-refill]` 2 个 PTW TLB refill 集成测试（v0.2.3）。
-- **`7stage_add_elf_end_to_end` 预先存在失败**（`tests/cpu/integration/test_7stage_riscv.cpp`）：superscalar 路径 cpu_sim segfault（`--config cpu_superscalar.json`），与代码逻辑无关的既有问题（v0.2.2 stash 验证非本次修复引入）。其余 4 个 RISC-V 仿真测试（3/5/10-stage + `test_cpu_sim_real_tohost`）已随 v0.2.2 CPU pipeline 修复转绿。
-- **`[riscv-tests]` 10 个 LOAD-family 用例失败**（`test_rv32ui_runner.cpp`，category=feature stub）：DBusPlugin LOAD width extraction（LB/LH/LBU/LHU）显式 OUT OF SCOPE，follow-up change `riscv-tests-rv32ui-load-width` 路由；`[riscv-tests]` 其余 30 个 PASS（基线 `soc/cpu/docs/dse/rv32ui-baseline-matrix.csv`）。
+- **7stage 测试 PASS（已修复）**：`7stage_add_elf_end_to_end` 原 segfault 根因已由 commit `b82af0f`（CpuFactory 7stage superscalar `lane_counters` use-after-free）修复；`[cpu-integration]` 全 81/81 case PASS（含 3 个 `7stage*` Catch2 filter 命中 + 2 个大写 S 命中（`build_7stage_superscalar` / `EnableMMU7StageCommitRetire`），合计 5 个 case 名称含 "7stage"）。**CWD 约束**：`test_7stage_riscv.cpp` 通过 `exec_cmd("./build/src/cf_plugin/cpu_sim ...")` 调用 cpu_sim（相对路径），ctest `WORKING_DIRECTORY=${CMAKE_SOURCE_DIR}`（`tests/CMakeLists.txt:101`）保证 PASS；从 CWD ≠ 仓库根（含 `build/` 子目录）直接执行 binary 会因相对路径解析失败误报 FAIL。务必用 ctest 或从仓库根运行。
+- **`[riscv-tests]` 40/40 PASS**（`test_rv32ui_runner.cpp`，基线 `soc/cpu/docs/dse/rv32ui-baseline-matrix.csv`）：P0#2 `cpu-pipeline-fix-rv32ui-load-width`（commit `8909165`，v0.6.0 提前归档）补完 DBusPlugin LOAD width extraction（funct3=000/001/010/100/101 LB/LH/LW/LBU/LHU + sign/zero extension + RD_DATA forwarding），原 10 个 LOAD-family 用例（lb/lbu/lh/lhu/lw + 内嵌 load 的 sb/sh/sw/ld_st/st_ld）从 stub FAIL 转为 PASS。
 - **`[cpu-l1-mmu-demo]` 6 个用例 PASS**（`tests/soc/test_cpu_l1_mmu_demo.cpp`，v0.2.3）：CPU+MMU+Memory 结构验证 demo（enable_mmu=true, sv32），5 个 riscv-tests（add/addi/auipc/jal/beq）端到端 tohost=1；L1CachePlugin 仅 JSON 声明不实例化（deferred to Wave 3 cache-dse-sweep）。
-- **P0#1 `cpu-pipeline-canonical-ordering-assert` 已落地**（v0.7.0, ADR-048）：`register_early_plugins()` 现在在 IBusPlugin 之前注册 MMUPlugin，并通过 `check_canonical_ordering()` 运行时断言验证。4 个 `[cpu-integration]` canonical_ordering 测试 PASS。
+- **P0#1 `cpu-pipeline-canonical-ordering-assert` 已落地**（v0.7.0, ADR-048）：`register_early_plugins()` 现在在 IBusPlugin 之前注册 MMUPlugin，并通过 `check_canonical_ordering()` 运行时断言验证。4 个 `[cpu-integration]` canonical_ordering 测试 PASS（实现走运行时断言而非原 proposal D1=A `static_assert`，因 `inline int` 非 constexpr；spec.md / archived proposal §3 仍提 `static_assert`，属 archive drift，已在 §3 注释 + spec 标注）。
 
 ### 构建模式
 
@@ -118,6 +118,7 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 - ✅ M3 PoC (`m3_poc_regfile_elaborate`/`m3_poc_alu_elaborate`) 13/13 PASS
 - ✅ `m4_poc_5stage_simulator_tick` 12/12 PASS (v0.3.1 M6 SEGV 修复后)
 - ⚠️ 1 known issue: `cpphdl_poc_chbool_contextual_conversion` 全量跑受 context pollution 影响失败 (单独跑 PASS), Phase 6d PoC follow-up change 跟踪修复
+- ⏱ **运行时长**：CH_MEM 全套 (6+9+16+13+12 + 1 known issue) 单二进制 `chipforge_tests_chmem` 实测 >300s（`elaborate(ctx)` DAG 发射 + Verilog `always_ff @(posedge)` 验证耗时）—— CI 设默认 ctest timeout 360s+；本地快速回归可 `--test-case` / `[chmem]` 单 family 过滤跳过 PoC 测试。
 
 ### `ip/{name}/` 标准结构
 
@@ -217,10 +218,13 @@ openspec change show <change-name>                     # 查看 change 内容
 openspec archive <change-name> -y                      # 归档到 openspec/changes/archive/
 ```
 
-**当前活跃 initiatives** (2026-09-24):
-- `wave3-cpu-pipeline-debt` (v0.4.0) — 2 changes (P0#1 canonical-ordering + P0#2 load-width 回顾性)
-- `wave3-mmu-real-memory-and-cycle` (v0.5.0) — 3 changes (P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle)
-- `wave4-csr-cache-dse` (v0.6.0 占位) — 2 changes (P2#6 phase-1.5-wave-4 + P2#7 cache-phase1.5-4way)
+**当前活跃 initiatives** (2026-09-24, version 节点对齐 `docs/roadmap/strategy/a-plus-c-hybrid.md` §3/§6 — Phase 6d 已消费 v0.4.0/v0.5.0/v0.6.0):
+
+| Initiative | Version | 状态 | Changes |
+|---|---|---|---|
+| `wave3-cpu-pipeline-debt` | **v0.7.0** | **已收官（archive）** | 2 changes (P0#1 canonical-ordering + P0#2 load-width 回顾性) |
+| `wave3-mmu-real-memory-and-cycle` | **v0.8.0** | 进行中 | 3 changes (P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle) |
+| `wave4-csr-cache-dse` | **v0.9.0 占位** | 未启动 | 2 changes (P2#6 phase-1.5-wave-4 + P2#7 cache-phase1.5-4way) |
 
 **Change proposal 关联**: 每个 change 的 `proposal.md` 必须含 frontmatter `initiative:` 字段, sync_strategy_status.sh 据此派生 §7。
 

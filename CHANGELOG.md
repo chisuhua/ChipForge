@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.7.0 (2026-09-24) — Plugin 注册规范序 + A+C Hybrid 战略启动 (ADR-048)
 
-> **OpenSpec changes**: `cpu-pipeline-canonical-ordering-assert` (active, v0.7.0) + `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` (archive)
+> **OpenSpec changes**: `cpu-pipeline-canonical-ordering-assert` (archived, v0.7.0) + `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` (archived)
 > **Initiative**: `wave3-cpu-pipeline-debt` P0
 > **Purpose**: 修复 MMU stall 隐式契约 + 正式启动 A+C Hybrid 战略 (Wave 3 清债 → Phase 2)
 

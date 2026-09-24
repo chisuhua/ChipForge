@@ -31,7 +31,7 @@
 
 | Initiative ID | Title | 包含 Change | 版本节点 | Status |
 |---------------|-------|-------------|----------|--------|
-| `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | exploring |
+| `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | 已收官（archived, commit cba5e53 + 8909165 + d98a9dd） |
 | `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle | **v0.8.0** | exploring |
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
 
@@ -89,7 +89,7 @@ graph TD
 
 | Change | Initiative | Priority | Status | Tasks |
 |--------|-----------|----------|--------|-------|
-| `cpu-pipeline-canonical-ordering-assert` | wave3-cpu-pipeline-debt | P0 | TODO | 23 0 |
+| `2026-09-24-cpu-pipeline-canonical-ordering-assert` | wave3-cpu-pipeline-debt | P0 | ✅ IN_PROGRESS (22/23) (archived) | 1 22 |
 | `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 0 18 |
 | `cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 27 0 |
 | `mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 31 0 |
