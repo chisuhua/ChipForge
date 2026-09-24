@@ -35,6 +35,8 @@ The canonical stage order in `PipeBuilder::run()` is determined by the first-occ
 2. **`cpu_factory.h::register_early_plugins()` MUST enforce this order** via `static_assert` (compile-time check) on registration sequence counters.
 3. **The check MUST be a hard error** at compile time, not a runtime warning.
 
+> **⚠️ Implementation drift (2026-09-24, cba5e53)**：原 proposal `cpu-pipeline-canonical-ordering-assert` D1=A 决策 `static_assert(MMUPlugin_register_order < IBusPlugin_register_order, ...)` **未实装**——所引符号属于未实装的 D1=A 提案。实装（cba5e53）为 `cf::cpu::detail::{PLUGIN_SEQ, MMU_REG_ORDER, IBUS_REG_ORDER, DBUS_REG_ORDER}` 4 个 `inline int` 跨 TU 共享计数器（`ip/cpu/cpu_factory.h:54-57`），由 `cf::cpu::detail::reset_canonical_counters()` / `check_canonical_ordering()` 管理（`cpu_factory.h:336` build_cpu 入口）；`inline int` 非 `constexpr`，C++17 `inline` 变量不满足 `static_assert` 编译期求值约束，故改为运行时 `throw std::logic_error` 硬失败。**违反本 spec 第 3 点 "hard error at compile time" 要求**——本 spec 字面承诺 `static_assert` 编译期硬错误，实装为运行时 throw。spec 形式与实现存在显式漂移。当前 cba5e53 实装为 ctest PASS + 4 个 `test_canonical_ordering.cpp` 用例覆盖，可视为功能等价但**不等于本 spec 字面承诺**。后续修复方向：(a) 引入 `constexpr inline int` 计数器（C++17 inline variable 在 namespace scope 非 constexpr）改回 `static_assert`，或 (b) spec 修订为"运行时 throw_or_exit 硬失败"。
+
 #### Scenario: Correct order compiles successfully
 - **WHEN** `cpu_factory.h::register_early_plugins()` is invoked with `MMUPlugin::build()` registering callbacks before `IBusPlugin::build()`
 - **THEN** the `static_assert(MMUPlugin_register_order < IBusPlugin_register_order, ...)` MUST pass at compile time

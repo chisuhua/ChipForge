@@ -45,6 +45,8 @@ depends_on: []
 - 现有 `tests/cpu/integration/test_*stage_riscv.cpp` 加 `REQUIRE(cpu_factory.early_plugin_order_ == expected_canonical_order)` 钩子
 - 验证 stall 真生效（通过 fetch stage PC 与 MMU TLB hit 一致性间接证明）
 
+> **⚠️ Archive drift 注释 (2026-09-24)**：本节承诺的"给 4 个 stage 测试文件加 `early_plugin_order_` 钩子"**未按字面实装**——`test_3stage_riscv.cpp` / `test_5stage_riscv.cpp` / `test_7stage_riscv.cpp` / `test_10stage_riscv.cpp` 4 文件中**无 `early_plugin_order_` 符号**（`grep early_plugin_order_ tests/cpu/integration/test_*stage_riscv.cpp` 无命中）。等价覆盖由新建 `tests/cpu/integration/test_canonical_ordering.cpp`（4 test cases, cba5e53）提供——canonical ordering 校验集中在该文件，3/5/7/10-stage 基础仿真测试保持不破坏。功能覆盖成立但 archived proposal 与实现存在 drift：若 rdd-verifier 复核 archive gate，需以此注释为"功能等价覆盖"证据。详见 AGENTS.md "已知测试状态"段 P0#1 条目 + `openspec/specs/cpu-stage-ordered-scheduling/spec.md` Requirement 3 静态断言→运行时断言 drift 标注。
+
 ### 4. ADR 新增
 
 - **新增** `docs/architecture/adr/ADR-048-plugin-registration-canonical-order.md`（252 行预算）：
