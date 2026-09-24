@@ -89,7 +89,7 @@ graph TD
 
 | Change | Initiative | Priority | Status | Tasks |
 |--------|-----------|----------|--------|-------|
-| `2026-09-24-cpu-pipeline-canonical-ordering-assert` | wave3-cpu-pipeline-debt | P0 | ✅ IN_PROGRESS (22/23) (archived) | 1 22 |
+| `2026-09-24-cpu-pipeline-canonical-ordering-assert` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 1 22 |
 | `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 0 18 |
 | `cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 27 0 |
 | `mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 31 0 |

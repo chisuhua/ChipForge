@@ -100,7 +100,7 @@ compute_change_status() {
   local open done
   read -r open done <<< "$(count_tasks "$tasks_file")"
   total=$((open + done))
-  if [[ "$fm_status" == "completed" || "$fm_status" == "completed-ahead-of-schedule" ]]; then
+  if [[ "$fm_status" == "completed" || "$fm_status" == "completed-ahead-of-schedule" || "$fm_status" == "DONE" ]]; then
     echo "DONE"
   elif [[ $total -eq 0 ]]; then
     echo "TODO"

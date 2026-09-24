@@ -3,6 +3,9 @@ initiative: wave3-cpu-pipeline-debt
 priority: P0
 version_target: v0.7.0
 depends_on: []
+status: completed
+completion_commit: cba5e53
+completion_version: v0.7.0
 ---
 
 # cpu-pipeline-canonical-ordering-assert — 修真 MMU stall inert + canonical ordering
