@@ -8,9 +8,13 @@ version_target: v0.8.0
 
 ## 1. failing test (TDD red)
 
-- [ ] 1.1 新建 `tests/cpu/test_mmu_paddr_propagation.cpp` —— IBus 期望读 PADDR 而非 vaddr, 故意构造 vaddr=0x80001000 + PADDR=0x1000 场景, 当前读 vaddr 0x80001000 → 测试期望读 PADDR 0x1000 fail
-- [ ] 1.2 新建 `tests/mmu/test_ptw_real_memory.cpp` —— PTW 期望读真实 PTE, 当前 `advance_from_stub` 用 mock → 测试期望 walk 走真内存 fail
-- [ ] 1.3 验证 fail: `[cpu]` 新测试 fail (期望 PADDR, 实际 vaddr); `[mmu]` 新测试 fail (期望真实 PTE, 实际 stub)
+- [x] 1.1 新建 `tests/cpu/test_mmu_paddr_propagation.cpp` —— IBus 期望读 PADDR 而非 vaddr, 故意构造 vaddr=0x80001000 + PADDR=0x1000 场景, 当前读 vaddr 0x80001000 → 测试期望读 PADDR 0x1000 fail
+- [x] 1.2 新建 `tests/mmu/test_ptw_real_memory.cpp` —— PTW 期望读真实 PTE, 当前 `advance_from_stub` 用 mock → 测试期望 walk 走真内存 fail
+- [x] 1.3 验证 fail: `[cpu]` 新测试 fail (期望 PADDR, 实际 vaddr); `[mmu]` 新测试 fail (期望真实 PTE, 实际 stub)
+  - **状态**: ✅ TDD red 验证成功 (2026-09-25):
+    - `IBusPlugin_Consumes_PADDR_Over_VADDR`: REQUIRE(`last_paddr_read == 0x1000`) FAIL → `0 == 4096` (IBus 当前不读 PADDR, 装饰性问题确认)
+    - `PTW_Sv32_Walk_Via_Stub_Memory_BackwardCompat`: CHECK(`result_fault == 0`) FAIL → `15 == 0` (PTW 当前仅 stub 路径, 真实路径缺失确认)
+  - **下一步**: 实装 task 5 (IBus PADDR consumption) + task 3-4 (MemoryInterface + advance_from_real_memory) 后, 重新跑这两个测试验证 PASS (TDD green).
 
 ## 2. ADR-049 起草
 
