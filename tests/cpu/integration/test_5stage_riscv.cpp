@@ -72,11 +72,11 @@ TEST_CASE("EnableMMU5StageBuilds", "[cpu-integration]") {
   cfg.btb_entries = 16;
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // enable_mmu=true: 5 topology (fetch/decode/execute/memory/writeback) + 3 MMUPlugin substages
-  // (tlb_lookup_ifetch/loadstore/ptw_l0 共享/链式) = 8 nodes
-  // RiscV hook substages 共享 execute/memory 节点
-  // 实测: 8 nodes (5 topology + 3 MMUPlugin substages; MMUPlugin::setup 部分声明失败因 stage 不匹配)
-  REQUIRE(pb->node_count() == 8);
+  // enable_mmu=true: 5 topology (fetch/decode/execute/memory/writeback) + 5 MMUPlugin substages
+  // (tlb_lookup_ifetch/loadstore/ptw_l0/l1/l2, mmu-paddr-consume C4 fix 后全独立)
+  // + 3 RiscV hook substages 共享 execute/memory 节点 = 13 nodes
+  // (P0#1 之前 8 nodes, 因 RiscvMMUPlugin::setup 没调基类, tlb_lookup_* 缺失 5 个 substage)
+  REQUIRE(pb->node_count() == 13);
   REQUIRE(pb->has_stage("csr_write_satp"));
   REQUIRE(pb->has_stage("sfence_vma"));
   REQUIRE(pb->has_stage("mmu_exit"));

@@ -64,12 +64,12 @@ TEST_CASE("EnableMMU3StageBuilds", "[cpu-integration]") {
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
   // 实测: 3 topology nodes (if/exmem/wb) + 5 MMUPlugin substages
-  // (tlb_lookup_ifetch/loadstore 共享 fetch/memory 节点, ptw_l0/l1/l2 链式) = 8 nodes
-  // RiscV hook substages 共享 execute/memory 节点, 不新增 node
-  // 实测: 11 nodes (3 topology + 8 MMUPlugin substages — pb.declare_substage 在 3-stage 拓扑下
-  // 部分 fallback 创建新节点而非共享). RiscV hook substages (csr_write_satp/sfence_vma 挂 execute → exmem 节点)
-  // 成功注册 (csr_write_satp=1); tlb_lookup_ifetch 等 MMUPlugin substages 失败 (no fetch 节点).
-  REQUIRE(pb->node_count() == 11);
+  // (tlb_lookup_ifetch/loadstore/ptw_l0/l1/l2 各为独立 substage 节点, mm-paddr-consume C4 fix)
+  // + 3 RiscV hook substages (csr_write_satp/sfence_vma 共享 exmem, mmu_exit 共享 memory) + 
+  // + StageLinkPlugin 4 个 EARLY 闭包 (fetch→decode 等), 实际 16 nodes
+  // (P0#1 之前是 11 nodes 因 RiscvMMUPlugin::setup 没调基类, tlb_lookup_* 缺失;
+  //  mmu-paddr-consume-and-real-memory P1#3 §5 修复后 +5 nodes)
+  REQUIRE(pb->node_count() == 16);
   REQUIRE(pb->has_stage("csr_write_satp"));
   REQUIRE(pb->has_stage("sfence_vma"));
   REQUIRE(pb->has_stage("mmu_exit"));

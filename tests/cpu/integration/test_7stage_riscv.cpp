@@ -51,8 +51,10 @@ TEST_CASE("build_7stage_superscalar", "[cpu-integration]") {
   cfg.mmu_mode = "sv39";
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // cpu-mmu-integration commit 2 实装: 7 nodes (TopologyBuilder<7>) + 5 nodes (MMUPlugin substages) = 12 nodes
-  REQUIRE(pb->node_count() == 12);
+  // mmu-paddr-consume-and-real-memory (P1#3 §5): 7 nodes (TopologyBuilder<7>) + 5 MMUPlugin substages
+// (tlb_lookup_ifetch/loadstore/ptw_l0/l1/l2 独立节点, C4 fix) + 5 RiscV hook substages 共享 = 17 nodes
+// (P0#1 之前 12 nodes, 因 RiscvMMUPlugin::setup 没调基类, tlb_lookup_* 缺失 +5)
+  REQUIRE(pb->node_count() == 17);
   REQUIRE(pb->has_stage("fetch"));
   REQUIRE(pb->has_stage("decode"));
   REQUIRE(pb->has_stage("execute"));
@@ -117,8 +119,9 @@ TEST_CASE("7stage_topology_from_config", "[cpu-integration]") {
 
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // cpu-mmu-integration commit 2 实装: 7 nodes + 5 MMUPlugin substages = 12 nodes
-  REQUIRE(pb->node_count() == 12);
+  // mmu-paddr-consume-and-real-memory (P1#3 §5): 7 nodes + 5 MMUPlugin substages + 5 RiscV hook substages = 17 nodes
+  // (P0#1 之前 12 nodes, C4 fix 后 +5)
+  REQUIRE(pb->node_count() == 17);
   REQUIRE(pb->has_stage("retire"));  // 7-stage 关键: retire 节点
   REQUIRE(pb->has_stage("commit"));  // 7-stage 关键: commit 节点
   // 验证 dispatch_width 字段已加载
@@ -141,8 +144,9 @@ TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   cfg.btb_entries = 128;
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
-  // 7 nodes (TopologyBuilder<7>) + 5 MMUPlugin substages - 2 mul_latency substages (mul_latency=1 = no-op) = 10 nodes
-  REQUIRE(pb->node_count() == 10);
+  // mmu-paddr-consume-and-real-memory (P1#3 §5): 7 nodes + 5 MMUPlugin substages + 5 RiscV hook substages - 2 mul_latency substages (mul_latency=1 = no-op) = 15 nodes
+  // (P0#1 之前 10 nodes, C4 fix 后 +5 MMUPlugin substages)
+  REQUIRE(pb->node_count() == 15);
   // 7 TopologyBuilder + 7 lane dispatch + 11 baseline cpu plugins at_stage + 5 MMUPlugin at_stage + 3 RiscVMMUPlugin at_stage - 3 mul_latency1 baseline at_stage (no-op substages 排除) = 30 stages
   REQUIRE(pb->stage_count() == 35);  // 7 TopologyBuilder + 7 lane + 11 baseline + 5 MMU + 3 RiscVMMU + 4 StageLink + 1 IBus writeback = 35
   // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 增加 4 个 EARLY 闭包

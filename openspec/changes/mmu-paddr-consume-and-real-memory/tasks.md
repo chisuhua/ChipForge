@@ -45,14 +45,20 @@ version_target: v0.8.0
 
 ## 5. IBusPlugin/DBusPlugin PADDR consumption
 
-- [ ] 5.1 `ip/cpu/plugins/ibus.h` `at_stage("fetch", NORMAL)` 加 `paddr_valid` 标志读取, 优先用 `pl::PADDR`
-- [ ] 5.2 `ip/cpu/plugins/dbus.h` `at_stage("memory", NORMAL)` 同样改造 (LOAD + STORE)
-- [ ] 5.3 验证 `paddr_valid` 标志由 MMU 写入 (RiscvMMUPlugin::at_stage "tlb_lookup_*" LATE 阶段写 `valid=true`)
+- [x] 5.1 `ip/cpu/plugins/ibus.h` `at_stage("fetch", NORMAL)` 加 `paddr_valid` 标志读取, 优先用 `pl::PADDR`
+  - **状态**: ✅ 已完成 — 读 tlb_lookup_ifetch 节点的 PADDR + PADDR_VALID (Oracle C4 design.md D1 注记), has() 守卫防 PayloadStore fail-fast (v0.3.1 M6), 节点 nullptr / PADDR_VALID=false → fallback PC
+- [x] 5.2 `ip/cpu/plugins/dbus.h` `at_stage("memory", NORMAL)` 同样改造 (LOAD + STORE)
+  - **状态**: ✅ 已完成 — LOAD + STORE 都优先用 tlb_lookup_loadstore 节点的 PADDR (镜像 §5.1 模式), fallback MEM_ADDR (vaddr)
+- [x] 5.3 验证 `paddr_valid` 标志由 MMU 写入 (RiscvMMUPlugin::at_stage "tlb_lookup_*" LATE 阶段写 `valid=true`)
+  - **状态**: ✅ 已完成 (Oracle C6: 与 PADDR 同点同 phase NORMAL 原子写; hit→true, fault→false)
+  - **额外修复**: RiscvMMUPlugin::setup() 现在调基类 MMUPlugin::setup() 声明 tlb_lookup_ifetch + tlb_lookup_loadstore substage (P0#1 之前缺失此调用导致 §5.1/§5.2 节点为 nullptr)
 
 ## 6. SoC JSON 集成
 
-- [ ] 6.1 `soc/cpu_l1_mmu_demo.json` 加 `mmu.memory_interface: "picolibc_host_memory"` 字段
-- [ ] 6.2 CpuFactory 解析该字段, 注入 MemoryInterface*
+- [x] 6.1 `soc/cpu_l1_mmu_demo.json` 加 `mmu.memory_interface: "picolibc_host_memory"` 字段
+  - **状态**: ✅ 已完成 — JSON 声明式字段 + description 标注 runner C++ 端透传 (Oracle C7 重述 scope)
+- [x] 6.2 CpuFactory 解析该字段, 注入 MemoryInterface*
+  - **状态**: ✅ 已完成 (rescoped per Oracle C7) — CpuFactory::register_early_plugins 1 行 static_cast<MemoryInterface*>(mem) 透传给 RiscvMMUPlugin (既有 mem 形参, 不需 JSON 解析器)
 
 ## 7. 验证 pass
 
