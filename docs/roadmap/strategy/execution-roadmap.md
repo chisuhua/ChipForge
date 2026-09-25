@@ -63,11 +63,14 @@ graph LR
 
 | 任务 | 范围 |
 |------|------|
-| `tests/cpu/riscv_tests/build_rv32m.sh` | vendor 脚本 (~30 行) |
-| 10 个 ELF 文件 | rv32mi-p-{mul, mulh, mulhu, mulhsu, div, divu, rem, remu, ...} |
-| 1 个新 test | `[riscv-tests-m]` family, 测试 ELF tohost=1 |
+| `tests/cpu/riscv_tests/build_rv32um.sh` | vendor 脚本 (~30 行) |
+| ~10 个 ELF 文件 | **rv32um-p-{mul, mulh, mulhu, mulhsu, div, divu, rem, remu, ...}** (M 扩展测试) |
+| 1 个新 test | `[riscv-tests-m]` family, **验收 = ELF 可加载执行** (tohost=1 是 P1#5 实装 M 扩展后的验收) |
+| 命名澄清 | riscv-tests 前缀: rv32ui=user-int, rv32um=**M 扩展** (本任务), rv32mi=machine-mode CSR/trap (P2#6 前置), rv32ua=atomics, rv32uc=compressed |
 
 **依赖**: riscv64-unknown-elf-gcc (v0.7.0 已具备)
+
+**验收标准** (Oracle Q2): "ELF 可加载 + 可执行到预期 fail 点" (mulh/mul 等尚未实装 → tohost=1 必 fail), 真正的 tohost=1 验收归 P1#5 multi-cycle 实装后
 
 ### 2.2 启动 P1#4 `plugin-framework-cycle-precision` (1-2 周, 独立)
 
@@ -112,11 +115,17 @@ graph LR
 
 ### 3.1 v0.8.0 中间检查 (P1#3/P1#4/P1#5 全 archive 后)
 
-| Go 条件 | No-Go 后果 |
-|--------|----------|
-| ✅ P1#3 PADDR 真消费 (5 ELF tohost=1 端到端)<br>✅ P1#4 cycle-precision 实装 (5 stage × 5 ELF cycle count 验证)<br>✅ P1#5 multi-cycle stall 注 (MUL/DIV 5 ELF cycle-identical 0% diff) | **如果剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) |
+> **量化标准 (Oracle 2026-09-25 修订)** — 全部满足 = Go, 任一违反 = 触发 §10 切轨评估
 
-**决策触发**: Phase 2 (P1#3/P1#4/P1#5) 全 archive + 验证报告后
+| # | 指标 | Go 阈值 | No-Go 信号 |
+|---|------|---------|-----------|
+| 1 | **日程** | v0.8.0 启动到 3 change 全 archive ≤ 6 周 | P1#3 单独 elapsed > 4 周 (Metis 偏差上限 1 周再 +1 周缓冲) |
+| 2 | **功能-PADDR 真消费** | `[cpu-l1-mmu-demo]` ≥ 8/8, 其中 ≥ 2 个新 PADDR 传播用例 PASS | 新用例靠 `paddr_valid=false` fallback 蒙混通过 (需检查断言走真 PADDR 分支) |
+| 3 | **功能-多周期 cycle-identical** | ≥ 3/5 MUL/DIV ELF 0% diff (允许 ≤ 2 个"已记录分歧" + CSV 说明) | 0/5 identical 或分歧无根因分析 |
+| 4 | **回归** | riscv-tests ≥ 40/40, TLM 0 新 fail, 3 门禁 (verify_adr + verify_plugin_decision + check_plugin_portability) 全 PASS (每个 archive 点) | 任一 archive 点门禁不过仍强行 archive |
+| 5 | **重试** | 每 change verifier 重试 ≤ 2 轮 | 任一 change 第 3 轮仍 fail → 直接判 No-Go, 不继续烧时间 |
+
+**L6 (17 pre-existing TLM fail 根因)** 不进 v0.8.0 验收 — 当前实测 0 fail, 根因分析作为 Phase 2 入场债记录即可
 
 ### 3.2 v0.9.0 archive (Phase 1.5 毕业标准)
 
