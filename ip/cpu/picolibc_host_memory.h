@@ -30,10 +30,16 @@
 #include <cstring>
 #include <vector>
 
+#include "ip/mmu/lib/memory_interface.h"
+
 namespace cf {
 namespace cpu {
 
-class PicolibcHostMemory {
+// ADR-049 D3: PicolibcHostMemory 继承 cf::ip::mmu::MemoryInterface (lib/ 层抽象)
+// 作为 PTW 真内存读消费者 (ip/mmu/lib/ptw.h::advance_from_real_memory() 调用方)
+// PicolibcHostMemory 既有 read_word / write_word 签名与 MemoryInterface 1:1 匹配
+// 唯一变动: read_word 移除 const 限定 (与 MemoryInterface 非 const 一致, 4 callers 已验证兼容)
+class PicolibcHostMemory : public cf::ip::mmu::MemoryInterface {
  public:
   static constexpr std::size_t kMemorySize = 64 * 1024;  // 64KB (legacy public, kept for back-compat)
 
@@ -98,7 +104,8 @@ class PicolibcHostMemory {
   }
 
   // 字写 (32-bit, little-endian, per-byte tohost check — fix partial-byte bug)
-  void write_word(std::uint64_t mem_address, std::uint32_t val) {
+  // (ADR-049 D3: override MemoryInterface::write_word)
+  void write_word(std::uint64_t mem_address, std::uint32_t val) override {
     if (!in_window(mem_address) || !in_window(mem_address + 3)) return;
     std::uint64_t off = mem_address - cfg_.base_addr;
     mem_[off + 0] = (val >> 0) & 0xFF;
@@ -112,8 +119,8 @@ class PicolibcHostMemory {
     check_tohost(mem_address + 3, static_cast<std::uint8_t>((val >> 24) & 0xFF));
   }
 
-  // 字读
-  std::uint32_t read_word(std::uint64_t mem_address) const {
+  // 字读 (ADR-049 D3: 移除 const 以匹配 MemoryInterface 非 const 接口)
+  std::uint32_t read_word(std::uint64_t mem_address) override {
     if (!in_window(mem_address) || !in_window(mem_address + 3)) return 0;
     std::uint64_t off = mem_address - cfg_.base_addr;
     return (static_cast<std::uint32_t>(mem_[off + 0]) << 0)

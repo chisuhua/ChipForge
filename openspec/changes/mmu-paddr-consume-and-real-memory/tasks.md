@@ -18,13 +18,17 @@ version_target: v0.8.0
 
 ## 2. ADR-049 起草
 
-- [ ] 2.1 新建 `docs/architecture/adr/ADR-049-mmu-paddr-consumption-contract.md` (Context / Decision PADDR-first / Consequences / 5 风险表)
-- [ ] 2.2 `docs/architecture/adr.md` 注册 ADR-049
+- [x] 2.1 新建 `docs/architecture/adr/ADR-049-mmu-paddr-consumption-contract.md` (Context / Decision PADDR-first / Consequences / 5 风险表)
+  - **状态**: ✅ 已完成 (commit pending) — 5 Decisions (D1 PADDR-first / D2 MemoryInterface 抽象 / D3 PicolibcHostMemory 继承 / D4 MMUPlugin 构造接 mem=nullptr / D5 SoC JSON 字段) + Open Questions + §后续项 已合入 P1#6 adr-049-followup-section.md 内容
+- [x] 2.2 `docs/architecture/adr.md` 注册 ADR-049
+  - **状态**: ✅ 已完成 — §2.1 已实现决策表行 + 计数 "37 → 38 条" 同步
 
 ## 3. MemoryInterface 抽象
 
-- [ ] 3.1 新建 `ip/mmu/lib/memory_interface.h` (~40 LOC) —— 抽象类: read_word/write_word
-- [ ] 3.2 `PicolibcHostMemory` 继承 `MemoryInterface` (修改构造 + 添加 override)
+- [x] 3.1 新建 `ip/mmu/lib/memory_interface.h` (~40 LOC) —— 抽象类: read_word/write_word
+  - **状态**: ✅ 已完成 — 纯 lib/ 层 (零 cf::plugin::* 依赖), 与 ptw.h 同层
+- [x] 3.2 `PicolibcHostMemory` 继承 `MemoryInterface` (修改构造 + 添加 override)
+  - **状态**: ✅ 已完成 — read_word 移除 const + write_word/read_word 加 override; 既有 4 callers (dbus.h:84, ibus.h:76, test_picolibc_memory_base_window.cpp:35/84) 兼容性已验证 (build 成功, [cpu-integration] 81/81 PASS 0 回归)
 
 ## 4. PTW advance_from_real_memory
 
