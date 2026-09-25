@@ -75,7 +75,7 @@
 
 > **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 37 条
+### 2.1 已实现决策（✅）— 38 条
 
 | ID | 标题 | 类别 | 验证路径 |
 |----|------|------|----------|
@@ -117,6 +117,7 @@
 | ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令 | Plugin | ✅ Phase 6c M5 落地 (2026-09-17, 前瞻锁定) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
 | ADR-048 | Plugin 注册规范序 (MMU before IBus/DBus, C++17 inline int 计数器) | Plugin | ✅ v0.7.0 落地 (2026-09-24) | [`adr/ADR-048-plugin-registration-canonical-order.md`](./adr/ADR-048-plugin-registration-canonical-order.md) |
+| ADR-049 | MMU PADDR Consumption Contract + MemoryInterface 抽象 (PADDR-first + `MemoryInterface` + PTW 真内存读) | IP 架构 | ✅ v0.8.0 落地 (2026-09-25, P1#3 mmu-paddr-consume) | [`adr/ADR-049-mmu-paddr-consumption-contract.md`](./adr/ADR-049-mmu-paddr-consumption-contract.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
