@@ -55,6 +55,19 @@
 - ❌ 用 `pl::PADDR != 0` 检测: 物理 0 地址合法, 误判
 - ❌ 用单独 `pl::PC_VALID` flag: 增加 PayloadStore 复杂度, 与现有 mmu_keys 不一致
 
+**节点归属注记 (Oracle C4)**:
+- PADDR + PADDR_VALID 由 `MMUPlugin::do_lookup()` 写入**`tlb_lookup_ifetch` / `tlb_lookup_loadstore` 节点** (`MMUPlugin.cpp:54`), 不是 `fetch` / `memory` 节点
+- IBus/DBus 必须从 `node_of_logic_stage("tlb_lookup_ifetch")` / `node_of_logic_stage("tlb_lookup_loadstore")` 读 PADDR + PADDR_VALID
+- 既有先例: `ibus.h:63` `halt_when` 从 `tlb_lookup_ifetch` 节点读 PTW_ACTIVE, 本 change 复用同一模式
+- 读取前用 `node->has(PADDR_VALID)` 守卫防 PayloadStore fail-fast (v0.3.1 M6, AGENTS.md §9)
+- `node_of_logic_stage("tlb_lookup_*")` 返回 nullptr (enable_mmu=false 时无 MMU 注册) → 直接 fallback vaddr
+
+**phase 注记 (Oracle C6)**:
+- PADDR 与 PADDR_VALID 在 `do_lookup` **同一 closure 同一 phase (NORMAL)** 原子写入, 镜像 PTW_ACTIVE 先例
+- hit → `PADDR_VALID = true` + PADDR + perms
+- fault → `PADDR_VALID = false` + EXCEPTION_CODE
+- 避免 LATE/NORMAL 跨 phase 时序引入 off-by-one-cycle
+
 ### D2: MemoryInterface 抽象 vs 直接传 PicolibcHostMemory*
 
 **决策**: 在 `ip/mmu/lib/memory_interface.h` 定义抽象类 (`read_word` / `write_word`), `PicolibcHostMemory` 继承实现。
@@ -67,6 +80,12 @@
 **替代方案**:
 - ❌ 直接传 `PicolibcHostMemory*`: 强耦合, 无法 mock 测试
 - ❌ 用 C++20 `std::span` + 模板: 增加模板复杂度, lib/ 层不友好
+
+**Scope 注记 (Oracle C5)**:
+- `MemoryInterface::read_word` 是 **32-bit** 接口 (Sv32 PTE = 4 字节, 与 Sv32 demo 配置匹配)
+- **Sv39/48 PTE 是 64-bit / 8 字节**, `read_word` 读不全, **real-memory 路径本 change 仅支持 Sv32**
+- Sv39/48 需 `read_dword` 扩展接口, defer 到 P1#6 `mmu-config-json-driven` 或 Phase 6d (`ip/cpu/plugins/mmu_ptw_chmem.h` 配套)
+- 当前 `soc/cpu_l1_mmu_demo.json` 用 `sv32`, 无 Sv39/48 测试覆盖, scope 限制安全
 
 ### D3: MMUPlugin 构造函数接 `MemoryInterface* mem = nullptr`
 

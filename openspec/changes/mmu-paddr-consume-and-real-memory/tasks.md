@@ -32,9 +32,16 @@ version_target: v0.8.0
 
 ## 4. PTW advance_from_real_memory
 
-- [ ] 4.1 `ip/mmu/lib/ptw.h/.cpp` 新增 `advance_from_real_memory(MemoryInterface* mem)` 方法
-- [ ] 4.2 `ip/mmu/tlm/MMUPlugin.h/.cpp` 构造函数接 `MemoryInterface* mem_ = nullptr` (向后兼容)
-- [ ] 4.3 MMUPlugin at_stage 闭包优先用 `mem_->advance_from_real_memory()`, fallback `advance_from_stub()` (当 mem_ == nullptr)
+- [x] 4.1 `ip/mmu/lib/ptw.h/.cpp` 新增 `advance_from_real_memory(MemoryInterface* mem)` 方法
+  - **状态**: ✅ 已完成 (Oracle C1+C2+§4.1 一并修复)
+  - **C1 fix**: 修 reserved encoding 检查 (旧 r&&w&&x spec-wrong → 新 w&&!r per RISC-V spec)
+  - **C2 fix**: start_walk + next_pte_paddr 加 mode-correct addressing (Sv32: 4-byte PTE + VPN[1]/VPN[0]; Sv39/48: 8-byte + 3/4-level walk)
+  - **新增方法**: `advance_from_real_memory(MemoryInterface* mem)` 内部 null 检查 → stub fallback; 越界读 (PicolibcHostMemory 返回 0) → decode 后 V=0 → advance() 走 fault 12 路径
+- [x] 4.2 `ip/mmu/tlm/MMUPlugin.h/.cpp` 构造函数接 `MemoryInterface* mem_ = nullptr` (向后兼容)
+  - **状态**: ✅ 已完成 — 构造加 `MemoryInterface* mem` 默认 nullptr; `RiscvMMUPlugin` 透传 mem 到基类 (Oracle C7 mitigation)
+- [x] 4.3 MMUPlugin at_stage 闭包优先用 `mem_->advance_from_real_memory()`, fallback `advance_from_stub()` (当 mem_ == nullptr)
+  - **状态**: ✅ 已完成 — ptw_l0/l1/l2 at_stage 全部调 `ptw_->advance_from_real_memory(mem_)`, 内部 null 检查统一处理 (DRY)
+  - **Oracle C6 fix**: PADDR + PADDR_VALID 在 do_lookup 同一 closure 同一 phase (NORMAL) 原子写, 镜像 PTW_ACTIVE 先例 (hit: true, fault: false)
 
 ## 5. IBusPlugin/DBusPlugin PADDR consumption
 

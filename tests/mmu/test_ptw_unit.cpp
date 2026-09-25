@@ -38,14 +38,17 @@ PTE make_invalid_pte() {
   return pte;
 }
 
-// 构造 reserved encoding PTE (R=1, W=1, X=1, V=1) → fault 15
+// 构造 reserved encoding PTE (W=1, R=0, V=1) → fault 15
+// per RISC-V spec: W=1 且 R=0 是 illegal reserved encoding
+// (mmu-paddr-consume-and-real-memory P1#3 Oracle C1: 旧实现错检 r && w && x,
+// RWX 实际是合法叶子 PTE, 现已修正为 w && !r)
 PTE make_reserved_pte() {
   PTE pte{};
-  pte.raw = (1ULL << 0) | (1ULL << 1) | (1ULL << 2) | (1ULL << 3);
+  pte.raw = (1ULL << 0) | (1ULL << 2);  // V=1, W=1, R=0, X=0
   pte.v = true;
-  pte.r = true;
+  pte.r = false;
   pte.w = true;
-  pte.x = true;
+  pte.x = false;
   return pte;
 }
 
@@ -121,7 +124,7 @@ TEST_CASE("PTWReservedEncodingTriggersFaultCallbackWithCode15", "[mmu][PTWUnit]"
       fault_fired = true;
     });
 
-  ptw.advance(reserved.raw, 0);  // R=1,W=1,X=1,V=1 → fault 15
+  ptw.advance(reserved.raw, 0);  // W=1,R=0,V=1 (RISC-V reserved encoding) → fault 15
 
   REQUIRE(fault_fired);
   CHECK(fault_code == 15);
