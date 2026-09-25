@@ -32,7 +32,7 @@
 | Initiative ID | Title | 包含 Change | 版本节点 | Status |
 |---------------|-------|-------------|----------|--------|
 | `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | 已收官（archived, commit cba5e53 + 8909165 + d98a9dd） |
-| `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle | **v0.8.0** | exploring |
+| `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | exploring |
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
 
 ## 4. 依赖图
@@ -48,6 +48,7 @@ graph TD
     P1c["P1#3 mmu<br/>paddr-consume-and-real-memory"]
     P1d["P1#4 plugin-framework<br/>cycle-precision"]
     P1e["P1#5 cpu-pipeline<br/>multi-cycle"]
+    P1f["P1#6 mmu-config-json<br/>(拆分自 P1#3, ≤ 1 周, P1#3 archive 后启动, 与 P1#5 并行)"]
   end
 
   subgraph P2 [P2 — 季度内 6-12 周]
@@ -59,6 +60,7 @@ graph TD
   P0a --> P1e
   P0b --> P1c
   P0b --> P1e
+  P1c --> P1f
   P1c --> P2f
   P1d -.-> P1
   P2g -.独立.-> P2f
@@ -69,7 +71,7 @@ graph TD
 | 柱 | 覆盖 Change | Initiative |
 |----|-------------|------------|
 | Debt-Clear (A前) | P0#1, P0#2 | `wave3-cpu-pipeline-debt` |
-| End-to-End Real | P1#3, P1#4, P1#5 | `wave3-mmu-real-memory-and-cycle` |
+| End-to-End Real | P1#3, P1#4, P1#5, **P1#6** | `wave3-mmu-real-memory-and-cycle` |
 | Phase 2 前置 | P2#6, P2#7 | `wave4-csr-cache-dse` |
 
 ## 6. 版本节点
@@ -77,7 +79,7 @@ graph TD
 | 版本 | 触发条件 | 预期日期 |
 |------|----------|----------|
 | **v0.7.0** | `wave3-cpu-pipeline-debt` archive | 2026-10 下旬 (2-3 周, P0#1 only — P0#2 回顾性) |
-| **v0.8.0** | `wave3-mmu-real-memory-and-cycle` archive | 2026-12 中旬 (依赖 v0.7.0 + 5-7 周, 3 change 串行) |
+| **v0.8.0** | `wave3-mmu-real-memory-and-cycle` archive (含 P1#6 拆分) | 2026-12 中旬 (依赖 v0.7.0 + 5-7 周, P1#3 + P1#4 启动 + P1#5 依赖 P1#3 + P1#6 与 P1#5 并行, ≤ 1 周) |
 | **v0.9.0** | `wave4-csr-cache-dse` archive | 2027-02 下旬 (依赖 v0.8.0 + 6-10 周, 含 umbrella 拆分 + cache 4-way) |
 
 ## 7. 状态总表 (SSOT)
@@ -92,6 +94,7 @@ graph TD
 | `2026-09-24-cpu-pipeline-canonical-ordering-assert` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 1 22 |
 | `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 0 18 |
 | `cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 27 0 |
+| `mmu-config-json-driven` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 0 0 |
 | `mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 31 0 |
 | `plugin-framework-cycle-precision` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 19 0 |
 | `cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | TODO | 32 0 |

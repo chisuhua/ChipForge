@@ -16,7 +16,7 @@
 ```mermaid
 graph LR
     V070[v0.7.0<br/>wave3-cpu-pipeline-debt<br/>P0#1 canonical-ordering ✅]
-    V080[v0.8.0<br/>wave3-mmu-real-memory-and-cycle<br/>P1#3 + P1#4 + P1#5]
+    V080[v0.8.0<br/>wave3-mmu-real-memory-and-cycle<br/>P1#3 + P1#4 + P1#5 + P1#6]
     V090[v0.9.0<br/>wave4-csr-cache-dse<br/>P2#6 + P2#7]
     V100[v1.0.0+<br/>Phase 2 产品化]
 
@@ -27,13 +27,15 @@ graph LR
     P14[P1#4 cycle-precision] -->|并行 1-2 周| V080
     P15[P1#5 multi-cycle] -->|依赖 P1#3| V080
     L4[L4 vendor rv32mi ELF] -->|硬前置| P15
+    PCJ[P1#6 mmu-config-json] -->|依赖 P1#3 archive<br/>与 P1#5 并行<br/>≤ 1 周| V080
     P26[P2#6 phase-1.5-wave-4] -->|拆 3 子 change| V090
     P27[P2#7 cache-phase1.5-4way] -->|E8 0% diff 约束| V090
 ```
 
-**当前状态 (2026-09-24)**:
+**当前状态 (2026-09-25)**:
 - ✅ v0.7.0 已 archive (3 commits: b2d7c21 + cba5e53 + d98a9dd + 1973cbe)
 - ⏸ v0.8.0 待启动 (3 changes 全 TODO, 0/41/19/25 tasks)
+- 📋 v0.8.0 拆分新增 P1#6 `mmu-config-json-driven` (proposal 骨架已建, P1#3 archive 后启动)
 - ⏸ v0.9.0 待 v0.8.0 archive
 
 ---
@@ -92,10 +94,10 @@ graph LR
 | 项 | 内容 |
 |----|------|
 | **依赖** | ✅ P0#1 canonical-ordering 已 archive (P1#3 proposal depends_on) |
-| **范围** | MemoryInterface 抽象 + PTW 真内存 walk + IBus/DBus 真消费 PADDR + ADR-049 + SoC JSON + (用户 idea) TLB 几何/SvMode 从 `ip/mmu/configs/params_schema.json` 读消除 C++ 硬编码 |
-| **产出** | ~700 LOC + 3 测试 + ADR-049 + SoC schema 更新 + `docs/roadmap/dse/mmu-paddr-propagation-matrix.csv` |
+| **范围** | MemoryInterface 抽象 + PTW 真内存 walk + IBus/DBus 真消费 PADDR + ADR-049 + SoC JSON `mmu.memory_interface` 字段。~~TLB 几何/SvMode 从 `ip/mmu/configs/params_schema.json` 读~~ **已拆分到 P1#6 `mmu-config-json-driven` (见 §2.5)** |
+| **产出** | ~700 LOC + 3 测试 + ADR-049 + SoC schema 更新 (`mmu.memory_interface`) + `docs/roadmap/dse/mmu-paddr-propagation-matrix.csv` |
 | **风险** | R3 ABI 改需 pb.run() 验证 (兜底: `tests/cpu/test_cpu_real_tohost` 5 ELF); R4 PADDR 字段类型变更需所有 Plugin 同步 |
-| **估时** | Oracle 估时 ~2 周, Metis 实测偏差 +0.5-1 周 (跨 5 文件 ABI) |
+| **估时** | Oracle 估时 ~2 周, Metis 实测偏差 +0.5-1 周 (跨 5 文件 ABI); 拆分 P1#6 后回归 Oracle 估时 ≤ 2 周 |
 
 **并行启动轨道**: 与 2.1 + 2.2 同时进行
 
@@ -108,6 +110,27 @@ graph LR
 | **依赖** | P1#3 完成 (latency_table 多 Plugin 裁决需要 P1#3 的接口稳定) + L4 vendor (2.1) |
 | **范围** | MUL/DIV 多周期子流水 (mul_latency=1/3/5) + latency_table 框架 (框架层取**最大值**, 保守 stall) + 5 ELF baseline 对比 |
 | **产出** | RiscvMulPlugin<U, LATENCY> 多模板实装 + latency_table header + 5 ELF cycle-identical 验证 |
+
+### 2.5 启动 P1#6 `mmu-config-json-driven` (≤ 1 周, P1#3 archive 后启动, 与 P1#5 并行)
+
+> **Scope 拆分来源**: 本 change 由 P1#3 拆分, 详见 ADR-048 §后续项修订 + 本文档 §2.3 修订标注。理由:
+> 1. 避免 P1#3 scope creep (Oracle 估时 ~2 周 + JSON 化 +0.5-1 周);
+> 2. 时序上 P1#3 铺好 `MMUPlugin` 构造参数 (`MMUConfig`) 注入点是 JSON 化的天然落点;
+> 3. 与 P1#5 (`cpu-pipeline-multi-cycle`) 并行可行 (互不阻塞, 双方均依赖 P1#3 完成)。
+
+**目的**: MMU 配置 JSON 化 —— `MMUPlugin` 构造参数从 `ip/mmu/configs/params_schema.json` 反序列化, 消除 `CpuFactory::register_early_plugins()` (`ip/cpu/cpu_factory.h:369-396`) 中 TLB 几何硬编码
+
+| 项 | 内容 |
+|----|------|
+| **依赖** | P1#3 archive (注入点稳定) |
+| **范围** | `MMUPlugin` / `RiscvMMUPlugin` 构造函数接 JSON config + `params_schema.json` 既有字段复用 (无新词) + `register_early_plugins()` 硬编码消除 + SoC JSON `mmu.levels` / `mmu.ptw_max_inflight` 字段 (与 `MMUPlugin::TLBConfig` 1:1, sv_mode 单源在 `cpu_default.json::mmu_mode` 不重复声明) + 3-5 个 `[mmu-config-json]` 测试 |
+| **产出** | `ip/mmu/lib/mmu_config_loader.{h,cpp}` (~150 LOC, lib/ 层允许 nlohmann/json 依赖) + `ip/cpu/plugins/mmu.h` 接口同步 + `tests/mmu/test_mmu_json_config.cpp` (~100 LOC) |
+| **风险** | R1 P1#3 archive 后 `mmu.levels`/`mmu.ptw_max_inflight` 与 P1#3 `mmu.memory_interface` 节点命名协调 (字段命名已与既有 `params_schema.json` 词汇表对齐); R2 fallback 硬编码路径与 P1#3 改后 `MMUConfig` 默认值一致性; R3 多 SoC JSON 缺失字段处理策略 (warning log 单条聚合, 不刷屏) |
+| **估时** | ≤ 1 周 (Oracle 估时: 配置层单 module 改动, 无 ABI 跨 5 文件) |
+| **兼容** | TLM baseline (JSON 缺失字段 fallback 硬编码 → byte-equal); CH_MEM (build 期一次, 无 elaboration 感知); ADR-040 v2.0 §3 实现样本 |
+| **proposal** | `openspec/changes/mmu-config-json-driven/proposal.md` (骨架, design/tasks 待 P1#3 archive 后细化) |
+
+**并行启动轨道**: 与 §2.4 P1#5 同时进行 (P1#5 改 latency_table 框架, P1#6 改 MMU 配置层, 双方均在 P1#3 完成基础上展开, 互不阻塞)
 
 ---
 

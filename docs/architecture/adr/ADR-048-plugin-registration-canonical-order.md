@@ -132,12 +132,24 @@ D1=A 被选中因为：最小侵入、compile-time 断言不可行（`inline int
 | R5 | `std::logic_error` 被 `build_cpu_impl` catch 链吃掉 | 已在 `build_cpu_impl()` try-catch 中验证：`std::logic_error` → `PluginError::BuildFailed`（但 check 在 `build_cpu_impl` 内委托 build_cpu → 异常被 catch）→ **需注意**：check 的 `std::logic_error` 不应被 catch 吞掉 |
 
 
-## 后续项（P1#3 规划）
+## 后续项（**已拆分独立 change**，不再是 P1#3 scope）
 
-**MMU 配置 JSON 驱动**：
+> **2026-09-25 Scope 拆分决策**: 原计划"在 P1#3 中改为 JSON 配置驱动"已**拆分**为独立 OpenSpec change `mmu-config-json-driven`，理由：
+> - 避免 P1#3 scope creep（P1#3 估时 2-2.5 周 + JSON 化 +0.5-1 周）
+> - 时序上 P1#3 铺好 PADDR 真消费 + `MMUConfig` 构造参数注入点是 JSON 化的天然落点
+> - 与 P1#5 (`cpu-pipeline-multi-cycle`) 并行可行（互不阻塞）
+
+**MMU 配置 JSON 驱动** (`openspec/changes/mmu-config-json-driven/`):
 - 当前 `register_early_plugins()` 中硬编码 TLB 几何（`{"L0", 8, 8, 1, 1, "LRU"}` 等）和 `SvMode` 枚举映射
 - `ip/mmu/configs/params_schema.json` 已存在，但未被 `CPUConfig` / MMU 注册点反化
-- 目标：P1#3 `mmu-paddr-consume-and-real-memory` 时改为 JSON 配置驱动，从 `soc/*.json` 读取 TLB 层级大小和替换策略
+- **目标**: P1#3 `mmu-paddr-consume-and-real-memory` archive 后启动独立 change `mmu-config-json-driven`，从 `soc/*.json` 读取 TLB 层级大小、替换策略、`SvMode`
+- **依赖**: P1#3 archive（注入点稳定后才做 JSON 化）+ 与 P1#5 (`cpu-pipeline-multi-cycle`) 并行
+- **预估时长**: ≤ 1 周
+- **约束**: JSON 字段缺失时 fallback 硬编码（保证现有 `[cpu-l1-mmu-demo]` 6 用例不破坏）
+- **关联文档**: 
+  - 决策记录: `docs/roadmap/strategy/execution-roadmap.md §2.4`
+  - 战略同步: `docs/roadmap/strategy/a-plus-c-hybrid.md §3/§4/§5/§6`
+  - Proposal: `openspec/changes/mmu-config-json-driven/proposal.md`
 
 ---
 
