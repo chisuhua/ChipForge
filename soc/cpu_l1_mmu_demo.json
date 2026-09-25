@@ -1,12 +1,12 @@
 {
   "name": "cpu_l1_mmu_demo",
-  "description": "Phase 1.5 Wave 2: CPU + MMU + L1 (declared) + Memory structural topology. Runner builds CPU+MMU+Memory via C++ manually (enable_mmu=true, sv32). L1CachePlugin is declared for topology completeness but NOT instantiated in the runner — instantiation deferred to Wave 3 cache-dse-sweep. See openspec/changes/soc-cpu-l1-mmu-demo/ for full spec.",
+  "description": "Phase 1.5 Wave 2: CPU + MMU + L1 (declared) + Memory structural topology. Runner builds CPU+MMU+Memory via C++ manually (enable_mmu=true, sv32). L1CachePlugin is declared for topology completeness but NOT instantiated in the runner — instantiation deferred to Wave 3 cache-dse-sweep. See openspec/changes/soc-cpu-l1-mmu-demo/ for full spec.\n\nmmu-memory-interface: mmu.memory_interface='picolibc_host_memory' (P1#3 mmu-paddr-consume §6.1) 声明 PTW 读真实内存路径；runner 在 tests/soc/test_cpu_l1_mmu_demo.cpp C++ 端透传 PicolibcHostMemory* 给 RiscvMMUPlugin（§6.2 重述 scope：JSON 声明式 + CpuFactory::register_early_plugins 透传, 见 Oracle review C7）。",
   "memory_map": [
     {"name": "ram", "base": "0x80000000", "size": "64KB", "type": "ram"}
   ],
   "components": [
     {"type": "cf::cpu::CpuFactory", "config": "ip/cpu/configs/cpu_default.json"},
-    {"type": "cf::ip::mmu::MMUPlugin", "sv": "sv32"},
+    {"type": "cf::ip::mmu::MMUPlugin", "sv": "sv32", "memory_interface": "picolibc_host_memory"},
     {"type": "cf::ip::cache::L1CachePlugin", "size_kb": 4, "assoc": 1},
     {"type": "cf::cpu::PicolibcHostMemory", "base": "0x80000000", "size": "64KB"}
   ]

@@ -67,15 +67,32 @@ class IBusPlugin : public cf::plugin::PluginBase {
     pb.register_ctrl_link("fetch", fetch_ctrl);
 
     // fetch 阶段 NORMAL: 取指 (mem 非空时真读; 否则 NOP stub)
+    // mmu-paddr-consume-and-real-memory (P1#3 task §5.1, ADR-049 D1):
+    //   优先读 PADDR (从 tlb_lookup_ifetch 节点, 镜像 halt_when 先例)
+    //   PADDR_VALID 守卫防 PayloadStore fail-fast (v0.3.1 M6)
+    //   无 MMU / PADDR_VALID=false → fallback PC (vaddr)
     // 当 PTW busy 时, 框架 stall loop 会 skip 本闭包 (不调), 保持 PC 不推进.
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
-      if (n) {
+      auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+      if (n && mem_) {
         T pc = n->operator()(KeyType::PC);
+        std::uint64_t access_addr = static_cast<std::uint64_t>(pc);
+        // MMU 真翻译: 优先 PADDR + PADDR_VALID 守卫
+        if (tlb_n && tlb_n->has(MmuKeys::PADDR_VALID)) {
+          const bool paddr_valid =
+              static_cast<bool>(tlb_n->operator()(MmuKeys::PADDR_VALID));
+          if (paddr_valid) {
+            access_addr = static_cast<std::uint64_t>(
+                tlb_n->operator()(MmuKeys::PADDR));
+          }
+        }
         const cf::plugin::uint_t<32> inst =
-            mem_ ? cf::plugin::uint_t<32>(mem_->read_word(static_cast<std::uint64_t>(pc)))
-                 : cf::plugin::uint_t<32>(0x00000013u);
+            cf::plugin::uint_t<32>(mem_->read_word(access_addr));
         n->operator()(KeyType::INSTRUCTION) = inst;
+      } else if (n) {
+        // mem_ == nullptr: NOP stub (向后兼容, 旧测试)
+        n->operator()(KeyType::INSTRUCTION) = cf::plugin::uint_t<32>(0x00000013u);
       }
     });
 

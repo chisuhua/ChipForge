@@ -26,6 +26,7 @@
 #include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/picolibc_host_memory.h"
+#include "ip/mmu/tlm/mmu_keys.h"
 
 namespace cf {
 namespace cpu {
@@ -51,6 +52,7 @@ class DBusPlugin : public cf::plugin::PluginBase {
   void build(cf::plugin::PipeBuilder& pb) override {
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
     using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<T>;
+    using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
     constexpr std::uint8_t kFunct3LB  = 0;  // RISC-V spec: LB =000
     constexpr std::uint8_t kFunct3LH  = 1;  //                LH =001
     constexpr std::uint8_t kFunct3LW  = 2;  //                LW =010
@@ -62,13 +64,29 @@ class DBusPlugin : public cf::plugin::PluginBase {
 
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
+      auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_loadstore").get();
+      // mmu-paddr-consume-and-real-memory (P1#3 task §5.2, ADR-049 D1):
+      // 优先 PADDR (从 tlb_lookup_loadstore 节点), PADDR_VALID 守卫
+      // 无 MMU / PADDR_VALID=false → fallback MEM_ADDR (vaddr)
+      std::uint64_t access_addr = 0;
+      bool use_paddr = false;
+      if (tlb_n && tlb_n->has(MmuKeys::PADDR_VALID)) {
+        const bool paddr_valid =
+            static_cast<bool>(tlb_n->operator()(MmuKeys::PADDR_VALID));
+        if (paddr_valid) {
+          access_addr = static_cast<std::uint64_t>(
+              tlb_n->operator()(MmuKeys::PADDR));
+          use_paddr = true;
+        }
+      }
       if (n) {
         const auto& dec = n->operator()(KeyType::DECODE);
         const auto& rv  = n->operator()(RvKey::RISCV_DETAIL);
 
       // LOAD: funct3 分发 width extraction; LB/LH 需符号扩展.
       if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::LOAD) {
-        T addr = n->operator()(KeyType::MEM_ADDR);
+        T addr = use_paddr ? static_cast<T>(access_addr)
+                           : n->operator()(KeyType::MEM_ADDR);
         if (mem_) {
           T result = T{0};
           switch (rv.funct3) {
@@ -104,7 +122,8 @@ class DBusPlugin : public cf::plugin::PluginBase {
         }
       } else if (dec.op_class == cf::cpu::core::payload::DecodePayload::OpClass::STORE) {
         // STORE 路径按 funct3 分发 (SB/SH/SW); 用 if-else 链, 无早返 — ADR-040 Tier-1 #4.
-        T addr = n->operator()(KeyType::MEM_ADDR);
+        T addr = use_paddr ? static_cast<T>(access_addr)
+                           : n->operator()(KeyType::MEM_ADDR);
         T data = n->operator()(KeyType::MEM_DATA);
         if (mem_) {
           if (rv.funct3 == kFunct3SB) {

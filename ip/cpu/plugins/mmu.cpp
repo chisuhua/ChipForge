@@ -57,6 +57,12 @@ void RiscvMMUPlugin::sfence_vma(std::int64_t rs1_vaddr, std::int64_t rs2_asid) {
 }
 
 void RiscvMMUPlugin::setup(cf::plugin::PipeBuilder& pb) {
+  // mmu-paddr-consume-and-real-memory (P1#3 task §5):
+  // 关键: 先调基类 MMUPlugin::setup() 声明 tlb_lookup_ifetch + tlb_lookup_loadstore substage
+  // (P0#1 mm-cache-integration commit 2/9 之前的实装缺失此调用, 导致 IBus §5.1 读 tlb_lookup_ifetch
+  // 节点 null 降级 PC, C3 测试 fail; 现在补全)
+  cf::ip::mmu::MMUPlugin::setup(pb);
+
   // mmu-cache-integration commit 2/9: 声明 3 个 substage 给 CPU pipeline hook
   // csr_write_satp / sfence_vma 挂 execute 阶段 (CSR 写 / SFENCE.VMA 在 execute 拦截)
   // mmu_exit 挂 memory 阶段 (MMU access 后路由 exception)

@@ -381,9 +381,13 @@ class CpuFactory {
         {"L1", 8, 8, 1, 2, "LRU"}
       };
       cf::cpu::detail::MMU_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
+      // mmu-paddr-consume-and-real-memory (P1#3 task §6.2, Oracle C7):
+      // 透传 PicolibcHostMemory* 到 RiscvMMUPlugin, 触发真内存读路径 (advance_from_real_memory)
+      // PicolibcHostMemory 继承 cf::ip::mmu::MemoryInterface (Step 1 task §3.2)
+      // nullptr 时 RiscvMMUPlugin 内部降级 stub 路径 (向后兼容)
       pb.register_plugin(std::make_unique<cf::cpu::plugins::RiscvMMUPlugin>(
           sv_mode, mmu_levels, cf::ip::mmu::MMUPlugin::PTWConfig{2},
-          /*satp_value=*/0));
+          /*satp_value=*/0, static_cast<cf::ip::mmu::MemoryInterface*>(mem)));
     }
 
     cf::cpu::detail::IBUS_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
