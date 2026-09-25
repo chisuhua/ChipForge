@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "ip/mmu/lib/memory_interface.h"
 #include "ip/mmu/tlm/MMUPlugin.h"
 
 namespace cf {
@@ -33,9 +34,12 @@ namespace plugins {
 
 class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
  public:
+  // mmu-paddr-consume-and-real-memory (P1#3 task §4.2, Oracle C7):
+  // mem 透传到基类 MMUPlugin, nullptr → stub 路径 (向后兼容, 现有 6 cpu-l1-mmu-demo 测试 0 回归)
   RiscvMMUPlugin(cf::ip::mmu::SvMode mode, std::vector<cf::ip::mmu::MMUPlugin::TLBConfig> levels_cfg,
-                 cf::ip::mmu::MMUPlugin::PTWConfig ptw_cfg, std::uint64_t satp_value = 0)
-      : cf::ip::mmu::MMUPlugin(mode, std::move(levels_cfg), ptw_cfg),
+                 cf::ip::mmu::MMUPlugin::PTWConfig ptw_cfg, std::uint64_t satp_value = 0,
+                 cf::ip::mmu::MemoryInterface* mem = nullptr)
+      : cf::ip::mmu::MMUPlugin(mode, std::move(levels_cfg), ptw_cfg, mem),
         satp_value_(satp_value) {}
 
   // cpu-mmu-integration commit 2/9: 覆盖基类 setup/build 加 3 个 substage 闭包
@@ -66,7 +70,6 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
   std::uint8_t last_exception_code_ = 0;
 };
 
-// 向后兼容类型别名 — 旧 cf::cpu::plugins::MMUPlugin 仍可用, 保 M3 阶段 cpu 测试 0 破坏
 using MMUPlugin = RiscvMMUPlugin;
 
 }  // namespace plugins

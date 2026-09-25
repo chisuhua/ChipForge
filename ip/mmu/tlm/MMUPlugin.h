@@ -20,6 +20,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
+#include "ip/mmu/lib/memory_interface.h"
 #include "ip/mmu/lib/multi_level_tlb.h"
 #include "ip/mmu/lib/ptw.h"
 #include "ip/mmu/lib/tlb_factory.h"
@@ -44,8 +45,15 @@ class MMUPlugin : public cf::plugin::PluginBase {
     std::size_t max_inflight = 2;
   };
 
-  MMUPlugin(SvMode mode, std::vector<TLBConfig> levels_cfg, PTWConfig ptw_cfg);
+  // mmu-paddr-consume-and-real-memory (P1#3 task §4.2, ADR-049 D4):
+  // mem == nullptr → 走 advance_from_stub (向后兼容, 现有 47 mmu 测试 0 回归)
+  // mem != nullptr → 走 advance_from_real_memory (production 路径, MemoryInterface 抽象)
+  MMUPlugin(SvMode mode, std::vector<TLBConfig> levels_cfg, PTWConfig ptw_cfg,
+            MemoryInterface* mem = nullptr);
   ~MMUPlugin() override = default;
+
+  // 暴露 mem_ 供 RiscvMMUPlugin / 测试访问
+  MemoryInterface* memory_interface() const { return mem_; }
 
   void setup(cf::plugin::PipeBuilder& pb) override;
   void build(cf::plugin::PipeBuilder& pb) override;
@@ -97,6 +105,8 @@ class MMUPlugin : public cf::plugin::PluginBase {
  private:
   SvMode sv_mode_;
   PTWConfig ptw_config_;
+  // mmu-paddr-consume-and-real-memory (P1#3 task §4.2): 真内存读消费者 (非拥有, 生命周期由 CpuFactory 管理)
+  MemoryInterface* mem_ = nullptr;
   std::unique_ptr<MultiLevelTLB> multi_tlb_;
   std::unique_ptr<PTW> ptw_;
   std::uint16_t current_asid_ = 0;

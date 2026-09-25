@@ -45,6 +45,12 @@ struct mmu_keys {
   static inline cf::plugin::Payload<std::uint8_t>  EXCEPTION_CODE{"mmu.exception_code"};
   static inline cf::plugin::Payload<T>       SATP_PPN{"mmu.satp_ppn"};
   static inline cf::plugin::Payload<std::uint8_t>  SATP_MODE{"mmu.satp_mode"};
+
+  // mmu-paddr-consume-and-real-memory (P1#3 task §4+§5): PADDR_VALID 标志
+  // 由 MMUPlugin::do_lookup() 在 tlb_lookup_ifetch/loadstore 节点 NORMAL phase
+  // 同步写入 (hit→true, fault→false), IBus/DBus 读取前用 has() 守卫
+  // (Oracle review 2026-09-25 C6 推荐: 与 PADDR 同点同 phase 原子写, 避免时序歧义)
+  static inline cf::plugin::Payload<bool>    PADDR_VALID{"mmu.paddr_valid"};
 };
 
 }  // namespace payload

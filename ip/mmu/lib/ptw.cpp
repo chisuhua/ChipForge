@@ -32,8 +32,25 @@ void PTW::start_walk(uint64_t vaddr, uint16_t asid, uint64_t satp_ppn,
   result_fault_ = 0;
   on_success_ = std::move(on_success);
   on_fault_ = std::move(on_fault);
-  // Sv39: L2 PTE paddr = satp_ppn << 12 + vaddr[38:30] * 8
-  current_pte_paddr_ = (satp_ppn << 12) + ((vaddr >> 30) & 0x1FF) * 8;
+  // mmu-paddr-consume-and-real-memory (P1#3 task §4.1, Oracle C2):
+  // mode-correct root PTE 地址计算
+  //   Sv32: PTE 4 字节, VPN[1] = vaddr[31:22]
+  //   Sv39: PTE 8 字节, VPN[2] = vaddr[38:30]
+  //   Sv48: PTE 8 字节, VPN[3] = vaddr[47:39]
+  switch (mode_) {
+    case SvMode::Sv32:
+      current_pte_paddr_ = (satp_ppn << 12) + (((vaddr >> 22) & 0x3FF) * 4);
+      break;
+    case SvMode::Sv39:
+      current_pte_paddr_ = (satp_ppn << 12) + (((vaddr >> 30) & 0x1FF) * 8);
+      break;
+    case SvMode::Sv48:
+      current_pte_paddr_ = (satp_ppn << 12) + (((vaddr >> 39) & 0x1FF) * 8);
+      break;
+    default:
+      current_pte_paddr_ = 0;
+      break;
+  }
   current_pte_l2_ = 0;
   current_pte_l1_ = 0;
   current_pte_l0_ = 0;
@@ -57,8 +74,9 @@ void PTW::advance(uint64_t pte_raw, std::size_t level) {
     return;
   }
 
-  // Reserved encoding (R=1, W=1, X=1) → ptw fault (15)
-  if (pte.r && pte.w && pte.x) {
+  // Reserved encoding per RISC-V spec: W=1 且 R=0 (writing without read is illegal)
+  // Pre-fix bug (Oracle C1): 旧实现检查 r && w && x (R+W+X 合法叶子 PTE 被误判 fault 15)
+  if (pte.w && !pte.r) {
     result_fault_ = 15;
     done_ = true;
     busy_ = false;
@@ -100,9 +118,52 @@ void PTW::advance_from_stub() {
   advance(pte.raw, current_level_);
 }
 
-uint64_t PTW::next_pte_paddr(uint64_t pte_ppn, std::size_t level) const {
-  // stub: 完整 PTE 地址计算推迟到 mmu-tlb-ptw-impl
-  return (pte_ppn << 12);
+// mmu-paddr-consume-and-real-memory (P1#3 task §4.1, Oracle C2):
+// 从 MemoryInterface 真内存读 32-bit PTE, 替代 stub 路径
+// Sv32-only (MemoryInterface 32-bit 接口, design.md D2 注记)
+// mem == nullptr → 降级 stub 路径 (向后兼容, 现有 47 mmu 测试 0 回归)
+// 越界读 (PicolibcHostMemory 返回 0) → decode_pte 后 V=0 → advance() 走 fault 12 路径
+void PTW::advance_from_real_memory(MemoryInterface* mem) {
+  if (!busy_) return;
+  if (mem == nullptr) {
+    advance_from_stub();
+    return;
+  }
+  const std::uint32_t pte_raw = mem->read_word(current_pte_paddr_);
+  advance(static_cast<std::uint64_t>(pte_raw), current_level_);
+}
+
+// mmu-paddr-consume-and-real-memory (P1#3 task §4.1, Oracle C2):
+// mode-correct next PTE 地址计算
+//   Sv32 (2-level): current_level=0 (root) → next=1 (leaf)
+//     VPN[0] = vaddr[21:12], PTE 4 字节
+//   Sv39 (3-level): current_level=0 (L2) → next=1 (L1) → next=2 (L0 leaf)
+//     VPN[i] = vaddr[12+i*9 : 20+i*9], PTE 8 字节
+//   Sv48 (4-level): 同 Sv39 模式多一层
+uint64_t PTW::next_pte_paddr(uint64_t pte_ppn, std::size_t next_level) const {
+  std::size_t pte_size = (mode_ == SvMode::Sv32) ? 4 : 8;
+  std::size_t vpn_shift = 0;
+  switch (mode_) {
+    case SvMode::Sv32:
+      // 2-level: next_level=1 (leaf) → VPN[0]=vaddr[21:12]
+      vpn_shift = 12;
+      break;
+    case SvMode::Sv39:
+      // 3-level: next_level=1 (L1) → VPN[1]=vaddr[29:21]
+      //          next_level=2 (L0 leaf) → VPN[0]=vaddr[20:12]
+      vpn_shift = (next_level == 1) ? 21 : 12;
+      break;
+    case SvMode::Sv48:
+      // 4-level: next_level=1 → VPN[2]=vaddr[38:30]
+      //          next_level=2 → VPN[1]=vaddr[29:21]
+      //          next_level=3 → VPN[0]=vaddr[20:12]
+      vpn_shift = (next_level == 1) ? 30
+                 : (next_level == 2) ? 21 : 12;
+      break;
+    default:
+      return 0;
+  }
+  return (pte_ppn << 12) + (((vaddr_ >> vpn_shift) & 0x1FF) * pte_size);
 }
 
 PTE PTW::decode_pte(uint64_t raw, SvMode mode) {

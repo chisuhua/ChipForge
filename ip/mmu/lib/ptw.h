@@ -18,6 +18,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "ip/mmu/lib/memory_interface.h"
+
 namespace cf {
 namespace ip {
 namespace mmu {
@@ -82,6 +84,13 @@ class PTW {
   // 从 pte_stub_memory_ 读 PTE 并调 advance(pte.raw, current_level_)
   // busy=false 时 no-op; 复用 advance 状态机, 不修改 stub memory
   void advance_from_stub();
+
+  // mmu-paddr-consume-and-real-memory (P1#3 task §4.1): 真内存读推进接口
+  // 从 MemoryInterface 读 32-bit PTE (Sv32-only per design.md D2 scope 注记)
+  // mem == nullptr 时降级到 stub 路径 (向后兼容, 现有 47 mmu 测试 0 回归)
+  // busy=false 时 no-op; 复用 advance 状态机
+  // Sv32: PTE 4 字节; Sv39/48 PTE 8 字节 (本 change 不支持, 见 design.md D2 注记)
+  void advance_from_real_memory(MemoryInterface* mem);
 
  private:
   SvMode mode_;
