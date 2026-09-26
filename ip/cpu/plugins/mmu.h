@@ -46,6 +46,15 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
   void setup(cf::plugin::PipeBuilder& pb) override;
   void build(cf::plugin::PipeBuilder& pb) override;
 
+  // mmu-paddr-consume-and-real-memory (P1#3 task §7 C9-b, Oracle 2026-09-25):
+  // vaddr_for_stage override — production 路径从父 stage 节点读真实 vaddr
+  //   tlb_lookup_ifetch → 父 "fetch" 节点读 PC
+  //   tlb_lookup_loadstore → 父 "memory" 节点读 MEM_ADDR
+  //   fallback: 基类返回 last_vaddr_ (test/bridge 路径)
+ protected:
+  std::uint64_t vaddr_for_stage(const char* stage_name) const override;
+
+ public:
   ~RiscvMMUPlugin() override = default;
 
   RiscvMMUPlugin(const RiscvMMUPlugin&) = delete;

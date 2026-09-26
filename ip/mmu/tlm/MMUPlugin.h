@@ -55,6 +55,12 @@ class MMUPlugin : public cf::plugin::PluginBase {
   // 暴露 mem_ 供 RiscvMMUPlugin / 测试访问
   MemoryInterface* memory_interface() const { return mem_; }
 
+  // mmu-paddr-consume-and-real-memory (P1#3 task §7 C9-c, Oracle 2026-09-25):
+  // set_satp_ppn — RiscvMMUPlugin::csr_write_satp 把 satp CSR[59:0] PPN 字段喂给 PTW root
+  // 默认 0 (Bare 模式, 或未配 satp) — start_walk 默认参数可保留 0 兼容既有路径
+  void set_satp_ppn(std::uint64_t ppn) { satp_ppn_ = ppn; }
+  std::uint64_t satp_ppn() const { return satp_ppn_; }
+
   void setup(cf::plugin::PipeBuilder& pb) override;
   void build(cf::plugin::PipeBuilder& pb) override;
 
@@ -102,6 +108,17 @@ class MMUPlugin : public cf::plugin::PluginBase {
     return resp;
   }
 
+ protected:
+  // mmu-paddr-consume-and-real-memory (P1#3 task §7 C9-b, Oracle 2026-09-25):
+  // vaddr_for_stage hook — 提供 do_lookup 用的 vaddr
+  //   默认: 返回 last_vaddr_ (issue_request 设置, 测试/bridge 路径)
+  //   RiscvMMUPlugin override: 从父 stage 节点读 PC (fetch) / MEM_ADDR (memory)
+  //     (生产路径关键修复 — 没有 override 则 MMU 在 production 永远查 vaddr=0)
+  virtual uint64_t vaddr_for_stage(const char* stage_name) const;
+
+  // build() 内 set 给 derived 用于读父 stage 节点; pb 生命周期 > plugin 生命周期 (CPU 成员)
+  cf::plugin::PipeBuilder* pb_for_vaddr_ = nullptr;
+
  private:
   SvMode sv_mode_;
   PTWConfig ptw_config_;
@@ -110,6 +127,10 @@ class MMUPlugin : public cf::plugin::PluginBase {
   std::unique_ptr<MultiLevelTLB> multi_tlb_;
   std::unique_ptr<PTW> ptw_;
   std::uint16_t current_asid_ = 0;
+  // mmu-paddr-consume-and-real-memory (P1#3 task §7 C9-c, Oracle 2026-09-25):
+  // satp CSR[59:0] PPN 字段 (RISC-V spec), 由 RiscvMMUPlugin::csr_write_satp 写入
+  //   do_lookup 的 PTW start_walk 第 3 参用此值 (替代硬编码 0)
+  std::uint64_t satp_ppn_ = 0;
 
   // 闭包状态 (跨 at_stage 调用, 同一 logical stage 复用)
   std::uint64_t last_vaddr_ = 0;

@@ -145,10 +145,12 @@ TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   auto pb = CpuFactory<T>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
   // mmu-paddr-consume-and-real-memory (P1#3 §5): 7 nodes + 5 MMUPlugin substages + 5 RiscV hook substages - 2 mul_latency substages (mul_latency=1 = no-op) = 15 nodes
-  // (P0#1 之前 10 nodes, C4 fix 后 +5 MMUPlugin substages)
+  // (P0#1 之前 10 nodes, C4 fix 后 +5 MMUPlugin substages, C9-a 后基类 build() 也跑过 — 节点数同 +5)
   REQUIRE(pb->node_count() == 15);
-  // 7 TopologyBuilder + 7 lane dispatch + 11 baseline cpu plugins at_stage + 5 MMUPlugin at_stage + 3 RiscVMMUPlugin at_stage - 3 mul_latency1 baseline at_stage (no-op substages 排除) = 30 stages
-  REQUIRE(pb->stage_count() == 35);  // 7 TopologyBuilder + 7 lane + 11 baseline + 5 MMU + 3 RiscVMMU + 4 StageLink + 1 IBus writeback = 35
+  // 7 TopologyBuilder + 7 lane dispatch + 11 baseline cpu plugins at_stage + 5 MMUPlugin at_stage
+  //   + 3 RiscVMMUPlugin at_stage - 3 mul_latency1 baseline at_stage (no-op substages 排除) = 30 stages
+  // C9-a fix (RiscvMMUPlugin::build 调基类 build): 35 → 40 (+5 MMU at_stage 闭包)
+  REQUIRE(pb->stage_count() == 40);
   // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 增加 4 个 EARLY 闭包
   // commit C: IBusPlugin 增加 1 个 writeback LATE 闭包 (PC 更新)
 }
