@@ -70,39 +70,21 @@ class FetchObservationSpyPlugin : public PluginBase {
 
 }  // namespace
 
-// TDD green (C3 端到端): 真 CPU 流水线 + PTE stub + MMU 翻译
-// 验证 IBus 真读 PADDR (PADDR_VALID=true 时) 而不是 vaddr
+// TDD green (C10b 真断言): IBusPlugin 真消费 PADDR, 端到端断言 INSTRUCTION payload
 TEST_CASE("IBusPlugin_Consumes_PADDR_Over_VADDR_EndToEnd", "[cpu][mmu][paddr-propagation]") {
   // PicolibcHostMemory: base=0x80000000, size=64KB (riscv-tests 标准)
   cf::cpu::PicolibcHostMemory mem(
       cf::cpu::PicolibcHostMemory::Config{0x80000000, 64 * 1024, 0});
 
-  // Sv32 翻译链: vaddr 0x80000000 → PADDR 0x00000000 (页偏移 0, 基址翻译)
-  //   satp_ppn = 0x80000 → root page table at phys 0x80000000
-  //   VPN[1] = (0x80000000 >> 22) & 0x3FF = 0x200
-  //   L1 PTE (root) addr = 0x80000000 + 0x200*4 = 0x80000800
-  //   L1 PTE: V=1, R=1, PPN=0x001 → L0 page table at phys 0x001000
-  //   VPN[0] = (0x80000000 >> 12) & 0x3FF = 0x000
-  //   L0 PTE addr = 0x001000 + 0x000*4 = 0x001000
-  //   L0 PTE (leaf): V=1, R=1, X=1, PPN=0x0 → phys 0x00000000 (page offset 0)
-  const std::uint32_t kL1Pte =
-      (1u << 0) | (1u << 1) | (0x001u << 10);  // V=1, R=1, PPN=0x001
-  const std::uint32_t kL0Pte =
-      (1u << 0) | (1u << 1) | (1u << 3);  // V=1, R=1, X=1, PPN=0 (leaf)
-  mem.write_word(0x80000800, kL1Pte);
-  mem.write_word(0x001000, kL0Pte);
-
-  // 关键测试 fixture: PADDR (0x00000000) 与 vaddr (0x80000000) 内容差异
+  // 关键测试 fixture: PADDR (0x80001000) 与 vaddr (0x80000000) 内容差异
   // 真实翻译: IBus 应读 PADDR 内容 (0xCAFEBABE)
   // 错误路径: IBus 若读 vaddr, 会得到 0xDEADBEEF (应是错的)
+  //   注: PADDR 必须在 PicolibcHostMemory window (base 0x80000000, size 64KB = 0x80000000-0x8000FFFF)
+  //       否则 read_word 返 0 (out-of-window), 端到端断言失效
   const std::uint32_t kInstructionAtPaddr = 0xCAFEBABEu;
   const std::uint32_t kTrapAtVaddr = 0xDEADBEEFu;
-  mem.write_word(0x00000000, kInstructionAtPaddr);  // PADDR
+  mem.write_word(0x80001000, kInstructionAtPaddr);  // PADDR (PPN=0x80001, offset 4KB in window)
   mem.write_word(0x80000000, kTrapAtVaddr);         // vaddr (TRAP)
-
-  // 真实 PTE 翻译需要 PTW stub (MMUPlugin 内部 pte_stub_memory_)
-  // 但 stub PTE 索引与 satp_ppn/addr 映射由 stub 实现决定, 这里直接通过 RiscvMMUPlugin
-  // 的 issue_request API + csr_write_satp 触发一次 walk, 验证 stub-to-real 翻译路径
 
   cf::cpu::CPUConfig cfg;
   cfg.name = "paddr_endtoend";
@@ -114,35 +96,29 @@ TEST_CASE("IBusPlugin_Consumes_PADDR_Over_VADDR_EndToEnd", "[cpu][mmu][paddr-pro
   auto pb = cf::cpu::CpuFactory<std::uint32_t>::build_cpu(cfg, &mem);
   REQUIRE(pb != nullptr);
 
-  // 触发 MMU 翻译: 设置 satp (Sv32 mode=8, PPN=0x80000) + issue_request 喂 vaddr
-  // satp 字段: [63:60] MODE, [59:0] PPN → satp = (8ULL << 60) | 0x80000
+  // 初始化 fetch 节点 PC (默认未初始化, IBus fallback 到 PC=0 → mem[0]=0)
+  using CommonKeys = cf::cpu::core::payload::keys<std::uint32_t, 32>;
+  auto* fetch_node = pb->node_of_logic_stage("fetch").get();
+  REQUIRE(fetch_node != nullptr);
+  fetch_node->operator()(CommonKeys::PC) = static_cast<std::uint32_t>(0x80000000);
 
-  // 查找 RiscvMMUPlugin 实例 (CpuFactory 不暴露, 通过 node_of_logic_stage 间接访问不可行;
-  // 用 mm_exit 节点读 MMUPlugin 实例, 或直接从 pb 内部搜索)
-  // 简化: 通过 PB 内部 plugin 列表查找 (CpuFactory::build_cpu 注册了 RiscvMMUPlugin)
-  // 当前 Pb API 不直接暴露 plugin list, 用 cf::cpu::plugins::RiscvMMUPlugin::issue_request
-  // 由 spy 验证: padDR_valid 路径
-
-  // 因 MMU 翻译需要 RISC-V satp CSR + TLB setup, 此测试仅验证 SpyPlugin 观测接口;
-  // 真 E2E 验证需要 [cpu-integration] EnableMMU5StageBuilds 配合运行 (已 PASS)。
-  // 本测试验证 spy 在 §5.1/§5.2 实装后行为正确, 即: 观测 tlb_lookup_ifetch.PADDR_VALID=true.
-
-  // 简化 E2E: 手动模拟 MMU 翻译 (写入 tlb_lookup_ifetch 节点), 然后断言 spy 观测
+  // 手动模拟 MMU 翻译 (enable_mmu=true 时 tlb_lookup_ifetch 节点存在)
+  // 简化: 直接写入 PADDR + PADDR_VALID, 跳过 PTW walk
+  //   真 E2E (含 PTW walk) 验证见 [cpu-integration] EnableMMU5StageBuilds (已 PASS)
   auto* tlb_node = pb->node_of_logic_stage("tlb_lookup_ifetch").get();
-  REQUIRE(tlb_node != nullptr);  // enable_mmu=true 必须存在
-
-  // 模拟 MMU 翻译结果写入: vaddr 0x80000000 → PADDR 0x00000000
-  (*tlb_node)(MmuKeys::PADDR) = static_cast<std::uint64_t>(0x00000000);
+  REQUIRE(tlb_node != nullptr);
+  (*tlb_node)(MmuKeys::PADDR) = static_cast<std::uint64_t>(0x80001000);
   (*tlb_node)(MmuKeys::PADDR_VALID) = true;
 
-  // 跑一次 pipeline pass
+  // 跑 pipeline: IBus fetch NORMAL 读 tlb_lookup_ifetch.PADDR + PADDR_VALID 守卫
+  //   真读 PADDR 内容 (0xCAFEBABE) 而不是 vaddr 内容 (0xDEADBEEF)
   pb->run();
 
-  // 注意: 由于 §5.1 IBus 已改为读 tlb_lookup_ifetch.PADDR + PADDR_VALID 守卫,
-  // 此测试断言 spy 观测接口 (LATE phase) 能正确读到 PADDR_VALID=true
-  // 真 E2E (CPU 执行指令 + tohost) 验证见 tests/soc/test_cpu_l1_mmu_demo.cpp
-  REQUIRE(tlb_node->has(MmuKeys::PADDR_VALID));
-  CHECK(static_cast<bool>((*tlb_node)(MmuKeys::PADDR_VALID)) == true);
+  // 端到端断言: fetch 节点 INSTRUCTION payload = PADDR 内容 (0xCAFEBABE)
+  const std::uint32_t inst =
+      static_cast<std::uint32_t>(fetch_node->operator()(CommonKeys::INSTRUCTION));
+  CHECK(inst == kInstructionAtPaddr);  // 真翻译成功 = 0xCAFEBABE
+  CHECK(inst != kTrapAtVaddr);          // 没退化到 vaddr 路径
 }
 
 TEST_CASE("IBusPlugin_FallsBack_To_VADDR_When_MMU_Disabled", "[cpu][mmu][paddr-propagation]") {
