@@ -1,0 +1,7 @@
+test_case,status,fail_stage,category,cycles,notes
+IBusPlugin_Consumes_PADDR_Over_VADDR_EndToEnd,PASS,,PADDR_consumption,1,C10b E2E 真断言 INSTRUCTION == 0xCAFEBABE (PADDR 内容, 非 vaddr 内容 0xDEADBEEF)
+IBusPlugin_FallsBack_To_VADDR_When_MMU_Disabled,PASS,,Bare_mode_fallback,1,§5.1 fallback 验证 — enable_mmu=false 时 tlb_lookup_ifetch 节点不存在 → IBus 读 PC
+MMU_Translation_Writes_PADDR_And_PADDR_Valid_To_TlbLookupIfetch,PASS,,Node_contract,1,§5 节点契约 — enable_mmu=true 时 MMU 写 PADDR + PADDR_VALID 到 tlb_lookup_ifetch 节点
+PTW_Sv32_VPN_HighBit_RealMemory_Walk_Succeeds,PASS,,C8_fix,2,Oracle C8 — Sv32 VPN[0]=0x200 (bit 9 set) next_pte_paddr 用 0x3FF mask 而非 0x1FF, 修复 vaddr 截断 bug
+PTW_Sv32_Walk_Via_Stub_Memory_BackwardCompat,PASS,,Stub_backward_compat,2,稳态守护 — 47 既有 stub 测试 0 回归 (advance_from_stub 路径)
+PTW_Has_AdvanceFromRealMemory_Method,PASS,,API_compile_time,1,API 占位 — advance_from_real_memory 编译通过即 PASS

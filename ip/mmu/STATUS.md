@@ -35,7 +35,8 @@ mmu-tlb-ptw-impl (archived 2026-09-12) + mmu-cache-integration (current) 完成:
 
 ## 已知限制
 - **Sv32/Sv48 PTW 解码未实装**：仅 Sv39 `decode_pte` 完整，Sv32/Sv48 + megapage/gigapage 推迟到 `mmu-sv32-sv48-ext`
-- **PTW 真实内存读未实装**：`pte_stub_memory_` 是测试接口，真实内存读推迟到 `soc-cpu-l1-mmu-demo`
+- ✅ **PTW 真实内存读已实装** (`mmu-paddr-consume-and-real-memory` P1#3, 2026-09-25): `PTW::advance_from_real_memory(MemoryInterface*)` 从 MemoryInterface 真内存读 PTE (Sv32-only 32-bit 接口 per design.md D2 scope); Oracle C8 修复 Sv32 VPN mask 0x1FF→0x3FF; RISC-V satp_ppn 从 CSR 喂入 (替代硬编码 0); Bare mode identity 短路 (sv_mode_==Bare); mmu_exit 读 tlb_lookup_loadstore 节点 (do_lookup 唯一写入者). PicolibcHostMemory 继承 MemoryInterface. 53/53 mmu tests + 117/117 cpu tests + 81/81 cpu-integration PASS.
+- **sv_mode=Sv32 + satp CSR=0 PTW 路径已知 follow-up**: 当前 Bare 短路只覆盖 sv_mode_==Bare 配置; sv_mode=Sv32 但 satp CSR 初始=0 (csr_write_satp 未调) 时仍走 PTW walk + 错位 fault. 待 satp_value_.MODE 字段追踪实装, 留后续 P1#3 task.
 - **CtrlLink halt_when PTW stall 未实装**（✅ v0.1.3 plugin-framework-stall 已实装）：框架消费 `should_halt`，fetch stage 闭包在 PTW_ACTIVE=1 时 skip，IBusPlugin::build() 注册 fetch CtrlLink 读 `mmu_keys::PTW_ACTIVE`；MMUPlugin PTW 完成回调原子清零 `PTW_ACTIVE=0`
 - **split_id 拓扑未实装**：`topology` 字段保留枚举值 `split_id`，骨架阶段仅 `unified` 工作
 - **cpptlm MMUTLMBridge 未实装**：与 `L1CacheTLMBridge` 同构但推迟到 TLB/PTW 算法稳定后
