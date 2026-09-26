@@ -5,6 +5,55 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.8.0 (2026-09-25) — MMU 真内存读 + PADDR 真消费 (P1#3 mmu-paddr-consume)
+
+> **OpenSpec change**: `mmu-paddr-consume-and-real-memory` (archived)
+> **Initiative**: `wave3-mmu-real-memory-and-cycle` P1#3 (split from P1#3 mmu-paddr-consume-and-real-memory)
+> **Purpose**: 让 MMU 在 CPU 流水线中真起作用——IBus/DBus 真消费物理地址 (PADDR), PTW 真内存读 PTE
+
+### Added
+
+- **`MemoryInterface` 抽象类** (`ip/mmu/lib/memory_interface.h`, ~70 LOC): `read_word` / `write_word` 虚函数接口, lib/ 层 (零 `cf::plugin::*` 依赖)
+- **`PicolibcHostMemory` 继承 `MemoryInterface`**: 移除 `read_word` 的 `const` 限定 (与抽象非 const 接口对齐); override `read_word` / `write_word`
+- **`PTW::advance_from_real_memory(MemoryInterface* mem)`** (`ip/mmu/lib/ptw.cpp`): 真内存读 32-bit PTE (Sv32 scope), `mem==nullptr` 降级 stub 路径
+- **`vaddr_for_stage` virtual hook** (`ip/mmu/tlm/MMUPlugin.h`): do_lookup 用此 hook 替代硬编码 `last_vaddr_`; 默认返回 `last_vaddr_` (test/bridge 路径), `RiscvMMUPlugin` override 从父 stage 节点读 PC (fetch) / MEM_ADDR (memory) — **production 路径关键修复**
+- **`set_satp_ppn` public setter** (`ip/mmu/tlm/MMUPlugin.h`): RISC-V satp CSR[59:0] PPN 喂给 PTW root (替代硬编码 0); `RiscvMMUPlugin::csr_write_satp` 自动调用
+- **`mmu_keys::PADDR_VALID`** (`ip/mmu/tlm/mmu_keys.h`): 新增 Payload key, hit/fault 双路径统一写; IBus/DBus 用 `has()` 守卫防 PayloadStore fail-fast
+- **`soc/cpu/docs/dse/mmu-paddr-propagation-matrix.csv`** (新): MMU PADDR 消费测试矩阵
+- **Oracle C8 修复 Sv32 VPN mask**: `ptw.cpp::next_pte_paddr` 从 `& 0x1FF` (9-bit, 截断 bit 21) 改为 mode-dependent `& 0x3FF` (Sv32) / `& 0x1FF` (Sv39/48) — 修复 VPN[0]≥512 时 L0 PTE 地址错位 bug
+- **`C9-a` 关键修复**: `RiscvMMUPlugin::build` 首行加 `cf::ip::mmu::MMUPlugin::build(pb)` — 镜像 §5.4 setup() fix 模式, 让基类 at_stage 闭包在 production 真正注册
+- **`C9-d` mmu_exit 路径修复**: 改从 `tlb_lookup_loadstore` 节点读 `EXCEPTION_CODE` (do_lookup 唯一写入者), 旧实现读 `mmu_exit` 节点 → 永空 → no-op → production trap 路径永断
+
+### Changed
+
+- **`RiscvMMUPlugin::csr_write_satp`**: 提取 satp CSR[59:0] PPN (mask `0x0FFFFFFFFFFFFULL`) → 调基类 `set_satp_ppn`
+- **`MMUPlugin::do_lookup`**: 加 `sv_mode_ == SvMode::Bare` identity 短路 (Bare mode 不走 PTW walk)
+- **`bus_halt 检测` (mmu_exit 闭包)**: 读 `tlb_lookup_loadstore` 节点替代 `mmu_exit` 节点 (C9-d fix)
+- **`cpu_l1_mmu_demo.json`**: 加 `mmu.memory_interface` 字段声明 (Oracle C7 rescoped, JSON 声明式, CpuFactory::register_early_plugins 1 行 static_cast 透传)
+- **`ADR-049`** 新增 (v0.8.0): MMU PADDR Consumption Contract + MemoryInterface 抽象 + 5 Decisions + §后续项合入 P1#6 mmu-config-json-driven 草案
+- **`docs/roadmap/strategy/a-plus-c-hybrid.md` + `execution-roadmap.md`**: §2.5 新增 P1#6 mmu-config-json-driven 启动轨道
+
+### Fixed
+
+- **Oracle C1 (RISC-V spec reserved encoding)**: 旧 `r && w && x` 错检 (RWX 合法), 修 `w && !r` (W=1 && R=0 才非法). `test_ptw_unit` helper `make_reserved_pte` 同步对齐 spec
+- **Oracle C2 (mode-correct addressing)**: `start_walk` + `next_pte_paddr` 改为 mode-specific (Sv32: 4 字节 PTE + 10-bit VPN; Sv39/48: 8 字节 + 9-bit)
+- **Oracle C8 (Sv32 VPN mask 截断)**: 见 Added 节
+- **Oracle C9-a-d (production MMU 翻译惰性)**: 见 Added 节
+- **`test_ptw_unit.cpp` 测试 helper 对齐**: `make_reserved_pte` 用真 reserved encoding (W=1+R=0, 原误用 RWX)
+
+### Known Follow-up
+
+- **`sv_mode_=Sv32 + satp CSR=0` PTW 路径**: Bare 短路只覆盖 `sv_mode_==Bare` 配置; sv_mode=Sv32 但 satp CSR 初始=0 (csr_write_satp 未调) 时仍走 PTW walk + 错位 fault. 待 `satp_value_.MODE` 字段追踪实装, 留后续 P1#3 task. (5 个 [cpu-l1-mmu-demo] ELF 测试受影响)
+- **`verify_adr.sh` / `doc_link_check.sh` 4 ADRs 缺 CppTLM headers + 2 broken links**: pre-existing infra 问题, 与本 change 无关
+
+### Verification
+
+- `[mmu]` **53/53 PASS** (131 assertions) — TDD red → green (含 Oracle C8 Sv32 mask unit test)
+- `[cpu]` **117/117 PASS** (353 assertions) — 含 C10b E2E 端到端真断言 `INSTRUCTION == 0xCAFEBABE`
+- `[cpu-integration]` **81/81 PASS** (65722 assertions) — 0 回归 (Oracle C4 fix +5 substage nodes 后)
+- `[riscv-tests]` **40/40 PASS** — 0 回归
+- **`verify_plugin_decision.sh` 12/12 + `check_plugin_portability.sh` 12/12**: D4 + ADR-040 + ADR-047 全 PASS
+
 ## v0.7.0 (2026-09-24) — Plugin 注册规范序 + A+C Hybrid 战略启动 (ADR-048)
 
 > **OpenSpec changes**: `cpu-pipeline-canonical-ordering-assert` (archived, v0.7.0) + `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` (archived)
