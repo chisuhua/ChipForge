@@ -62,11 +62,11 @@ version_target: v0.8.0
 
 ## 7. 验证 pass
 
-- [ ] 7.1 `[cpu]` test_mmu_paddr_propagation 4/4 PASS
-- [ ] 7.2 `[mmu]` test_ptw_real_memory 3/3 PASS + 既有 47 PASS 无回归 (合计 50/50)
+- [ ] 7.1 `[cpu]` test_mmu_paddr_propagation 3/3 PASS (C10b E2E 真断言依赖 C9 — 见 C9 风险)
+- [ ] 7.2 `[mmu]` test_ptw_real_memory 3/3 PASS + 既有 50 PASS 无回归 (合计 53/53, Oracle C10a drift 修正)
 - [ ] 7.3 `[soc]` test_cpu_l1_mmu_demo 8/8 PASS (升级 2 用例)
 - [ ] 7.4 `[riscv-tests]` 40/40 PASS 无回归
-- [ ] 7.5 `[cpu-integration]` 4/4 PASS 无回归
+- [ ] 7.5 `[cpu-integration]` 81/81 PASS 无回归 (Oracle C10a drift 修正: 原 4/4 写错)
 - [ ] 7.6 TLM baseline 0 回归
 
 ## 8. CI 门禁
@@ -90,10 +90,18 @@ version_target: v0.8.0
 > - ADR-048 §后续项: 建议 P1#3 或 P1#4 时改为从 `soc/*.json` 配置读取 TLB 层级数/每级大小/替换策略/`ptw_max_inflight`
 > - 预期收益: 消除 C++ 中的配置描述代码, 支持 DSE 参数扫描
 
+## 8. CI 门禁
+
+- [ ] 8.1 `bash tools/verify_adr.sh` PASS（含 ADR-049）
+- [ ] 8.2 `bash tools/verify_plugin_decision.sh` PASS（D4 合规）
+- [ ] 8.3 `bash tools/check_plugin_portability.sh` PASS
+- [ ] 8.4 `bash tools/doc_link_check.sh` PASS
+- [ ] 8.5 (Oracle C10a 推荐) `grep -l "JSON 配置驱动" docs/architecture/adr/ADR-049-*.md` 必须 1 命中 (ADR-049 §后续项 8 项 checklist item 8)
+
 ## 10. commit + archive
 
 - [ ] 10.1 1 个原子 commit (含 test + ADR + MemoryInterface + PTW 改造 + IBus/DBus 改造 + SoC JSON + 文档)
-- [ ] 10.2 `CHANGELOG.md` v0.5.0 段本 change 条目
+- [ ] 10.2 `CHANGELOG.md` v0.8.0 段本 change 条目 (Oracle C10a drift 修正: 原 v0.5.0 写错, version_target = v0.8.0)
 - [ ] 10.3 `openspec archive mmu-paddr-consume-and-real-memory -y`
 
 ## Acceptance

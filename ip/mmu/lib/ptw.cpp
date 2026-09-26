@@ -142,6 +142,10 @@ void PTW::advance_from_real_memory(MemoryInterface* mem) {
 //   Sv48 (4-level): 同 Sv39 模式多一层
 uint64_t PTW::next_pte_paddr(uint64_t pte_ppn, std::size_t next_level) const {
   std::size_t pte_size = (mode_ == SvMode::Sv32) ? 4 : 8;
+  // Oracle C8 (2026-09-25): Sv32 VPN 是 10 bits (vaddr[21:12]), 不是 9 bits;
+  //   旧 mask 0x1FF 截断 bit 21 导致 VPN[0]≥512 时 L0 PTE 地址算错
+  //   Sv39/Sv48 VPN 是 9 bits (vaddr[12+i*9 : 20+i*9]), mask 0x1FF 正确
+  std::size_t vpn_mask = (mode_ == SvMode::Sv32) ? 0x3FF : 0x1FF;
   std::size_t vpn_shift = 0;
   switch (mode_) {
     case SvMode::Sv32:
@@ -163,7 +167,7 @@ uint64_t PTW::next_pte_paddr(uint64_t pte_ppn, std::size_t next_level) const {
     default:
       return 0;
   }
-  return (pte_ppn << 12) + (((vaddr_ >> vpn_shift) & 0x1FF) * pte_size);
+  return (pte_ppn << 12) + (((vaddr_ >> vpn_shift) & vpn_mask) * pte_size);
 }
 
 PTE PTW::decode_pte(uint64_t raw, SvMode mode) {
