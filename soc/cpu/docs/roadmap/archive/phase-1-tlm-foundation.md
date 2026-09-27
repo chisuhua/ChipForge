@@ -1,3 +1,5 @@
+> **⚠️ ARCHIVED 2026-09-26**：本文档作为**历史参考**保留（commit 链路 + 子任务清单溯源）。当前主控路线图是 [`./execution-roadmap.md`](./execution-roadmap.md)（v0.10.0 → v1.3.0），Phase 1 全部内容已被 execution-roadmap.md §1 目标 + §7 历史归档覆盖。**不再作为执行依据。**
+
 # Phase 1：基础 TLM 平台（L1CachePlugin "Hello World"）
 
 > **Status**: ✅ 核心完成 (2026-09-14, Phase 1.3→1.5 全部子任务 + MMU/VIPT/CPU Pipeline 4 change 归档)

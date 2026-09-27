@@ -1,57 +1,75 @@
 # RISC-V CPU SoC 实施路线图
 
-> **属主**：`soc/cpu/` — RISC-V CPU 中心 SoC（CPU + MMU + Cache + Memory + Interconnect + Peripheral）  
-> **框架级 Phase（0、6）在**：`docs/roadmap/phases/`  
-> **全局路线图入口**：`docs/roadmap/README.md`  
-> **最后更新**：2026-09-15（`plugin-framework-stall` v0.1.3 归档 + Phase 1.5 wave 计划启动）
+> **属主**：`soc/cpu/` — RISC-V CPU 中心 SoC（CPU + MMU + Cache + Memory + Interconnect + Peripheral）
+> **最后更新**：2026-09-27（ADR 编号 050~062 平移到 070~082，避开 active change 撞号；3 决策锁定，12 PoC 已编号；v0.10.0 启动就绪）
 
-## 阶段总览
+## 目录结构
 
-| Phase | 文档 | 状态 | 关键目标 |
-|-------|------|------|---------|
-| Phase 1 | [基础 TLM 平台（Hello World = L1CachePlugin）](phase-1-tlm-foundation.md) | ✅ 核心完成（L1Cache + MMU + CPU Pipeline） | TLB/PTW 实装 + VIPT 集成 + CpuFactory 注册 |
-| Phase 1.5 | [Stall 兑现 + 端到端验证](phase-1.5-stall-and-validate.md) | 🚧 启动（plugin-framework-stall 归档后） | RV32I 合规基线 + SoC demo + DSE |
-| Phase 2 | [Bare-metal 测试套件](phase-2-baremetal.md) | 未开始 | SoC 完整装配 + riscv-tests RV64GC |
-| Phase 3 | [RTOS 测试套件](phase-3-rtos.md) | 未开始 | FreeRTOS + Zephyr |
-| Phase 4 | [Linux 启动支持](phase-4-linux.md) | 未开始 | OpenSBI + Linux Kernel |
-| Phase 5 | [RTL 协同验证 + Verilog 生成](phase-5-rtl.md) | 未开始 | CppHDL RTL 与 TLM 对比 |
+```
+soc/cpu/docs/roadmap/
+├── README.md                          ← 本文件（索引）
+├── execution-roadmap.md               ← 主控路线图（最小骨架：目标/产出/路径）
+├── references/                        ← 深度内容（按需查阅）
+│   ├── decision-1-plugin-evolution.md
+│   ├── adr-matrix.md
+│   ├── multi-core-comparison.md
+│   └── poics-and-risks.md
+└── archive/                           ← 历史 phase 文档（仅溯源，不执行）
+    ├── phase-1-tlm-foundation.md
+    ├── phase-1.5-stall-and-validate.md
+    ├── phase-2-baremetal.md
+    ├── phase-3-rtos.md
+    ├── phase-4-linux.md
+    └── phase-5-rtl.md
+```
 
-## 当前进展与下一里程碑
+## 主控文档
 
-**2026-09 已归档 6 个 change（332/337 tests PASS，5 RISC-V 仿真 pre-existing fail 待解决）：**
+### **[📍 execution-roadmap.md — ChipForge 超越路径规划 v0.10.0 → v1.3.0](./execution-roadmap.md)**
 
-| Change | 归档日期 | 交付内容 |
-|--------|---------|---------|
-| `mmu-tlb-ptw-impl` | 2026-09-12 | TLB lookup/insert/invalidate + PTW Sv39 walk + MultiLevelTLB coherence + TLBFactory 11 组特化 + MMUPlugin at_stage 5 闭包 + RiscvMMUPlugin satp/SFENCE.VMA/exception hook + MMUTLMBridge 核心 |
-| `mmu-cache-integration` | 2026-09-13 | L1CachePlugin 消费 `pl::MMU_VADDR` VIPT 索引 + PIPT fallback + mmu_bridge_adapter cpptlm 集成 + soc/mmu_minimal.json 全链 + cache_keys.h + 29→39 mmu tests |
-| `cpu-mmu-integration` | 2026-09-14 | RiscvMMUPlugin 注册到 CpuFactory（`enable_mmu=true`）+ at_stage 3 substage（csr_write_satp/sfence_vma/mmu_exit）+ cpu_keys.h IPC + 8 集成测试 |
-| `ptw-walk-bridge-fix` | 2026-09-14 | PTW at_stage 闭包接线（修复 walk 永远 busy）+ MMUTLMBridge issue_request/read_response 实装（修复 stub）+ 3 tests |
-| `cpu-pipeline-stubs-replace` | 2026-09-15 | `cpu_sim --elf add.elf` → tohost=1（5 cycles，真 RISC-V 执行）+ StageLinkPlugin 跨阶段 Payload 传播 + PC 写回 fetch 节点 + 4 个隐藏 bug 修复（branch/ALU×2） |
-| `plugin-framework-stall` | 2026-09-15 | `PipeBuilder::run()` CtrlLink stall loop + `PluginException` + IBus fetch PTW-busy CtrlLink + HazardPlugin execute RAW CtrlLink + MMU PTW_ACTIVE 原子清零 + ADR-045 |
+骨架结构：
 
-**当前 IP 状态：**
-- ✅ **CPU Core**：11 Plugin 套件 + RiscvMMUPlugin 条件注册（`enable_mmu=true` 时插入 PluginOrder + 3 substage）+ 真跑 RV32I add.elf
-- ✅ **L1Cache**：lookup + refill 两阶段 + Bridge + Adapter e2e + **VIPT 索引消费**（ADR-044 §3.2 契约双端完成）
-- ✅ **MMU**：TLB + PTW（Sv39 端到端走通）+ VIPT 双写 + RISC-V hook + MMUTLMBridge/Adapter 真实工作 + PTW-busy → fetch stall（plugin-framework-stall）
-- ✅ **Plugin 框架**：CtrlLink 4 API 全部激活（halt/throw/flush/bypass），ADR-045 立
-- 🧩 **Memory / Interconnect / Peripheral**：规划中（Phase 2+，cpptlm MemoryTLM 暂时服务 SoC JSON）
+| § | 内容 |
+|---|------|
+| 1 | 目标（技术 / 差异化 / 超越 / 非目标）|
+| 2 | 3 大决策锁定（范式不动 / ASIC 友好 / DSE-as-a-Service）|
+| 3 | 实施路径：4 版本节点 timeline + 产出 + 12 PoC 速查 + 8 风险速查 |
+| 4 | 验收与同步机制（CI 门禁 + OpenSpec 同步 + 文档同步规则）|
+| 5 | 立即可执行的下一步（v0.10.0 启动第一周动作清单）|
+| 6 | 参考文档索引（references/）|
+| 7 | 历史归档索引（archive/）|
+| 附录 | 术语表 |
 
-**Phase 1.5 wave 计划**（详见 [phase-1.5-stall-and-validate.md](phase-1.5-stall-and-validate.md)）：
+## 参考文档（references/）
 
-| Wave | 内容 | 估时 | 目标 |
-|------|------|------|------|
-| **Wave 1** | `riscv-tests-rv32ui` 接入 | 1 周 | 客观 RV32I 合规基线（红/绿矩阵） |
-| **Wave 2** | `cpu-pipeline-fix-rv32ui-N` + `soc-cpu-l1-mmu-demo`（双轨） | 2 周 | 修真 bug + riscv_virt.json 重建 |
-| **Wave 3** | `cache-dse-sweep` + `cpu-pipeline-multi-cycle` + `plugin-framework-cycle-precision` | 1-2 周 | DSE + 多周期 + 真 cycle 精度 |
-| **Wave 4** | `mmu-sv32-sv48-ext` + `cpu-pipeline-exception` + `cpu-pipeline-mispredict` | 2 周 | Sv32/Sv48 + trap + mispredict → Phase 2 |
+| 文档 | 内容 | 何时读 |
+|------|------|--------|
+| [`references/decision-1-plugin-evolution.md`](./references/decision-1-plugin-evolution.md) | VexiiRiscv 5 病灶 × ChipForge 机制级回应（5 条 × 4 维 + 客观回退信号）| 起草任何 Plugin 范式相关 ADR 时 |
+| [`references/adr-matrix.md`](./references/adr-matrix.md) | 18 条 ADR + 2 CI 门禁整合 + 依赖图 + 门禁分层决策树 | 任何 ADR 起效/降级/回退时 |
+| [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) | VexRiscv / VexiiRiscv / XiangShan / ChipForge 47 行 × 4 列对比 + 7 个 🚀 独占维度 | 对外汇报 / 论文 / 商业化展示 |
+| [`references/poics-and-risks.md`](./references/poics-and-risks.md) | 12 PoC 完整规范（含 ADR 锚点 + 失败砍分叉）+ 8 风险反向决策树 | 任何 PoC 启动/失败决策时 |
 
-**Wave 1 优先级论证**：当前 5 个 pre-existing RISC-V 仿真测试 fail（add.elf 之外）无客观根因分析。先建立 riscv-tests rv32ui-p 合规基线，所有后续 change 的红/绿都基于这套客观矩阵。**1 周投资换全周期可量化**。
+## 历史归档（archive/）
+
+6 个历史 phase 文档归档保留（commit 链路 + 子任务清单溯源），不再作为执行依据。
+
+| 归档文档 | 当时状态 | 当前覆盖 |
+|---------|---------|---------|
+| `archive/phase-1-tlm-foundation.md` | ✅ v0.1.x 完成 | execution-roadmap.md §3.2 v0.10.0 |
+| `archive/phase-1.5-stall-and-validate.md` | ✅ v0.4.1–v0.8.0 完成 | execution-roadmap.md §3.2 v0.10.0 |
+| `archive/phase-2-baremetal.md` | ⏳ 被覆盖 | execution-roadmap.md §3.2 v0.10.0 / v1.0.0 |
+| `archive/phase-3-rtos.md` | ⏳ 被覆盖 | execution-roadmap.md §3.2 v1.0.0 PoC-7 |
+| `archive/phase-4-linux.md` | ⏳ 被覆盖 | execution-roadmap.md §3.2 v1.2.0 / v1.3.0 |
+| `archive/phase-5-rtl.md` | ⏳ 被覆盖 | execution-roadmap.md §3.2 v1.2.0 PoC-9 + ADR-060 |
 
 ## 相关文档
 
 | 文档 | 内容 |
 |------|------|
-| [`../architecture.md`](../architecture.md) | SoC 系统架构（数据流、IP 集成状态、跨 IP 缺口） |
+| [`./execution-roadmap.md`](./execution-roadmap.md) | **主控路线图（v0.10.0 → v1.3.0）** |
+| [`../architecture.md`](../architecture.md) | SoC 系统架构（数据流、IP 集成状态） |
 | [`../../../../ip/mmu/docs/architecture.md`](../../../../ip/mmu/docs/architecture.md) | MMU 内部微架构 |
 | [`../../../../docs/architecture/plugin-framework.md`](../../../../docs/architecture/plugin-framework.md) | Plugin 框架设计 |
 | [`../../../../docs/roadmap/README.md`](../../../../docs/roadmap/README.md) | 全局路线图入口（含 Phase 0/6） |
+| [`../../../../docs/roadmap/strategy/a-plus-c-hybrid.md`](../../../../docs/roadmap/strategy/a-plus-c-hybrid.md) | 战略入口（A+C Hybrid） |
+| [`../../../../docs/architecture/adr.md`](../../../../docs/architecture/adr.md) | ADR 注册表 |

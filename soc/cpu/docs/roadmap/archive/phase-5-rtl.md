@@ -1,3 +1,16 @@
+> **⚠️ ARCHIVED 2026-09-26**：本文档作为**历史参考**保留（CppHDL RTL + co-simulation 任务清单溯源）。当前主控路线图是 [`./execution-roadmap.md`](./execution-roadmap.md)（v0.10.0 → v1.3.0）。原 Phase 5 内容覆盖映射：
+>
+> | 原 Phase 5 任务 | 对应 execution-roadmap.md 章节 |
+> |-----------------|-------------------------------|
+> | CppHDL RTL + VerilogCodeGen | Phase 6c 已完成（`pb.elaborate(ctx)` 一次性发射 DAG） |
+> | Verilator 编译 + VL1Cache 替换 | Phase 6d.5 已完成（0d30d64 + CppHDL 7f7da88 lint clean + 1a99ed3 sim cycle-identical） |
+> | ImplMode::COMPARE/SHADOW + ComparisonEngine | 双模对拍 ADR-080（v1.2 试点 → v1.3 硬门禁）天然等同 COMPARE 模式 |
+> | Spike Co-simulation | v1.2.0 PoC-9 Spike lockstep（1M 条零分歧） |
+> | 测试矩阵（ISA/中断/MMU/Cache/冒险/随机） | riscv-tests 40/40 + riscv-dv 随机指令流（v1.2.0 PoC-9 内） |
+> | GPU SoC 跨芯片扩展 | 推迟到 v1.x 之后远期 |
+>
+> **不再作为执行依据。**
+
 # Phase 5：RTL 协同验证 + Verilog 生成
 
 > **Status**: Not Started

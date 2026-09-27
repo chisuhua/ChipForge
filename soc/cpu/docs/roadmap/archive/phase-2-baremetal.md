@@ -1,3 +1,16 @@
+> **⚠️ ARCHIVED 2026-09-26**：本文档作为**历史参考**保留（riscv-tests 子集 + RISCOF + 基准测试任务清单溯源）。当前主控路线图是 [`./execution-roadmap.md`](./execution-roadmap.md)（v0.10.0 → v1.3.0）。原 Phase 2 内容覆盖映射：
+>
+> | 原 Phase 2 任务 | 对应 execution-roadmap.md 章节 |
+> |-----------------|-------------------------------|
+> | rv64ui/um/ua/uf/ud/uc/si/mi 8 子集 | v0.10.0（rv32ui+um+uc）+ v1.0.0（rv32ua+si）；rv64 子集推迟到 v1.x 之后远期 |
+> | RISCOF 合规认证 | v1.3.0 远期评估项（Spike lockstep 是更轻量替代） |
+> | CSR/PMP/Sv39/原子/中断嵌套 | v1.0.0 §3.2 + v1.2.0 §3.2 + ADR-073/074/077 |
+> | Dhrystone / CoreMark | v0.10.0 PoC（Dhrystone ≥1.4 DMIPS/MHz）+ v1.0.0 §3.2（CoreMark ≥2.3/MHz） |
+> | 自动化测试驱动 | 已被 ctest 408/413 PASS + `[riscv-tests]` family tag 替代 |
+> | DSE sweep | chip-selector 工具（ADR-079，v1.3.0 PoC-11） |
+>
+> **不再作为执行依据。**
+
 # Phase 2：Bare-metal 测试套件
 
 > **Status**: Not Started

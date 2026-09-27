@@ -1,3 +1,5 @@
+> **⚠️ ARCHIVED 2026-09-26**：本文档作为**历史参考**保留（commit 链路 + Wave 子任务清单溯源）。当前主控路线图是 [`./execution-roadmap.md`](./execution-roadmap.md)（v0.10.0 → v1.3.0），Phase 1.5 全部 Wave（Wave 1–4：riscv-tests rv32ui 40/40 PASS / socs-cpu-l1-mmu-demo / cache-dse-sweep / mmu-sv32 + exception + mispredict）已在 CHANGELOG v0.4.1–v0.8.0 全部归档完毕；v0.10.0 = wave3-cpu-pipeline-debt（v0.7.0 已收官）+ wave5-isa-coverage-and-bp（待 strategy 注册后启动），详见 execution-roadmap.md §1 目标 + §3.1 4 版本节点时间线 + §7 历史归档。**不再作为执行依据。**
+
 # Phase 1.5：Stall 兑现 + 端到端验证（2026-09-15 ~ 2026-10）
 
 > **Status**: 🚧 Active (2026-09-15 启动)

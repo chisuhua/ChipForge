@@ -1,3 +1,14 @@
+> **⚠️ ARCHIVED 2026-09-26**：本文档作为**历史参考**保留（RTOS 移植任务清单溯源）。当前主控路线图是 [`./execution-roadmap.md`](./execution-roadmap.md)（v0.10.0 → v1.3.0）。原 Phase 3 内容覆盖映射：
+>
+> | 原 Phase 3 任务 | 对应 execution-roadmap.md 章节 |
+> |-----------------|-------------------------------|
+> | CLINT/PLIC IP | v1.0.0 PoC-7（FreeRTOS 3 任务 demo 必备） |
+> | FreeRTOS 移植（多任务/信号量/中断/栈溢出） | v1.0.0 §3.2 + PoC-7（10M cycle 零异常 + 中断路径 ≥15 断言） |
+> | Zephyr BSP | 推迟到 v1.x 之后远期（v1.3.0 Linux 跑通后再评估） |
+> | ReplacementPolicy / PrefetchPolicy | L1CachePlugin 已支持 4 替换策略（含 RRIP）+ Wave 3 已评估；PrefetchPolicy 推迟 v1.4+ |
+>
+> **不再作为执行依据。**
+
 # Phase 3：RTOS 测试套件
 
 > **Status**: Not Started

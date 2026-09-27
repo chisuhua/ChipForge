@@ -1,3 +1,13 @@
+> **⚠️ ARCHIVED 2026-09-26**：本文档作为**历史参考**保留（Linux 启动链 + DTS 模板任务清单溯源）。当前主控路线图是 [`./execution-roadmap.md`](./execution-roadmap.md)（v0.10.0 → v1.3.0）。原 Phase 4 内容覆盖映射：
+>
+> | 原 Phase 4 任务 | 对应 execution-roadmap.md 章节 |
+> |-----------------|-------------------------------|
+> | Sv39 MMU + S/U mode + PLIC S-mode + DRAM 128MB + VirtIO | v1.0.0 §3.2（S/U + medeleg）+ v1.2.0 §3.2（Linux-sim SOFT gate）+ v1.3.0 §3.2（Linux-on-FPGA HARD） |
+> | OpenSBI FW_PAYLOAD + Linux Kernel 配置 + Buildroot rootfs | v1.2.0 资产 + v1.3.0 PoC 配套 |
+> | DTS 设备树模板 | v1.2.0 资产（CLINT 0x2000000 / PLIC 0xc000000 / UART 0x10000000 / VirtIO 0x10001000 布局） |
+>
+> **不再作为执行依据。**
+
 # Phase 4：Linux 启动支持
 
 > **Status**: Not Started
