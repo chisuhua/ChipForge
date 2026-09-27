@@ -118,6 +118,7 @@
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
 | ADR-048 | Plugin 注册规范序 (MMU before IBus/DBus, C++17 inline int 计数器) | Plugin | ✅ v0.7.0 落地 (2026-09-24) | [`adr/ADR-048-plugin-registration-canonical-order.md`](./adr/ADR-048-plugin-registration-canonical-order.md) |
 | ADR-049 | MMU PADDR Consumption Contract + MemoryInterface 抽象 (PADDR-first + `MemoryInterface` + PTW 真内存读) | IP 架构 | ✅ v0.8.0 落地 (2026-09-25, P1#3 mmu-paddr-consume) | [`adr/ADR-049-mmu-paddr-consumption-contract.md`](./adr/ADR-049-mmu-paddr-consumption-contract.md) |
+| ADR-082 | Plugin::negotiate() capability 协商 (provides/requires + 拓扑排序 + elaboration fail-fast) | Plugin | 🚧 Drafting (2026-09-27, v0.10.0 内嵌) | [`adr/ADR-082-plugin-negotiate-capability.md`](./adr/ADR-082-plugin-negotiate-capability.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
