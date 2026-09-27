@@ -4,9 +4,17 @@ priority: P1
 version_target: v0.8.0
 depends_on:
   - cpu-pipeline-canonical-ordering-assert
+superseded_by: mfc-cpu-pipeline-multi-cycle-fsm
+superseded_at: 2026-09-27
+superseded_reason: "本 change 的 PoC 最小骨架任务已被 wave5-isa-coverage-and-bp initiative 下的 `mfc-cpu-pipeline-multi-cycle-fsm` change 完整继承并扩展（增加 FSM 化 + ADR-082 negotiate 集成 + 双模配对）。为避免双账本（double-accounting）和 ADR-046/047/082 集成规范冲突，本 change 标记为 superseded，所有未来工作转移到 mfc-cpu-pipeline-multi-cycle-fsm。"
+superseded_preserve_as: "历史 PoC 最小骨架记录（ad-hoc stall 计数器实现历史可考）。"
 ---
 
-# cpu-pipeline-multi-cycle — MUL/DIV 真多周期 stall
+# cpu-pipeline-multi-cycle — MUL/DIV 真多周期 stall（SUPERSEDED）
+
+> **⚠️ 本 change 已被 [mfc-cpu-pipeline-multi-cycle-fsm](../mfc-cpu-pipeline-multi-cycle-fsm/proposal.md) 取代（2026-09-27）。**
+> **未来工作（FSM 化、ADR-082 negotiate 集成、rv32um 验证）请转移到新 change。**
+> **本 change 的最小 PoC 骨架实现保留作为 ad-hoc stall 计数器的历史参考。**
 
 ## Why
 
