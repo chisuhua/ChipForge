@@ -71,9 +71,12 @@ struct MulDivFsmFixture {
     ch::core::ctx_swap guard(&ctx);
     auto p = std::make_unique<cfcpu::MulDivFsmPlugin<std::uint32_t>>();
     plugin = p.get();
+    plugin->set_context(&ctx);  // bind DSL ctx before any signal access
     pb->register_plugin(std::move(p));
     pb->build();
     pb->elaborate();
+    // ensure DSL is created (signals available)
+    plugin->opcode();
     sim = cf::plugin::auto_throw(pb->create_simulator());
     sim->reset();
   }
