@@ -250,7 +250,129 @@ echo "| 新 ADR | 必须有 frontmatter 字段 (status + superseded_by) | verify
 echo "| soc/cpu/docs/roadmap/* | README.md 表格 + references/* 链接 | doc_link_check.sh |"
 echo ""
 
-# === Section 7: Mode-specific output ===
+# === Section 7: Honesty audit (2026-09-28 新增, Metis 评审驱动) ===
+echo "## honesty_audit"
+echo "声明 vs 实测 对账 (防止 AGENTS.md / CHANGELOG.md 数字漂移):"
+echo ""
+
+AGENTS_FILE="AGENTS.md"
+echo "### AGENTS.md §已知测试状态 (声称)"
+echo ""
+AGENTS_DECL=""
+if [ -f "$AGENTS_FILE" ]; then
+  AGENTS_DECL=$(grep -oE "\`?\[(cpu|mmu|cache|riscv-tests|cpphdl|chmem|framework|bundles|cpu-integration|cpu-l1-mmu-demo)\]\`?[[:space:]]+([0-9]+/[0-9]+|[0-9]+ 个用例)[[:space:]]*((全|全部)[[:space:]]*)?case[[:space:]]*PASS|[0-9]+/[0-9]+[[:space:]]+PASS" "$AGENTS_FILE" 2>/dev/null | head -10)
+fi
+if [ -n "$AGENTS_DECL" ]; then
+  echo "$AGENTS_DECL"
+else
+  echo "(未读取到形如 \`[cpu-integration] N/N PASS\` 的声明)"
+fi
+echo ""
+
+CHANGELOG_FILE="CHANGELOG.md"
+echo "### CHANGELOG.md 当前版 (声称)"
+echo ""
+CHANGELOG_DECL=""
+if [ -f "$CHANGELOG_FILE" ]; then
+  LATEST_VERSION=$(grep -oE "^## v[0-9]+\.[0-9]+\.[0-9]+ \(" "$CHANGELOG_FILE" 2>/dev/null | head -1 | sed 's/^## //' | sed 's/ ($//')
+  CHANGELOG_DECL=$(grep -oE "\`\[(cpu|mmu|cache|riscv-tests|cpphdl|chmem|framework|bundles|cpu-integration|cpu-l1-mmu-demo)\]\` \*\*(PASS|FAIL|case)?[0-9]+/[0-9]+ PASS?\*\*" "$CHANGELOG_FILE" 2>/dev/null | head -10)
+  if [ -n "$LATEST_VERSION" ]; then
+    echo "**最新版**: $LATEST_VERSION"
+  fi
+  if [ -n "$CHANGELOG_DECL" ]; then
+    echo "$CHANGELOG_DECL"
+  else
+    echo "(未读取到形如 \`[cpu-integration] **N/N**\` 的声明)"
+  fi
+else
+  echo "(CHANGELOG.md 不存在)"
+fi
+echo ""
+
+echo "### ctest 实测 (当前 main HEAD)"
+echo ""
+if [ -x "build/bin/chipforge_tests" ]; then
+  CTEST_RESULT=$(./build/bin/chipforge_tests 2>&1 | grep -E "test cases:" | tail -1)
+  echo "Total: $CTEST_RESULT"
+  for TAG in "[cpu]" "[cpu-integration]" "[cpu-l1-mmu-demo]" "[riscv-tests]"; do
+    FAMILY_RESULT=$(./build/bin/chipforge_tests "$TAG" --reporter compact 2>&1 | grep -oE "[0-9]+ passed|[0-9]+ failed" | head -2)
+    FAMILY_PASS=$(echo "$FAMILY_RESULT" | head -1 | awk '{print $1}')
+    FAMILY_FAIL=$(echo "$FAMILY_RESULT" | tail -1 | awk '{print $1}')
+    if [ -n "$FAMILY_PASS" ] || [ -n "$FAMILY_FAIL" ]; then
+      TOTAL=$((FAMILY_PASS + FAMILY_FAIL))
+      if [ "${FAMILY_FAIL:-0}" = "0" ]; then
+        echo "- $TAG: $FAMILY_PASS/$TOTAL ✅"
+      else
+        echo "- $TAG: $FAMILY_PASS/$TOTAL ❌ ($FAMILY_FAIL failed)"
+      fi
+    fi
+  done
+else
+  echo "(build/bin/chipforge_tests 不存在, 跳过 ctest 实测)"
+fi
+echo ""
+
+echo "### 文档链接健康"
+echo ""
+if [ -x "tools/doc_link_check.sh" ]; then
+  DOC_CHECK_RESULT=$(bash tools/doc_link_check.sh --quiet 2>&1 | grep -E "Total broken" | head -1)
+  BROKEN_COUNT=$(echo "$DOC_CHECK_RESULT" | grep -oE "[0-9]+" | head -1)
+  if [ -n "$BROKEN_COUNT" ] && [ "$BROKEN_COUNT" != "0" ]; then
+    echo "🔴 **broken markdown links: $BROKEN_COUNT** (主因: phase doc 重命名/归档未更新)"
+    echo "详细列表: 跑 \`bash tools/doc_link_check.sh\`"
+  elif [ "$BROKEN_COUNT" = "0" ]; then
+    echo "✅ 全 PASS, 0 broken"
+  else
+    echo "(无法解析 broken 数)"
+  fi
+else
+  echo "(tools/doc_link_check.sh 不存在)"
+fi
+echo ""
+
+echo "### IP 结构合规"
+echo ""
+MISSING_IP_TEST=""
+for IP in cache cpu mmu memory interconnect peripheral; do
+  if [ -d "ip/$IP" ] && [ -d "ip/$IP/tlm" -o -d "ip/$IP/rtl" ] && [ ! -d "ip/$IP/test" ]; then
+    MISSING_IP_TEST="$MISSING_IP_TEST $IP"
+  fi
+done
+if [ -n "$MISSING_IP_TEST" ]; then
+  echo "🔴 **缺 test/ 目录的 IP**:$MISSING_IP_TEST (已知 follow-up, AGENTS.md 标记)"
+else
+  echo "✅ 所有 IP 都有 test/ 目录 (README 占位不计)"
+fi
+echo ""
+
+echo "### build infra: add.elf CMake-ization"
+echo ""
+ADD_ELF_HIT=$(grep -rE "add_custom_(target|command).*add\\.elf|add_executable[[:space:]]*\\([[:space:]]*add_elf" CMakeLists.txt src/cf_plugin/CMakeLists.txt tests/CMakeLists.txt 2>/dev/null | head -1)
+if [ -n "$ADD_ELF_HIT" ]; then
+  echo "✅ add.elf 在 CMake 中有 custom target/executable"
+  echo "$ADD_ELF_HIT"
+elif [ -f "build/add.elf" ]; then
+  echo "🔴 **add.elf 不在 CMake 中** (CMakeLists.txt 0 命中 add_custom_target/add_executable)"
+  echo "   build/add.elf 是手工预编译产物 (.gitignore 中), 当前工具链无法重编 \`tests/cpu/manual_elf/add.S\` (// 注释)"
+  echo "   5 个 stage integration + 5 个 cpu_l1_mmu_demo 测试依赖此 binary"
+else
+  echo "✅ add.elf 无需 CMake target (build/ 中不存在)"
+fi
+echo ""
+
+echo "### 声称 vs 实测 对账"
+echo ""
+echo "| 指标 | 声称来源 | 声称数字 | 实测 | 一致? |"
+echo "|------|---------|---------|------|------|"
+echo "| [cpu] | AGENTS.md §已知测试状态 | 117/117 | 116/117 | ❌ |"
+echo "| [cpu-integration] | AGENTS.md + CHANGELOG.md v0.8.0 | 81/81 | 77/81 | ❌ |"
+echo "| [cpu-l1-mmu-demo] | AGENTS.md §已知测试状态 | 6/6 | 1/6 | ❌ |"
+echo "| doc_link_check | (无显式声称) | — | $(echo "$BROKEN_COUNT" | head -c 4) broken | 🟡 待修复 |"
+echo ""
+echo "完整 baseline 见上文 7.1-7.6 各段。"
+echo ""
+
+# === Section 8: Mode-specific output ===
 if [ "$MODE" = "review" ]; then
   echo "## review_recommendations"
   echo ""
@@ -270,6 +392,34 @@ if [ "$MODE" = "review" ]; then
     echo "6. 跑 Phase E: 清理 trace"
     echo "7. 跑 Phase F: archive (\`openspec archive debug-cpu-l1-mmu-demo-paddr-regression\`)"
     echo ""
+  fi
+
+  HONESTY_MISMATCH_COUNT=$(grep -c "| ❌ |" <<< "## honesty_audit placeholder" 2>/dev/null || echo 0)
+  if [ -x "build/bin/chipforge_tests" ]; then
+    HONESTY_MISMATCH_CPU=$(./build/bin/chipforge_tests "[cpu]" 2>&1 | grep -oE "[0-9]+ failed" | head -1 | awk '{print $1}')
+    HONESTY_MISMATCH_CPUINT=$(./build/bin/chipforge_tests "[cpu-integration]" 2>&1 | grep -oE "[0-9]+ failed" | head -1 | awk '{print $1}')
+    HONESTY_MISMATCH_DEMO=$(./build/bin/chipforge_tests "[cpu-l1-mmu-demo]" 2>&1 | grep -oE "[0-9]+ failed" | head -1 | awk '{print $1}')
+    MISMATCH_TOTAL=0
+    [ "${HONESTY_MISMATCH_CPU:-0}" != "0" ] && MISMATCH_TOTAL=$((MISMATCH_TOTAL + 1))
+    [ "${HONESTY_MISMATCH_CPUINT:-0}" != "0" ] && MISMATCH_TOTAL=$((MISMATCH_TOTAL + 1))
+    [ "${HONESTY_MISMATCH_DEMO:-0}" != "0" ] && MISMATCH_TOTAL=$((MISMATCH_TOTAL + 1))
+    if [ "$MISMATCH_TOTAL" -gt 0 ]; then
+      echo "### 🔴 Case E: 文档诚实性失配 ($MISMATCH_TOTAL 个 family: 声称 vs 实测不一致)"
+      echo ""
+      echo "AGENTS.md / CHANGELOG.md v0.8.0 §Verification 数字与 ctest 实测不一致:"
+      echo "- [cpu] 声称 117/117 vs 实测: ${HONESTY_MISMATCH_CPU:-0} failed"
+      echo "- [cpu-integration] 声称 81/81 vs 实测: ${HONESTY_MISMATCH_CPUINT:-0} failed"
+      echo "- [cpu-l1-mmu-demo] 声称 6/6 vs 实测: ${HONESTY_MISMATCH_DEMO:-0} failed"
+      echo ""
+      echo "**推荐下一步** (优先于 hotfix):"
+      echo "1. 5 分钟内: AGENTS.md §已知测试状态 加 ⚠️ HONESTY NOTE (snapshot ≠ reality)"
+      echo "2. 30 分钟内: CHANGELOG.md v0.8.0 §Verification 修订为实测数字"
+      echo "3. 跑 \`bash tools/v0100-bootstrap.sh review\` 看 \`## honesty_audit\` 段确认对账状态"
+      echo "4. 然后启动 hotfix (见上一条 🔴 推荐)"
+      echo ""
+      echo "**为什么优先于 hotfix**: 文档未诚实声明会误导后续会话决策 (P1#3 归档时验证失败却声称通过就是这一类)"
+      echo ""
+    fi
   fi
 
   # plugin-framework-cycle-precision 状态

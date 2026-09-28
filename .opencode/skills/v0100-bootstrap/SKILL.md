@@ -46,6 +46,7 @@ The script outputs structured markdown with these sections:
 | `## initiative_status` | `tools/sync_strategy_status.sh --dry-run` |
 | `## recent_commits` | `git log --oneline -5` |
 | `## hard_prerequisites` | v0.10.0 launch gates table |
+| `## honesty_audit` | AGENTS.md/CHANGELOG.md 声明 vs ctest/doc_link_check/ip/cpu/test/add.elf 实测对账 |
 | `## preflight_reminders` | cross-file change impact |
 
 ## Step 2: Generate session-bootstrap prompt
@@ -74,10 +75,9 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 {{ACTIVE_CHANGES_LIST}}
 
 ## 必读 (静态, 见 AGENTS.md):
+- `AGENTS.md §路线 / Roadmap 类文档` — 文档导航入口（首次必读，含 4 类文档职责对照 + 记忆口诀）
 - `soc/cpu/docs/roadmap/execution-roadmap.md §5` — 立即下一步
-- `docs/roadmap/strategy/a-plus-c-hybrid.md §3` — initiative 状态
 - `openspec/changes/*/proposal.md` — active change Why 段
-- `docs/architecture/adr.md` — ADR 注册表
 
 ## 按需加载路由 (L3/L4/L6 条件触发)
 
@@ -85,7 +85,7 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 | # | 触发场景（关键词） | 加读文件（限 section） | 优先级 vs L1/L2/L5 | 与默认"不读"的区别 |
 |---|---|---|---|---|
-| 1 | PoC-1 / MUL/DIV / multi-cycle / FSM / negotiate 实装 | `references/decision-1-plugin-evolution.md §3` + `ADR-082` 仅 Context+Decision 节 + `references/poics-and-risks.md §1` PoC-1 行 | **高于 L5** | 不读 → negotiate 设计契约靠猜 |
+| 1 | PoC-1 / MUL/DIV / multi-cycle / FSM / negotiate 实装 | `references/decision-1-plugin-evolution.md §3` + `docs/architecture/adr/ADR-082-plugin-negotiate-capability.md` §Context+Decision + `references/poics-and-risks.md §1` PoC-1 行 | **高于 L5** | 不读 → negotiate 设计契约靠猜 |
 | 2 | RV32C / 解码 / 跨页 fetch | `references/poics-and-risks.md §1` PoC-2 行 + `ADR-070`（若已起草） | 与 L5 同级 | 不读 → 成功标准（rv32uc ≥95%）缺失 |
 | 3 | ICache / fence.i / 取指一致性 | `references/poics-and-risks.md §1` PoC-3 行 + `ADR-072`（若已起草） | 与 L5 同级 | 不读 → fence.i ≥10 断言要求漏 |
 | 4 | BTB / GShare / 分支预测 / mispredict | `references/decision-1-plugin-evolution.md §1` + `references/poics-and-risks.md §1` PoC-6 行 | 与 L5 同级 | 不读 → 漏 Port 抽象纪律（CI 第 11 条） |
@@ -172,6 +172,31 @@ Based on parsed `## hard_prerequisites` table, generate `{{SMART_RECOMMENDATIONS
 
 **Case D 升级触发**：dirty tree 永久（或 orphan change 数 >1）应拒绝推进 PoC。
 
+### Case E: `## honesty_audit` 失配 (声明数字 vs 实测) — 2026-09-28 新增
+
+触发条件: 任何一条"声称 vs 实测 对账表"行 = ❌。意味着 AGENTS.md / CHANGELOG.md 数字与当前 main HEAD ctest 实测不一致。
+
+```markdown
+🔴 **🟡 文档诚实性失配** (Metis 评审驱动, 2026-09-28)
+
+`## honesty_audit.声称 vs 实测 对账` 出现 ❌:
+- [cpu]: 声称 117/117 → 实测 116/117
+- [cpu-integration]: 声称 81/81 → 实测 77/81
+- [cpu-l1-mmu-demo]: 声称 6/6 → 实测 1/6
+- doc_link_check: 17 broken (无显式声称)
+
+📋 **推荐下一步**:
+1. 🔴 立即停止推进 hotfix (`debug-cpu-l1-mmu-demo-paddr-regression`) — 文档未诚实声明的"已修复"会误导后续会话
+2. 在 AGENTS.md §已知测试状态 加 ⚠️ HONESTY NOTE (5 分钟) — 声明数字是 v0.7.0 archive 时快照
+3. 在 CHANGELOG.md v0.8.0 §Verification 修订 — 改为实测数字
+4. 跑 `bash tools/v0100-bootstrap.sh review` 看 `## review_recommendations` 段获取修 hotfix 的执行步骤
+5. hotfix Phase F archive 后, 回填实测数字
+```
+
+**Case E 升级触发**: 4 项对账中 ≥2 项 ❌ 应**拒绝推进 PoC**，直到 AGENTS.md/CHANGELOG.md 数字与 ctest 一致。
+
+**为什么是 Case E 不是 Case A**: Case A 是 `[cpu-l1-mmu-demo]` FAIL — 这是**代码 bug**。Case E 是**文档与代码不一致** — 这是**流程失败**（P1#3 归档验证时没跑集成测试）。两者都阻塞 PoC-1 启动，但 Case E 优先级更高（修文档 5 分钟 vs 修 hotfix 1-2 周）。
+
 # Mode: Review
 
 Same data collection as Generate mode, but output a structured review report instead of a session prompt.
@@ -220,6 +245,18 @@ The skill body contains only pointers (file paths, command names). All state is 
 - Skill does NOT need updates when state changes (✅ no腐化面)
 - Skill DOES need updates when file paths change (rare, only on architecture decisions)
 - Bash script (`tools/v0100-bootstrap.sh`) needs updates when commands change (e.g., new test family added)
+
+## 当文档结构变化时同步本 skill
+
+> **触发条件**: 任何 roadmap 文档的新增/删除/重命名/section 编号变更（如 `execution-roadmap.md §3.5 新增`、`AGENTS.md §路线 / Roadmap 类文档 新增`）。
+
+**同步步骤**:
+1. **跑链接检查**: `bash tools/doc_link_check.sh` — 验证 §必读 / 路由表中的路径仍可解析
+2. **检查 §必读 引用**: 若 `AGENTS.md §路线 / Roadmap 类文档` 等导航节的内容变化,本 skill §必读 第 1 条的描述要保持同步
+3. **检查路由表路径**: 若 `references/decision-1-plugin-evolution.md` / `ADR-082` / `references/poics-and-risks.md` 等路径变化,路由表具体路径必须更新
+4. **检查 MIGRATION_LOG**: 若本次变化足够大(新增/合并/重命名文档),在 `docs/MIGRATION_LOG.md` 追加变更记录
+
+**反向警示**: 避免"因为变了所以同步修所有引用"的反射。文档结构变化时,先问"这个变化是否影响 SKILL.md 的 §必读 / 路由表 / #Maintenance 三处",影响才动;不影响则不动(如 `references/decision-1-plugin-evolution.md §1+§2` 内容调整不影响 skill 路径)。
 
 # Output to user
 
