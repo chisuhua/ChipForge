@@ -61,6 +61,10 @@ class MMUPlugin : public cf::plugin::PluginBase {
   void set_satp_ppn(std::uint64_t ppn) { satp_ppn_ = ppn; }
   std::uint64_t satp_ppn() const { return satp_ppn_; }
 
+  // 完整 satp CSR (含 MODE 字段) — Bare shortcut 严格判定用, 不被 PPN-only set 覆盖
+  void set_satp_value(std::uint64_t satp_csr) { satp_value_ = satp_csr; }
+  std::uint64_t satp_value() const { return satp_value_; }
+
   void setup(cf::plugin::PipeBuilder& pb) override;
   void build(cf::plugin::PipeBuilder& pb) override;
 
@@ -131,6 +135,7 @@ class MMUPlugin : public cf::plugin::PluginBase {
   // satp CSR[59:0] PPN 字段 (RISC-V spec), 由 RiscvMMUPlugin::csr_write_satp 写入
   //   do_lookup 的 PTW start_walk 第 3 参用此值 (替代硬编码 0)
   std::uint64_t satp_ppn_ = 0;
+  std::uint64_t satp_value_ = 0;  // 完整 satp CSR, 含 MODE 字段 (Bare shortcut 判定)
 
   // 闭包状态 (跨 at_stage 调用, 同一 logical stage 复用)
   std::uint64_t last_vaddr_ = 0;

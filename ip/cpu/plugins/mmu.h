@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "cf/plugin/pipe_builder.h"
 #include "ip/mmu/lib/memory_interface.h"
 #include "ip/mmu/tlm/MMUPlugin.h"
 
@@ -77,6 +78,7 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
  private:
   std::uint64_t satp_value_ = 0;
   std::uint8_t last_exception_code_ = 0;
+  cf::plugin::PipeBuilder* pb_for_vaddr_ = nullptr;  // debug-cpu-l1-mmu-demo-paddr-regression Phase C
 };
 
 using MMUPlugin = RiscvMMUPlugin;

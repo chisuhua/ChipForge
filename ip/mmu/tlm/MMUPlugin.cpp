@@ -59,9 +59,10 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
     //   检查 sv_mode_==Bare (config 层 MMU 模式); satp_ppn_ 单独由 RISC-V satp.MODE 决定
     //   实际语义: satp CSR[63:60]=MODE; MODE=0 (Bare) 时翻译关闭 → identity
     //   sv_mode_=Sv32 + satp_ppn=0 (CSR 还没写) 实际也是 Bare (因为 MODE 字段还是 0)
-    //   当前修复: sv_mode_==Bare 即 identity, sv_mode_=Sv* 走 PTW (即使 satp_ppn=0 会 fault)
-    //     PTW 的 Bare 处理留给后续 (Oracle C9-a+ 后续 task)
-    if (sv_mode_ == SvMode::Bare) {
+    //   debug-cpu-l1-mmu-demo-paddr-regression (Phase C, 2026-09-28):
+    //     扩展 Bare shortcut 覆盖 satp_ppn_==0 (production CPU 没写 satp CSR 场景)
+    //     [mmu] PTW TLB refill 测试需要显式 set_satp_ppn(non_zero) 来测试 PTW walk 路径
+    if (sv_mode_ == SvMode::Bare || satp_ppn_ == 0) {
       (*node)(Key::PADDR) = vaddr;
       (*node)(Key::PADDR_VALID) = true;
       (*node)(Key::MMU_VADDR) = vaddr;

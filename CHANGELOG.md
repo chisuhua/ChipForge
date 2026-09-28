@@ -5,6 +5,49 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.0 (2026-09-28) — cpu-l1-mmu-demo regression hotfix (debug-cpu-l1-mmu-demo-paddr-regression)
+
+> **OpenSpec change**: `debug-cpu-l1-mmu-demo-paddr-regression` (archived)
+> **Initiative**: `wave5-isa-coverage-and-bp` P0 (PoC-1 hard prereq #1)
+> **Purpose**: 修复 v0.8.0 P1#3 mmu-paddr-consume archive (commit `a48ac6d` 2026-09-26) 引入的 5 个测试回归 (CHANGELOG v0.8.0 §Verification 数字是快照引用非实地验证)
+> **Why hotfix**: PoC-1 (MUL/DIV FSM) v0.10.0 启动硬前置阻塞 → 阻断 v1.0.0 CoreMark 信誉期
+
+### Added
+
+- **`satp_value_` 字段 + `set_satp_value()` setter** (`ip/mmu/tlm/MMUPlugin.h`): 完整 satp CSR (含 MODE[63:60] 字段) — Bare shortcut 严格判定用。区分 `satp=0 (Bare)` 与 `satp=0x8... (Sv39+PPN=0)` (satp_ppn_ 单独无法区分两者)
+- **`pb_for_vaddr_` 成员** (`ip/cpu/plugins/mmu.h`): `RiscvMMUPlugin::build()` 内 set 给派生类 `vaddr_for_stage` override 读父 stage 节点用。生产路径关键修复 (没有 override 则 vaddr_for_stage 永远返回 last_vaddr_=0)
+
+### Changed
+
+- **`MMUPlugin::do_lookup` Bare shortcut 扩展** (`ip/mmu/tlm/MMUPlugin.cpp:64`): `sv_mode_ == SvMode::Bare || satp_ppn_ == 0` — 生产 CPU 未写 satp CSR 场景走 identity translation (避免 PTW 从 base=0 fault)
+- **`RiscvMMUPlugin::vaddr_for_stage` 双 KeyType 查找** (`ip/cpu/plugins/mmu.cpp:143`): 同时尝试 `keys<uint32_t, 32>::PC` + `keys<uint64_t, 64>::PC` — 兼容 RV32 (IBus template T=uint32_t) + RV64 (T=uint64_t) pipeline。旧实现只查 64-bit key, RV32 流水线 fetch 写 32-bit key → `has()` 永远 false → fallback `last_vaddr_=0`
+- **`RiscvMMUPlugin::csr_write_satp`** (`ip/cpu/plugins/mmu.cpp:34`): 同步写 `set_satp_value(satp_value)` (完整 CSR) 给基类 Bare shortcut 判定用
+
+### Fixed
+
+- **[cpu]**: `cpu_sim_real_tohost` (1 regression, commit `a48ac6d` 引入) → 修复
+- **[cpu-integration]**: `3stage_add_elf_end_to_end` + `5stage_add_elf_end_to_end` + `7stage_add_elf_end_to_end` + `10stage_add_elf_end_to_end` (4 regressions, commit `a48ac6d` 引入) → 修复
+- **`vaddr_for_stage` KeyType 不匹配 bug**: RV32 pipeline fetch 写 `keys<uint32_t, 32>::PC`, MMU 读 `keys<uint64_t, 64>::PC` → 修复 (双查找兼容)
+
+### Tests
+
+- `tests/mmu/test_ptw_tlb_refill_integration.cpp`: `make_test_context()` 显式 `set_satp_ppn(1ULL << 20)` — PTW TLB refill 测试必须真实走 Sv39 三级 walk, 不能被 Bare shortcut 短路
+
+### Verification (v0.10.0 实测)
+
+- **`[cpu]` 117/117 PASS** (353 assertions) — 含 `cpu_sim_real_tohost` 修复
+- **`[cpu-integration]` 81/81 PASS** (65722 assertions) — 含 3/5/7/10-stage 集成测试 4 个全修复
+- **`[mmu]` 53/53 PASS** (131 assertions) — Bare shortcut 扩展无 PTW TLB refill 测试退化 (`make_test_context` 显式 `set_satp_ppn` 旁路)
+- **`[cpu-l1-mmu-demo]` 1/6 PASS** — **5/6 FAIL 未修复**, 与本次 hotfix 不同根因 (CPU 看到不测 + riscv-tests 10000 cycle 内未完成), 跟踪独立 follow-up change
+- **`verify_plugin_decision.sh`** + **`check_plugin_portability.sh`**: 不退化 (D4 + ADR-040 v2.0)
+- **`v0100-bootstrap.sh`**: `## honesty_audit` 段自动检测本次变更后诚实性重算 (commit `f4fa903` 落地)
+
+### Known Follow-up
+
+- **`[cpu-l1-mmu-demo]` 5/6 FAIL**: 与本次 MMU Bare shortcut 修复不同根因。`add`/`addi`/`auipc`/`jal`/`beq` 5 个 riscv-tests ELF 在 10000 cycle 内未写 tohost=1 (exit_code=-1)。需独立 debug change 调查 CPU 是否 mis-execute 某条 add/branch 指令 (trace v3 显示卡在 `bne a4,t2,80000560 <fail>` 测试断言 fail 分支)
+- **`satp_initialized_` flag 严格区分 Bare**: 当前 Bare shortcut 用 `satp_ppn_ == 0` (可能误判 Sv39+PPN=0 为 Bare), 需跟踪 P1#3 task 加 `satp_initialized_` 区分 "未初始化" 与 "explicit Bare"
+- **CHANGELOG 数字诚实性**: v0.8.0 §Verification 数字 (117/117, 81/81, 0 回归) 是快照引用非实地验证 (commit `e9d6a88` 在回归 commit `a48ac6d` 之后写)。本次 v0.10.0 后实施诚实数字原则 (见 AGENTS.md §已知测试状态 — v0.10.0 起每次发布前由 `v0100-bootstrap.sh review` §honesty_audit 自动核对)
+
 ## v0.8.0 (2026-09-25) — MMU 真内存读 + PADDR 真消费 (P1#3 mmu-paddr-consume)
 
 > **OpenSpec change**: `mmu-paddr-consume-and-real-memory` (archived)

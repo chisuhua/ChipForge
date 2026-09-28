@@ -105,6 +105,11 @@ TestContext make_test_context(uint64_t test_vaddr) {
   levels.push_back({"L1", 16, 16});  // 16-entry fully-assoc (whitelist), idx=0
   auto mmu = std::make_unique<MMUPlugin>(
       SvMode::Sv39, levels, MMUPlugin::PTWConfig{});
+  // debug-cpu-l1-mmu-demo-paddr-regression (Phase C, 2026-09-28):
+  //   显式 set satp_ppn 为非零值 (1ULL << 20 = 4KB 页表的 root base),
+  //   避免 MMUPlugin Bare shortcut (sv_mode_==Bare || satp_ppn_==0) bypass PTW
+  //   PTW TLB refill 测试必须真实走 Sv39 三级 walk, 不能被 Bare shortcut 短路
+  mmu->set_satp_ppn(1ULL << 20);
   ctx.mmu = mmu.get();
 
   auto driver = std::make_unique<RequestDriver>(ctx.mmu, test_vaddr);

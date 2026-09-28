@@ -33,12 +33,8 @@ namespace plugins {
 
 void RiscvMMUPlugin::csr_write_satp(std::uint64_t satp_value) {
   satp_value_ = satp_value;
-  // mmu-paddr-consume-and-real-memory (P1#3 task §7 C9-c, Oracle 2026-09-25):
-  // 把 satp CSR[59:0] PPN 字段喂给基类 MMUPlugin, PTW root walk 用此值
-  // RISC-V spec: satp[63:60]=MODE (8/1/0), satp[59:0]=PPN, PPN shift 12 → 物理页号
-  //   satp_value & 0x0FFFFFFFFFFFFFFF 提取 PPN
+  set_satp_value(satp_value);
   set_satp_ppn(satp_value & 0x0FFFFFFFFFFFFULL);
-  // satp CSR 切换地址空间 → invalidate ALL TLB entries (新 root page table)
   if (auto* tlb = multi_tlb()) {
     tlb->invalidate_all();
   }
@@ -85,6 +81,10 @@ void RiscvMMUPlugin::build(cf::plugin::PipeBuilder& pb) {
   // (镜像 §5.4 setup() fix 模式; 没有这个调用, production 流水线 do_lookup 闭包从未注册,
   // 整条 MMU 翻译惰性: IBus 读 PADDR_VALID 永 false → 永远 fallback PC)
   cf::ip::mmu::MMUPlugin::build(pb);
+
+  // debug-cpu-l1-mmu-demo-paddr-regression (Phase C, 2026-09-28):
+  // 保存 pb 给 vaddr_for_stage override 用 (读父 "fetch" 节点 PC + "memory" 节点 MEM_ADDR)
+  pb_for_vaddr_ = &pb;
 
   using cpu_keys_t = cf::cpu::tlm::payload::cpu_keys<std::uint64_t>;
   using mmu_keys_t = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
@@ -141,25 +141,27 @@ void RiscvMMUPlugin::build(cf::plugin::PipeBuilder& pb) {
 //   enable_mmu=false 时父节点不存在 → fallback 基类 last_vaddr_
 //   pb_for_vaddr_ == nullptr → fallback 基类 last_vaddr_ (test 路径)
 std::uint64_t RiscvMMUPlugin::vaddr_for_stage(const char* stage_name) const {
-  // PC + MEM_ADDR 在 ip/cpu/core/payload_common.h::keys (不是 cpu_keys.h 的 RISC-V 专属 keys)
-  using CommonKeys = cf::cpu::core::payload::keys<std::uint64_t, 64>;
+  // 双 KeyType 查找: 兼容 RV32 (IBus T=uint32_t) + RV64 (T=uint64_t) pipeline
+  using Keys32 = cf::cpu::core::payload::keys<std::uint32_t, 32>;
+  using Keys64 = cf::cpu::core::payload::keys<std::uint64_t, 64>;
 
   if (pb_for_vaddr_ == nullptr) {
-    return MMUPlugin::vaddr_for_stage(stage_name);  // fallback (test/bridge)
+    return MMUPlugin::vaddr_for_stage(stage_name);
   }
 
   if (std::strcmp(stage_name, "tlb_lookup_ifetch") == 0) {
     auto parent = pb_for_vaddr_->node_of_logic_stage("fetch");
-    if (parent && parent->has(CommonKeys::PC)) {
-      return static_cast<std::uint64_t>(parent->operator()(CommonKeys::PC));
+    if (parent) {
+      if (parent->has(Keys64::PC)) return static_cast<std::uint64_t>(parent->operator()(Keys64::PC));
+      if (parent->has(Keys32::PC)) return static_cast<std::uint64_t>(parent->operator()(Keys32::PC));
     }
   } else if (std::strcmp(stage_name, "tlb_lookup_loadstore") == 0) {
     auto parent = pb_for_vaddr_->node_of_logic_stage("memory");
-    if (parent && parent->has(CommonKeys::MEM_ADDR)) {
-      return static_cast<std::uint64_t>(parent->operator()(CommonKeys::MEM_ADDR));
+    if (parent) {
+      if (parent->has(Keys64::MEM_ADDR)) return static_cast<std::uint64_t>(parent->operator()(Keys64::MEM_ADDR));
+      if (parent->has(Keys32::MEM_ADDR)) return static_cast<std::uint64_t>(parent->operator()(Keys32::MEM_ADDR));
     }
   }
-  // fallback: 父节点没值 (e.g., enable_mmu=false) → 基类 last_vaddr_
   return MMUPlugin::vaddr_for_stage(stage_name);
 }
 
