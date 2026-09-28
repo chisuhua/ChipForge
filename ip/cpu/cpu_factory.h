@@ -40,6 +40,7 @@
 #include "ip/cpu/arch/riscv/decode.h"
 #include "ip/cpu/arch/riscv/int_alu.h"
 #include "ip/cpu/arch/riscv/mul.h"
+#include "ip/cpu/arch/riscv/mul_div_fsm.h"
 #include "ip/cpu/arch/riscv/branch.h"
 #include "ip/cpu/arch/riscv/lsu.h"
 #include "ip/cpu/arch/riscv/csr.h"
@@ -164,6 +165,13 @@ struct CPUConfig {
   // 默认 1 = 单周期 (byte-identical to baseline); 3/5 走多周期子流水
   // 详见 mul.h::RiscvMulPlugin<T, LATENCY> 模板参数化
   std::uint8_t mul_latency = 1;
+
+  // mfc-cpu-pipeline-multi-cycle-fsm (v0.10.0 PoC-1): MUL/DIV 实现选择
+  // - LEGACY: RiscvMulPlugin<U, LATENCY> (Phase A 默认, byte-identical baseline)
+  // - FSM:    MulDivFsmPlugin<U> (ADR-046 v2.0 §2.1.1 算术多周期 FSM 豁免首例)
+  // 互斥注册: 二选一, 默认 LEGACY (Phase A 过渡; Phase B 完成后切换默认)
+  enum class MulImpl : std::uint8_t { LEGACY = 0, FSM = 1 };
+  MulImpl mul_impl = MulImpl::LEGACY;
 };
 
 // ----------------------------------------------------------------------------
@@ -457,22 +465,33 @@ class CpuFactory {
     pb.register_plugin(std::make_unique<cf::cpu::plugins::HazardPlugin<U> >());
     pb.register_plugin(
         std::make_unique<cf::cpu::arch::riscv::RiscvIntAluPlugin<U> >());
-    switch (config.mul_latency) {
-      case 1:
-        pb.register_plugin(
-            std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 1> >());
-        break;
-      case 3:
-        pb.register_plugin(
-            std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 3> >());
-        break;
-      case 5:
-        pb.register_plugin(
-            std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 5> >());
-        break;
-      default:
-        throw std::invalid_argument(
-            "CpuFactory: unsupported mul_latency (must be 1/3/5)");
+    // mfc-cpu-pipeline-multi-cycle-fsm: MUL/DIV 实现互斥注册 (Phase A in-context 验证)
+    if (config.mul_impl == CPUConfig::MulImpl::FSM) {
+      // FSM 模式: MulDivFsmPlugin (ADR-046 v2.0 §2.1.1 算术多周期 FSM 豁免首例)
+      // 取代 RiscvMulPlugin, Phase A 用 ad-hoc counter (Phase B 才改 ch_state_machine DSL)
+      // 注意: Phase A 缺 CtrlLink stall 机制, DIV 进行中无 pipeline freeze,
+      //       实测期望: tohost=1 (结果对) + cycles ≥ DIV_CYCLES+1 (但实际可能 < 33 因为无 stall)
+      pb.register_plugin(
+          std::make_unique<cf::cpu::arch::riscv::MulDivFsmPlugin<U> >());
+    } else {
+      // LEGACY 模式: RiscvMulPlugin<U, LATENCY> (默认, byte-identical to baseline)
+      switch (config.mul_latency) {
+        case 1:
+          pb.register_plugin(
+              std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 1> >());
+          break;
+        case 3:
+          pb.register_plugin(
+              std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 3> >());
+          break;
+        case 5:
+          pb.register_plugin(
+              std::make_unique<cf::cpu::arch::riscv::RiscvMulPlugin<U, 5> >());
+          break;
+        default:
+          throw std::invalid_argument(
+              "CpuFactory: unsupported mul_latency (must be 1/3/5)");
+      }
     }
     pb.register_plugin(
         std::make_unique<cf::cpu::arch::riscv::RiscvBranchPlugin<U> >());

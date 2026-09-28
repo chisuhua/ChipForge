@@ -3,9 +3,24 @@
 ## Purpose
 TBD - created by archiving change mfc-cpu-pipeline-multi-cycle-fsm. Update Purpose after archive.
 
+> **Phase-A 过渡条款（Metis 2026-09-28 审查后修订，spec v0.2 草案）**
+>
+> 本 change 分 Phase A-H 实施。**Requirement 1 (ch_state_machine DSL)** 的强制约束**仅在 Phase B.2 完成后生效**：
+> - Phase A 允许 `enum class State + switch(state_)` ad-hoc 实现（TLM 模式）作为骨架过渡，**但必须在 `ip/cpu/arch/riscv/mul_div_fsm.h` 文件头显式声明 `#define CF_PLUGIN_USE_FSM_EXEMPT` 标记（ADR-046 v2.0 §2.1.1 算术多周期豁免）**
+> - Phase A 测试 `[cpu][mul-div-fsm]` 不强制验证 ch_state_machine DSL 行为，但必须验证 FSM 状态转换正确性（IDLE→MULTIPLY→WRITE_BACK）
+> - Phase B.2 [GREEN] 把 Phase A 的 ad-hoc 计数器改造为 `chlib::ch_state_machine` DSL，验收时强制走 DSL 路径
+>
+> **Phase-A 实施窗口的硬约束**（不能等到 Phase B 才做）：
+> 1. **MUL=1 cycle / DIV=33 cycle** 必须实测 PASS（ad-hoc counter 精度足够）
+> 2. **`busy-cycles` Payload Key** 必须在 Phase A 定义（Plugin 内部 namespace，避免污染 framework）
+> 3. **TLM-CH_MEM cycle parity**：Phase A 不验证（CH_MEM 实现推迟到 Phase D）
+> 4. **CI 门禁**：Phase A 通过 `tools/verify_plugin_decision.sh`（D4 合规 + dynamic_cast=0）
+
 ## ADDED Requirements
 
 ### Requirement: MulDivFsmPlugin SHALL use ch_state_machine DSL for MUL/DIV state machine (ADR-046)
+
+> **过渡条款见上文 Purpose §Phase-A 过渡条款**
 
 `MulDivFsmPlugin` SHALL describe the MUL/DIV state machine using `ch_state_machine` DSL (not ad-hoc stall counter). States: `IDLE → MULTIPLY | DIVIDE(33 cycle) → WRITE_BACK`. State transitions SHALL be elaborated at `pb.elaborate(ctx)` time and emit Verilog `always_ff @(posedge clk)` in CH_MEM mode. TLM mode SHALL walk the same state machine via `pb.run()` cycle iterations.
 

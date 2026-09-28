@@ -114,7 +114,7 @@
 | ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
 | ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
-| ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令 | Plugin | ✅ Phase 6c M5 落地 (2026-09-17, 前瞻锁定) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
+| ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令（v2.0 含算术多周期 FSM 子类） | Plugin | ✅ v1.0 Phase 6c M5 (2026-09-17) + ✅ v2.0 算术豁免 (2026-09-28, mfc-cpu-pipeline-multi-cycle-fsm 触发) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
 | ADR-048 | Plugin 注册规范序 (MMU before IBus/DBus, C++17 inline int 计数器) | Plugin | ✅ v0.7.0 落地 (2026-09-24) | [`adr/ADR-048-plugin-registration-canonical-order.md`](./adr/ADR-048-plugin-registration-canonical-order.md) |
 | ADR-049 | MMU PADDR Consumption Contract + MemoryInterface 抽象 (PADDR-first + `MemoryInterface` + PTW 真内存读) | IP 架构 | ✅ v0.8.0 落地 (2026-09-25, P1#3 mmu-paddr-consume) | [`adr/ADR-049-mmu-paddr-consumption-contract.md`](./adr/ADR-049-mmu-paddr-consumption-contract.md) |
