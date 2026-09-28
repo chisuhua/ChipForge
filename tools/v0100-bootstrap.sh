@@ -219,7 +219,7 @@ if [ "$DEMO_PASSED" = "$DEMO_TOTAL" ] && [ "$DEMO_TOTAL" != "?" ] && [ "$DEMO_PA
   DEMO_BLOCKER="false"
 else
   echo "| 1 | [cpu-l1-mmu-demo] PASS | $DEMO_PASSED/$DEMO_TOTAL ❌ | 6/6 | **是** |"
-  echo "|   | └─ debug change | debug-cpu-l1-mmu-demo-paddr-regression/ |  |  |"
+  echo "|   | └─ debug change | debug-cpu-l1-mmu-demo-deep-rca/ |  |  |"
   DEMO_BLOCKER="true"
 fi
 
@@ -381,16 +381,16 @@ if [ "$MODE" = "review" ]; then
   if [ "${DEMO_BLOCKER:-false}" = "true" ]; then
     echo "### 🔴 PoC-1 启动被 [cpu-l1-mmu-demo] 回归阻塞"
     echo ""
-    echo "**推荐下一步**: 执行 \`debug-cpu-l1-mmu-demo-paddr-regression\` change"
+    echo "**推荐下一步**: 执行 \`debug-cpu-l1-mmu-demo-deep-rca\` change (独立 follow-up, 与已 archive 的 debug-cpu-l1-mmu-demo-paddr-regression hotfix 不同根因)"
     echo ""
     echo "执行步骤:"
-    echo "1. 读 \`openspec/changes/debug-cpu-l1-mmu-demo-paddr-regression/proposal.md\`"
-    echo "2. 跑 Phase A: 加 trace 到 \`ibus.h\` + \`picolibc_host_memory.h\`"
-    echo "3. 跑 Phase B: 二分定位真凶 (4 嫌疑 A/B/C/D, 按概率排序)"
-    echo "4. 跑 Phase C: 修复"
-    echo "5. 跑 Phase D: 回归验证 (\`[riscv-tests]\` 40/40 + \`[mmu]\` ≥53/53 不退化)"
+    echo "1. 读 \`openspec/changes/debug-cpu-l1-mmu-demo-deep-rca/proposal.md\`"
+    echo "2. 跑 Phase A: 单独 trace 5 个 FAIL case (add/addi/auipc/jal/beq) — 与 hotfix trace 区分"
+    echo "3. 跑 Phase B: 二分定位 4 嫌疑 (A: kMaxCycles 不足 / B: ELF 加载顺序错位 / C: CPU mis-execute add/branch / D: PTE base_addr 不一致)"
+    echo "4. 跑 Phase C: 按嫌疑修法 (按概率排序)"
+    echo "5. 跑 Phase D: 回归验证 (\`[cpu]\` ≥117/117 + \`[cpu-integration]\` ≥81/81 + \`[mmu]\` ≥53/53 + \`[riscv-tests]\` 40/40 不退化)"
     echo "6. 跑 Phase E: 清理 trace"
-    echo "7. 跑 Phase F: archive (\`openspec archive debug-cpu-l1-mmu-demo-paddr-regression\`)"
+    echo "7. 跑 Phase F: archive (\`openspec archive debug-cpu-l1-mmu-demo-deep-rca\`)"
     echo ""
   fi
 
