@@ -1,7 +1,7 @@
-// tests/cpu/manual_elf/or.S
-//
-// 功能描述: RV32I OR 测试程序
-// x3 = 0xF0 | 0x0F = 0xFF, 写 1 到 tohost
+# tests/cpu/manual_elf/or.S
+#
+# 功能描述: RV32I OR 测试程序
+# x3 = 0xF0 | 0x0F = 0xFF, 写 1 到 tohost
 
 .section .text
 .global _start

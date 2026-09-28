@@ -1,7 +1,7 @@
-// tests/cpu/manual_elf/and.S
-//
-// 功能描述: RV32I AND 测试程序
-// x3 = 0xFF & 0x0F = 0x0F, 写 1 到 tohost
+# tests/cpu/manual_elf/and.S
+#
+# 功能描述: RV32I AND 测试程序
+# x3 = 0xFF & 0x0F = 0x0F, 写 1 到 tohost
 
 .section .text
 .global _start

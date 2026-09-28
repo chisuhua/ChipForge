@@ -1,7 +1,7 @@
-// tests/cpu/manual_elf/sll.S
-//
-// 功能描述: RV32I SLL 测试程序
-// x3 = 1 << 4 = 16, 写 1 到 tohost
+# tests/cpu/manual_elf/sll.S
+#
+# 功能描述: RV32I SLL 测试程序
+# x3 = 1 << 4 = 16, 写 1 到 tohost
 
 .section .text
 .global _start

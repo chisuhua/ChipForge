@@ -108,6 +108,36 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
   )
   target_compile_options(cpu_sim PRIVATE -w)  # suppress warnings from third-party headers
   cf_plugin_link_cpptlm(cpu_sim)  # nlohmann/json via CppTLM bundled
+
+  # add.elf 自动生成 (Step 6, 2026-09-28): 5 个 stage integration + 5 个 cpu_l1_mmu_demo 测试依赖此 binary
+  # 避免"build cache 清理 → ELF 缺失 → 测试全 FAIL" 的隐性 bug
+  find_program(RISCV_AS riscv64-unknown-elf-as)
+  find_program(RISCV_LD riscv64-unknown-elf-ld)
+  if(RISCV_AS AND RISCV_LD AND EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/add.S)
+    add_custom_command(
+      OUTPUT ${CMAKE_BINARY_DIR}/add.elf
+      COMMAND ${RISCV_AS} -march=rv32i -mabi=ilp32
+        ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/add.S
+        -o ${CMAKE_BINARY_DIR}/add.o
+      COMMAND ${RISCV_LD} -m elf32lriscv
+        -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
+        ${CMAKE_BINARY_DIR}/add.o
+        -o ${CMAKE_BINARY_DIR}/add.elf
+      COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/add.o
+      DEPENDS
+        ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/add.S
+        ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
+      COMMENT "Building add.elf from add.S + link.ld"
+      VERBATIM
+    )
+    add_custom_target(add_elf ALL DEPENDS ${CMAKE_BINARY_DIR}/add.elf)
+    add_dependencies(cpu_sim add_elf)
+  elseif(NOT RISCV_AS OR NOT RISCV_LD)
+    message(STATUS
+      "[ChipForge] add.elf custom target 跳过: 未找到 riscv64-unknown-elf-as/ld "
+      "(CPU stage integration + cpu_l1_mmu_demo 测试需要 riscv 工具链)"
+    )
+  endif()
 endif()
 
 # ----------------------------------------------------------------------------

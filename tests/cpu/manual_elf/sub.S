@@ -1,7 +1,7 @@
-// tests/cpu/manual_elf/sub.S
-//
-// 功能描述: RV32I SUB 测试程序
-// x3 = 5 - 3 = 2, 写 1 到 tohost
+# tests/cpu/manual_elf/sub.S
+#
+# 功能描述: RV32I SUB 测试程序
+# x3 = 5 - 3 = 2, 写 1 到 tohost
 
 .section .text
 .global _start
