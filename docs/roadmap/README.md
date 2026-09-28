@@ -5,7 +5,20 @@
 
 ---
 
-## 文档导航
+## 📌 新会话第一件事（路线文档导航）
+
+> **⚠️ 项目里有 4 类路线文档，2 个执行路线图**。下面的导航表告诉你"你要找的内容在哪个文件"。
+
+| 你想知道什么 | 读这个文件 |
+|--------------|-----------|
+| **整体战略选择**（为什么做）| [`strategy/a-plus-c-hybrid.md`](strategy/a-plus-c-hybrid.md) — A+C Hybrid 战略 |
+| **v0.8.0 / v0.9.0 框架级执行**（Phase 6d → v0.9.0）| [`strategy/execution-roadmap.md`](strategy/execution-roadmap.md) — 5 个并行轨道 + §6 架构图 |
+| **v0.10.0 → v1.3.0 SoC 级执行**（产品化路径）| [`../../soc/cpu/docs/roadmap/execution-roadmap.md`](../../soc/cpu/docs/roadmap/execution-roadmap.md) — §3.5 架构图 |
+| **某个版本对应的实施细节** | [`phases/phase-6d-rtl-verification.md`](phases/phase-6d-rtl-verification.md) 等独立 phase doc |
+| **当前阶段 + 状态总览** | [`roadmap-status.md`](roadmap-status.md) — 滚动状态简报 |
+| **文档结构为什么是这样** | [`../MIGRATION_LOG.md`](../MIGRATION_LOG.md) — 文档迁移日志 |
+
+详细职责对照、记忆口诀、phase 文档拆分粒度判断标准见 [`../../AGENTS.md` §路线 / Roadmap 类文档](../../AGENTS.md)。
 
 ### 架构设计文档
 

@@ -108,6 +108,381 @@ graph TD
 
 **完整反向决策树 + 触发后动作**见 [`references/poics-and-risks.md`](./references/poics-and-risks.md) §3。
 
+### 3.5 架构演进与架构图（v0.10.0 → v1.3.0 四版本节点）
+
+> **目的**: 把 §3.1 timeline + §3.2 deliverables + §3.3 12 PoC + §3.4 8 风险 落到**具体架构图**上,作为 v0.10.0 → v1.3.0 实施的**视觉 SSOT**。
+>
+> **与现有文档关系**:
+> - §3.1-§3.4 = 文本驱动的"做什么"（timeline / 产出 / PoC / 风险）
+> - §3.5（本节）= 视觉驱动的"怎么做"（架构图 + 关键决策）
+> - 深度 ADR 锚点见 [`references/adr-matrix.md`](./references/adr-matrix.md)
+
+#### 3.5.1 架构演进全景（4 版本节点时间线 + 关键架构能力）
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  2027 Q1            2027 Q3            2028 Q2            2029 Q1    │
+│  ┌────────┐         ┌────────┐         ┌────────┐         ┌────────┐ │
+│  │v0.10.0 │ ──────► │ v1.0.0 │ ──────► │ v1.2.0 │ ──────► │ v1.3.0 │ │
+│  └────────┘         └────────┘         └────────┘         └────────┘ │
+│     │                  │                  │                  │       │
+│  ADR-082            ADR-070~076        ADR-080            ADR-079     │
+│  negotiate          S/U+AMO+           RRIP+PMP+          chip-       │
+│  capability         BTB+PLIC/          Spike              selector    │
+│  +MUL/DIV FSM       CLINT              lockstep           商业化      │
+│     │                  │                  │                  │       │
+│     ▼                  ▼                  ▼                  ▼       │
+│  ┌────────┐         ┌────────┐         ┌────────┐         ┌────────┐ │
+│  │PoC-1~3 │         │PoC-4~7 │         │PoC-8~10│         │PoC-11  │ │
+│  │rv32ui  │         │rv32ua+ │         │4-way+  │         │chip-   │ │
+│  │+um+uc  │         │si 100% │         │PMP+    │         │selector│ │
+│  │100%    │         │CoreMark│         │Debug   │         │IPC ≤15%│ │
+│  └────────┘         │≥2.3    │         │Linux-  │         └────────┘ │
+│                     └────────┘         │sim SOFT│                       │
+│                                        └────────┘                       │
+└──────────────────────────────────────────────────────────────────────┘
+
+通用架构能力栈（4 版本累积）:
+├─ Phase 6d (前置): CH_MEM elaboration + Verilog 生成 + Verilator 后端
+├─ v0.9.0 (前置): ADR-049 PADDR 真消费 + ADR-046 多周期 FSM 豁免 + 4-way Cache
+├─ v0.10.0: ADR-082 negotiate capability + MUL/DIV FSM + RV32C + ICache + Zicsr
+├─ v1.0.0: S/U mode + AMO + BTB/GShare/RAS + PLIC/CLINT + FreeRTOS demo
+├─ v1.2.0: 4-way RRIP + PMP + Debug + Spike lockstep + gdbstub
+└─ v1.3.0: Linux-on-FPGA + chip-selector CLI + ADR-080 双模对拍硬门禁
+```
+
+#### 3.5.2 v0.10.0 架构目标（2027 Q1,Wave 5 isa-coverage-and-bp）
+
+**核心**: RV32IMAC + RV32C + ICache + Zicsr/Zifencei + MUL/DIV FSM + ADR-082 negotiate capability
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  v0.10.0 架构总览                                                     │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌─────────── Application: rv32ui+um+uc 100% ──────────────────┐    │
+│   │  add / addi / auipc / jal / beq + MUL/DIV + RVC 16-bit      │    │
+│   └───────────────────────────┬──────────────────────────────────┘    │
+│                               │                                       │
+│   ┌───────────────────────────▼──────────────────────────────────┐    │
+│   │  Plugin 框架扩展: ADR-082 negotiate(CapabilityTable&)        │    │
+│   │  ┌──────────────────────────────────────────────────────┐   │    │
+│   │  │  pb.build() 编排:                                    │   │    │
+│   │  │  1. 注册所有 Plugin                                   │   │    │
+│   │  │  2. 拓扑排序 (基于 negotiate 输出的 requires 边)      │   │    │
+│   │  │  3. for each Plugin:                                  │   │    │
+│   │  │     cap_table = new CapabilityTable                    │   │    │
+│   │  │     plugin->negotiate(cap_table) ← NEW 钩子           │   │    │
+│   │  │     if plugin->validate() returns err → throw         │   │    │
+│   │  │  4. for each Plugin in topo order: build()            │   │    │
+│   │  └──────────────────────────────────────────────────────┘   │    │
+│   │  CI 第 8 条门禁: build() 内 dynamic_cast = 0                  │    │
+│   └──────────────────────────────────────────────────────────────┘    │
+│                               │                                       │
+│   ┌───────────────────────────▼──────────────────────────────────┐    │
+│   │  5-stage Pipeline (CH_MEM 完整, 来自 Phase 6d)              │    │
+│   │  IF → ID → EX → MEM → WB                                     │    │
+│   │  + IBusPlugin / DBusPlugin (CH_MEM, 来自 Phase 6d)         │    │
+│   │  + DecoderPlugin (完整 RV32IMAC 主 opcode 7+funct3+funct7)  │    │
+│   │  + IntAluPlugin + BranchPlugin + HazardPlugin (CH_MEM)     │    │
+│   │  + RegFilePlugin (32 ch_reg, CH_MEM)                        │    │
+│   └──────────────────────────────────────────────────────────────┘    │
+│                               │                                       │
+│       ┌───────────────────────┼───────────────────────┐               │
+│       ▼                       ▼                       ▼               │
+│  ┌─────────┐           ┌─────────────┐         ┌─────────────┐         │
+│  │MUL/DIV  │           │   ICache    │         │   Zicsr/    │         │
+│  │FSM      │           │  (新 PoC-3) │         │  Zifencei   │         │
+│  │(PoC-1)  │           │  ≥90% 命中  │         │  CSR 扩展   │         │
+│  │         │           └─────────────┘         │  + FENCE.I  │         │
+│  │ch_state_│                                  └─────────────┘         │
+│  │machine  │           ┌─────────────┐         ┌─────────────┐         │
+│  │+ EXEMPT │           │   RV32C     │         │   ADR-070   │         │
+│  │         │           │  (新 PoC-2) │         │   2-phase   │         │
+│  │requires:│           │  16-bit 压缩│         │   fetch     │         │
+│  │- flush_ │           │  ≥95%       │         │             │         │
+│  │ broad-  │           └─────────────┘         └─────────────┘         │
+│  │ caster  │                                                          │
+│  │- write- │           ┌─────────────────────────────┐                │
+│  │ back_   │           │  ADR-082 negotiate 实例契约 │                │
+│  │ arbiter │           │  MulDivFsmPlugin.negotiate()│                │
+│  └─────────┘           │  cap.provide<MCFHandle>(    │                │
+│                        │    "multi_cycle_fsm")       │                │
+│                        │  cap.require<FlushBroad>(    │                │
+│                        │    "flush_broadcaster")     │                │
+│                        │  cap.require<WBArbiter>(    │                │
+│                        │    "writeback_arbiter")     │                │
+│                        │  BranchPlugin.negotiate()   │                │
+│                        │  cap.provide<FlushBroad>(    │                │
+│                        │    "flush_broadcaster")     │                │
+│                        │  HazardPlugin.negotiate()   │                │
+│                        │  cap.provide<WBArbiter>(...)│                │
+│                        └─────────────────────────────┘                │
+│                                                                       │
+│   验证: PoC-1 (MUL/DIV 1c/33c rv32um 100%)                           │
+│        PoC-2 (RV32C ≥95%)                                            │
+│        PoC-3 (ICache 命中 ≥90%)                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**关键架构变更**:
+
+| 维度 | v0.9.0 → v0.10.0 | 关联 ADR |
+|------|------------------|---------|
+| 框架层 | 无 negotiate → `Plugin::negotiate(CapabilityTable&)` 新增 | ADR-082 |
+| MUL/DIV | stub → ch_state_machine FSM (1c/3c/33c) | ADR-046 |
+| 指令集 | RV32I → RV32IMAC + RV32C | ADR-070 (RVC) |
+| CSR | 基础 → mcycle/minstret/Zicsr/Zifencei | Zicsr ext |
+| 缓存 | 无 I$ → ICache 新增 (PoC-3) | ADR-040 v3.0 |
+| CI 门禁 | 9 → 11 (新增第 8 条 dynamic_cast + 第 10 条 FPGA ifdef) | 决策 1+2 |
+| PoC | 0 → 3 (PoC-1/2/3) | §3.3 |
+
+#### 3.5.3 v1.0.0 架构目标（2027 Q3,wave6-linux-and-productization §1）
+
+**核心**: S/U mode 完整 + RV32A 原子操作 + 分支预测 BTB+GShare+RAS + PLIC/CLINT 中断 + FreeRTOS 验证
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  v1.0.0 架构总览                                                     │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌───────────── Application: FreeRTOS demo + CoreMark ≥ 2.3 ────┐  │
+│   │  Multi-task scheduling + Timer interrupt + Semaphore/Queue    │  │
+│   │  + RV32A atomic + S-mode trap 64 组合                         │  │
+│   └────────────────────────────┬──────────────────────────────────┘  │
+│                                │                                     │
+│   ┌────────────────────────────▼─────────────────────────────────┐    │
+│   │  Privilege Architecture (S-mode + U-mode 完整)              │    │
+│   │  ┌──────────────────────────────────────────────────────┐   │    │
+│   │  │  M-mode (machine)                                     │   │    │
+│   │  │    ↑ mret / ecall / trap entry                       │   │    │
+│   │  │  S-mode (supervisor) ← FreeRTOS / Linux kernel 运行  │   │    │
+│   │  │    ↑ sret                                              │   │    │
+│   │  │  U-mode (user)        ← Application 运行              │   │    │
+│   │  └──────────────────────────────────────────────────────┘   │    │
+│   │  + satp.MODE = sv32 (依赖 v0.9.0 ADR-049 §后续项 JSON 化)  │    │
+│   │  + sstatus/sepc/scause/stvec CSR 完整                        │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+│                                │                                     │
+│       ┌────────────┬───────────┼────────────┬────────────┐           │
+│       ▼            ▼           ▼            ▼            ▼           │
+│  ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
+│  │ RV32A   │ │  BTB     │ │  GShare  │ │   RAS    │ │ PLIC/    │    │
+│  │ atomic  │ │ Branch   │ │ 13-bit   │ │ 8-entry  │ │ CLINT    │    │
+│  │ (PoC-5) │ │ Target   │ │ global   │ │ call/ret │ │ 中断控制 │    │
+│  │         │ │ Buffer   │ │ history  │ │ stack    │ │ (PoC-7)  │    │
+│  │ LR/SC   │ │ 4K-entry │ │          │ │          │ │          │    │
+│  │ AMOADD  │ │ (PoC-6)  │ │ (PoC-6)  │ │ (PoC-6)  │ │ timer +  │    │
+│  │ AMOXOR  │ │          │ │          │ │          │ │ IPI +    │    │
+│  │ ...     │ │          │ │          │ │          │ │ external │    │
+│  └─────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
+│                                                                       │
+│   验证: PoC-4 (S/U trap 64 组合全 PASS)                               │
+│        PoC-5 (AMO 100%)                                               │
+│        PoC-6 (BTB CoreMark ≥ 1.9)                                     │
+│        PoC-7 (FreeRTOS 10M cycle 稳定)                                │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**关键架构变更**:
+
+| 维度 | v0.10.0 → v1.0.0 | 关联 PoC |
+|------|------------------|---------|
+| Privilege | M-only → M+S+U 三层 | PoC-4 |
+| CSR | mcycle/minstret → + sstatus/sepc/scause/stvec | PoC-4 |
+| 原子操作 | 无 → LR/SC + AMO* 6 类 | PoC-5 |
+| 分支预测 | Static → BTB 4K + GShare 13-bit + RAS 8 | PoC-6 |
+| 中断控制器 | 无 → PLIC + CLINT 完整 | PoC-7 |
+| OS 验证 | 无 → FreeRTOS demo 10M cycle | PoC-7 |
+| 性能 | DMIPS/MHz ≥ 1.4 → CoreMark ≥ 2.3 | §3.2 |
+
+#### 3.5.4 v1.2.0 架构目标（2028 Q2,验证基建版）
+
+**核心**: 4-way RRIP Cache + PMP 内存保护 + Debug(gdbstub)+ Spike lockstep 对拍 + Linux-sim shell(SOFT 交付)
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  v1.2.0 架构总览（验证基建版）                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌─────────────── Application: Linux-sim shell (SOFT) ────────────┐ │
+│   │  TLM sim: OpenSBI → Linux Kernel → Shell 跑通                 │ │
+│   │  + gdbstub 远程调试 + Spike lockstep 对拍                    │ │
+│   └─────────────────────────────┬──────────────────────────────────┘ │
+│                                 │                                    │
+│   ┌─────────────────────────────▼──────────────────────────────────┐ │
+│   │  4-way RRIP Cache (PoC-8, 替换 LRU)                          │ │
+│   │  ┌──────────────────────────────────────────────────────┐    │ │
+│   │  │  Cache Line (4 ways × N sets)                         │    │ │
+│   │  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐         │    │ │
+│   │  │  │ Way 0  │ │ Way 1  │ │ Way 2  │ │ Way 3  │         │    │ │
+│   │  │  │ tag    │ │ tag    │ │ tag    │ │ tag    │         │    │ │
+│   │  │  │ RRPV   │ │ RRPV   │ │ RRPV   │ │ RRPV   │         │    │ │
+│   │  │  │ 2-bit  │ │ 2-bit  │ │ 2-bit  │ │ 2-bit  │         │    │ │
+│   │  │  └────────┘ └────────┘ └────────┘ └────────┘         │    │ │
+│   │  │  RRIP 算法: hit → RRPV=0; miss → RRPV=RRIP_MAX       │    │ │
+│   │  │           periodic → RRPV++ (aging)                  │    │ │
+│   │  │  E8 约束: 与 Phase 6d 6d.5 baseline byte-equal       │    │ │
+│   │  └──────────────────────────────────────────────────────┘    │ │
+│   └───────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│   ┌─────────────────────────────────────────────────────────────┐    │
+│   │  PMP (Physical Memory Protection) - 8/16 regions             │    │
+│   │  ┌──────────────────────────────────────────────────────┐   │    │
+│   │  │  pmpcfg0-3 (4 × 8-bit region config)                  │   │    │
+│   │  │  pmpaddr0-15 (16 × physical address)                 │   │    │
+│   │  │  M-mode: 配置; S/U-mode: 受限访问                     │   │    │
+│   │  │  阻止 S-mode 访问 CLINT/PLIC 寄存器空间                │   │    │
+│   │  └──────────────────────────────────────────────────────┘   │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│   ┌─────────────────────────────────────────────────────────────┐    │
+│   │  Spike lockstep 对拍 (PoC-9, HARD 门禁)                     │    │
+│   │  ┌──────────────────────────────────────────────────────┐   │    │
+│   │  │  ChipForge sim ──────┐                                │   │    │
+│   │  │  (TLM/CH_MEM)       ├──► Trace Comparator ──► 1M 条 │   │    │
+│   │  │                     │   (指令 + PC + reg state) 零分歧 │   │    │
+│   │  │  Spike ISS ─────────┘                                │   │    │
+│   │  │  (黄金参考)         允许已记录分歧 ≤ 5/1M             │   │    │
+│   │  └──────────────────────────────────────────────────────┘   │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│   ┌─────────────────────────────────────────────────────────────┐    │
+│   │  gdbstub (PoC-10) - RISC-V Debug Spec 0.13                 │    │
+│   │  ┌──────────────────────────────────────────────────────┐   │    │
+│   │  │  CPU Pipeline ──── Debug Transport Module ──── TCP    │   │    │
+│   │  │  (halt/resume/step)                          socket   │   │    │
+│   │  │  + 断点 / 单步 / 寄存器读写 / 内存读写               │   │    │
+│   │  └──────────────────────────────────────────────────────┘   │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│   验证: PoC-8 (4-way RRIP miss 率降 ≥30%)                             │
+│        PoC-9 (Spike lockstep 1M 条零分歧 HARD)                        │
+│        PoC-10 (gdbstub 远程调试可用)                                  │
+│        Linux-sim shell (SOFT, R6 触发降级路径)                        │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**关键架构变更**:
+
+| 维度 | v1.0.0 → v1.2.0 | 关联 PoC |
+|------|-----------------|---------|
+| Cache 替换 | LRU 4-way → RRIP 4-way | PoC-8 |
+| 内存保护 | 无 → PMP 8/16 regions | §3.2 |
+| 调试 | 无 → gdbstub + Debug Spec 0.13 | PoC-10 |
+| 对拍 | 无 → Spike lockstep 1M 条零分歧 | PoC-9 |
+| Linux 启动 | 无 → Linux-sim shell (SOFT) | §3.2 |
+| CI 门禁 | 10 → 10 (lockstep HARD 门禁) | §4.1 |
+
+#### 3.5.5 v1.3.0 架构目标（2029 Q1,产品化版）
+
+**核心**: Linux-on-FPGA 端到端 + chip-selector CLI 商业化工具 + ADR-080 双模对拍硬门禁
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  v1.3.0 架构总览（产品化版）                                          │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌─────────────── Application: Linux-on-FPGA + chip-selector ──────┐│
+│   │  FPGA: OpenSBI → Linux → Shell (RV32F soft-float 内测)        ││
+│   │  chip-selector: 8 配置 TLM 扫描 < 10 min                       ││
+│   └─────────────────────────────┬──────────────────────────────────┘│
+│                                 │                                    │
+│   ┌─────────────────────────────▼──────────────────────────────────┐│
+│   │  chip-selector CLI (PoC-11, 商业化核心, ADR-079)              ││
+│   │  ┌──────────────────────────────────────────────────────┐    ││
+│   │  │  $ chipforge select --isa rv32imac --cache 4way \     │    ││
+│   │  │                    --mmu sv32 --perf-target 100MHz    │    ││
+│   │  │                                                       │    ││
+│   │  │  ┌─────────────┐    ┌─────────────┐    ┌────────────┐ │    ││
+│   │  │  │ 8 配置 TLM  │ ─► │  Pareto     │ ─► │ chip.toml  │ │    ││
+│   │  │  │ 并行扫描    │    │ 前沿计算    │    │ + Verilog  │ │    ││
+│   │  │  │ < 10 min    │    │ CoreMark×   │    │ bundle     │ │    ││
+│   │  │  │             │    │ FMAX×资源   │    │            │ │    ││
+│   │  │  └─────────────┘    └─────────────┘    └────────────┘ │    ││
+│   │  └──────────────────────────────────────────────────────┘    ││
+│   │  ADR-079 chip-selector 契约:                                    ││
+│   │  - 输入: ISA/Cache/MMU/性能目标 JSON/YAML                      ││
+│   │  - 输出: Pareto 最优配置 + chip.toml + 可综合 Verilog bundle   ││
+│   │  - 约束: TLM↔CH_MEM IPC 偏差 ≤15% (R3 PoC-11 触发条件)      ││
+│   └─────────────────────────────────────────────────────────────┘│
+│                                                                       │
+│   ┌─────────────────────────────────────────────────────────────┐    │
+│   │  Linux-on-FPGA 端到端                                         │    │
+│   │  ┌──────────────────────────────────────────────────────┐   │    │
+│   │  │  FPGA 板级 (Digilent/VexRiscv 风格 board bundle)     │   │    │
+│   │  │   ├─ CPU (CH_MEM 编译产出)                           │   │    │
+│   │  │   ├─ MMU (sv32 + PTW FSM, 来自 Phase 6d 6d.6)      │   │    │
+│   │  │   ├─ Cache (4-way RRIP, 来自 v1.2.0)                │   │    │
+│   │  │   ├─ PLIC/CLINT (来自 v1.0.0)                       │   │    │
+│   │  │   ├─ PMP (来自 v1.2.0)                               │   │    │
+│   │  │   ├─ Debug (gdbstub, 来自 v1.2.0)                   │   │    │
+│   │  │   └─ DDR controller + UART + VirtIO (新)            │   │    │
+│   │  │  OpenSBI → Linux → Shell 实际跑在 FPGA               │   │    │
+│   │  │  FMAX ≥ 100 MHz                                       │   │    │
+│   │  └──────────────────────────────────────────────────────┘   │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│   ┌─────────────────────────────────────────────────────────────┐    │
+│   │  ADR-080 转硬门禁 (TLM↔CH_MEM 双模对拍)                      │    │
+│   │  - v1.2.0 试点 → v1.3.0 强制                                  │    │
+│   │  - chip-selector 产出必须 TLM ↔ CH_MEM byte-equal            │    │
+│   │  - PoC-11 验证: 8 配置 TLM <10min + IPC 偏差 ≤15%             │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│   验证: PoC-11 (chip-selector 8 配置 TLM <10min + IPC ≤15%)          │
+│        FPGA CoreMark ≥ 2.5                                           │
+│        4-way RRIP/PMP/Debug 全部在 FPGA 验证                         │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**关键架构变更**:
+
+| 维度 | v1.2.0 → v1.3.0 | 关联 PoC/ADR |
+|------|-----------------|-------------|
+| chip-selector | 无 → 商业化 CLI 工具 | PoC-11 + ADR-079 |
+| FPGA 交付 | Linux-sim SOFT → Linux-on-FPGA HARD | §3.4 R6 升级 |
+| 浮点 | 无 → RV32F soft-float (内测) | R7 触发降级 |
+| 商业化 | 无 → DSE-as-a-Service | §2 决策 3 |
+| CI 门禁 | 10 → 11 (ADR-080 双模对拍硬门禁) | §4.1 |
+| 性能 | 验证版 → FPGA CoreMark ≥ 2.5 | §3.2 |
+
+#### 3.5.6 4 版本节点架构演进对比表
+
+| 架构维度 | v0.10.0 | v1.0.0 | v1.2.0 | v1.3.0 |
+|---------|---------|--------|--------|--------|
+| **指令集** | RV32IMAC + RV32C | RV32IMAC + RV32A | 同 v1.0.0 | + RV32F (soft-float) |
+| **Privilege** | M-mode | M+S+U 三层 | 同 v1.0.0 | 同 v1.0.0 + PMP |
+| **CSR** | mcycle/minstret/Zicsr | + sstatus/sepc/scause/stvec | + pmpcfg/pmpaddr | + debug CSR |
+| **分支预测** | Static | BTB + GShare + RAS | 同 v1.0.0 | 同 v1.0.0 |
+| **Cache** | L1D 4-way (LRU) | 同 v0.10.0 | 4-way RRIP | 同 v1.2.0 + ICache |
+| **MMU** | sv32 (v0.9.0 沉淀) | + S-mode satp | 同 v1.0.0 | 同 v1.0.0 |
+| **中断** | 无 | PLIC + CLINT | 同 v1.0.0 | 同 v1.0.0 |
+| **调试** | 无 | 无 | gdbstub + Debug 0.13 | 同 v1.2.0 |
+| **对拍** | 无 | 无 | Spike lockstep HARD | + ADR-080 硬门禁 |
+| **OS 验证** | riscv-tests 100% | FreeRTOS demo | Linux-sim SOFT | Linux-on-FPGA HARD |
+| **Plugin 框架** | + ADR-082 negotiate | 同 v0.10.0 | 同 v0.10.0 | 同 v0.10.0 |
+| **交付形态** | TLM + Verilator sim | + FPGA 验证板 | + Spike 对拍 | + chip-selector 商业化 |
+| **核心 PoC** | PoC-1/2/3 | PoC-4/5/6/7 | PoC-8/9/10 | PoC-11 |
+| **CI 门禁数** | 9 → 11 | 11 | 11 (lockstep HARD) | 11 (+ ADR-080) |
+
+#### 3.5.7 与现有文档的衔接
+
+| 本节引用 | 关联章节 |
+|---------|---------|
+| §3.5.1 timeline | §3.1 mermaid timeline + §3.2 deliverables 表 |
+| §3.5.2 v0.10.0 | §3.3 PoC-1/2/3 + §2 决策 1/2/3 |
+| §3.5.3 v1.0.0 | §3.3 PoC-4/5/6/7 + §3.4 R1 风险 |
+| §3.5.4 v1.2.0 | §3.3 PoC-8/9/10 + §3.4 R2/R6 风险 |
+| §3.5.5 v1.3.0 | §3.3 PoC-11 + §3.4 R3/R7/R8 风险 |
+| §3.5.6 对比表 | §3.2 deliverables + §4.1 CI 门禁 |
+| ADR-082 | [`../../architecture/adr/ADR-082-plugin-negotiate-capability.md`](../../../../docs/architecture/adr/ADR-082-plugin-negotiate-capability.md) |
+| ADR-046 | [`../../architecture/adr/ADR-046-multi-cycle-fsm-exemption.md`](../../../../docs/architecture/adr/ADR-046-multi-cycle-fsm-exemption.md) |
+| ADR-040 v2.0 | [`../../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md`](../../../../docs/architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) |
+| ADR-049 | [`../../architecture/adr/ADR-049-mmu-paddr-consumption-contract.md`](../../../../docs/architecture/adr/ADR-049-mmu-paddr-consumption-contract.md) |
+
+> **更新规则**: 任何版本节点 PoC 状态变更 → 同步 §3.3 + §3.5 + `references/poics-and-risks.md`。
+
 ---
 
 ## 4. 验收与同步机制

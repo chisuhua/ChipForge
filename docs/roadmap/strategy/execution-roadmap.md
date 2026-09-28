@@ -1,11 +1,12 @@
 # Execution Roadmap — A+C Hybrid 战略执行分解
 
-> **Status**: 🚧 Active (2026-09-24 起, v0.7.0 archive 后启动)
+> **Status**: 🚧 Active (2026-09-24 起, v0.7.0 archive 后启动; 2026-09-28 新增 §5 架构演进章节, 覆盖 Phase 6d → v0.8.0 → v0.9.0 ASCII 架构图)
 > **Owner**: ChipForge Build Team
 > **关联战略**: [`a-plus-c-hybrid.md`](./a-plus-c-hybrid.md) (§1-§10 决策矩阵 + §6 版本节点 + §10 Go/No-Go)
 > **关联 SSOT**: [`a-plus-c-hybrid.md §7`](./a-plus-c-hybrid.md#7-状态总表-ssot) (AUTO-GENERATED, 不可手改)
-> **本文档定位**: 战略的**执行分解**——阶段拆解 + 依赖图 + 并行轨道 + 阻塞识别 + Go/No-Go 触发条件
-> **与战略文档关系**: 战略 = 为什么做/做什么 (稳定); 执行路线 = 怎么做/谁先谁后/谁并行 (动态)
+> **关联下游**: [`soc/cpu/docs/roadmap/execution-roadmap.md`](../../../soc/cpu/docs/roadmap/execution-roadmap.md) §3.5 (v0.10.0 → v1.3.0 架构演进, 上下游衔接)
+> **本文档定位**: 战略的**执行分解**——阶段拆解 + 依赖图 + 并行轨道 + 阻塞识别 + Go/No-Go 触发条件 + 架构演进视觉 SSOT
+> **与战略文档关系**: 战略 = 为什么做/做什么 (稳定); 执行路线 = 怎么做/谁先谁后/谁并行 (动态) + 怎么做架构 (新增 §5)
 
 ---
 
@@ -192,17 +193,347 @@ graph LR
 
 ---
 
-## 6. 关联文档
+## 6. 架构演进（Phase 6d → v0.8.0 → v0.9.0）
+
+> **目的**: 把 §1-§5 的"做什么 + 怎么做"落到**具体架构图**上, 作为 Phase 6d → v0.8.0 → v0.9.0 实施的**视觉 SSOT**。
+>
+> **覆盖范围**: Phase 6d (前置) → v0.8.0 (Wave 3-mmu) → v0.9.0 (Wave 4-csr-cache-dse)。v0.10.0 → v1.3.0 见 [`soc/cpu/docs/roadmap/execution-roadmap.md §3.5`](../../../soc/cpu/docs/roadmap/execution-roadmap.md#35-架构演进与架构图v0010--v130-四版本节点)。
+>
+> **关联 ADR**: ADR-040 v2.0 (CH_MEM 是新正道) + ADR-046 (多周期 FSM 豁免) + ADR-047 (Result 范式) + ADR-048 (注册规范序) + ADR-049 (MMU PADDR 真消费契约)
+
+### 6.1 架构演进全景（Phase 6d → v0.8.0 → v0.9.0）
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  2026 Q4            2026-12            2027-02                       │
+│  ┌────────────┐     ┌────────────┐     ┌────────────┐               │
+│  │ Phase 6d   │ ──► │  v0.8.0    │ ──► │  v0.9.0    │               │
+│  │ 5-stage    │     │ MMU 真端到端│     │ CSR + 4-way│               │
+│  │ CH_MEM     │     │ + cycle-    │     │ Cache      │               │
+│  │ + Verilator│     │ precision  │     │ + except.  │               │
+│  │ + FSM      │     │ + MUL/DIV  │     │ + mispred. │               │
+│  │ (前置)     │     │ (Wave 3)    │     │ (Wave 4)   │               │
+│  └────────────┘     └────────────┘     └────────────┘               │
+│       │                   │                  │                       │
+│       ▼                   ▼                  ▼                       │
+│  ADR-040 v2.0       ADR-049            ADR-046+FSM                  │
+│  CH_MEM 双模        PADDR 真消费       CSR/exception                │
+│  elaboration        +MemoryInterface   +4-way LRU                   │
+│  + Verilog 生成    +cycle-precision   +mispredict                   │
+│                    +mfc multi-cycle                                  │
+│                    +mmu-config-json                                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+通用架构能力演进:
+├─ Phase 6d: CH_MEM elaboration substrate + Verilator 后端 + 多周期 FSM 框架
+├─ v0.8.0:   ADR-049 PADDR-first 真消费 + cycle-accurate 仿真 + 多周期 Plugin 框架
+└─ v0.9.0:   CSR/exception 完整 + 4-way LRU + mispredict recovery + Phase 1.5 毕业
+```
+
+### 6.2 Phase 6d 架构目标（2026 Q4,5-stage Pipeline CH_MEM 端到端）
+
+**核心**: 把 Phase 6c 的"框架能力"(CH_MEM elaboration + Verilog 生成 + Simulator)在**真实业务代码**上完整化,从"PoC 单元级" → "端到端 riscv-tests RV32I 5 指令 tohost=1"。
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Phase 6d 架构总览                                                     │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌─────────── Application: riscv-tests RV32I 5 指令 ──────────────┐│
+│   │  add / addi / auipc / jal / beq + 内嵌 sw/bne                  ││
+│   │  端到端 tohost=1 (CH_MEM 模式 + Verilator 后端)               ││
+│   └───────────────────────────┬─────────────────────────────────────┘│
+│                               │                                     │
+│   ┌───────────────────────────▼──────────────────────────────────┐  │
+│   │  Harness Layer (迁移, 6d.8)                                  │  │
+│   │  pb.run() → pb.elaborate() + ch::Simulator::tick()           │  │
+│   │  OR Verilator VL1Cache (verilator --cc cpu.v --exe main.cpp) │  │
+│   │  保留 --elf CLI 兼容                                         │  │
+│   └───────────────────────────┬──────────────────────────────────┘  │
+│                               │                                     │
+│   ┌───────────────────────────▼──────────────────────────────────┐  │
+│   │  CpuFactoryChmem 完整 5-stage (CH_MEM, 6d.3)               │  │
+│   │  IF / ID / EX / MEM / WB                                    │  │
+│   │  + 6 plugins 正确 stage wiring                              │  │
+│   │  + EARLY payload pre-population (v0.3.1 M6 fix 沿用)       │  │
+│   └───────────────────────────┬──────────────────────────────────┘  │
+│                               │                                     │
+│       ┌───────────┬───────────┼───────────┬───────────┐             │
+│       ▼           ▼           ▼           ▼           ▼             │
+│  ┌─────────┐ ┌─────────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐│
+│  │IBusPlugin│ │DecoderPlugin│ │IntAlu    │ │Branch    │ │RegFile  ││
+│  │+ DBus   │ │(完整 6d.1)  │ │+ Hazard  │ │(完整     │ │+ dmem   ││
+│  │CH_MEM   │ │RV32I 主     │ │(完整     │ │6d.2)     │ │CH_MEM   ││
+│  │(6d.3)   │ │opcode 7+    │ │6d.2)     │ │6-op B-type│ │         ││
+│  │         │ │funct3+funct7│ │          │ │+ GShare  │ │         ││
+│  └────┬────┘ └─────────────┘ └──────────┘ └──────────┘ └─────────┘│
+│       │                                                             │
+│       ▼                                                             │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │  MMU/PTW FSM (6d.6, sv32 5 状态)                            │  │
+│  │  ch_state_machine<PTW_State, 5>                              │  │
+│  │  IDLE → L0_WAIT → L1_WAIT → DONE → FAULT                    │  │
+│  │  + #define CF_PLUGIN_USE_FSM_EXEMPT (ADR-046 豁免)         │  │
+│  │  + 必须 Verilator 验证 (ch_state_machine 简化实现)          │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  L1Cache refill FSM (6d.7, 4 状态)                          │    │
+│  │  IDLE → LOOKUP → MISS → REFILL_WAIT                          │    │
+│  │  + 同 ch_state_machine + CF_PLUGIN_USE_FSM_EXEMPT           │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│   验证: 6d.4 riscv-tests 5 指令 tohost=1 CppHDL sim PASS            │
+│        6d.5 Verilator sim byte-equal 对比                            │
+│        8/8 check_plugin_portability.sh PASS (含新增 Check 9)         │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**关键架构变更**:
+
+| 维度 | Phase 6c → Phase 6d | 关联子阶段 |
+|------|---------------------|-----------|
+| Decoder | ALU 内嵌 PoC → 完整 RV32I 主 opcode | 6d.1 |
+| Branch | 6-op PoC → 完整 RV32I B-type | 6d.2 |
+| Hazard | RAW 6 条件 PoC → 完整 id/ex/mem/wb 检测 | 6d.2 |
+| CPU 集成 | PoC skeleton → 完整 5-stage wiring | 6d.3 |
+| 内存模型 | 无 → ibus_chmem.h + dmem_chmem.h | 6d.3 |
+| riscv-tests | 无 → 5 指令 tohost=1 CppHDL sim | 6d.4 |
+| Verilator | 无 → verilator --cc cpu.v 后端 | 6d.5 |
+| MMU FSM | 无 → sv32 5 状态 ch_state_machine | 6d.6 |
+| L1Cache FSM | 无 → 4 状态 refill FSM | 6d.7 |
+| Harness | pb.run() → pb.elaborate() + Simulator/Verilator | 6d.8 |
+
+### 6.3 v0.8.0 架构目标（2026-12 中旬,Wave 3-mmu-real-memory-and-cycle）
+
+**核心**: 让 MMU 在 CPU 流水线中**真起作用**(IBus/DBus 真消费 `pl::PADDR`)+ cycle-accurate 仿真 + MUL/DIV 多周期 FSM。
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  v0.8.0 架构总览（Wave 3-mmu-real-memory-and-cycle）                 │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌───────────── Application: SoC demo (rv32ui 40/40 PASS) ────────┐ │
+│   │  + MUL/DIV 多周期 rv32um (新 vendor L4 ELF)                   │ │
+│   │  + cycle-precision cycle counter                              │ │
+│   └────────────────────────────┬──────────────────────────────────┘ │
+│                                │                                     │
+│   ┌────────────────────────────▼──────────────────────────────────┐ │
+│   │  Pipeline (CH_MEM 完整版)                                     │ │
+│   │  IF → IBusPlugin 真消费 pl::PADDR (ADR-049 D1=A)            │ │
+│   │        ↓ if (paddr_valid_) mem_->read_word(pl::PADDR)        │ │
+│   │        ↓ else fallback pl::PC                                │ │
+│   │  ID → DecoderPlugin (Phase 6d 沉淀)                          │ │
+│   │  EX → IntAluPlugin / BranchPlugin / HazardPlugin             │ │
+│   │  MEM → DBusPlugin 真消费 pl::PADDR (对称)                    │ │
+│   │  WB → RegFilePlugin writeback                                │ │
+│   │  + MUL/DIV Plugin (mfc supersede, 多模板 LATENCY)            │ │
+│   └────────────────────────────┬──────────────────────────────────┘ │
+│                                │                                     │
+│   ┌────────────────────────────▼──────────────────────────────────┐ │
+│   │  MMUPlugin 真内存走线 (ADR-049 D2+D3+D4)                    │ │
+│   │  ┌──────────────────────────────────────────────────────┐    │ │
+│   │  │  MMUPlugin(SvMode, TLBConfig[], PTWConfig,          │    │ │
+│   │  │            MemoryInterface* mem = nullptr)           │    │ │
+│   │  │   - mem == nullptr → advance_from_stub() (旧 47 测试)│    │ │
+│   │  │   - mem != nullptr → advance_from_real_memory(mem_)  │    │ │
+│   │  │   - + paddr_valid_ explicit flag (新增 Payload key)  │    │ │
+│   │  │   - ADR-048 canonical ordering: MMU before IBus     │    │ │
+│   │  └──────────────────────────────────────────────────────┘    │ │
+│   └────────────────────────────┬──────────────────────────────────┘ │
+│                                │                                     │
+│   ┌────────────────────────────▼──────────────────────────────────┐ │
+│   │  PicolibcHostMemory : public MemoryInterface (ADR-049 D3)    │ │
+│   │  - read_word/write_word 真实现                              │ │
+│   │  - 既有 read_byte/read_half 保留 (ELF 加载必需)            │ │
+│   └─────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│   ┌──────────────────────────────────────────────────────────────┐ │
+│   │  5 个并行轨道 (新增 §6.3.1-§6.3.4)                            │ │
+│   └──────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│   验证: [cpu-l1-mmu-demo] ≥8/8 (含 ≥2 个新 PADDR 传播用例)          │
+│        ≥3/5 MUL/DIV ELF 0% diff (cycle-identical)                  │
+│        riscv-tests ≥40/40 + 0 新 fail                              │
+│        3 门禁全 PASS                                                │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### 6.3.1 P1#3 `mmu-paddr-consume-and-real-memory`（2.5-3 周,主路径）
+
+**架构目标**: IBus/DBus 真消费 `pl::PADDR` + PTW `advance_from_real_memory()` 替换 stub + ADR-049 + MemoryInterface 抽象。
+
+```
+SoC JSON: soc/cpu_l1_mmu_demo.json
++ mmu.memory_interface 字段路径
+   ↓
+CpuFactory::build_cpu() resolve "memory_interface"
++ 在 components 数组查找 "cf::cpu::PicolibcHostMemory"
++ 注入 MMUPlugin 构造
+   ↓
+MMUPlugin(SvMode, TLBConfig[], PTWConfig, MemoryInterface*)
+   ↓
+ptw_->advance_from_real_memory(mem_) (替代 advance_from_stub)
+```
+
+#### 6.3.2 P1#4 `plugin-framework-cycle-precision`（1-2 周,并行）
+
+**架构目标**: `pb.run()` → `pb.run(N)` 真 cycle 数,解锁 cycle counter + 5-7 个新测试。
+
+```cpp
+class PipeBuilder {
+public:
+  // 新增 API (来自 ADR-050 草案, v0.6.0 ADR-047 §保留 throw 条款)
+  void run(size_t cycle_count = 0);  // 0 = 一次性（默认）
+  size_t cycle_counter() const noexcept;
+};
+```
+
+#### 6.3.3 P1#5 `cpu-pipeline-multi-cycle`（已被 mfc supersede）
+
+> **2026-09-27 变更**: 原 P1#5 `cpu-pipeline-multi-cycle` 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` 取代 (FSM 化 + ADR-082 negotiate 集成)。本 change 标 SUPERSEDED,所有未来工作转移到 mfc change (v0.10.0 实施)。
+
+#### 6.3.4 P1#6 `mmu-config-json-driven`（≤1 周,P1#3 后启动,并行）
+
+**架构目标**: MMU 配置从 C++ 硬编码迁移到 JSON 配置驱动。
+
+```
+ip/mmu/configs/params_schema.json (已有)
+   ↓ (反序列化)
+ip/mmu/lib/mmu_config_loader.{h,cpp} (~150 LOC, lib/ 层)
+   ↓
+MMUPlugin 构造函数接 JSON config
+   ↓
+register_early_plugins() 硬编码消除 (TLB 几何 / SvMode)
+```
+
+### 6.4 v0.9.0 架构目标（2027-02 下旬,Wave 4-csr-cache-dse）
+
+**核心**: Phase 1.5 毕业标准达成(RV32I ≥85% PASS + SoC demo ≥5 ELF + cache-dse-sweep CSV + D4+ADR-040+ADR-044+ADR-045+ADR-048+ADR-049 全合规)+ CSR/exception 完整 + 4-way Cache。
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  v0.9.0 架构总览（Wave 4-csr-cache-dse）                             │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│   ┌───────────── Application: Phase 1.5 毕业 ──────────────────────┐│
+│   │  ✅ RV32I ≥ 85% riscv-tests PASS                              ││
+│   │  ✅ SoC demo ≥ 5 ELF tohost=1                                 ││
+│   │  ✅ cache-dse-sweep CSV                                       ││
+│   │  ✅ D4 + ADR-040 + ADR-044 + ADR-045 + ADR-048 + ADR-049      ││
+│   └────────────────────────────┬──────────────────────────────────┘│
+│                                │                                    │
+│   ┌────────────────────────────▼──────────────────────────────────┐│
+│   │  phase-1.5-wave-4 (P2#6, 4-6 周)                            ││
+│   │  ┌──────────────────────────────────────────────────────┐    ││
+│   │  │  RiscV CSR Plugin (扩展当前 RiscvCsrPlugin stub)     │    ││
+│   │  │  - mstatus (machine status)                          │    ││
+│   │  │  - mtvec (trap vector)                               │    ││
+│   │  │  - mepc (exception PC)                               │    ││
+│   │  │  - mcause (exception cause)                          │    ││
+│   │  │  - mtval (trap value)                                │    ││
+│   │  │  - satp (MMU mode, 依赖 v0.8.0 ADR-049 §后续项)      │    ││
+│   │  │  - sstatus/sepc/scause/stvec (S-mode, 推迟 v1.0.0)  │    ││
+│   │  └──────────────────────────────────────────────────────┘    ││
+│   │                                                              ││
+│   │  exception 路由 (RiscV spec §1.6)                            ││
+│   │  ┌──────────────────────────────────────────────────────┐    ││
+│   │  │  CtrlLink::throw_when 真实消费者                      │    ││
+│   │  │  - mmu_exit hook 真生效 (依赖 v0.8.0 ADR-049)        │    ││
+│   │  │  - exception 12/13/15 (page fault/load fault/store)  │    ││
+│   │  │  - trap delivery to mtvec, mepc ← PC, mcause ← cause │    ││
+│   │  └──────────────────────────────────────────────────────┘    ││
+│   │                                                              ││
+│   │  mispredict recovery                                        ││
+│   │  ┌──────────────────────────────────────────────────────┐    ││
+│   │  │  CtrlLink::flush_when 真实消费者                      │    ││
+│   │  │  - branch recovery + flush ROB                       │    ││
+│   │  │  - PC ← branch_target (重定向)                       │    ││
+│   │  └──────────────────────────────────────────────────────┘    ││
+│   └──────────────────────────────────────────────────────────────┘│
+│                                                                       │
+│   ┌──────────────────────────────────────────────────────────────┐ │
+│   │  cache-phase1.5-4way (P2#7, 3-4 周, cycle-identical 5 ELF) │ │
+│   │  ┌──────────────────────────────────────────────────────┐   │ │
+│   │  │  L1CachePlugin 4-way LRU 升级                         │   │ │
+│   │  │  Set: 256 → 64 (4-way)                                │   │ │
+│   │  │  Way: 1 → 4                                          │   │ │
+│   │  │  Replacement: Direct-mapped → LRU                     │   │ │
+│   │  │  + TLM+CH_MEM 双轨 (ADR-040 v2.0)                    │   │ │
+│   │  │  + cache-dse-sweep CSV (size × assoc × repl × line) │   │ │
+│   │  │  + ADR-044 §2.5 VIPT 正式安全                         │   │ │
+│   │  │  E8 约束: 与 Phase 6d 6d.5 baseline byte-equal       │   │ │
+│   │  └──────────────────────────────────────────────────────┘   │ │
+│   └──────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│   验证: RV32I ≥ 85% riscv-tests PASS                                 │
+│        SoC demo ≥ 5 ELF tohost=1                                     │
+│        cache-dse-sweep CSV 落盘                                      │
+│        D4 + 6 个 ADR 全合规                                           │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**关键架构变更**:
+
+| 维度 | v0.8.0 → v0.9.0 | 关联 ADR/PoC |
+|------|-----------------|-------------|
+| CSR 覆盖 | 无 → mstatus/mtvec/mepc/mcause/mtval 完整 | spec §1.6 |
+| 异常处理 | throw_when stub → trap delivery 真生效 | ADR-049 §3 |
+| 分支预测 | BranchPlugin 6-op → + flush ROB recovery | ADR-046 |
+| Cache 几何 | 256×1 direct-mapped → 4-way LRU | ADR-044 §2.5 |
+| VIPT 安全 | edge case 风险 → ADR-044 正式锁 | ADR-044 |
+| DSE 输出 | 无 → cache-dse-sweep CSV 落盘 | §3.2 R1 |
+| Plugin 数 | 11 → +CSR/Exception/Mispredict ≈ 14 | ADR-042 supersede |
+
+### 6.5 Phase 6d → v0.8.0 → v0.9.0 架构演进对比表
+
+| 架构维度 | Phase 6d | v0.8.0 | v0.9.0 |
+|---------|---------|--------|--------|
+| **CPU 集成** | 5-stage CH_MEM 完整 (PoC 单元级 → 端到端 5 指令) | 完整 CPU 跑通 riscv-tests rv32ui | + CSR/exception 完整 |
+| **MMU** | sv32 PTW FSM (5 状态) | PADDR-first 真消费 + MemoryInterface 抽象 | + JSON 配置驱动 (P1#6) |
+| **Cycle 精度** | CppHDL sim + Verilator | + cycle counter + latency_table 框架 | 持续完善 |
+| **多周期** | MMU/PTW + L1Cache refill FSM | MUL/DIV 多模板 (mfc supersede) | 持续完善 |
+| **CSR** | 无 | 无 | mstatus/mtvec/mepc/mcause/mtval 完整 |
+| **异常** | CtrlLink::throw_when stub | stub | 12/13/15 路由完整 + trap delivery |
+| **分支预测** | B-type 6-op | 同 Phase 6d | + flush ROB recovery |
+| **Cache** | L1Cache 256×1 (来自 Phase 1.2) | 同 Phase 6d | 4-way LRU + cache-dse-sweep |
+| **VIPT 安全** | ADR-044 §2.5 风险标记 | 同 Phase 6d | 正式锁 (ADR-044 §2.5 实施) |
+| **DSE** | 无 | 无 | cache-dse-sweep CSV |
+| **工具链** | Verilator + riscv64 集成 | + cycle-precision 框架 | 持续完善 |
+| **退出标准** | 8 指令 tohost=1 + Verilator byte-equal | [cpu-l1-mmu-demo] ≥8/8 + MUL/DIV ≥3/5 | Phase 1.5 毕业 |
+| **Plugin 框架** | ADR-040 v2.0 CH_MEM 完整 + Verilator | + ADR-049 PADDR-first | + ADR-048 canonical ordering 已落地 (v0.7.0) |
+
+### 6.6 与现有文档的衔接
+
+| 本节引用 | 关联章节 |
+|---------|---------|
+| §6.1 全景 | §0 mermaid + §4 Go/No-Go 5 项指标 |
+| §6.2 Phase 6d | [`../../roadmap/phases/phase-6d-rtl-verification.md`](../../roadmap/phases/phase-6d-rtl-verification.md) §2 范围拆分 |
+| §6.3 v0.8.0 | §2.1-§2.5 5 个并行轨道 (L4/P1#4/P1#3/P1#5/P1#6) |
+| §6.4 v0.9.0 | [`openspec/changes/phase-1.5-wave-4/`](../../../openspec/changes/phase-1.5-wave-4/) + [`openspec/changes/cache-phase1.5-4way/`](../../../openspec/changes/cache-phase1.5-4way/) (占位) |
+| ADR-040 v2.0 | [`../../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md`](../../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) |
+| ADR-046 | [`../../architecture/adr/ADR-046-multi-cycle-fsm-exemption.md`](../../architecture/adr/ADR-046-multi-cycle-fsm-exemption.md) |
+| ADR-047 | [`../../architecture/adr/ADR-047-static-config-result-paradigm.md`](../../architecture/adr/ADR-047-static-config-result-paradigm.md) |
+| ADR-048 | [`../../architecture/adr/ADR-048-plugin-registration-canonical-order.md`](../../architecture/adr/ADR-048-plugin-registration-canonical-order.md) |
+| ADR-049 | [`../../architecture/adr/ADR-049-mmu-paddr-consumption-contract.md`](../../architecture/adr/ADR-049-mmu-paddr-consumption-contract.md) |
+| 下游衔接 | [`soc/cpu/docs/roadmap/execution-roadmap.md §3.5`](../../../soc/cpu/docs/roadmap/execution-roadmap.md#35-架构演进与架构图v0010--v130-四版本节点) (v0.10.0 → v1.3.0 架构演进) |
+
+> **更新规则**: 任何阶段 PoC 状态变更 → 同步 §6 架构图 + §2 任务清单 + `sync_strategy_status.sh` 自动派生 `a-plus-c-hybrid.md §7`。
+
+---
+
+## 7. 关联文档
 
 - 战略入口: [`a-plus-c-hybrid.md`](./a-plus-c-hybrid.md) (§1-§10)
 - 路线图状态: [`../roadmap-status.md`](../roadmap-status.md) (滚动状态简报)
+- 下游架构演进: [`soc/cpu/docs/roadmap/execution-roadmap.md §3.5`](../../../soc/cpu/docs/roadmap/execution-roadmap.md#35-架构演进与架构图v0010--v130-四版本节点) (v0.10.0 → v1.3.0)
 - 6 活跃 changes: `openspec/changes/{cpu-pipeline-multi-cycle,mmu-paddr-consume-and-real-memory,plugin-framework-cycle-precision,cache-phase1.5-4way,phase-1.5-wave-4}/`
 - sync 工具: `tools/sync_strategy_status.sh` (§7 AUTO-GENERATED 派生)
 - 验证命令: `tools/{verify_adr,verify_plugin_decision,check_plugin_portability,doc_link_check}.sh`
 
 ---
 
-## 7. 变更日志
+## 8. 变更日志
 
 | 日期 | 版本 | 变更 | 作者 |
 |------|------|------|------|

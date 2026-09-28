@@ -23,6 +23,8 @@ ctest --test-dir build --output-on-failure
 
 ### 已知测试状态
 
+> **⚠️ HONESTY NOTE (2026-09-28)**：以下数字截至 **v0.7.0 archive 时的快照**，**不代表当前 main HEAD 实测状态**。当前 ctest 实测由 `bash tools/v0100-bootstrap.sh review` 输出，**真实数字以 ctest 为准**。原因：`a48ac6d` (IBus/DBus 真消费 PADDR, 2026-09-26) 引入回归，导致 `[cpu]` 1 fail + `[cpu-integration]` 4 fail + `[cpu-l1-mmu-demo]` 5 fail，CHANGELOG v0.8.0 §Verification 数字 (117/117, 81/81, 0 回归) 是**快照引用而非实地验证**（commit `e9d6a88` 在回归后写）。修复跟踪：`openspec/changes/debug-cpu-l1-mmu-demo-paddr-regression/` (0/17 tasks, hotfix 未启动)。hotfix Phase F archive 后回填实测数字。
+
 - **MMU 测试已重新启用**（`tests/CMakeLists.txt`，mmu-tlb-ptw-impl commit 10）：47 个 `[mmu]` 测试全部 PASS（110 assertions），含新增 `[tlb-refill]` 2 个 PTW TLB refill 集成测试（v0.2.3）。
 - **7stage 测试 PASS（已修复）**：`7stage_add_elf_end_to_end` 原 segfault 根因已由 commit `b82af0f`（CpuFactory 7stage superscalar `lane_counters` use-after-free）修复；`[cpu-integration]` 全 81/81 case PASS（含 3 个 `7stage*` Catch2 filter 命中 + 2 个大写 S 命中（`build_7stage_superscalar` / `EnableMMU7StageCommitRetire`），合计 5 个 case 名称含 "7stage"）。**CWD 约束**：`test_7stage_riscv.cpp` 通过 `exec_cmd("./build/src/cf_plugin/cpu_sim ...")` 调用 cpu_sim（相对路径），ctest `WORKING_DIRECTORY=${CMAKE_SOURCE_DIR}`（`tests/CMakeLists.txt:101`）保证 PASS；从 CWD ≠ 仓库根（含 `build/` 子目录）直接执行 binary 会因相对路径解析失败误报 FAIL。务必用 ctest 或从仓库根运行。
 - **`[riscv-tests]` 40/40 PASS**（`test_rv32ui_runner.cpp`，基线 `soc/cpu/docs/dse/rv32ui-baseline-matrix.csv`）：P0#2 `cpu-pipeline-fix-rv32ui-load-width`（commit `8909165`，v0.6.0 提前归档）补完 DBusPlugin LOAD width extraction（funct3=000/001/010/100/101 LB/LH/LW/LBU/LHU + sign/zero extension + RD_DATA forwarding），原 10 个 LOAD-family 用例（lb/lbu/lh/lhu/lw + 内嵌 load 的 sb/sh/sw/ld_st/st_ld）从 stub FAIL 转为 PASS。
@@ -181,6 +183,49 @@ ip/{name}/
 | **ADR-046** | 多周期协议引擎豁免 D4 无状态机禁令 | `CF_PLUGIN_USE_FSM_EXEMPT` 标记 + `chlib::ch_state_machine` DSL |
 
 **ADR-037 v2.0 状态 (Oracle 2026-09-20 确认)**: `docs/architecture/adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17, D4 elaboration 语义兑现)`。Phase 6d prereqs change 仅验证内容完整性 + 修正 adr.md:1251 拆分描述不一致 (原 6c/6d/6e 与现行 6a/6b/6c/6d), 不重新写 v2.0。
+
+### 路线 / Roadmap 类文档（2026-09-28 统一导航）
+
+> **⚠️ 新会话第一件事**: 项目里**有两个** `execution-roadmap.md`, 不要混淆!
+> 详见 [`docs/MIGRATION_LOG.md`](docs/MIGRATION_LOG.md)（文档结构变更历史）。
+
+#### 4 类路线文档职责对照
+
+| 类型 | 文档 | 范围 | 何时读 |
+|------|------|------|--------|
+| **战略** | [`docs/roadmap/strategy/a-plus-c-hybrid.md`](docs/roadmap/strategy/a-plus-c-hybrid.md) | A+C Hybrid 战略选择（为什么做）| 任何 ADR / PoC 决策时看大方向 |
+| **框架级执行** | [`docs/roadmap/strategy/execution-roadmap.md`](docs/roadmap/strategy/execution-roadmap.md) | v0.8.0 / v0.9.0 框架 + 所有 IP（Phase 6d → v0.9.0 架构图见 §6）| 当前冲刺阶段（v0.8.0 启动 / 实施） |
+| **SoC 级执行** | [`soc/cpu/docs/roadmap/execution-roadmap.md`](soc/cpu/docs/roadmap/execution-roadmap.md) | v0.10.0 → v1.3.0 CPU SoC（产品化路径，架构图见 §3.5）| SoC 路线规划 / PoC 评估 / 商业化决策 |
+| **Phase 独立 doc** | [`docs/roadmap/phases/phase-6d-rtl-verification.md`](docs/roadmap/phases/phase-6d-rtl-verification.md) 等 | 已确定阶段的端到端细节（tasks + 退出标准 + ADR）| 实施具体 phase 前 |
+
+#### 当前活跃 versions + 关联架构图
+
+| 版本 | 时间 | 文档位置 | 架构图 |
+|------|------|---------|--------|
+| **v0.7.0** | ✅ 2026-09-25 archive | strategy §3 + roadmap-status §2 | — |
+| **v0.8.0** | 🟡 2026-12 中旬（Wave 3-mmu） | strategy execution-roadmap §2 + §6.3 | strategy §6.3 |
+| **v0.9.0** | 📋 2027-02 下旬（Wave 4-csr-cache-dse） | strategy execution-roadmap §4 + §6.4 | strategy §6.4 |
+| **v0.10.0** | 📋 2027 Q1（Wave 5-isa-coverage-and-bp） | soc/cpu execution-roadmap §3 + §3.5.2 | soc/cpu §3.5.2 |
+| **v1.0.0** | 📋 2027 Q3（wave6-linux-and-productization） | soc/cpu execution-roadmap §3 + §3.5.3 | soc/cpu §3.5.3 |
+| **v1.2.0** | 📋 2028 Q2 | soc/cpu execution-roadmap §3 + §3.5.4 | soc/cpu §3.5.4 |
+| **v1.3.0** | 📋 2029 Q1 | soc/cpu execution-roadmap §3 + §3.5.5 | soc/cpu §3.5.5 |
+
+#### 记忆口诀（防止新会话混淆）
+
+- **"战略 execution-roadmap"** → 看 [`docs/roadmap/strategy/execution-roadmap.md`](docs/roadmap/strategy/execution-roadmap.md)
+- **"SoC execution-roadmap"** → 看 [`soc/cpu/docs/roadmap/execution-roadmap.md`](soc/cpu/docs/roadmap/execution-roadmap.md)
+- 两者通过 §6.6 / §3.5.7 **互相衔接**（2026-09-28 新增）
+- 详细职责对照见 [`soc/cpu/docs/roadmap/README.md §与框架级 execution-roadmap 的区别`](soc/cpu/docs/roadmap/README.md)
+
+#### Phase 文档拆分粒度判断标准
+
+> 避免预测式文档腐烂。
+
+| 状态 | 处理 |
+|------|------|
+| 已有 OpenSpec change + tasks.md + ADR 锚点 | **独立** phase doc（如 `phase-6d-rtl-verification.md`） |
+| 仅"目标" + "PoC 列表"，未启动实施 | **留在** execution-roadmap.md 里（如 v1.0.0/v1.2.0/v1.3.0） |
+| 历史已 archive | 移到 `soc/cpu/docs/roadmap/archive/` 或 `docs/roadmap/phases/` 标注历史 |
 
 ---
 

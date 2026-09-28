@@ -1,14 +1,31 @@
 # RISC-V CPU SoC 实施路线图
 
 > **属主**：`soc/cpu/` — RISC-V CPU 中心 SoC（CPU + MMU + Cache + Memory + Interconnect + Peripheral）
-> **最后更新**：2026-09-27（ADR 编号 050~062 平移到 070~082，避开 active change 撞号；3 决策锁定，12 PoC 已编号；v0.10.0 启动就绪）
+> **最后更新**：2026-09-28（execution-roadmap.md 新增 §3.5 架构演进章节：v0.10.0 → v1.3.0 四版本节点 ASCII 架构图 + 关键产出 + 关联 ADR；与 §3.1 timeline + §3.2 deliverables + §3.3 12 PoC 完整对齐）
+
+## 📌 这个目录解决什么问题
+
+> **新会话第一件事**: 读完本节就能判断"你要找的内容在哪个文件"
+
+| 你想知道什么 | 读哪个文件 |
+|--------------|----------|
+| 当前 SoC 路线图（v0.10.0 → v1.3.0）整体目标 | [`execution-roadmap.md §1`](./execution-roadmap.md) |
+| 4 个版本节点（v0.10.0 / v1.0.0 / v1.2.0 / v1.3.0）什么时候做什么 | [`execution-roadmap.md §3`](./execution-roadmap.md) |
+| **v0.10.0 → v1.3.0 每个版本的架构图 + 关键产出** | [`execution-roadmap.md §3.5`](./execution-roadmap.md) |
+| 12 个 PoC 速查（哪个版本验收什么） | [`execution-roadmap.md §3.3`](./execution-roadmap.md) |
+| 8 个风险 + 砍分叉条件 | [`execution-roadmap.md §3.4`](./execution-roadmap.md) |
+| 3 大决策（范式 / ASIC / DSE-aaS）的详细论证 | [`references/decision-1-plugin-evolution.md`](./references/decision-1-plugin-evolution.md) |
+| 18 条 ADR 矩阵 + 依赖图 | [`references/adr-matrix.md`](./references/adr-matrix.md) |
+| 12 PoC 完整规范 + ADR 锚点 + 失败砍分叉 | [`references/poics-and-risks.md`](./references/poics-and-risks.md) |
+| 与 VexRiscv/VexiiRiscv/XiangShan 对比 | [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) |
+| 历史 phase 文档（v0.1.x ~ v0.8.0 完成的实施记录） | `archive/`（仅溯源，不执行） |
 
 ## 目录结构
 
 ```
 soc/cpu/docs/roadmap/
-├── README.md                          ← 本文件（索引）
-├── execution-roadmap.md               ← 主控路线图（最小骨架：目标/产出/路径）
+├── README.md                          ← 本文件（索引 + 导航表）
+├── execution-roadmap.md               ← 主控路线图（v0.10.0 → v1.3.0）
 ├── references/                        ← 深度内容（按需查阅）
 │   ├── decision-1-plugin-evolution.md
 │   ├── adr-matrix.md
@@ -27,18 +44,31 @@ soc/cpu/docs/roadmap/
 
 ### **[📍 execution-roadmap.md — ChipForge 超越路径规划 v0.10.0 → v1.3.0](./execution-roadmap.md)**
 
-骨架结构：
+骨架结构（2026-09-28 更新）：
 
-| § | 内容 |
-|---|------|
-| 1 | 目标（技术 / 差异化 / 超越 / 非目标）|
-| 2 | 3 大决策锁定（范式不动 / ASIC 友好 / DSE-as-a-Service）|
-| 3 | 实施路径：4 版本节点 timeline + 产出 + 12 PoC 速查 + 8 风险速查 |
-| 4 | 验收与同步机制（CI 门禁 + OpenSpec 同步 + 文档同步规则）|
-| 5 | 立即可执行的下一步（v0.10.0 启动第一周动作清单）|
-| 6 | 参考文档索引（references/）|
-| 7 | 历史归档索引（archive/）|
-| 附录 | 术语表 |
+| § | 内容 | 何时读 |
+|---|------|--------|
+| 1 | 目标（技术 / 差异化 / 超越 / 非目标）| 战略汇报 / 项目立项 |
+| 2 | 3 大决策锁定（范式不动 / ASIC 友好 / DSE-as-a-Service）| 任何 ADR / PoC 决策时 |
+| 3 | 实施路径：4 版本节点 timeline + 产出 + 12 PoC + 8 风险 | 版本节点规划时 |
+| **3.5** | **架构演进与架构图（v0.10.0 → v1.3.0 四版本节点 ASCII 图）** | **实施具体阶段时（每次实施前必读 §3.5 对应版本）** |
+| 4 | 验收与同步机制（CI 门禁 + OpenSpec 同步 + 文档同步规则）| 任何 change archive 前 |
+| 5 | v0.10.0 启动状态（高挥发，每周校准）| 每周一例会 |
+| 6 | 参考文档索引（references/）| 见下表 |
+| 7 | 历史归档索引（archive/）| 仅溯源 |
+| 附录 | 术语表 | 任何时候 |
+
+**§3.5 架构演进章节（2026-09-28 新增）**:
+
+| 子章节 | 内容 |
+|--------|------|
+| §3.5.1 | 4 版本节点时间线 + 关键架构能力栈 |
+| §3.5.2 | v0.10.0 架构目标 + ADR-082 negotiate + MUL/DIV FSM + RV32C + ICache |
+| §3.5.3 | v1.0.0 架构目标 + S/U mode + AMO + BTB/GShare/RAS + PLIC/CLINT |
+| §3.5.4 | v1.2.0 架构目标 + 4-way RRIP + PMP + gdbstub + Spike lockstep |
+| §3.5.5 | v1.3.0 架构目标 + Linux-on-FPGA + chip-selector CLI |
+| §3.5.6 | 4 版本节点架构演进对比表（13 个维度） |
+| §3.5.7 | 与现有文档的衔接（ADR + 章节锚点） |
 
 ## 参考文档（references/）
 
@@ -72,4 +102,24 @@ soc/cpu/docs/roadmap/
 | [`../../../../docs/architecture/plugin-framework.md`](../../../../docs/architecture/plugin-framework.md) | Plugin 框架设计 |
 | [`../../../../docs/roadmap/README.md`](../../../../docs/roadmap/README.md) | 全局路线图入口（含 Phase 0/6） |
 | [`../../../../docs/roadmap/strategy/a-plus-c-hybrid.md`](../../../../docs/roadmap/strategy/a-plus-c-hybrid.md) | 战略入口（A+C Hybrid） |
+| [`../../../../docs/roadmap/strategy/execution-roadmap.md`](../../../../docs/roadmap/strategy/execution-roadmap.md) | 框架级执行（Phase 6d → v0.8.0 → v0.9.0）—— **与本文件互补，不是替代** |
 | [`../../../../docs/architecture/adr.md`](../../../../docs/architecture/adr.md) | ADR 注册表 |
+
+## 🎯 与框架级 execution-roadmap 的区别（重要）
+
+> **新会话易混淆点**: 项目里有 **两个** `execution-roadmap.md`
+
+| 维度 | `docs/roadmap/strategy/execution-roadmap.md` | `soc/cpu/docs/roadmap/execution-roadmap.md`（本目录） |
+|------|------------------------------------------|---------------------------------------------------|
+| **范围** | 框架级 v0.8.0（Phase 6d → v0.9.0）| SoC 级 v0.10.0 → v1.3.0 |
+| **关注** | 框架能力完整化 + 清债 | CPU SoC 产品化 + 商业化 |
+| **决策依据** | ADR-040/046/047/048/049（技术债清理） | ADR-070~083（产品化）+ 3 大决策锁定 |
+| **更新频率** | 周级别（每 archive change 同步） | 季度级别（版本节点驱动） |
+| **Owner** | ChipForge Build Team | soc/cpu/ SoC 团队 |
+
+**记忆口诀**:
+- "**战略** execution-roadmap" = 看 `docs/roadmap/strategy/`
+- "**SoC** execution-roadmap" = 看 `soc/cpu/docs/roadmap/`
+- 两者通过 `§6.6` / `§3.5.7` 衔接（2026-09-28 新增）
+
+**详细文档结构变更历史**: 见 [`../../../../docs/MIGRATION_LOG.md`](../../../../docs/MIGRATION_LOG.md)（2026-09-28 新增）
