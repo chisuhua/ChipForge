@@ -5,6 +5,46 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.2 (2026-09-28) — cpu-factory-satp-mapping: satp_value helper + ctor propagation (Phase D e2e 推迟)
+
+> **OpenSpec change**: `cpu-factory-satp-mapping` (archived)
+> **Initiative**: `wave5-isa-coverage-and-bp` P1#5 follow-up
+> **Purpose**: 修复 `cpu_factory.h:390` 硬写 `satp_value=0` (使 `cfg.mmu_mode` config 变成死代码); RISC-V Spec §4.3.1 satp CSR layout
+> **实现状态**: Phase B/C/E 完成 (helpers + ctor + unit test + 5 family 回归全 PASS). **Phase D e2e 翻转推迟** (CPU pipeline 缺 MMU exception handler, 出本 change scope, 跟踪 follow-up `cpu-pipeline-mmufault-handler`).
+
+### Added
+
+- **`detail::make_satp_value` + `detail::extract_satp_ppn` helper** (`ip/cpu/cpu_factory.h`): RISC-V Privileged Spec §4.3.1 satp CSR layout. Sv32 `(1ULL<<31) | (ppn & 0x3FFFFFULL)`, Sv39 `(8ULL<<60) | (ppn & 0xFFFFFFFFFULL)`, Sv48 `(9ULL<<60) | (ppn & 0xFFFFFFFFFULL)`, Bare `0`. **关键**: satp PPN **直接占 [21:0]/[43:0], 不左移** (`<<10` 是 PTE 格式混淆).
+- **`CPUConfig::satp_ppn` 字段** (`ip/cpu/cpu_factory.h`): root page table PPN, additive 字段默认 0 (合法 RISC-V reset state)
+- **`RiscvMMUPlugin` ctor 调基类 setter** (`ip/cpu/plugins/mmu.h`): `MMUPlugin::set_satp_value(satp_value)` + `set_satp_ppn(extract_ppn(mode, satp_value))` 调基类 API. **关键**: 派生 `set_satp_value` shadow 基类同名, ctor 内用 qualified `cf::ip::mmu::MMUPlugin::set_satp_value(...)`. **不调基类** → PTW root 永为 0 → Bare shortcut 永真 → 修复无效.
+- **`plant_identity_page_table` helper** (`tests/soc/page_table_helpers.h`): 单条 4MB Sv32 superpage leaf PTE, PTE flags `V|R|W|X|U|A|D = 0xDF`. PTE PPN=`vaddr>>12` (identity mapping). vaddr 必须 4MB 对齐, pte_base 必须 4KB 对齐.
+
+### Fixed
+
+- **`cpu_factory.h:390` 死代码** (`ip/cpu/cpu_factory.h`): `cfg.mmu_mode` 实际生效 (Bare mode 不需 satp, Sv32/Sv39/Sv48 走 helper). 不再硬写 `0`.
+- **`RiscvMMUPlugin` ctor satp_value_ 不再仅存派生成员** (`ip/cpu/plugins/mmu.h`): 修复后 base class `satp_ppn_` 真更新, PTW walk 真走, 不再 Bare shortcut 永真.
+
+### Tests
+
+- **`CpuFactory_MMUCfg_PassesSatpValue` TEST_CASE** (`tests/cpu/test_cpu_factory.cpp`): 5 SECTIONs (Sv32/Sv39/Sv48/Bare/Negative-PPN-masked), **9 assertions PASS** (TDD Red→Green)
+- **`[cpu-l1-mmu-demo]` 保持 workaround** (`tests/soc/test_cpu_l1_mmu_demo.cpp`): `cfg.enable_mmu = false` 维持 (v0.10.1 workaround), 6/6 PASS 不退化. **真 sv32 e2e 翻转推迟** (CPU pipeline hazard on vaddr=0 PTW fault).
+
+### Verification (v0.10.2 实测)
+
+- **`CpuFactory_MMUCfg_PassesSatpValue` 9/9 PASS** (新 unit test, 验证 helpers 正确)
+- **`[cpu-l1-mmu-demo]` 6/6 PASS** (40 assertions, 维持 workaround)
+- **`[cpu]` 118/118 PASS** (362 assertions, +1 from new TEST_CASE, 117→118)
+- **`[cpu-integration]` 81/81 PASS** (65722 assertions)
+- **`[mmu]` 53/53 PASS** (131 assertions, Bare shortcut 行为不变)
+- **`[riscv-tests]` 40/40 PASS** (40 assertions, 走 enable_mmu=false 路径)
+- **`verify_plugin_decision.sh`** + **`check_plugin_portability.sh`**: 不退化 (D4 + ADR-040 v2.0)
+
+### Known Limitations (out of scope, tracked separately)
+
+- **`cpu-pipeline-mmufault-handler` (P1 follow-up)**: CPU pipeline 当前缺 MMU exception handler. 任何 PTW fault (异常码 12/13/15) 被 ignore, 不写 mcause/mepc/mtval, 不跳转 trap entry. 阻塞 `[cpu-l1-mmu-demo]` 真 sv32 e2e (vaddr=0 PTW fault 后 CPU 陷入 hazard 重试循环). 修复后 flip `enable_mmu=true` 即可 6/6 PASS.
+- **`mmu-csr-write-satp-sv32-mask-fix` (P2 follow-up)**: `ip/cpu/plugins/mmu.cpp:37` `csr_write_satp` 用 48-bit mask (`satp_value & 0x0FFFFFFFFFFFFULL`), 对 Sv32 错 (含 MODE bit31 + ASID bits [30:22]). 运行时 `csrw satp` 路径潜在 broken (本 change 只走 ctor 路径, 不触发).
+- **`cpu_params_schema.json` (P3 follow-up)**: `satp_ppn` 字段加到 `CPUConfig` (additive), 但未同步到 JSON Schema. JSON 构造路径用户看不到此字段直到 schema 更新.
+
 ## v0.10.1 (2026-09-28) — cpu-l1-mmu-demo 5/6 FAIL follow-up fix (debug-cpu-l1-mmu-demo-deep-rca)
 
 > **OpenSpec change**: `debug-cpu-l1-mmu-demo-deep-rca` (archived)

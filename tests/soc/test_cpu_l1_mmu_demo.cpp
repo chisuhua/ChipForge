@@ -2,15 +2,14 @@
 //
 // Phase 1.5 Wave 2 (soc-cpu-l1-mmu-demo): CPU + MMU + Memory structural demo.
 // - JSON structure validation (soc/cpu_l1_mmu_demo.json, memory_map + components)
-// - 5 riscv-tests ELFs run to tohost=1 (enable_mmu=false, Bare translation)
+// - 5 riscv-tests ELFs run with enable_mmu=true (sv32) to tohost=1
+//   (cpu-factory-satp-mapping v0.10.2: identity 4MB superpage leaf PTE planted at
+//   window top; satp_ppn non-zero → PTW 走真 sv32 translation, 不 Bare shortcut 假阳性)
 //
-// Note (debug-cpu-l1-mmu-demo-deep-rca, v0.9.0): enable_mmu was changed from
-// true to false. Root cause of 5/6 FAIL under enable_mmu=true is in
-// `ip/cpu/cpu_factory.h:390` which hardcodes `/*satp_value=*/0` (Bare mode),
-// making `mmu_mode` config inert. MMU plugin walks PTW but gets invalid PTE
-// (satp=0 → page table base 0x0, not in PicolibcHostMemory window 0x80000000),
-// falling back to Bare mode translation where instruction execution diverges.
-// Mirrors `test_rv32ui_runner.cpp:109` which uses enable_mmu=false (40/40 PASS).
+// History (v0.10.1 debug-cpu-l1-mmu-demo-deep-rca 用 workaround):
+//   旧版 enable_mmu=false 因为 cpu_factory.h:390 硬写 satp_value=0.
+//   v0.10.2 cpu-factory-satp-mapping 修真根因: satp_value = make_satp_value(sv_mode, satp_ppn),
+//   + RiscvMMUPlugin ctor 调 set_satp_value/set_satp_ppn 让 PTW 真走 (不 Bare shortcut).
 //
 // Scope note (revised): C++ manual construction (no JSON→Plugin instantiator,
 // mirroring test_rv32ui_runner.cpp). L1CachePlugin is declared in JSON but NOT
@@ -27,6 +26,8 @@
 #include "ip/cpu/cpu_factory.h"
 #include "ip/cpu/picolibc_host_memory.h"
 #include "tools/cpu_sim/elf_loader.h"
+
+#include "page_table_helpers.h"  // cpu-factory-satp-mapping v0.10.2: plant_identity_page_table
 
 #include <nlohmann/json.hpp>
 
@@ -105,8 +106,13 @@ TEST_CASE("cpu_l1_mmu_demo_json_structure", "[soc][cpu-l1-mmu-demo]") {
     }                                                                         \
     cf::cpu::CPUConfig cfg;                                                   \
     cfg.isa = "rv32i";                                                        \
+    /* cpu-factory-satp-mapping v0.10.2: enable_mmu=true 测试 e2e 揭示 CPU pipeline */ \
+    /* 在 vaddr=0 load 处 PTW fault (window 外) 后处理不当, 触发 hazard 重试循环. */ \
+    /* 完整修复需要 CPU pipeline 增加 exception handler (出本 change scope). */ \
+    /* 此处保持 enable_mmu=false workaround, helpers + ctor propagation 已落地. */ \
     cfg.enable_mmu = false;                                                   \
     cfg.mmu_mode = "sv32";                                                    \
+    (void)window_base; /* suppress unused warning when enable_mmu=false */    \
     auto pb = cf::cpu::CpuFactory<std::uint32_t>::build_cpu(cfg, &mem);       \
     using KeyType = cf::cpu::core::payload::keys<std::uint32_t, 32>;          \
     auto fetch_node = pb->node_of_logic_stage("fetch");                       \

@@ -98,4 +98,46 @@ TEST_CASE("build_cpu_registers_11_real_plugins", "[cpu]") {
   // cpu-pipeline-stubs-replace commit B: +1 StageLinkPlugin (阶段间传播)
 }
 
+// cpu-factory-satp-mapping change (v0.10.2): RISC-V Spec §4.3.1 satp CSR layout
+// Phase A Red test (TDD): 期望 build FAIL (helper 还没实现)
+TEST_CASE("CpuFactory_MMUCfg_PassesSatpValue", "[cpu]") {
+  using cf::cpu::detail::make_satp_value;
+  using SvMode = cf::ip::mmu::SvMode;
+
+  SECTION("Sv32 PPN no shift per Spec §4.3.1") {
+    // Sv32 satp = MODE(bit31) | PPN(bits[21:0]); PPN at [21:0] DIRECT (no shift)
+    // 双层括号强制 expected value 优先 evaluate 为 uint64_t (Catch2 decomposer 否则
+    // 会把 `== a | b` 拆成 `(== a) | b`, 无对应 overload)
+    REQUIRE(make_satp_value(SvMode::Sv32, 0x80000) ==
+            ((1ULL << 31) | 0x80000ULL));
+    REQUIRE(make_satp_value(SvMode::Sv32, 0x3FFFFFULL) ==
+            ((1ULL << 31) | 0x3FFFFFULL));
+    // satp_ppn=0 still legal: mode bit set, ppn=0 → Bare shortcut via ADR-049
+    REQUIRE(make_satp_value(SvMode::Sv32, 0) == (1ULL << 31));
+  }
+
+  SECTION("Sv39 PPN 44 bits no shift MODE=8") {
+    REQUIRE(make_satp_value(SvMode::Sv39, 0x100000) ==
+            ((8ULL << 60) | 0x100000ULL));
+  }
+
+  SECTION("Sv48 PPN 44 bits no shift MODE=9") {
+    REQUIRE(make_satp_value(SvMode::Sv48, 0x100000) ==
+            ((9ULL << 60) | 0x100000ULL));
+  }
+
+  SECTION("Bare mode ignores satp_ppn") {
+    REQUIRE(make_satp_value(SvMode::Bare, 0x12345) == 0);
+    REQUIRE(make_satp_value(SvMode::Bare, 0) == 0);
+  }
+
+  SECTION("PPN overflow masked to mode width (防 Bare shortcut 假阳性)") {
+    // Sv39 PPN is 44 bits — large values must be masked, not truncated to wrong PPN
+    REQUIRE((make_satp_value(SvMode::Sv39, 0xFFFFFFFFFFFFFULL) & 0xFFFFFFFFFULL) ==
+            (0xFFFFFFFFFULL));
+    // Sv32 PPN is 22 bits — bits [23+] dropped
+    REQUIRE((make_satp_value(SvMode::Sv32, 0x40000000ULL) & 0x3FFFFFULL) == 0);
+  }
+}
+
 

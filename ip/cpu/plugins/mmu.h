@@ -37,11 +37,35 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
  public:
   // mmu-paddr-consume-and-real-memory (P1#3 task §4.2, Oracle C7):
   // mem 透传到基类 MMUPlugin, nullptr → stub 路径 (向后兼容, 现有 6 cpu-l1-mmu-demo 测试 0 回归)
+  //
+  // cpu-factory-satp-mapping (v0.10.2): 原 ctor 仅存 satp_value_ 到派生成员, 基类 satp_ppn_ 仍 0
+  // → ADR-049 Bare shortcut (sv_mode_==Bare || satp_ppn_==0) 永真 → 翻译永远 Bare → 修复无效.
+  // 必须把 satp 传到基类让 PTW 知道根页表位置. 派生 set_satp_value shadow 基类同名, 用 qualified.
+  // PPN 提取 mode-aware (避免 mmu.cpp:37 错 48-bit mask 对 Sv32 含 MODE bit31 → root 天文数字).
+  // 此处 inline 而非 #include "ip/cpu/cpu_factory.h" 是因 cpu_factory.h:46 已 include 本头
+  // (会循环依赖); cf::cpu::detail::extract_satp_ppn 是单元测试入口, 此处重复 6 行可接受.
   RiscvMMUPlugin(cf::ip::mmu::SvMode mode, std::vector<cf::ip::mmu::MMUPlugin::TLBConfig> levels_cfg,
                  cf::ip::mmu::MMUPlugin::PTWConfig ptw_cfg, std::uint64_t satp_value = 0,
                  cf::ip::mmu::MemoryInterface* mem = nullptr)
       : cf::ip::mmu::MMUPlugin(mode, std::move(levels_cfg), ptw_cfg, mem),
-        satp_value_(satp_value) {}
+        satp_value_(satp_value) {
+    cf::ip::mmu::MMUPlugin::set_satp_value(satp_value);  // qualified: 调用基类 (派生 shadow)
+    std::uint64_t ppn = 0;
+    switch (mode) {
+      case cf::ip::mmu::SvMode::Sv32:
+        ppn = satp_value & 0x3FFFFFULL;       // Sv32 PPN 22 bits [21:0] (RISC-V Spec §4.3.1)
+        break;
+      case cf::ip::mmu::SvMode::Sv39:
+      case cf::ip::mmu::SvMode::Sv48:
+        ppn = satp_value & 0xFFFFFFFFFULL;    // Sv39/48 PPN 44 bits [43:0]
+        break;
+      case cf::ip::mmu::SvMode::Bare:
+      default:
+        ppn = 0;                              // Bare mode: 无 PTE chain
+        break;
+    }
+    set_satp_ppn(ppn);                         // unqualified: 派生无 shadow, 解析到基类
+  }
 
   // cpu-mmu-integration commit 2/9: 覆盖基类 setup/build 加 3 个 substage 闭包
   void setup(cf::plugin::PipeBuilder& pb) override;

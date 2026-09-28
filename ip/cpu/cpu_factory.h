@@ -70,6 +70,44 @@ inline void check_canonical_ordering() {
                            ") — ADR-048 canonical ordering violation");
   }
 }
+
+// cpu-factory-satp-mapping (v0.10.2): RISC-V Privileged Spec §4.3.1 satp CSR encoding.
+// satp.PPN 字段在 satp CSR 中**直接占 [21:0] (Sv32) / [43:0] (Sv39/Sv48)**, **没有 `<<10` 左移**
+// (`<<10` 是 PTE 格式里 PPN 占 [31:10] 的混淆). 8ULL 用 ULL 后缀避免 `8u << 60` UB.
+inline std::uint64_t make_satp_value(cf::ip::mmu::SvMode sv_mode,
+                                    std::uint64_t satp_ppn) {
+  switch (sv_mode) {
+    case cf::ip::mmu::SvMode::Sv32:
+      // Sv32 (RV32): MODE=bit31, ASID=[30:22], PPN=[21:0]
+      return (1ULL << 31) | (satp_ppn & 0x3FFFFFULL);
+    case cf::ip::mmu::SvMode::Sv39:
+      // Sv39 (RV64): MODE=[63:60]=8, ASID=[59:44], PPN=[43:0]
+      return (8ULL << 60) | (satp_ppn & 0xFFFFFFFFFULL);
+    case cf::ip::mmu::SvMode::Sv48:
+      // Sv48 (RV64): MODE=[63:60]=9, ASID=[59:44], PPN=[43:0]
+      return (9ULL << 60) | (satp_ppn & 0xFFFFFFFFFULL);
+    case cf::ip::mmu::SvMode::Bare:
+    default:
+      // Bare mode or unknown: satp_value = 0 (Bare translation)
+      return 0;
+  }
+}
+
+// PPN extraction mode-aware (供 mmu.h ctor 调 set_satp_ppn 用, 不走 mmu.cpp 错 mask)
+// mmu.cpp csr_write_satp 用 48-bit mask, 对 Sv32 错 (含 MODE bit31 → root 地址天文数字).
+inline std::uint64_t extract_satp_ppn(cf::ip::mmu::SvMode sv_mode,
+                                      std::uint64_t satp_value) {
+  switch (sv_mode) {
+    case cf::ip::mmu::SvMode::Sv32:
+      return satp_value & 0x3FFFFFULL;
+    case cf::ip::mmu::SvMode::Sv39:
+    case cf::ip::mmu::SvMode::Sv48:
+      return satp_value & 0xFFFFFFFFFULL;
+    case cf::ip::mmu::SvMode::Bare:
+    default:
+      return 0;
+  }
+}
 }}}  // namespace cf::cpu::detail
 
 namespace cf {
@@ -95,6 +133,12 @@ struct CPUConfig {
   bool enable_pmp = true;
   bool enable_mmu = true;
   std::string mmu_mode = "sv39";    // sv32/sv39/sv48
+
+  // cpu-factory-satp-mapping (v0.10.2): Root page table PPN, 仅 enable_mmu=true 时有效.
+  // Default 0 = Bare mode via ADR-049 Bare shortcut (MMUPlugin.cpp:65).
+  // 合法 boot 前状态: satp reset = 0 (Bare), OS 后续 csrw satp 启用分页.
+  // Sv32 PPN 22 bits [21:0]; Sv39/48 PPN 44 bits [43:0] (per RISC-V Privileged Spec §4.3.1)
+  std::uint64_t satp_ppn = 0;
 
   // 分支预测
   std::string branch_predictor = "gshare";  // static/bimodal/gshare/tournament
@@ -385,9 +429,14 @@ class CpuFactory {
       // 透传 PicolibcHostMemory* 到 RiscvMMUPlugin, 触发真内存读路径 (advance_from_real_memory)
       // PicolibcHostMemory 继承 cf::ip::mmu::MemoryInterface (Step 1 task §3.2)
       // nullptr 时 RiscvMMUPlugin 内部降级 stub 路径 (向后兼容)
+      // cpu-factory-satp-mapping (v0.10.2): 旧版硬写 satp_value=0 让 mmu_mode 是死代码.
+      // 修复: 根据 config.mmu_mode + config.satp_ppn 计算 satp_value (RISC-V Spec §4.3.1).
+      // RiscvMMUPlugin ctor 还会再调 set_satp_value + set_satp_ppn 让 PTW 真走 (不 Bare shortcut 永真).
+      const std::uint64_t satp_value =
+          cf::cpu::detail::make_satp_value(sv_mode, config.satp_ppn);
       pb.register_plugin(std::make_unique<cf::cpu::plugins::RiscvMMUPlugin>(
           sv_mode, mmu_levels, cf::ip::mmu::MMUPlugin::PTWConfig{2},
-          /*satp_value=*/0, static_cast<cf::ip::mmu::MemoryInterface*>(mem)));
+          satp_value, static_cast<cf::ip::mmu::MemoryInterface*>(mem)));
     }
 
     cf::cpu::detail::IBUS_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
