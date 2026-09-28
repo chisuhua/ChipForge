@@ -64,7 +64,7 @@ graph TD
 | # | 前置项 | 当前状态（2026-09-27 校准） | 验证位置 |
 |---|--------|------------------------|---------|
 | 1 | `plugin-framework-cycle-precision` P1#4 实装完成（v0.10.0 PoC-1/2/3 的 cycle 精度前提）| 🟡 **SSOT 漂移**：代码实装完成（commit 已落），但 `tasks.md` 0/19 checkbox 未回填。SSOT 显示 TODO 19/0 与口头声明 "25/25 收官" 矛盾 → **P0-1 任务 = 同步 commit 与 tasks.md** | `openspec/changes/plugin-framework-cycle-precision/tasks.md` |
-| 2 | `[cpu-l1-mmu-demo]` 6/6 PASS 修回归（commit `8a14402` PADDR 改造同步）| 🚧 当前 5/6 FAIL；debug change 已建（`debug-cpu-l1-mmu-demo-paddr-regression/`） | ctest `[cpu-l1-mmu-demo]` |
+| 2 | `[cpu-l1-mmu-demo]` 6/6 PASS 修回归（commit `8a14402` PADDR 改造同步）| ✅ **v0.10.2 实测 6/6** (v0.10.1 deep-rca workaround `cfg.enable_mmu=false` + v0.10.2 cpu-factory-satp-mapping 落地 infrastructure, 真 sv32 e2e 翻转推迟到 `cpu-pipeline-mmufault-handler`) | ctest `[cpu-l1-mmu-demo]` |
 | 3 | `cpu-pipeline-multi-cycle` P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede | ✅ 已被 wave5 supersede（mfc change 已建，0/35 tasks 待启动） | `openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/` |
 | 4 | 2 个 wave4 占位 change（cache-phase1.5-4way / phase-1.5-wave-4）展开 | ⏸ 待 wave3-mmu 残余 change（P1#4 checkbox + P1#6）闭环后展开 | OpenSpec tasks.md |
 
@@ -522,21 +522,26 @@ v1.3.0  +1 条（§6 行 11）：ADR-080 双模对拍转硬门禁（v1.2 试点�
 
 ---
 
-## 5. v0.10.0 启动状态（2026-09-27 校准）
+## 5. v0.10.0 启动状态（2026-09-28 校准）
 
 > **挥发节说明**：本节是高挥发内容（status 类），与 §1–§4 稳定主控解耦。每周由 `openspec list` + `tools/sync_strategy_status.sh` 派生刷新；手改须附当周校准日期。
 
-| # | 动作 | 状态（2026-09-27） |
+| # | 动作 | 状态（2026-09-28） |
 |---|------|---------------------|
-| 1 | 修 `[cpu-l1-mmu-demo]` 5/6 FAIL 回归 | 🚧 change 已建：`openspec/changes/debug-cpu-l1-mmu-demo-paddr-regression/`。**硬验收：6/6 PASS 才允许 PoC-1 进入实施** |
+| 1 | 修 `[cpu-l1-mmu-demo]` 5/6 FAIL 回归 | ✅ **v0.10.1 archive** (`debug-cpu-l1-mmu-demo-paddr-regression` 修 PADDR 真消费); ✅ **v0.10.1 deep-rca archive** (`debug-cpu-l1-mmu-demo-deep-rca` 走 `cfg.enable_mmu=false` workaround, 6/6 PASS); ✅ **v0.10.2 archive** (`cpu-factory-satp-mapping` 落地 infrastructure: helpers + ctor propagation + unit test 9 assertions PASS, 真 sv32 e2e 翻转推迟到 `cpu-pipeline-mmufault-handler`) |
 | 2 | 注册 `wave5-isa-coverage-and-bp` initiative | ✅ 已注册（`a-plus-c-hybrid.md` §3，2026-09-27） |
-| 3 | 创建 PoC-1 载体 change `mfc-cpu-pipeline-multi-cycle-fsm` | ✅ 已建（supersedes `cpu-pipeline-multi-cycle`，0/35 tasks 待启动） |
+| 3 | 创建 PoC-1 载体 change `mfc-cpu-pipeline-multi-cycle-fsm` | ✅ 已建（supersedes `cpu-pipeline-multi-cycle`，0/35 tasks 待启动）。**硬前置 #1（[cpu-l1-mmu-demo] 6/6）已解**, Phase A 可启动 |
 | 4 | 起草 ADR-082 `Plugin::negotiate(CapabilityTable&)` | 🚧 Drafting（`docs/architecture/adr/ADR-082-plugin-negotiate-capability.md`，2026-09-27）。**拟生效触发**：mfc change archive 时同步 |
 | 5 | CI 第 10 条门禁（核内禁 `#ifdef FPGA`）实装 | ⏳ 待 `tools/check_plugin_portability.sh` 加 grep 规则 + `architecture-gates.yml` 挂接 |
+| 6 | **NEW** 启动 `mfc-cpu-pipeline-multi-cycle-fsm` Phase A (TDD) | 📋 **立即下一步**: 硬前置 #1 已解, 启动 Phase A 写 failing tests for ADR-082 negotiate + MUL/DIV FSM |
+| 7 | **NEW** 修 CPU pipeline MMU exception handler | 📋 跟踪独立 follow-up `cpu-pipeline-mmufault-handler` (P1, 1-2 周): mcause/mepc/mtval + trap entry |
 
-**本周唯一关键路径**：#1 修回归 → 6/6 PASS → mfc change 启动 TDD。
+**本周唯一关键路径**: #6 启动 mfc change Phase A → TDD Red→Green→Refactor→...→Archive。
 
-**已知 stale 风险**：wave3-mmu 残余 change（P1#4/P1#6）尚未闭环，initiative 形式 archive 状态见 §4.2 与 strategy §3 双向同步。
+**已知 stale 风险**: 
+- wave3-mmu 残余 change（P1#4/P1#6）尚未闭环 (plugin-framework-cycle-precision 0/19, mmu-config-json-driven 0/0)
+- CPU pipeline MMU exception handler 缺失 → 阻塞 [cpu-l1-mmu-demo] 真 e2e (当前 workaround 维持)
+- v0100-bootstrap.sh §honesty_audit 表已修 (2026-09-28): 之前硬编码 "117/117" 等数字, 现实测 ctest 输出替代 (`[cpu]` 118/118 ✅ 等)
 
 ---
 

@@ -205,11 +205,55 @@ echo "v0.10.0 launch gates (主控 execution-roadmap.md §3.1):"
 echo ""
 DEMO_PASSED="?"
 DEMO_TOTAL="?"
+CPU_PASSED="?"
+CPU_TOTAL="?"
+CPUINT_PASSED="?"
+CPUINT_TOTAL="?"
 if [ -x "build/bin/chipforge_tests" ]; then
-  DEMO_RESULT=$(./build/bin/chipforge_tests "[cpu-l1-mmu-demo]" --reporter compact 2>&1 | grep -oE "[0-9]+ passed|[0-9]+ failed" | head -2)
-  DEMO_PASSED=$(echo "$DEMO_RESULT" | head -1 | awk '{print $1}')
-  DEMO_FAILED=$(echo "$DEMO_RESULT" | tail -1 | awk '{print $1}')
+  # v0.10.0+ 起 §honesty_audit 强制实测 ctest (禁止 hardcoded 字符串).
+  # Catch2 compact 输出格式:
+  #   - 全 PASS: "All tests passed (X assertions in N test cases)"
+  #   - 部分 FAIL: "X failed | Y passed" (multi-line, head -1 第一行)
+  #   - 全 FAIL: "N test cases failed" (罕见)
+  # 通用解析: 先尝试 "in N test cases" 格式 (compact 全 PASS), 再回退到 "X failed | Y passed"
+  DEMO_OUTPUT=$(./build/bin/chipforge_tests "[cpu-l1-mmu-demo]" --reporter compact 2>&1)
+  if echo "$DEMO_OUTPUT" | grep -qE "All tests passed|in [0-9]+ test cases"; then
+    DEMO_PASSED=$(echo "$DEMO_OUTPUT" | grep -oE "in [0-9]+ test cases" | grep -oE "[0-9]+" | head -1)
+    DEMO_FAILED="0"
+  elif echo "$DEMO_OUTPUT" | grep -qE "[0-9]+ failed"; then
+    DEMO_FAILED=$(echo "$DEMO_OUTPUT" | grep -oE "[0-9]+ failed" | head -1 | grep -oE "[0-9]+")
+    DEMO_PASSED=$(echo "$DEMO_OUTPUT" | grep -oE "[0-9]+ passed" | head -1 | grep -oE "[0-9]+")
+  else
+    DEMO_PASSED="0"
+    DEMO_FAILED="?"
+  fi
   DEMO_TOTAL=$((DEMO_PASSED + DEMO_FAILED))
+  # [cpu] 测量
+  CPU_OUTPUT=$(./build/bin/chipforge_tests "[cpu]" --reporter compact 2>&1)
+  if echo "$CPU_OUTPUT" | grep -qE "All tests passed|in [0-9]+ test cases"; then
+    CPU_PASSED=$(echo "$CPU_OUTPUT" | grep -oE "in [0-9]+ test cases" | grep -oE "[0-9]+" | head -1)
+    CPU_FAILED="0"
+  elif echo "$CPU_OUTPUT" | grep -qE "[0-9]+ failed"; then
+    CPU_FAILED=$(echo "$CPU_OUTPUT" | grep -oE "[0-9]+ failed" | head -1 | grep -oE "[0-9]+")
+    CPU_PASSED=$(echo "$CPU_OUTPUT" | grep -oE "[0-9]+ passed" | head -1 | grep -oE "[0-9]+")
+  else
+    CPU_PASSED="0"
+    CPU_FAILED="?"
+  fi
+  CPU_TOTAL=$((CPU_PASSED + CPU_FAILED))
+  # [cpu-integration] 测量
+  CPUINT_OUTPUT=$(./build/bin/chipforge_tests "[cpu-integration]" --reporter compact 2>&1)
+  if echo "$CPUINT_OUTPUT" | grep -qE "All tests passed|in [0-9]+ test cases"; then
+    CPUINT_PASSED=$(echo "$CPUINT_OUTPUT" | grep -oE "in [0-9]+ test cases" | grep -oE "[0-9]+" | head -1)
+    CPUINT_FAILED="0"
+  elif echo "$CPUINT_OUTPUT" | grep -qE "[0-9]+ failed"; then
+    CPUINT_FAILED=$(echo "$CPUINT_OUTPUT" | grep -oE "[0-9]+ failed" | head -1 | grep -oE "[0-9]+")
+    CPUINT_PASSED=$(echo "$CPUINT_OUTPUT" | grep -oE "[0-9]+ passed" | head -1 | grep -oE "[0-9]+")
+  else
+    CPUINT_PASSED="0"
+    CPUINT_FAILED="?"
+  fi
+  CPUINT_TOTAL=$((CPUINT_PASSED + CPUINT_FAILED))
 fi
 
 echo "| # | 项 | 当前状态 | 目标 | 阻塞 PoC-1 启动? |"
@@ -364,9 +408,31 @@ echo "### 声称 vs 实测 对账"
 echo ""
 echo "| 指标 | 声称来源 | 声称数字 | 实测 | 一致? |"
 echo "|------|---------|---------|------|------|"
-echo "| [cpu] | AGENTS.md §已知测试状态 | 117/117 | 117/117 | ✅ |"
-echo "| [cpu-integration] | AGENTS.md + CHANGELOG.md v0.8.0 | 81/81 | 81/81 | ✅ |"
-echo "| [cpu-l1-mmu-demo] | AGENTS.md §已知测试状态 | 6/6 | 1/6 | ❌ |"
+# v0.10.0+ 起 §honesty_audit 强制实测 ctest (禁止 hardcoded 字符串, 2026-09-28 cpu-factory-satp-mapping archive 后修复)
+[ -n "$CPU_TOTAL" ] && [ "$CPU_TOTAL" != "?" ] && {
+  if [ "$CPU_PASSED" = "$CPU_TOTAL" ]; then
+    CPU_HONESTY="✅"
+  else
+    CPU_HONESTY="❌"
+  fi
+  echo "| [cpu] | AGENTS.md §已知测试状态 | 117/117 | $CPU_PASSED/$CPU_TOTAL | $CPU_HONESTY |"
+}
+[ -n "$CPUINT_TOTAL" ] && [ "$CPUINT_TOTAL" != "?" ] && {
+  if [ "$CPUINT_PASSED" = "$CPUINT_TOTAL" ]; then
+    CPUINT_HONESTY="✅"
+  else
+    CPUINT_HONESTY="❌"
+  fi
+  echo "| [cpu-integration] | AGENTS.md + CHANGELOG.md v0.8.0 | 81/81 | $CPUINT_PASSED/$CPUINT_TOTAL | $CPUINT_HONESTY |"
+}
+[ -n "$DEMO_TOTAL" ] && [ "$DEMO_TOTAL" != "?" ] && {
+  if [ "$DEMO_PASSED" = "$DEMO_TOTAL" ]; then
+    DEMO_HONESTY="✅"
+  else
+    DEMO_HONESTY="❌"
+  fi
+  echo "| [cpu-l1-mmu-demo] | AGENTS.md §已知测试状态 | 6/6 | $DEMO_PASSED/$DEMO_TOTAL | $DEMO_HONESTY |"
+}
 echo "| doc_link_check | (无显式声称) | — | $(echo "$BROKEN_COUNT" | head -c 4) broken | 🟡 待修复 |"
 echo ""
 echo "完整 baseline 见上文 7.1-7.6 各段。"
