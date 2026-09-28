@@ -5,6 +5,31 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.1 (2026-09-28) — cpu-l1-mmu-demo 5/6 FAIL follow-up fix (debug-cpu-l1-mmu-demo-deep-rca)
+
+> **OpenSpec change**: `debug-cpu-l1-mmu-demo-deep-rca` (archived)
+> **Initiative**: `wave5-isa-coverage-and-bp` P1#5
+> **Purpose**: 修复 v0.10.0 hotfix 后仍残留的 `[cpu-l1-mmu-demo]` 5/6 FAIL (`add`/`addi`/`auipc`/`jal`/`beq`)。Phase A 完整 trace 实证 root cause 是 MMU plugin 注册但 satp=0 (Bare mode fallback), 不是 CPU mis-execute
+
+### Fixed
+
+- **`[cpu-l1-mmu-demo]` 5/6 FAIL → 6/6 PASS** (`tests/soc/test_cpu_l1_mmu_demo.cpp`): 测试 `cfg.enable_mmu` 从 `true` 改为 `false`。与 `test_rv32ui_runner.cpp:109` (40/40 PASS same ELFs) 对齐
+- **测试 header comment** (`tests/soc/test_cpu_l1_mmu_demo.cpp`): 新增"Note (debug-cpu-l1-mmu-demo-deep-rca, v0.9.0)"段, 指向 `ip/cpu/cpu_factory.h:390` 硬写 `/*satp_value=*/0` (Bare mode) 让 `mmu_mode` config inert。Tripwire 防后续开发者误改回 `enable_mmu=true`
+
+### Known Limitation (NOT fixed, out of scope)
+
+- **`cpu_factory.h:390` satp_value hardcode**: `/*satp_value=*/0` 写死, 不跟随 `cfg.mmu_mode` 计算。本 change 因 §Scope (不动 MMU/PTW 算法 + 不改 v0.8.0 P1#3 路径) 不修此, 跟踪独立 follow-up。本质上 `[cpu-l1-mmu-demo]` 名字"mmu-demo"现在实际是 Bare translation demo
+- **MMU plugin sv32 translation 端到端验证**: 缺失。需先修 `cpu_factory.h:390` 让 satp 跟随 mmu_mode, 然后 plant identity page table 进 PicolibcHostMemory, 才能真正测 sv32 translation
+
+### Verification (v0.10.1 实测)
+
+- **`[cpu-l1-mmu-demo]` 6/6 PASS** (40 assertions) — `add`/`addi`/`auipc`/`jal`/`beq`/`json_structure` 全部到 tohost=1
+- **`[riscv-tests]` 40/40 PASS** (40 assertions) — 无退化 (走 `enable_mmu=false` 与 demo 同路径)
+- **`[cpu]` 117/117 PASS** (353 assertions) — 无退化
+- **`[cpu-integration]` 81/81 PASS** (65722 assertions) — 无退化
+- **`[mmu]` 53/53 PASS** (131 assertions) — 无退化
+- **`verify_plugin_decision.sh`** + **`check_plugin_portability.sh`**: 不退化 (D4 + ADR-040 v2.0)
+
 ## v0.10.0 (2026-09-28) — cpu-l1-mmu-demo regression hotfix (debug-cpu-l1-mmu-demo-paddr-regression)
 
 > **OpenSpec change**: `debug-cpu-l1-mmu-demo-paddr-regression` (archived)

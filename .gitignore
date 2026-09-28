@@ -5,6 +5,11 @@
 # 临时产物
 /patch.patch
 
+# Debug trace artifacts (large stderr/trace files from local debug sessions)
+/docs/notes/*.stderr
+/docs/notes/*.txt
+/docs/notes/archive/
+
 # Python
 __pycache__/
 *.py[cod]
