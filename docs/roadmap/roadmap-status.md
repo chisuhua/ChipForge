@@ -290,7 +290,7 @@
 - ✅ `tools/sync_strategy_status.sh` 实装 (状态自动派生)
 - ✅ 当前 v0.6.0 测试基线: TLM 386/17 (pre-existing fail) + CH_MEM 43/43
 
-**任务** (详见 [change proposal](../../openspec/changes/cpu-pipeline-canonical-ordering-assert/proposal.md)):
+**任务** (详见 [change proposal](../../openspec/changes/archive/2026-09-24-cpu-pipeline-canonical-ordering-assert/proposal.md)):
 - 1.1 在 `ip/cpu/cpu_factory.h::register_early_plugins` 加 canonical-ordering static_assert
 - 1.2 新建 `tests/cpu/integration/test_canonical_ordering.cpp` (故意错序注册触发 compile error)
 - 1.3 新建 ADR-048 plugin-registration-canonical-order
@@ -307,7 +307,7 @@
 **前置条件**:
 - ⏸ P0#1 cpu-pipeline-canonical-ordering-assert archive (依赖)
 
-**任务** (详见 [change proposal](../../openspec/changes/mmu-paddr-consume-and-real-memory/proposal.md)):
+**任务** (详见 [change proposal](../../openspec/changes/archive/2026-09-26-mmu-paddr-consume-and-real-memory/proposal.md)):
 - 1.1 IBusPlugin/DBusPlugin 真消费 `pl::PADDR` (PADDR-first pattern)
 - 1.2 PTW `advance_from_real_memory()` 替换 stub (新 `MemoryInterface` 抽象)
 - 1.3 `[cpu-l1-mmu-demo]` 升级 8 用例 (含 PADDR 翻译验证)

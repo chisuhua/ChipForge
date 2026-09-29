@@ -2,14 +2,14 @@
 
 > **Status**: v2 (Phase 6c 收官后升级, 2026-09-20; v1 L1CachePlugin-only supersede by v2 双模)
 > **Author**: Sisyphus (orchestrator) + Atlas (Phase 1.4 v1 author)
-> **关联决策**: [DECISION-2026-06-13-02](../../.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md) + [ADR-040 v2.0](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) + [ADR-046](../architecture/adr/ADR-046-multi-cycle-fsm-exemption.md)
+> **关联决策**: `.omo/drafts/decision-phase-1.4-methodology-review-2026-06-13.md` (DECISION-2026-06-13-02, gitignored 草稿不链接) + [ADR-040 v2.0](../architecture/adr/ADR-040-tlm-hdl-portability-constraints.md) + [ADR-046](../architecture/adr/ADR-046-multi-cycle-fsm-exemption.md)
 > **范围**: v1 L1CachePlugin (TLM-only) + v2 新增 7 大借鉴点 (CH_MEM elaboration DSL)
 > **关联文档**:
 > - **Phase 1.2 lessons (v1 范围)**: [lessons/phase-1.2-l1cacheplugin.md](../lessons/phase-1.2-l1cacheplugin.md) (TLM 模式踩坑清单)
 > - **Phase 6c lessons (v2 新增范围)**: [lessons/phase-6c-elaboration-substrate.md](../lessons/phase-6c-elaboration-substrate.md) (CH_MEM 模式踩坑清单 + 7 个模式 + 8 项检查)
-> - **D4 Plugin-style 决策**: [decision-plugin-framework-2026-06-08.md](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
-> - **Phase 1.3 v2 决策**: [decision-phase-1.3-bridge-2026-06-10.md](../../.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md)
-> - **Phase 1.3d-extras 决策**: [decision-phase-1.3d-extras-bridge-2026-06-13.md](../../.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md)
+> - **D4 Plugin-style 决策**: `.omo/drafts/decision-plugin-framework-2026-06-08.md`（gitignored 草稿不链接）
+> - **Phase 1.3 v2 决策**: `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`（gitignored 草稿不链接）
+> - **Phase 1.3d-extras 决策**: `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md`（gitignored 草稿不链接）
 > - **Phase 6c 研究**: [research/phase6c-elaboration-pattern-study.md](../research/phase6c-elaboration-pattern-study.md) (910 行, SpinalHDL/VexRiscv/CppHDL 借鉴)
 > - **Phase 6c OpenSpec archive**: `openspec/changes/archive/2026-09-17-plugin-elaboration-substrate/` + `archive/2026-09-20-fix-5stage-mux-segv-elaboration/`
 
@@ -24,7 +24,7 @@
 | 评估维度 | D1 可读性 / D2 范式合规 / D3 TLM↔RTL / D4 阶段调度 / D5 Payload 通信 / D6 测试便利 (6 维度) |
 | 边界类型 | **B1 接受** (范式自然, 无需妥协) / **B2 摩擦** (范式能表达但需 helper/包装) / **B3 局限** (范式硬限制, 需外部机制补充) |
 | 评估基线 | D4 + ADR-040 静态检查 **3+4/3 全部 PASS** (`.omo/evidence/phase-1.4-task-1-d4-static-check.txt`) |
-| 详细评估笔记 | [`.omo/drafts/phase-1.4-d1-d2-notes.md`](../../.omo/drafts/phase-1.4-d1-d2-notes.md) (324 行) + [`.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md`](../../.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md) (555 行) |
+| 详细评估笔记 | `.omo/drafts/phase-1.4-d1-d2-notes.md` (324 行, gitignored 不链接) + `.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md` (555 行, gitignored 不链接) |
 
 ---
 
@@ -256,7 +256,7 @@ static constexpr cf::plugin::uint_t<kIdxBits> extract_idx(
 // helper 仅暴露 constexpr 接口, 不暴露 shift/mask 表达式
 ```
 
-#### B2 模式 #5 + #6: 见详细评估笔记 (`.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md`)
+#### B2 模式 #5 + #6: 见详细评估笔记 (`.omo/drafts/phase-1.4-d3-d4-d5-d6-notes.md`，gitignored 草稿不链接)
 
 ### 3.3 B3 局限 (3 个观察点, 7%)
 

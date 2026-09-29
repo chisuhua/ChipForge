@@ -108,7 +108,7 @@
 | ADR-030 | PipeNode 三态握手 | Plugin | `include/cf/plugin/pipe_node.h` |
 | ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
-| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制）+ **v2.0 Phase 6c M5 落地 (2026-09-17, D4 elaboration 语义兑现)** |
+| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制；gitignored 草稿不链接）+ **v2.0 Phase 6c M5 落地 (2026-09-17, D4 elaboration 语义兑现)** |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
 | ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ Phase 6c M5 落地 (2026-09-17, 含 M1-M5 8 commit) | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
@@ -140,7 +140,7 @@
 | ADR-044 | L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 | IP 架构 | 🚧（设计方向已锁，实装推迟 mmu-tlb-ptw-impl 以后） | [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../../ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) |
 | ADR-045 | Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop | Plugin | ✅ Accepted (2026-09-15, plugin-framework-stall v0.1.3) | [`adr/ADR-045-plugin-ctrl-link-consumption.md`](adr/ADR-045-plugin-ctrl-link-consumption.md) |
 
-> ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 [`../soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md` §11](../../soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md)。
+> ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 `soc/cpu/docs/roadmap/archive/phase-1.5-stall-and-validate.md` §11。
 
 ### 2.4 统计
 
@@ -1061,7 +1061,7 @@ grep -nE "^class PipeBuilder\b" /workspace/project/ChipForge/include/cf/plugin/p
 
 **决策依据** (D6 共存方案):
 
-引用 `.omo/drafts/decision-plugin-framework-2026-06-08.md` §3.5 (CtrlLink 控制 API 命名) + §4.2 D6：
+引用 `.omo/drafts/decision-plugin-framework-2026-06-08.md` §3.5 (CtrlLink 控制 API 命名) + §4.2 D6（gitignored 草稿，不链接）：
 
 - `halt_when` (`CtrlLink` 对象方法) ↔ `stream_halt_when` (`chlib` 自由函数，位于 `chlib/stream.h:92`)：方案 C — 两者共存，明确层级差异
 - `throw_when` (`CtrlLink` 对象方法) ↔ `stream_throw_when` (`chlib` 自由函数，位于 `chlib/stream.h:58`)：方案 C — 两者共存
@@ -1209,7 +1209,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 | 字段 | 值 |
 |------|-----|
 | 状态 | ✅ 已实现（2026-06-12）|
-| 来源 | `.omo/drafts/fix-plan-2026-06-12-design.md` §3 Change 4 |
+| 来源 | `.omo/drafts/fix-plan-2026-06-12-design.md` §3 Change 4（gitignored 草稿，不链接）|
 | 决策 | PR 必须通过 3 个架构验证脚本（`verify_adr.sh` + `verify_plugin_decision.sh` + `check_plugin_portability.sh`），任一失败 → exit 1 → 阻止 merge；CI 集成在 `.github/workflows/architecture-gates.yml`（PR 阻塞）+ `.github/workflows/doc_check.yml` 末尾 smoke（`--only=ADR-024`, `continue-on-error: true` 不阻塞）|
 | 理由 | 防止未来 PR 引入 ADR 漂移 / D4 违规 / 移植性约束违反；3 脚本已就位（Phase 0/1 实施期）但未集成 CI，本 ADR 强制集成 |
 | 后果 | ✅ PR 自动化守门，ADR/D4/移植性问题早发现；⚠️ 3 脚本任一回归 → 阻塞所有 PR，需立即修复 |
@@ -1239,7 +1239,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 **状态**: ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17)
 **决策者**: User + Prometheus + Phase 6c Oracle 重构
 **背景**: 
-- v1.0 (2026-06-08): `.omo/drafts/decision-plugin-framework-2026-06-08.md`
+- v1.0 (2026-06-08): `.omo/drafts/decision-plugin-framework-2026-06-08.md`（gitignored 草稿，不链接）
 - v2.0 (2026-09-16): Phase 6c W0 审计 + Oracle 重构报告（`openspec/changes/plugin-elaboration-substrate/proposal.md`）
 **关联**: 重塑路线图（Phase 0/1/6 重新定位）; Phase 6c 兑现 D4 在 elaboration 语义下
 
