@@ -275,9 +275,15 @@ if [ -f "$CF_TASKS_FILE" ]; then
   # 确保是纯数字 (防止 grep 在 stderr 输出混入变量)
   CF_DONE=$(echo "$CF_DONE" | tr -dc '0-9' | head -c 3)
   CF_TOTAL=$(echo "$CF_TOTAL" | tr -dc '0-9' | head -c 3)
-  echo "| 2 | plugin-framework-cycle-precision | ${CF_DONE:-0}/${CF_TOTAL:-0} tasks | 25/25 | **是** |"
+  # 2026-09-29 修: 硬编码 "25/25" 是谎言, cycle-precision 实际 0/25 (Oracle 2026-09-29 核实, 仅 b2d7c21 创建提案无代码落地)
+  if [ "${CF_DONE:-0}" = "${CF_TOTAL:-0}" ] && [ "${CF_TOTAL:-0}" != "0" ]; then
+    CF_MATCH="✅"
+  else
+    CF_MATCH="❌"
+  fi
+  echo "| 2 | plugin-framework-cycle-precision | ${CF_DONE:-0}/${CF_TOTAL:-0} tasks | 25/25 (target) | $CF_MATCH |"
 else
-  echo "| 2 | plugin-framework-cycle-precision | tasks.md 缺失 | 25/25 | **是** |"
+  echo "| 2 | plugin-framework-cycle-precision | tasks.md 缺失 | 25/25 (target) | ❌ N/A |"
 fi
 echo ""
 
@@ -359,15 +365,15 @@ echo ""
 echo "### 文档链接健康"
 echo ""
 if [ -x "tools/doc_link_check.sh" ]; then
-  DOC_CHECK_RESULT=$(bash tools/doc_link_check.sh --quiet 2>&1 | grep -E "Total broken" | head -1)
-  BROKEN_COUNT=$(echo "$DOC_CHECK_RESULT" | grep -oE "[0-9]+" | head -1)
-  if [ -n "$BROKEN_COUNT" ] && [ "$BROKEN_COUNT" != "0" ]; then
-    echo "🔴 **broken markdown links: $BROKEN_COUNT** (主因: phase doc 重命名/归档未更新)"
-    echo "详细列表: 跑 \`bash tools/doc_link_check.sh\`"
-  elif [ "$BROKEN_COUNT" = "0" ]; then
+  # 2026-09-29 修: 改 exit-code 为主要判定 (--quiet 成功路径不输出任何 token, 原 grep "Total broken" 永远为空)
+  bash tools/doc_link_check.sh --quiet >/dev/null 2>&1
+  DOC_EXIT=$?
+  if [ "$DOC_EXIT" = "0" ]; then
     echo "✅ 全 PASS, 0 broken"
   else
-    echo "(无法解析 broken 数)"
+    BROKEN_COUNT=$(bash tools/doc_link_check.sh --quiet 2>&1 | grep -E "Total broken" | grep -oE "[0-9]+" | head -1)
+    echo "🔴 **broken markdown links: ${BROKEN_COUNT:-unknown}** (主因: phase doc 重命名/归档未更新)"
+    echo "详细列表: 跑 \`bash tools/doc_link_check.sh\`"
   fi
 else
   echo "(tools/doc_link_check.sh 不存在)"
@@ -509,7 +515,7 @@ if [ "$MODE" = "review" ]; then
   if [ "${CF_DONE_COUNT:-0}" -lt "${CF_TOTAL_COUNT:-0}" ] && [ "${CF_TOTAL_COUNT:-0}" != "0" ]; then
     echo "### 🔴 plugin-framework-cycle-precision 未收官 ($CF_DONE_COUNT/$CF_TOTAL_COUNT)"
     echo ""
-    echo "**推荐下一步**: P1#4 owner 收官 25/25 tasks (PoC-1 cycle 精度前提)"
+    echo "**推荐下一步**: cycle-precision 0/25 NOT STARTED — **Phase F optional, 不阻塞 PoC-1 启动**（2026-09-29 (b) 决策, mfc 走 self-contained counter via cpu_sim actual_cycles). 真正瓶颈 = mfc Phase B.3 / mmu-config-json-driven / wave4 占位展开"
     echo ""
     echo "或: 接受 \`[cpu-l1-mmu-demo]\` regression 修复后, 在 \`mfc-cpu-pipeline-multi-cycle-fsm\` 内部"
     echo "顺带实现 cycle 精度验证 (Phase F of mfc change)"

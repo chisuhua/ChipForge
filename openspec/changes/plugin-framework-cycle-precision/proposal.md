@@ -5,7 +5,20 @@ version_target: v0.8.0
 depends_on: []
 ---
 
-# plugin-framework-cycle-precision — 让 `pb.run()` 真 cycle 精度
+# plugin-framework-cycle-precision — 让 `pb.run()` 真 cycle 精度（NOT STARTED）
+
+> **⚠️ 2026-09-29 状态核实（Oracle 审计）**：本 change **0/25 未实施**。
+> - 代码考古：无 `CURRENT_CYCLE` / `cycle_count_t` / `test_pb_run_cycle_precision.cpp` / `ADR-050*` 任何痕迹
+> - Git 历史：`openspec/changes/plugin-framework-cycle-precision/` 下仅 1 个 commit (`b2d7c21` A+C Hybrid 战略落地, 仅创建提案/tasks/spec, 无代码落地)
+> - 现状：tasks.md 25 个 `- [ ]` 全未勾选（**不应勾选**，勾选即造假）
+>
+> **非 superseded, 但已降级为 Phase F optional**（2026-09-29 修订）:
+> - mfc `depends_on`（frontmatter line 5-7）**仍**引用本 change — openspec 模板声明性元数据
+> - **不再**是 mfc 启动条件: mfc proposal §实施窗口 line 125 现写 "**启动条件: 仅 `[cpu-l1-mmu-demo]` 6/6 PASS**", 本 change 降级为 Phase F optional 消费点
+> - 实际消费位置: mfc `tasks.md:201` 依赖图 cycle-precision → Phase F → E → D → C → B → A; mfc `tasks.md:11` Phase A 决策明示"不依赖"
+> - **不能**标记取代（superseded）: mfc 前置依赖本 change（即便 Phase F 才消费），反转 supersession 会破坏依赖关系
+>
+> **状态**: not-started, Phase F optional。**决策**: 采纳 `(b)`, 不阻塞 mfc Phase A 启动。重启触发 = (i) Phase F 提前进入 + DSE/VexiiRiscv 真实消费者需求, 或 (ii) wave4 DSE Pareto 启动。
 
 ## Why
 

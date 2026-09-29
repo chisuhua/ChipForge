@@ -9,6 +9,14 @@ depends_on:
 
 # mfc-cpu-pipeline-multi-cycle-fsm — MUL/DIV FSM 化与 ADR-082 negotiate 集成（v0.10.0 收官版）
 
+> **`depends_on` 声明 vs 实际消费差异**（2026-09-29 Step 4 决策 (b)）：
+> - Frontmatter `depends_on` 含 `plugin-framework-cycle-precision` 是 openspec 模板**声明性元数据**, **非执行阻塞**。
+> - 实际消费仅在 **Phase F**（mfc `tasks.md:201` 依赖图: cycle-precision → Phase F → E → D → C → B → A）, **Phase A 启动不依赖**（`tasks.md:11` 明示 "不依赖 `plugin-framework-cycle-precision` change（其尚未 archive, 0/25 tasks）"）。
+> - **决策采纳 (b)**: cycle-precision 降级为 Phase F optional。Phase F 时点路径选择:
+>   - **(b)-lite**: 直接读 `tools/cpu_sim/main.cpp:230-242` 的 `actual_cycles`（wall-clock 计数, **非** framework cycle 精度, 仅作 cycle 精度不足时的兜底）
+>   - **(a)**: Phase F 启动前实装 cycle-precision（解锁真 cycle 精度能力, 当前 0/25 NOT STARTED）
+> - **(a) 路径保留** — 若 Phase F 提前进入或 DSE/VexiiRiscv 对拍门禁触发真实消费者需求, 可重新启用
+
 > **承接关系**：本 change **supersedes** `cpu-pipeline-multi-cycle`（P1#5，2026-09 已作为 P1 启动，当前 0/35 tasks，未 archive）。
 >
 > **处置关系**：
@@ -90,7 +98,7 @@ if (!mul_status) throw PluginException(mul_status.error());  // ADR-047 fail-fas
 
 ### 5. Cycle precision 验证（P1#4 闭环）
 
-- 利用 `plugin-framework-cycle-precision` 25/25 的 `pb.run(cycle_count=N)` API
+- 利用 `plugin-framework-cycle-precision` 的 `pb.run(cycle_count=N)` API（**Phase F optional 消费点, 不阻塞 Phase A 启动** — 见 [`plugin-framework-cycle-precision/proposal.md`](../plugin-framework-cycle-precision/proposal.md) §NOT STARTED 标头 + 本 change §实施窗口决策 (b)）
 - 验证 MUL=1 cycle、DIV=33 cycle、stall 期间 IPC 回归 ≤5%
 - 通过 `busy-cycles` Payload Key 在 idle 周期数 ≤ total cycles × 5%
 
@@ -122,6 +130,9 @@ if (!mul_status) throw PluginException(mul_status.error());  // ADR-047 fail-fas
 
 ## 实施窗口
 
-- **启动条件**：plugin-framework-cycle-precision 25/25 + `[cpu-l1-mmu-demo]` 6/6 PASS（两个 hard prerequisite）
+- **启动条件**: `[cpu-l1-mmu-demo]` 6/6 PASS（**唯一 hard prerequisite**）
+  - `plugin-framework-cycle-precision` 不再是启动条件: mfc `tasks.md:11` 明示"不依赖", frontmatter `depends_on` 是声明性元数据（实际消费在 Phase F, 见 mfc `tasks.md:178-182` + 本 proposal §5 line 91-95）
+  - **Phase F 消费点**: 通过 framework cycle-precision 验证 MUL=1c / DIV=33c / IPC 回归 ≤5%（详见 §5 line 91-95）
+  - **Phase F 时点路径选择**: (b)-lite — 直接读 `tools/cpu_sim/main.cpp:230-242` `actual_cycles`（无需 framework API）；(a) — Phase F 启动前实装 cycle-precision。2026-09-29 默认采纳 (b)-lite
 - **估时**：3-4 周（与 P1#6 mmu-config-json-driven 并行）
 - **顺序**：先实现 FSM → 再 integrate ADR-082 → 最后 rv32um PASS 验证

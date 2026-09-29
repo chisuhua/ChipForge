@@ -8,7 +8,7 @@
 > 1. **路径**：`ip/cpu/arch/riscv/mul_div_fsm.h`（**不是** `ip/cpu/plugins/mul.h` —— AGENTS.md 说 `ip/cpu/` 是历史最老 IP，`plugins/` 子目录不存在，新文件与既有 `arch/riscv/mul.h` 同级）
 > 2. **与 RiscvMulPlugin 关系**：并存（双 Plugin），CPU Factory 由 cfg 选择；**不替换** `RiscvMulPlugin` 以保护既有 `[cpu]` 测试（`test_mul.cpp` 56 行 + `test_mul_latency.cpp` 90 行 PASS）
 > 3. **CH_MEM 配对**：Phase A **不建** `_chmem.h`（避免 Check 2 空 stub FAIL），Phase D.1 才建 `mul_div_fsm_chmem.h`
-> 4. **Cycle 精度**：Phase A 用 Plugin 内部 `busy_cycles_` counter（每次 `pb.run()` +1），**不依赖** `plugin-framework-cycle-precision` change（其尚未 archive，0/9 tasks）
+> 4. **Cycle 精度**：Phase A 用 Plugin 内部 `busy_cycles_` counter（每次 `pb.run()` +1），**不依赖** `plugin-framework-cycle-precision` change（其尚未 archive，0/25 tasks, 2026-09-29 (b) 决策降级为 Phase F optional）
 > 5. **A.5 已删除**：过早抽象（Phase A 单一调用方），合并入 Phase D.4
 > 6. **33 vs 35 cycle 决议**：DIV=33 cycle 是 radix-2 iterative 实测（MUL 32 位迭代 32 cycle + 1 cycle write-back = 33 cycle，**不**是 RISC-V 规范上限 35 cycle）；superseded 前作 35 cycle 是"全 35 cycle stall"近似，本 change 改用真 iterative 实现
 
@@ -198,7 +198,7 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 ## 依赖关系
 
 ```
-P1#4 cycle-precision (25/25) ──┐
+P1#4 cycle-precision (0/25 NOT STARTED, Phase F optional) ──┐
                               ├──> Phase F → Phase E → Phase D → Phase C → Phase B → Phase A
 [cpu-l1-mmu-demo] 6/6 ──────────┘
 ```
