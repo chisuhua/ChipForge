@@ -1,11 +1,11 @@
-# ADR-046: 多周期协议引擎豁免 D4 无状态机禁令（Phase 6c）
+# ADR-046: 多周期协议引擎豁免 D4 无状态机禁令（Phase 6c，v2.0 扩展）
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | ✅ Accepted (2026-09-16, Phase 6c M5 落地) |
-| 来源 | Phase 6c W0 审计 + Oracle 报告 |
-| 决策 | 多周期协议引擎（MMU/PTW、Cache refill FSM、I/O 总线握手）豁免 D4 "无状态机" 禁令，但必须使用 `chlib::ch_state_machine` DSL 而非手写 `enum class + switch` |
-| 关联 ADR | ADR-025（无基业务 tick）、ADR-037（Plugin 作为设计范式）、ADR-040 v2.0（TLM→HDL 移植性约束修订） |
+| 状态 | ✅ Accepted v1.0 (2026-09-16, Phase 6c M5 落地) → ✅ Accepted v2.0 (2026-09-28, Phase 6d/wave5 mfc-cpu-pipeline-multi-cycle-fsm 扩展算术多周期豁免) |
+| 来源 | Phase 6c W0 审计 + Oracle 报告；v2.0 扩展触发：mfc-cpu-pipeline-multi-cycle-fsm (v0.10.0 PoC-1 硬指标 RV32M 100% PASS) |
+| 决策 | **v1.0**: 多周期协议引擎（MMU/PTW、Cache refill FSM、I/O 总线握手）豁免 D4 "无状态机" 禁令，但必须使用 `chlib::ch_state_machine` DSL 而非手写 `enum class + switch`。**v2.0**: 新增 **EX 阶段多周期算术单元**（RV32M MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU）豁免子类，强约束见 §2.1.1 |
+| 关联 ADR | ADR-025（无基业务 tick）、ADR-037（Plugin 作为设计范式）、ADR-040 v2.0（TLM→HDL 移植性约束修订）、ADR-082（Plugin::negotiate capability 协商） |
 
 ---
 
@@ -52,7 +52,7 @@ Cache refill FSM（miss 处理）:
 
 ## 2. 决策
 
-### 2.1 豁免范围（仅限多周期协议引擎）
+### 2.1 豁免范围（v1.0: 仅限多周期协议引擎）
 
 **豁免 D4 无状态机禁令**：以下组件可以使用 FSM：
 - **MMU TLB / PTW**（多级页表 walk）
@@ -60,10 +60,37 @@ Cache refill FSM（miss 处理）:
 - **I/O 总线握手 FSM**（AXI 总线状态机、CHI 协议等）
 - **任何**协议层的状态机（CPU 总线、NoC 路由器、Memory Controller 等）
 
-**不豁免范围**（仍必须遵守 D4）：
+**不豁免范围（v1.0, 仍必须遵守 D4）**：
 - **流水线数据通路 Plugin**（IF/ID/EX/MEM/WB 各阶段逻辑）
 - **组合逻辑 Plugin**（ALU、Decoder mux、Branch decision）
 - **寄存器文件**（用 ch_reg 数组，不用 FSM）
+
+### 2.1.1 v2.0 扩展豁免（EX 阶段多周期算术单元）
+
+> **触发 change**: mfc-cpu-pipeline-multi-cycle-fsm (v0.10.0, P1 PoC-1 硬指标)
+> **修订日期**: 2026-09-28
+
+**新增豁免子类**：EX 阶段多周期算术单元可以使用 FSM：
+
+- **RV32M 扩展**（MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU）—— RISC-V 规范规定 DIV 类 latency 1~35 cycle，FSM 是协议正确的实现方式
+- **未来可能的扩展**：RV64M 扩展（FPU multicycle、IEEE 754 除法等）按相同模式走 ADR 修订
+
+**v2.0 强约束**（与 v1.0 协议层豁免**叠加**——必须全部满足才能豁免）：
+
+1. **必须使用 `chlib::ch_state_machine` DSL**，禁止手写 `enum class State + switch(state_)`（与 v1.0 一致）
+2. **必须实现 `Plugin::negotiate(CapabilityTable&)`**（ADR-082）声明 `provides = { multi_cycle_fsm: true, fsm_exemption_kind: FSM_EXEMPTION::MULTI_CYCLE_ARITHMETIC }`
+3. **必须实现 `Plugin::build()` 顶部 `MulDivResult` fail-fast 校验**（ADR-047）：cfg.xlen 与 capability 缺失必须在 elaboration 期抛 `PluginException`，**禁止运行期隐式退化**
+4. **必须有 TLM↔CH_MEM cycle parity 验证**（spec Requirement "TLM-CH_MEM cycle parity"）：在 `[cpu][mul-div-fsm]` family 跑同一组 input，cycle 数差必须 ≤0
+5. **必须 CI 第 8 条门禁通过**：`tools/verify_plugin_decision.sh` 检测 `build()` 内 `dynamic_cast` 必须 = 0
+6. **CH_MEM 配对文件**：`ip/cpu/plugins/mul_div_fsm_chmem.h` 必须含 `ch_*` 类型（`check_plugin_portability.sh` Check 2）
+
+**v2.0 不豁免边界**（保留 v1.0 "组合逻辑 Plugin（ALU）不豁免" 立场）：
+
+- **1-cycle 算术**（ADD/SUB/AND/OR/XOR/SLT 等）仍走 `at_stage` 闭包 + 组合逻辑，**不走 FSM**
+- **分支决策 Plugin**（BranchPlugin）仍走 `at_stage`，**不走 FSM**
+- **寄存器文件**（RegFile）用 `ch_reg` 数组，不用 FSM
+
+**v2.0 与 v1.0 的关键区别**：v1.0 豁免"协议层 FSM"（与外部组件握手），v2.0 扩展"算术层 FSM"（latency > 1 cycle 的内部计算）。两者本质都是"状态机是协议正确的实现方式"——v1.0 的"协议"指 CPU ↔ 外部组件，v2.0 的"协议"指 CPU ↔ RISC-V 规范 latency 合约。
 
 ### 2.2 必须使用 `chlib::ch_state_machine` 而非手写 FSM
 
@@ -170,13 +197,15 @@ D4 核心是"声明式表达替代命令式控制流"。**多周期 FSM 本质�
 
 ### 4.1 Phase 6c 范围内的豁免使用
 
-| 组件 | FSM 类型 | 落地时间 |
-|---|---|---|
-| **MMU PTW** | 5-状态 sv39 walk（IDLE/L0_WAIT/L1_WAIT/L2_WAIT/DONE/FAULT）| Phase 6d（M3-M4 仅做单周期组件）|
-| **Cache refill** | 4-状态（IDLE/LOOKUP/MISS/REFILL_WAIT）| Phase 6d |
-| **AXI/CHI 协议** | 8+ 状态握手 | Phase 6d（无总线实现）|
+| 组件 | FSM 类型 | 落地时间 | v2.0 算术豁免？ |
+|---|---|---|---|
+| **MMU PTW** | 5-状态 sv39 walk（IDLE/L0_WAIT/L1_WAIT/L2_WAIT/DONE/FAULT）| Phase 6d（M3-M4 仅做单周期组件）| — |
+| **Cache refill** | 4-状态（IDLE/LOOKUP/MISS/REFILL_WAIT）| Phase 6d | — |
+| **AXI/CHI 协议** | 8+ 状态握手 | Phase 6d（无总线实现）| — |
+| **MulDivFsmPlugin** | 3-状态（IDLE/MULTIPLY\|DIVIDE/WRITE_BACK），DIV=33c iterative radix-2 | Phase 6d/wave5 (mfc-cpu-pipeline-multi-cycle-fsm) | ✅ v2.0 算术豁免首例 |
 
 **Phase 6c W1-9 内不涉及多周期 FSM**——单周期组件足够 PoC。豁免**前瞻锁定**，但**实际使用**推迟到 Phase 6d。
+**Phase 6d/wave5 内首个算术多周期 FSM**：`MulDivFsmPlugin`（mfc-cpu-pipeline-multi-cycle-fsm change）作为 v2.0 算术豁免的首个落地样例，强约束见 §2.1.1。
 
 ### 4.2 必须配合的 CI 检查（`check_plugin_portability.sh` v2.0）
 
@@ -256,6 +285,7 @@ ADR-040 Tier-1 #5 翻转：**CH_MEM 是新正道**——ch 渗透禁令变成"�
 | 2026-09-16 | Accepted | Phase 6c M5 落地：豁免范围明确 + DSL 强约束 |
 | 2026-09-17 | Verified | Phase 6c M5 完成: edad878 (M4/W7 BranchPlugin+HazardPlugin RAW) + b68996a (M4/W8 cpu_factory+PoC fix); 所有 8 commit 已推送; 前瞻锁定确认 |
 | 2026-09-22 | Verified | Phase 6d.6/6d.7 落地: `mmu_ptw_chmem.h` + `l1_cache_refill_fsm_chmem.h` 用 ch_state_machine DSL 实装; DSL `build()` select-tree 增强 (transition_when API); Check 9 豁免白名单 (check_plugin_portability.sh 9/9); PoC 6/6 PASS (mmu 3 + cache 3) |
+| 2026-09-28 | **v2.0 Proposed → Accepted** | 新增 §2.1.1 EX 阶段多周期算术单元豁免子类（MulDivFsmPlugin 首例）；强约束：ch_state_machine DSL + negotiate() + MulDivResult fail-fast + TLM↔CH_MEM cycle parity + CI #8 dynamic_cast=0 + CH_MEM 配对。触发 change: mfc-cpu-pipeline-multi-cycle-fsm (v0.10.0 P1 PoC-1) |
 
 ---
 

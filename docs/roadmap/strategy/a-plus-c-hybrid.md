@@ -101,8 +101,9 @@ graph TD
 | `2026-09-26-mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | ✅ DONE (archived) | 0 36 |
 | `cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | TODO | 32 0 |
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
-| `debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | TODO | 19 0 |
-| `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | TODO | 35 0 |
+| `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (8/60) | 52 8 |
+| `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
+| `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
 
 > **Status 解读**:

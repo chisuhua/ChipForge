@@ -86,6 +86,20 @@ cf::cpu::CPUConfig load_config(const std::string& path) {
     cfg.pipeline_stages =
         p.value("pipeline_stages", cfg.pipeline_stages);
     cfg.mul_latency = p.value("mul_latency", cfg.mul_latency);
+    // mfc-cpu-pipeline-multi-cycle-fsm: MUL/DIV 实现选择 (Phase A in-context 验证)
+    // 合法值: "legacy" (默认, RiscvMulPlugin) | "fsm" (MulDivFsmPlugin)
+    {
+      const std::string mul_impl_str = p.value("mul_impl", std::string("legacy"));
+      if (mul_impl_str == "fsm") {
+        cfg.mul_impl = cf::cpu::CPUConfig::MulImpl::FSM;
+      } else if (mul_impl_str == "legacy") {
+        cfg.mul_impl = cf::cpu::CPUConfig::MulImpl::LEGACY;
+      } else {
+        std::cerr << "FAIL: invalid mul_impl '" << mul_impl_str
+                  << "' (must be 'legacy' or 'fsm')\n";
+        std::exit(1);
+      }
+    }
     cfg.dispatch_width =
         p.value("dispatch_width", cfg.dispatch_width);
     cfg.n_lanes = p.value("n_lanes", cfg.n_lanes);
@@ -234,6 +248,10 @@ int main(int argc, char** argv) {
   std::cout << "dispatch_width="
             << static_cast<unsigned>(cfg.dispatch_width) << "\n";
   std::cout << "mul_latency=" << static_cast<unsigned>(cfg.mul_latency) << "\n";
+  std::cout << "mul_impl="
+            << (cfg.mul_impl == cf::cpu::CPUConfig::MulImpl::FSM ? "fsm"
+                                                                  : "legacy")
+            << "\n";
 
   // reserved for future use — avoid unused-variable warning
   (void)seed;
