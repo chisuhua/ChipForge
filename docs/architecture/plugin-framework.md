@@ -5,14 +5,14 @@
 | 版本号 | 1.2 |
 | 日期 | 2026-06-09 |
 | 状态 | **Active (Phase 0 已完成, 5+3/5+3 P0+M1 组件稳定, Phase 1.5 进行中)** |
-| 关联决策 | [decision-plugin-framework-2026-06-08](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) |
+| 关联决策 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（gitignored 草稿，不链接） |
 | 适用范围 | ChipForge 插件架构（独立于 CppTLM/CppHDL 框架层） |
 
 ---
 
 ## 1. 设计动机
 
-ChipForge 的电路设计有两种主要风格：命令式的 `tick()` 风格（每个模块自己实现 `tick()` 推进仿真）和声明式的 Plugin 风格（每个模块通过 `at_stage` 注册阶段回调，调度由 `PipeBuilder` 决定）。本节列出选择 Plugin 风格的五个关键动机。这些论证直接引用决策文档 [`decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) §2.1-2.3 的三段式论证。
+ChipForge 的电路设计有两种主要风格：命令式的 `tick()` 风格（每个模块自己实现 `tick()` 推进仿真）和声明式的 Plugin 风格（每个模块通过 `at_stage` 注册阶段回调，调度由 `PipeBuilder` 决定）。本节列出选择 Plugin 风格的五个关键动机。这些论证直接引用决策文档 `.omo/drafts/decision-plugin-framework-2026-06-08.md` §2.1-2.3（gitignored 草稿，不链接）的三段式论证。
 
 ### 1.1 替换 `tick()`：Plugin 是范式不是工具
 
@@ -108,7 +108,7 @@ Plugin 风格强制一个明确的生命周期，每个阶段职责清晰：
 
 > Plugin 框架的目的不是"提供调度"，而是"用声明式风格替代 `tick()` 风格"。调度本身仍然由业务代码决定；框架只提供类型安全 Key、阶段回调、状态机、声明式控制这四类基础设施。
 
-详细决策依据见 [decision-plugin-framework-2026-06-08.md §2.1-2.3](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)。
+详细决策依据见 `.omo/drafts/decision-plugin-framework-2026-06-08.md` §2.1-2.3（gitignored 草稿，不链接）。
 
 ---
 
@@ -646,7 +646,7 @@ static int run_hello_pipeline() {
 - 想给上述 Cache 注入"tag lookup 逻辑"——实现 `Plugin`，用 `Payload<T>` 共享状态，由 `at_stage` 阶段调度
 - 二者通过**配置层**（JSON 模块列表 + C++ Plugin 注册）组合，而非通过**代码继承**组合
 
-> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 [`soc/cpu/docs/roadmap/phase-1-tlm-foundation.md`](../../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md)）。
+> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 `soc/cpu/docs/roadmap/archive/phase-1-tlm-foundation.md`）。
 
 ### 4.2 Component
 
@@ -715,7 +715,7 @@ CppHDL 的 `chlib` 子模块（位于 `CppHDL/include/chlib/`）已存在一套*
 
 #### 4.3.2 D6 决策依据
 
-> **决策引用**：`.omo/drafts/decision-plugin-framework-2026-06-08.md` §3.5（D6 CtrlLink 控制 API 命名）+ ADR-033 §"决策依据"。
+> **决策引用**：`.omo/drafts/decision-plugin-framework-2026-06-08.md` §3.5（D6 CtrlLink 控制 API 命名；gitignored 草稿，不链接）+ ADR-033 §"决策依据"。
 
 D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业务代码统一使用 `CtrlLink::*` 对象方法，`chlib` 自由函数保持向后兼容。
 
@@ -758,7 +758,7 @@ D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业�
 
 > **详细阶段定义**：
 > - Phase 0：[`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
-> - Phase 1：[`soc/cpu/docs/roadmap/phase-1-tlm-foundation.md`](../../soc/cpu/docs/roadmap/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
+> - Phase 1：`soc/cpu/docs/roadmap/archive/phase-1-tlm-foundation.md`（L1CachePlugin 业务实现）
 > - Phase 6：[`docs/roadmap/phases/phase-6-declarative.md`](../../docs/roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
 
 ### 5.2 Phase 0 接口稳定性承诺

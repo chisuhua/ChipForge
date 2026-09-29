@@ -4,7 +4,7 @@
 > **所属阶段**: Phase 0 — Plugin 最小脚手架
 > **目标版本**: ChipForge 0.0.x
 > **依赖**: 无
-> **决策依据**: [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md)
+> **决策依据**: `.omo/drafts/decision-plugin-framework-2026-06-08.md`（gitignored 草稿，不链接）
 > **实施日期**: 2026-06-08
 
 ## 1. 目标
@@ -131,7 +131,7 @@ target_include_directories(cf_plugin
 | `chlib::PipelineStage` / `PipelineChain` | **可借鉴**:cf_plugin 的 StageLink 可调用这些已有组件作为 RTL 后端实现 |
 | `chlib::stream_*_when` | **共存**:保留 chlib 自由函数,Plugin 路径用 `ctrl_link.halt_when()` 对象方法 |
 
-> 详细决策: [`.omo/drafts/decision-plugin-framework-2026-06-08.md`](../../.omo/drafts/decision-plugin-framework-2026-06-08.md) D6-D9
+> 详细决策: `.omo/drafts/decision-plugin-framework-2026-06-08.md` D6-D9（gitignored 草稿，不链接）
 
 ## 8. 实施参考
 
