@@ -106,6 +106,10 @@ graph TD
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
 
+> **⚠️ 手动补充 (2026-09-29)**: `vexii-riscv-parity-poc` (wave6-linux-and-productization 提案) 暂未出现在自动派生表内——`wave6-linux-and-productization` initiative 待 `plugin-framework-cycle-precision` 25/25 闭环 + `mmu-config-json-driven` archive 后正式注册（per vexii frontmatter `initiative:` 字段预声明占用编号）。同步脚本按 `~/.local/share/openspec/context-stores/chipforge/initiatives/*/` 过滤，wave6 目录缺失时静默丢弃该 change。当前条目**手补**，下次 sync 前需重新注册或手工保留。
+>
+> | `vexii-riscv-parity-poc` | wave6-linux-and-productization (PROPOSED) | P1 | TODO | 0 74 |
+
 > **Status 解读**:
 > - `TODO`: tasks.md 全部 open 或不存在
 > - `IN_PROGRESS (N/M)`: 部分完成
@@ -129,12 +133,12 @@ graph TD
 
 | # | 缺漏 | 影响 | 处理 |
 |---|------|------|------|
-| **L1** | ~~`7stage_add_elf_end_to_end` superscalar cpu_sim segfault (v0.2.2 起 pre-existing)~~ | **已修复** (`b82af0f` CpuFactory 7stage superscalar `lane_counters` use-after-free + v0.7.0 P0#1 canonical-ordering 沉淀); [cpu-integration] 5 个 case 含 "7stage" 全 PASS | 闭合 (无后续 action) |
+| **L1** | ~~`7stage_add_elf_end_to_end` superscalar cpu_sim segfault (v0.2.2 起 pre-existing)~~ | **已修复** (`b82af0f` CpuFactory 7stage superscalar `lane_counters` use-after-free + v0.7.0 P0#1 canonical-ordering 沉淀); [cpu-integration] 5 个 case 含 "7stage" 全 PASS | 闭合 [✅ v0.7.0/v0.10.0 双锁] (无后续 action) |
 | **L2** | `ip/cpu` 老 IP 不遵守标准 IP 文档结构 (无 `ip/cpu/docs/` 等) | 文档债务累积 | 推迟 wave4 完成后 cleanup change (1 天) |
 | **L3** | TLM deprecation 路径不清晰 (ADR-040 v3.0 §1260 已标 `pb.run()` deprecated, 但 wave3 全基于 TLM) | 用户预期混乱 | 战略级澄清: TLM 与 CH_MEM 并存**至少到 v1.0.0**, CH_MEM 是 Phase 6d+ 主路径, TLM 是兼容基线 |
-| **L4** | MUL/DIV riscv-tests ELF 完全缺失 (Metis #4) | P1#5 测试基线缺 | wave3 P1#5 启动前 vendor `tests/cpu/riscv_tests/build_rv32m.sh` |
+| **L4** | ~~MUL/DIV riscv-tests ELF 完全缺失 (Metis #4)~~ | [✅ v0.10.0 已闭环: commit `b12c920` vendor mul/div manual_elf + mfc Phase A in-context (commit `4c3b796`)] | 闭合 (无后续 action) |
 | **L5** | rv32mi-p (CSR/trap) ELF 是否已 vendor 未验证 | P2#6 测试基线缺 | wave4 P2#6 启动前 vendor `tests/cpu/riscv_tests/build_rv32mi.sh` |
-| **L6** | 17 pre-existing TLM fail 根因未分析 (commit `7d310c6` 之后稳定但 17 个 fail 来源不明) | Phase 1.5 退出标准 "RV32I ≥85%" 验收有歧义 | wave3 (2026-09-26) 加 root-cause triage change (不阻塞本战略启动) |
+| **L6** | ~~17 pre-existing TLM fail 根因未分析 (commit `7d310c6` 之后稳定但 17 个 fail 来源不明)~~ | [✅ v0.10.0/1/2 hotfix 已闭环 0 fail: v0.10.0 paddr-regression (commit `6a0d506`) + v0.10.1 deep-rca workaround `enable_mmu=false` + v0.10.2 cpu-factory-satp-mapping (commit `9070ceb`) 修 cpu_factory.h:390] | 闭合; 剩余 cpu-pipeline-mmufault-handler P1 跟踪 (真 sv32 e2e 翻转) |
 
 ## 10. Go/No-Go 决策点 (Metis Hidden Intentions 修订)
 

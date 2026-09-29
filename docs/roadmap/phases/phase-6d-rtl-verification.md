@@ -79,7 +79,7 @@
 | E9 | MMU PTW 5 状态 FSM (`chlib::ch_state_machine`) 实装 + `CF_PLUGIN_USE_FSM_EXEMPT` 标记 | `ip/cpu/plugins/mmu_ptw_chmem.h` |
 | E10 | L1Cache refill FSM (4 状态) 实装 | `ip/cache/tlm/l1_cache_refill_fsm_chmem.h` |
 | E11 | Harness 切换 (`tools/cpu_sim/main.cpp` → CppHDL sim runner) + 保留 CLI 兼容 | `tools/cpu_sim --elf add.elf` 跑 CppHDL sim |
-| E12 | `chipforge_tests` TLM baseline 0 回归 (391 PASS / 12 known FAIL 保持不变, 不新增 FAIL) | `ctest -R chipforge_tests` |
+| E12 | `chipforge_tests` TLM baseline 0 回归 (419 PASS / 1 known FAIL / 420 total @ HEAD fbe5e48, v0100-bootstrap §honesty_audit 实测; Phase 6d 启动时回归基线) | `ctest -R chipforge_tests` |
 | E13 | `chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS | `ctest -R chipforge_tests_chmem` |
 | E14 | CHANGELOG v0.4.x 发布 + ADR-037 v2.0 Accepted + ADR-040 v3.0 (Verilator 集成段) | `CHANGELOG.md` + `docs/architecture/adr.md` |
 

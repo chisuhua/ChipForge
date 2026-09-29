@@ -415,7 +415,7 @@ echo "|------|---------|---------|------|------|"
   else
     CPU_HONESTY="❌"
   fi
-  echo "| [cpu] | AGENTS.md §已知测试状态 | 117/117 | $CPU_PASSED/$CPU_TOTAL | $CPU_HONESTY |"
+  echo "| [cpu] | AGENTS.md §已知测试状态 (baseline = HEAD fbe5e48 v0.10.0+v0.10.1+v0.10.2+mfc Phase B 实测) | 124/124 | $CPU_PASSED/$CPU_TOTAL | $CPU_HONESTY |"
 }
 [ -n "$CPUINT_TOTAL" ] && [ "$CPUINT_TOTAL" != "?" ] && {
   if [ "$CPUINT_PASSED" = "$CPUINT_TOTAL" ]; then

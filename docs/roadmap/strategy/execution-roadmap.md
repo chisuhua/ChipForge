@@ -527,7 +527,7 @@ register_early_plugins() 硬编码消除 (TLB 几何 / SvMode)
 - 战略入口: [`a-plus-c-hybrid.md`](./a-plus-c-hybrid.md) (§1-§10)
 - 路线图状态: [`../roadmap-status.md`](../roadmap-status.md) (滚动状态简报)
 - 下游架构演进: [`soc/cpu/docs/roadmap/execution-roadmap.md §3.5`](../../../soc/cpu/docs/roadmap/execution-roadmap.md#35-架构演进与架构图v0010--v130-四版本节点) (v0.10.0 → v1.3.0)
-- 6 活跃 changes: `openspec/changes/{cpu-pipeline-multi-cycle,mmu-paddr-consume-and-real-memory,plugin-framework-cycle-precision,cache-phase1.5-4way,phase-1.5-wave-4}/`
+- 7 活跃 changes (含 2026-09-29 新增 wave6 prep): `openspec/changes/{cpu-pipeline-multi-cycle,mmu-paddr-consume-and-real-memory,plugin-framework-cycle-precision,cache-phase1.5-4way,phase-1.5-wave-4,vexii-riscv-parity-poc}/`
 - sync 工具: `tools/sync_strategy_status.sh` (§7 AUTO-GENERATED 派生)
 - 验证命令: `tools/{verify_adr,verify_plugin_decision,check_plugin_portability,doc_link_check}.sh`
 
