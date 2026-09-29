@@ -1,11 +1,11 @@
-# Reference 4：12 PoC 详细规范 + PoC↔change 映射 + 8 风险反向决策树
+# Reference 4：14 PoC 详细规范 + PoC↔change 映射 + 8 风险反向决策树（2026-09-29 扩展：新增 PoC-13 占位 + PoC-14 + PoC-15）
 
 > **主控文档**：[`../execution-roadmap.md`](../execution-roadmap.md) §3.3 PoC 速查 + §3.4 风险速查
 > **关联**：本文是 §3.3 / §3.4 的展开版
 
 ---
 
-## 1. 12 个 PoC 详细规范 + OpenSpec change 映射
+## 1. 14 个 PoC 详细规范 + OpenSpec change 映射（2026-09-29 扩展：新增 PoC-13 占位 + PoC-14 + PoC-15）
 
 每个 PoC 配**绝对值成功标准**（不能写"快"或"通过"，要写具体数）+ **ADR 锚点** + **OpenSpec change**（已存在/待创建）+ **失败 → 砍分叉**。
 
@@ -23,8 +23,11 @@
 | **PoC-10** | gdbstub Debug | 078 | **待创建** `soc-debug-gdbstub`（v1.2.0）| halt/resume/step/断点 4 原语功能 PASS、GDB 附载到 Verilator sim 成功单步 ≥1000 指令零错 | halt 侵入导致流水线回归 >2% IPC → 仅留内存断点模式，硬件单步推迟 |
 | **PoC-11** | chip-selector | 079, 080 | **待创建** `tools-chip-selector`（v1.3.0）| **8 种配置 TLM 全扫描 <10 分钟**（单机）；Top-3 CH_MEM elaborate+Verilog emit **<1 小时**；每配置报告含 IPC/miss 率/stall 分布；双模对拍 100% match 为出报告前置；**TLM↔CH_MEM IPC 偏差 ≤15%** | TLM 估算与 CH_MEM 实测 IPC 偏差 >15% → 工具降级为"只出 RTL 不出性能预测"（保流片价值，丢 DSE 卖点 —— **决策 3 回退条件触发**） |
 | **PoC-12** | dual-issue 7stage 预研 | 081 | **待创建** `cpu-pipeline-dual-issue`（v1.4.0 候选）| single baseline IPC=1.0 归一；dual 实测 **IPC≥1.55**、FMAX **>120 MHz Artix-7**、LUT ≤1.8x；绕过 at_stage 的裸指针点 **≤8 处** | IPC<1.35 或裸指针 >8 处 → **理由 #2 信号 1/2 触发**：砍 dual-issue，v1.4 转向 single+late-alu 保 FMAX |
+| **PoC-13** | _（保留 ID，未指派，备选）_ | — | — | — | — |
+| **PoC-14** 🆕 | **VexiiRiscv single-issue 对拍（HARD）** | **090**（拟新增） + 040 + 080 | **已创建** [`vexii-riscv-parity-poc`](../../../../../openspec/changes/vexii-riscv-parity-poc/)（proposal 4/4 完成）| **FPGA 实测 CoreMark/MHz 与 VexiiRiscv single-issue 官方 2.4–2.6 偏差 ≤10%（v1.0.0 archive gate）**；v1.3.0 archive 复测 PASS（FPGA 综合版）；TLM↔CH_MEM 双模式偏差 < 5%；baseline.json SHA256 校验通过；VexiiRiscv 2025-07-01 数值 SSOT 化 | 偏差 > 10% 持续 4 周 → 推迟 v1.0.0 + RCA 单项；CoreMark v1.01 ELF license 不可获取 → 降级 Dhrystone 对拍，阈值放宽 15%；baseline.json checksum 不匹配 → CI 阻塞（拒绝执行） |
+| **PoC-15** 🆕 | **VexiiRiscv dual 全家桶对拍（HARD 候选）** | **090**（拟新增） + 040 + 080 + 083 | **已创建** [`vexii-riscv-parity-poc`](../../../../../openspec/changes/vexii-riscv-parity-poc/)（proposal 4/4 完成）| **dual 全家桶（dual-issue + HW prefetch + write-back + store buffer）CoreMark/MHz ≥ 4.5**（[估]），**与 VexiiRiscv dual+prefetch 官方 5.24 偏差 ≤15%（v1.4+ archive gate）**；mispredict 率 ~3-5%；DMIPS/MHz ≥ 2.4（追平 VexiiRiscv 2.50 的 96%）；PoC-15 标 `[v1.4-pending]` 在 v1.4 启动前 SKIP | 偏差 > 15% 持续 8 周 → 砍 dual-issue 分叉（理由 #2 信号 2），v1.4 转 single+late-alu；dual 全家桶永不实装 → PoC-15 标 archived-skipped（**不阻塞 PoC-14**）；FPGA 不可综合 → 走 sim-only，FPGA 综合推迟 v1.4+ |
 
-**前置依赖（不在 12 PoC 内但 v0.10.0 启动必须先收官）**：
+**前置依赖（不在 14 PoC 内但 v0.10.0 启动必须先收官）**：
 
 | 项 | 内容 | OpenSpec change |
 |---|------|----------------|

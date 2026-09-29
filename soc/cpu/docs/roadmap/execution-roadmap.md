@@ -14,7 +14,7 @@
 |------|------|---------|
 | **技术目标** | v1.3.0 实现 RV32IMAC + S/U mode + 动态 BP + Linux-on-FPGA + chip-selector 工具 | 见 §3 |
 | **差异化目标** | 3 大决策锁定（范式不动 / ASIC 友好 / DSE-as-a-Service） | 见 §2 |
-| **超越目标** | 在 7 个 🚀 独占维度构成 VexRiscv/VexiiRiscv 差异化超越（双模同语义 / golden 与 RTL 同源 / CI 11 门禁 / TLB RRIP / MemoryInterface 解耦 / 架构探索单源生成 / 定制指令极低侵入度） | 见 [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) §2 |
+| **超越目标** | 在 8 个 🚀 独占维度构成 VexRiscv/VexiiRiscv 差异化超越（双模同语义 / golden 与 RTL 同源 / CI 11 门禁 / TLB RRIP / MemoryInterface 解耦 / 架构探索单源生成 / 定制指令极低侵入度 / **双模对拍协议 ADR-080** —— 2026-09-29 新增 v1.2.0/v1.3.0 双层防护，VexiiRiscv 结构性无法跟进） | 见 [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) §2 |
 | **非目标** | 不与 XiangShan 拼 OoO 性能 / 不与 VexiiRiscv 拼配置空间 / 不做 ASIC 物理实现（v1.3.0 前纯 FPGA 验证） | 见 §2 决策 2 |
 
 ---
@@ -72,26 +72,27 @@ graph TD
 
 ### 3.2 4 版本节点产出（Deliverables）
 
-| 版本 | 产出（代码/测试/ADR/CI/文档/Demo） | 关键指标 |
-|------|----------------------------------|---------|
-| **v0.10.0** (2027 Q1) | MUL/DIV FSM + RV32C + ICache + Zicsr/Zifencei + ADR-082 negotiate | rv32ui+um+uc 100% / DMIPS/MHz ≥1.4 / CI 门禁 9→11 |
-| **v1.0.0** (2027 Q3) | S/U mode + RV32A + BTB+GShare+RAS + PLIC/CLINT + FreeRTOS demo + ADR-073/074/075 | rv32ua+si 100% / CoreMark ≥2.3 / FMAX ≥100 MHz |
-| **v1.2.0** (2028 Q2) | 4-way RRIP + PMP + gdbstub + Spike lockstep + ADR-080 对拍试点 | lockstep 1M 条零分歧（HARD）/ Linux-sim shell（SOFT）|
-| **v1.3.0** (2029 Q1) | Linux-on-FPGA + RV32F（或宣告 soft-float）+ chip-selector CLI + ADR-080 转硬门禁 | FPGA CoreMark ≥2.5 / TLM↔CH_MEM IPC 偏差 ≤15% / 8 配置 TLM 扫描 <10min |
+| 版本 | 产出（代码/测试/ADR/CI/文档/Demo） | 关键指标 | **VexiiRiscv 客观对拍 HARD 门禁**（2026-09-29 新增） |
+|------|----------------------------------|----------|------------------------------------------------|
+| **v0.10.0** (2027 Q1) | MUL/DIV FSM + RV32C + ICache + Zicsr/Zifencei + ADR-082 negotiate | rv32ui+um+uc 100% / DMIPS/MHz ≥1.4 / CI 门禁 9→11 | DMIPS/MHz 与 VexiiRiscv single-issue（官方 ~1.4 [估]）偏差 ≤ 10% [目] |
+| **v1.0.0** (2027 Q3) | S/U mode + RV32A + BTB+GShare+RAS + PLIC/CLINT + FreeRTOS demo + ADR-073/074/075 | rv32ua+si 100% / CoreMark ≥2.3 / FMAX ≥100 MHz | **PoC-14（HARD 门禁）**：FPGA CoreMark/MHz 与 VexiiRiscv single-issue（官方 2.4–2.6）偏差 ≤ 10% |
+| **v1.2.0** (2028 Q2) | 4-way RRIP + PMP + gdbstub + Spike lockstep + ADR-080 对拍试点 | lockstep 1M 条零分歧（HARD）/ Linux-sim shell（SOFT）| ADR-080 双模对拍协议 HARD 试点（v1.3.0 转硬门禁）|
+| **v1.3.0** (2029 Q1) | Linux-on-FPGA + RV32F（或宣告 soft-float）+ chip-selector CLI + ADR-080 转硬门禁 | FPGA CoreMark ≥2.5 / TLM↔CH_MEM IPC 偏差 ≤15% / 8 配置 TLM 扫描 <10min | **PoC-14 复测（HARD 门禁）**：FPGA CoreMark/MHz 与 VexiiRiscv single-issue 偏差 ≤ 10%；**ADR-080 TLM↔CH_MEM byte-equal HARD 门禁** |
+| **v1.4+（远期候选分叉）** (2029 Q3+) | dual-issue + HW prefetch + write-back + store buffer 全家桶（ADR-075/081/083）| dual-issue IPC ≥ 1.55 / CoreMark/MHz ≥ 4.5 [估] | **PoC-15（HARD 候选门禁）**：dual 全家桶 CoreMark/MHz ≥ 4.5，且与 VexiiRiscv dual+prefetch（官方 5.24）偏差 ≤ 15% |
 
 > v0.9.0（CSR/exception + 4-way Cache）由 strategy `wave4-csr-cache-dse` 管理（占位 change `cache-phase1.5-4way` + `phase-1.5-wave-4`），本表不展开。
 
-### 3.3 12 个 PoC 速查
+### 3.3 14 个 PoC 速查（2026-09-29 扩展：新增 PoC-14 + PoC-15）
 
 完整规范（含 ADR 锚点 + 失败砍分叉 + PoC↔OpenSpec change 映射）见 [`references/poics-and-risks.md`](./references/poics-and-risks.md)。
 
 | 版本 | 代表性 PoC（其余见 references）|
 |------|-------------------------------|
 | **v0.10.0** | PoC-1 MUL/DIV 1c/33c rv32um 100% · PoC-2 RV32C ≥95% · PoC-3 ICache 命中 ≥90% |
-| **v1.0.0** | PoC-4 S/U trap 64 组合全 PASS · PoC-5 AMO 100% · PoC-6 BTB CoreMark ≥1.9 · PoC-7 FreeRTOS 10M cycle |
+| **v1.0.0** | PoC-4 S/U trap 64 组合全 PASS · PoC-5 AMO 100% · PoC-6 BTB CoreMark ≥1.9 · PoC-7 FreeRTOS 10M cycle · **PoC-14（2026-09-29 新增 HARD）**：FPGA 实测 CoreMark/MHz 与 VexiiRiscv single-issue（官方 2.4–2.6）偏差 ≤ 10% |
 | **v1.2.0** | PoC-8 4-way RRIP miss 率降 ≥30% · PoC-9 Spike lockstep 1M 条零分歧 · PoC-10 gdbstub |
-| **v1.3.0** ⚠️ | **PoC-11 chip-selector 单点风险**：8 配置 TLM <10min + TLM↔CH_MEM IPC 偏差 ≤15%（>15% 触发决策 3 回退） |
-| v1.4.0 候选 | PoC-12 dual-issue IPC ≥1.55 |
+| **v1.3.0** ⚠️ | **PoC-11 chip-selector 单点风险**：8 配置 TLM <10min + TLM↔CH_MEM IPC 偏差 ≤15%（>15% 触发决策 3 回退）· **PoC-14 复测（HARD）**：FPGA CoreMark/MHz 与 VexiiRiscv single-issue 偏差 ≤ 10% + **ADR-080 TLM↔CH_MEM byte-equal HARD 门禁** |
+| v1.4+ 候选 | PoC-12 dual-issue IPC ≥1.55 · **PoC-15（2026-09-29 新增 HARD 候选）**：dual 全家桶（dual-issue + HW prefetch + write-back + store buffer）CoreMark/MHz ≥ 4.5，且与 VexiiRiscv dual+prefetch（官方 5.24）偏差 ≤ 15% |
 
 ### 3.4 8 项风险速查（2026-09-27 补全全部 8 项，避免 references 跳转）
 
@@ -110,7 +111,7 @@ graph TD
 
 ### 3.5 架构演进与架构图（v0.10.0 → v1.3.0 四版本节点）
 
-> **目的**: 把 §3.1 timeline + §3.2 deliverables + §3.3 12 PoC + §3.4 8 风险 落到**具体架构图**上,作为 v0.10.0 → v1.3.0 实施的**视觉 SSOT**。
+> **目的**: 把 §3.1 timeline + §3.2 deliverables + §3.3 14 PoC + §3.4 8 风险 落到**具体架构图**上,作为 v0.10.0 → v1.3.0 实施的**视觉 SSOT**。
 >
 > **与现有文档关系**:
 > - §3.1-§3.4 = 文本驱动的"做什么"（timeline / 产出 / PoC / 风险）
@@ -551,8 +552,8 @@ v1.3.0  +1 条（§6 行 11）：ADR-080 双模对拍转硬门禁（v1.2 试点�
 |------|------|--------|
 | [`references/decision-1-plugin-evolution.md`](./references/decision-1-plugin-evolution.md) | VexiiRiscv 5 病灶 × ChipForge 机制级回应（5 条 × 4 维展开 + 客观回退信号）| 起草任何 Plugin 范式相关 ADR 时 |
 | [`references/adr-matrix.md`](./references/adr-matrix.md) | 18 条 ADR + 2 CI 门禁整合 + 依赖图 + 门禁分层决策树 | 任何 ADR 起效/降级/回退时 |
-| [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) | 47 行 × 4 列对比 + 7 个 🚀 独占维度 + 数据来源 | 对外汇报 / 论文 / 商业化展示 |
-| [`references/poics-and-risks.md`](./references/poics-and-risks.md) | 12 PoC 完整规范（含 ADR 锚点 + PoC↔change 映射 + 失败砍分叉）+ 8 风险反向决策树 | 任何 PoC 启动/失败决策时 |
+| [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) | 47 行 × 4 列对比 + 8 个 🚀 独占维度（2026-09-29 新增 ADR-080）+ 数据来源 | 对外汇报 / 论文 / 商业化展示 |
+| [`references/poics-and-risks.md`](./references/poics-and-risks.md) | 14 PoC 完整规范（含 ADR 锚点 + PoC↔change 映射 + 失败砍分叉）+ 8 风险反向决策树 | 任何 PoC 启动/失败决策时 |
 
 ---
 
