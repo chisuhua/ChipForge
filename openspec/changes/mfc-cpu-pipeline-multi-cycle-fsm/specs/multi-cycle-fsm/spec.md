@@ -18,11 +18,11 @@ TBD - created by archiving change mfc-cpu-pipeline-multi-cycle-fsm. Update Purpo
 
 ## ADDED Requirements
 
-### Requirement: MulDivFsmPlugin SHALL use ch_state_machine DSL for MUL/DIV state machine (ADR-046)
-
-> **过渡条款见上文 Purpose §Phase-A 过渡条款**
+### Requirement: MulDivFsmPlugin uses ch_state_machine DSL for MUL/DIV state machine (ADR-046)
 
 `MulDivFsmPlugin` SHALL describe the MUL/DIV state machine using `ch_state_machine` DSL (not ad-hoc stall counter). States: `IDLE → MULTIPLY | DIVIDE(33 cycle) → WRITE_BACK`. State transitions SHALL be elaborated at `pb.elaborate(ctx)` time and emit Verilog `always_ff @(posedge clk)` in CH_MEM mode. TLM mode SHALL walk the same state machine via `pb.run()` cycle iterations.
+
+> **过渡条款见上文 Purpose §Phase-A 过渡条款**
 
 #### Scenario: MUL completes in 1 cycle
 - **WHEN** RV32M `MUL` instruction issued with operands set
@@ -38,7 +38,7 @@ TBD - created by archiving change mfc-cpu-pipeline-multi-cycle-fsm. Update Purpo
 - **WHEN** identical MUL/DIV input sequence applied to TLM and CH_MEM modes
 - **THEN** cycle count SHALL differ by at most 0 (TLM and CH_MEM Verilator sim match exactly)
 
-### Requirement: MulDivFsmPlugin SHALL declare capability via Plugin::negotiate() (ADR-082)
+### Requirement: MulDivFsmPlugin declares capability via Plugin::negotiate() (ADR-082)
 
 `MulDivFsmPlugin::negotiate(CapabilityTable& cap)` SHALL declare `provides` and `requires` capabilities. Top-level `PipeBuilder::build()` SHALL call `negotiate()` on all registered Plugin instances **before** calling `build()`, in topological order derived from `requires` edges. Plugins that fail to satisfy `requires` SHALL cause `PipeBuilder::build()` to throw `PluginException` carrying a `PluginError` from `MulDivResult::err(...)`.
 
@@ -57,7 +57,7 @@ TBD - created by archiving change mfc-cpu-pipeline-multi-cycle-fsm. Update Purpo
 - **THEN** `tools/verify_plugin_decision.sh` (CI gate #8) SHALL exit with non-zero status
 - **AND** the PR SHALL be blocked from merging
 
-### Requirement: MulDivFsmPlugin SHALL use MulDivResult for elaboration-time fail-fast (ADR-047)
+### Requirement: MulDivFsmPlugin uses MulDivResult for elaboration-time fail-fast (ADR-047)
 
 `MulDivFsmPlugin::build(pb)` SHALL start with `MulDivResult` validation of `cfg.xlen == 32` and any capability requirements derived from `negotiate()`. Validation failures SHALL throw `PluginException` (not silently continue). This eliminates the "runtime crash vs my-bug" ambiguity from VexRiscv's plugin system.
 
@@ -71,7 +71,7 @@ TBD - created by archiving change mfc-cpu-pipeline-multi-cycle-fsm. Update Purpo
 - **THEN** `MulDivResult::ok()` SHALL be returned
 - **AND** FSM instantiation proceeds to `ch_state_machine` elaboration
 
-### Requirement: RV32M extension SHALL be functional in riscv-tests (PoC-1 hard gate)
+### Requirement: RV32M extension is functional in riscv-tests (PoC-1 hard gate)
 
 `riscv-tests rv32um-p-*` (mul/mulh/mulhsu/mulhu/div/divu/rem/remu) SHALL 100% PASS via `[riscv-tests]` family ctest. Current stub state (FAIL with `category=feature_stub`) SHALL transition to PASS through the FSM implementation above.
 
