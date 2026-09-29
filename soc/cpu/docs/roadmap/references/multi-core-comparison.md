@@ -1,7 +1,7 @@
 # Reference 3：多核对比矩阵（VexRiscv / VexiiRiscv / XiangShan / ChipForge）
 
 > **主控文档**：[`../execution-roadmap.md`](../execution-roadmap.md) §1 目标表（差异化目标行 + 超越目标行）
-> **关联**：本文是 §1 超越目标"7 个 🚀 独占维度"的依据
+> **关联**：本文是 §1 超越目标"8 个 🚀 独占维度（2026-09-29 扩展）"的依据
 
 ---
 
@@ -69,7 +69,7 @@
 
 ---
 
-## 2. 7 个 🚀 独占维度汇总
+## 2. 8 个 🚀 独占维度汇总（2026-09-29 扩展：新增 ADR-080 双模对拍协议时间差优势）
 
 | # | 独占维度 | 三家对照（结构性无法跟进） |
 |---|---------|--------------------------|
@@ -80,6 +80,7 @@
 | 34 | **MemoryInterface 总线解耦** | VexRiscv 核内耦合 / VexiiRiscv 三实现并存但未抽象 |
 | 46 | **架构探索→RTL 单源生成（chip-selector）** | VexiiRiscv Param.scala 每次改需 SpinalHDL+Verilator |
 | 47 | **定制指令侵入度极低** | VexRiscv 需懂 SpinalHDL / VexiiRiscv Plugin 友好但仍需懂流水线 / XiangShan OoO 侵入深 |
+| **48** 🆕 | **双模对拍协议（ADR-080）—— TLM↔CH_MEM 同源 byte-equal** | VexiiRiscv 仅 Spike 外部黄金（RVLS 是社区项目，VexiiRiscv 自身无内部同源机制）；ChipForge v1.2.0 PoC-9 Spike lockstep + v1.3.0 ADR-080 TLM↔CH_MEM byte-equal HARD 门禁形成**同源 + 外部黄金双层防护**，比 VexiiRiscv 的单外部 golden 更彻底，结构性无法跟进 |
 
 ---
 
@@ -87,7 +88,7 @@
 
 **正面确认**：XiangShan 在 ISA 广度（#1–10）、OoO 性能（#38–40、43）、流片（#44）、多核（#45）全面压制两家 in-order 核 —— **ChipForge 不与它同赛道竞争**，其出现于此表的唯一作用是**性能天花板坐标**。
 
-ChipForge 的可超越点集中在 7 个 🚀 独占维度，**全部围绕"双模 + 工程纪律"**，无一是正面拼 IPC。
+ChipForge 的可超越点集中在 8 个 🚀 独占维度（2026-09-29 扩展，新增第 48 项 ADR-080 双模对拍协议时间差优势），**全部围绕"双模 + 工程纪律"**，无一是正面拼 IPC。
 
 ---
 

@@ -1,7 +1,7 @@
 # RISC-V CPU SoC 实施路线图
 
 > **属主**：`soc/cpu/` — RISC-V CPU 中心 SoC（CPU + MMU + Cache + Memory + Interconnect + Peripheral）
-> **最后更新**：2026-09-28（execution-roadmap.md 新增 §3.5 架构演进章节：v0.10.0 → v1.3.0 四版本节点 ASCII 架构图 + 关键产出 + 关联 ADR；与 §3.1 timeline + §3.2 deliverables + §3.3 12 PoC 完整对齐）
+> **最后更新**：2026-09-29（execution-roadmap.md §3.2/§3.3 新增 VexiiRiscv 客观对拍 HARD 门禁列 + PoC-14/15；与 §3.1 timeline + §3.2 deliverables + §3.3 14 PoC 完整对齐；新增 `openspec/changes/vexii-riscv-parity-poc/` 4 artifacts）
 
 ## 📌 这个目录解决什么问题
 
@@ -12,11 +12,11 @@
 | 当前 SoC 路线图（v0.10.0 → v1.3.0）整体目标 | [`execution-roadmap.md §1`](./execution-roadmap.md) |
 | 4 个版本节点（v0.10.0 / v1.0.0 / v1.2.0 / v1.3.0）什么时候做什么 | [`execution-roadmap.md §3`](./execution-roadmap.md) |
 | **v0.10.0 → v1.3.0 每个版本的架构图 + 关键产出** | [`execution-roadmap.md §3.5`](./execution-roadmap.md) |
-| 12 个 PoC 速查（哪个版本验收什么） | [`execution-roadmap.md §3.3`](./execution-roadmap.md) |
+| 14 个 PoC 速查（哪个版本验收什么） | [`execution-roadmap.md §3.3`](./execution-roadmap.md) |
 | 8 个风险 + 砍分叉条件 | [`execution-roadmap.md §3.4`](./execution-roadmap.md) |
 | 3 大决策（范式 / ASIC / DSE-aaS）的详细论证 | [`references/decision-1-plugin-evolution.md`](./references/decision-1-plugin-evolution.md) |
 | 18 条 ADR 矩阵 + 依赖图 | [`references/adr-matrix.md`](./references/adr-matrix.md) |
-| 12 PoC 完整规范 + ADR 锚点 + 失败砍分叉 | [`references/poics-and-risks.md`](./references/poics-and-risks.md) |
+| 14 PoC 完整规范 + ADR 锚点 + 失败砍分叉（含 PoC-14/15 VexiiRiscv 客观对拍） | [`references/poics-and-risks.md`](./references/poics-and-risks.md) |
 | 与 VexRiscv/VexiiRiscv/XiangShan 对比 | [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) |
 | 历史 phase 文档（v0.1.x ~ v0.8.0 完成的实施记录） | `archive/`（仅溯源，不执行） |
 
@@ -50,7 +50,7 @@ soc/cpu/docs/roadmap/
 |---|------|--------|
 | 1 | 目标（技术 / 差异化 / 超越 / 非目标）| 战略汇报 / 项目立项 |
 | 2 | 3 大决策锁定（范式不动 / ASIC 友好 / DSE-as-a-Service）| 任何 ADR / PoC 决策时 |
-| 3 | 实施路径：4 版本节点 timeline + 产出 + 12 PoC + 8 风险 | 版本节点规划时 |
+| 3 | 实施路径：4 版本节点 timeline + 产出 + 14 PoC + 8 风险 | 版本节点规划时 |
 | **3.5** | **架构演进与架构图（v0.10.0 → v1.3.0 四版本节点 ASCII 图）** | **实施具体阶段时（每次实施前必读 §3.5 对应版本）** |
 | 4 | 验收与同步机制（CI 门禁 + OpenSpec 同步 + 文档同步规则）| 任何 change archive 前 |
 | 5 | v0.10.0 启动状态（高挥发，每周校准）| 每周一例会 |
@@ -76,8 +76,8 @@ soc/cpu/docs/roadmap/
 |------|------|--------|
 | [`references/decision-1-plugin-evolution.md`](./references/decision-1-plugin-evolution.md) | VexiiRiscv 5 病灶 × ChipForge 机制级回应（5 条 × 4 维 + 客观回退信号）| 起草任何 Plugin 范式相关 ADR 时 |
 | [`references/adr-matrix.md`](./references/adr-matrix.md) | 18 条 ADR + 2 CI 门禁整合 + 依赖图 + 门禁分层决策树 | 任何 ADR 起效/降级/回退时 |
-| [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) | VexRiscv / VexiiRiscv / XiangShan / ChipForge 47 行 × 4 列对比 + 7 个 🚀 独占维度 | 对外汇报 / 论文 / 商业化展示 |
-| [`references/poics-and-risks.md`](./references/poics-and-risks.md) | 12 PoC 完整规范（含 ADR 锚点 + 失败砍分叉）+ 8 风险反向决策树 | 任何 PoC 启动/失败决策时 |
+| [`references/multi-core-comparison.md`](./references/multi-core-comparison.md) | VexRiscv / VexiiRiscv / XiangShan / ChipForge 47 行 × 4 列对比 + 8 个 🚀 独占维度（2026-09-29 新增 ADR-080 双模对拍协议） | 对外汇报 / 论文 / 商业化展示 |
+| [`references/poics-and-risks.md`](./references/poics-and-risks.md) | 14 PoC 完整规范（含 ADR 锚点 + 失败砍分叉）+ 8 风险反向决策树 | 任何 PoC 启动/失败决策时 |
 
 ## 历史归档（archive/）
 

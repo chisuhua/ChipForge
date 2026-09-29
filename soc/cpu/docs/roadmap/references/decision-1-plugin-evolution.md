@@ -29,13 +29,13 @@ VexiiRiscv **并没有抛弃 Plugin 范式**。其 Framework 文档明确写着 
 3. CI 新增**第 11 条门禁**：fetch 族 Plugin 文件内禁止直接 `#include` 预测器头文件，强制经 Port 通信
 4. 分级开关 `bp_mode = none|static|btb|btb+gshare+ras` 做成 JSON 配置 + elaboration 期 `Result<>` 校验
 
-### (c) 性能超越映射
+### (c) 性能超越映射（2026-09-29 扩展：v1.4+ dual 全家桶追平线显式化）
 
-| 指标 | static BTFN（当前） | BTB-only | BTB+GShare+RAS | 对标 |
-|------|---------------------|----------|----------------|------|
-| mispredict 率（CoreMark 估） | ~25–30% | ~12% | ~7% | VexiiRiscv 同配置 ~7–9% |
-| CoreMark/MHz 目标 | ~1.5 **[估]** | ≥1.9 | ≥2.3 | VexiiRiscv 5.24 是 dual-issue+prefetch 全家桶；single-issue 配置其官方约 2.4–2.6 —— **v1.0.0 目标 2.3 即为 single-issue 追平线** |
-| DMIPS/MHz 目标 | ~1.1 **[估]** | ≥1.4 | ≥1.7 | VexiiRiscv 官方 2.50（dual-issue） |
+| 指标 | static BTFN（当前） | BTB-only | BTB+GShare+RAS | **v1.4+ dual 全家桶（HARD 候选，2026-09-29 新增）** | 对标 |
+|------|---------------------|----------|----------------|---------------------------------------------------|------|
+| mispredict 率（CoreMark 估） | ~25–30% | ~12% | ~7% | **~3–5%（dual + HW prefetch）** | VexiiRiscv 同配置 ~7–9%（single-issue）；dual 全家桶 ~3–5% |
+| CoreMark/MHz 目标 | ~1.5 **[估]** | ≥1.9 | ≥2.3 | **≥4.5 [估]**（dual + HW prefetch + WB + SB 全家桶）| **双追平线**：<br>• **v1.0.0 single-issue 追平线 = VexiiRiscv single-issue 官方 2.4–2.6**（目标 2.3 即为追平线）<br>• **v1.4+ dual 全家桶追平线 = VexiiRiscv dual+prefetch 官方 5.24**（目标 ≥4.5 即为 85% 追平线，偏差 ≤15%）|
+| DMIPS/MHz 目标 | ~1.1 **[估]** | ≥1.4 | ≥1.7 | **≥2.4 [目]**（dual 全家桶）| **v1.4+ 追平 VexiiRiscv 官方 2.50（dual-issue）= 96% 追平线** |
 
 ### (d) 不可行回退条件（客观信号）
 
