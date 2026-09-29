@@ -65,7 +65,7 @@ graph TD
 |---|--------|------------------------|---------|
 | 1 | `plugin-framework-cycle-precision` P1#4 实装完成（v0.10.0 PoC-1/2/3 的 cycle 精度前提）| 🟡 **SSOT 漂移**：代码实装完成（commit 已落），但 `tasks.md` 0/19 checkbox 未回填。SSOT 显示 TODO 19/0 与口头声明 "25/25 收官" 矛盾 → **P0-1 任务 = 同步 commit 与 tasks.md** | `openspec/changes/plugin-framework-cycle-precision/tasks.md` |
 | 2 | `[cpu-l1-mmu-demo]` 6/6 PASS 修回归（commit `8a14402` PADDR 改造同步）| ✅ **v0.10.2 实测 6/6** (v0.10.1 deep-rca workaround `cfg.enable_mmu=false` + v0.10.2 cpu-factory-satp-mapping 落地 infrastructure, 真 sv32 e2e 翻转推迟到 `cpu-pipeline-mmufault-handler`) | ctest `[cpu-l1-mmu-demo]` |
-| 3 | `cpu-pipeline-multi-cycle` P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede | ✅ 已被 wave5 supersede（mfc change 已建，0/35 tasks 待启动） | `openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/` |
+| 3 | `cpu-pipeline-multi-cycle` P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede | 🟡 **部分收官（2026-09-29）**：Phase A (5/59) + Phase B.1 RED + B.2 GREEN + B.2.1 GREEN ch_reg 缓存（8/60 done）。B.2.1 PoC 限制已显式记录（ch 算术 * / 用 `ch_literal<12,3,33>` 占位, 真 ch 算术 fix 跟踪 Phase C.2/B.4；ch_reg lock 顺序 race 跟踪 Phase C.2）。继续 Phase B.3/B.4/C.1-C.6/D.1-D.4/E.1-E.5/F.1-F.3 | `openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/` |
 | 4 | 2 个 wave4 占位 change（cache-phase1.5-4way / phase-1.5-wave-4）展开 | ⏸ 待 wave3-mmu 残余 change（P1#4 checkbox + P1#6）闭环后展开 | OpenSpec tasks.md |
 
 > **删除**：原 §3.1 #4 误将 `mmu-config-json-driven`（P1#6，wave3-mmu 自身）列为 "wave3 archive 后展开" 的占位 change，已修正。P1#6 实际触发条件 = **P1#3 archive**（已于 2026-09-26 达成，commit 8a14402），现已可启动。

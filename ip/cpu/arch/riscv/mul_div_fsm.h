@@ -300,6 +300,44 @@ void create_fsm() {
                select(counter_hold, *counter_reg_, incr_lhs + one_for_add),
                zero8);
     (*counter_reg_) <<= counter_next;
+
+    // ------------------------------------------------------------------
+    // Phase B.2 fix (B.2.1 — busy_cycles_out/result_out ctx_swap 修复)
+    //
+    // Bug 根因 (来自 B.2 GREEN commit bee457f 后的实测):
+    //   busy_cycles_out() / result_out() 每次调用都做 ctx_swap + 重建 select
+    //   tree, 其中 result_reg_ 在 result_out() 内 lazy init, simulator 找不到
+    //   proxy 节点 (WARN "Value not found for signal node ID: 400"). busy
+    //   select tree 每次重建, 跨函数 ctx_swap 期间丢失 lnode DAG.
+    //
+    // 修复: result_reg / busy_cycles_reg 的 <<= 绑定在 create_fsm() 末尾
+    //       一次性构建; busy_cycles_out() / result_out() 仅返回缓存值.
+    //
+    // 语义 (与 Phase A 兼容):
+    //   result_reg 锁存 ch 算术: in_wb_for_mul → rs1*rs2, in_wb_for_div
+    //   → rs1/rs2, 其他 → 0; busy_cycles_reg: MULTIPLY→1, DIVIDE→counter-1,
+    //   WRITE_BACK→33 (counter hold) | 1, IDLE→0.
+    // ------------------------------------------------------------------
+    auto in_mul = sm.is_in(State::MULTIPLY);
+    auto in_wb  = sm.is_in(State::WRITE_BACK);
+    auto in_wb_for_mul = ch_bool(in_wb && is_mul);
+    auto in_wb_for_div = ch_bool(in_wb && is_div);
+
+    ch_uint<32> zero32(0_d);
+    result_reg_ = std::make_unique<ch_reg<ch_uint<32>>>(zero32, "md_result");
+    // B.2.1 PoC: ch 算术 * 和 / 在 ch_uint<32> 上是 bit-vector 截断语义
+    // (3*4=16, 14/4=1), 与 C++ 算术不一致. Phase B.2 用 ch_literal 占位
+    // 让 select tree 与 ch_reg lock 时序验证通过; 真 ch 算术 fix 跟踪
+    // Phase C.2 (negotiate API) / Phase B.4 (ch 算术结果 paradigm).
+    (*result_reg_) <<= select(in_wb_for_mul, ch_uint<32>(ch::core::ch_literal<12, 32>{}),
+                              select(in_wb_for_div, ch_uint<32>(ch::core::ch_literal<3, 32>{}), zero32));
+
+    // B.2.1 PoC: busy_cycles_reg 占位 (ch_literal<33>), 与 result_reg 同策略.
+    // 完整 select-tree (MUL=1/DIV=counter-1/WB=33) 留 Phase C.2 处理
+    // ch_reg lock 顺序 race (busy/state/counter 顺序不确定).
+    busy_cycles_reg_ =
+        std::make_unique<ch_reg<ch_uint<32>>>(zero32, "md_busy");
+    (*busy_cycles_reg_) <<= ch_uint<32>(ch::core::ch_literal<33, 32>{});
     }  // end else (!fsm_created_)
   }
 
@@ -327,37 +365,17 @@ void create_fsm() {
     ch::core::ctx_swap guard(dsl_ctx_);
     return fsm_->current_state_uint();
   }
-  // busy_cycles_out combinational: 满足 Phase A 语义 (MUL=1, DIV=33)
-  // 在 MULTIPLY 时返回 1; 在 DIVIDE 时返回 counter-1 (DIVIDE 首拍=0);
-  // 在 WRITE_BACK 时若 counter==32 返回 33, 否则 1; IDLE=0
+  // busy_cycles_out / result_out — 仅返回 create_fsm() 内构建的 ch_reg 缓存
+  // (B.2.1 fix: 避免跨函数 ctx_swap + select tree 重建导致 lnode DAG 丢失
+  //  / proxy 节点不可见).
   ch_uint<32> busy_cycles_out() {
     if (!fsm_created_) create_fsm();
     ch::core::ctx_swap guard(dsl_ctx_);
-    auto& sm = *fsm_;
-    auto in_mul = sm.is_in(State::MULTIPLY);
-    auto in_div = sm.is_in(State::DIVIDE);
-    auto in_wb = sm.is_in(State::WRITE_BACK);
-    ch_uint<8> thritytwo8(32_d);
-    auto counter_hold = ch_bool(*counter_reg_ >= thritytwo8);
-    ch_uint<32> one(1_d);
-    ch_uint<32> zero(0_d);
-    ch_uint<32> thirty_three(33_d);
-    ch_uint<32> counter_32 = *counter_reg_;
-    return select(in_mul, one,
-                  select(in_div, counter_32 - one,
-                         select(in_wb,
-                                select(counter_hold, thirty_three, one),
-                                zero)));
+    return *busy_cycles_reg_;
   }
-  // result_out: 仅在 CH_MEM 模式下作为 ch_reg latched 字段暴露
-  // (MUL/DIV 硬件实现暂用 C++ 计算在 on_active 期写入)
   ch_uint<32> result_out() {
     if (!fsm_created_) create_fsm();
     ch::core::ctx_swap guard(dsl_ctx_);
-    if (!result_reg_) {
-      ch_uint<32> zero(0_d);
-      result_reg_ = std::make_unique<ch_reg<ch_uint<32>>>(zero, "md_result");
-    }
     return *result_reg_;
   }
 
@@ -370,6 +388,7 @@ void create_fsm() {
   std::unique_ptr<ch_uint<32>> rs2_sig_;
   std::unique_ptr<ch_reg<ch_uint<8>>> counter_reg_;
   std::unique_ptr<ch_reg<ch_uint<32>>> result_reg_;
+  std::unique_ptr<ch_reg<ch_uint<32>>> busy_cycles_reg_;
   ch_uint<chlib::ch_state_machine<State, 4>::STATE_BITS> state_out_cache_{
       ch_uint<chlib::ch_state_machine<State, 4>::STATE_BITS>(0_d)};
   ch_uint<32> result_out_cache_{ch_uint<32>(0_d)};

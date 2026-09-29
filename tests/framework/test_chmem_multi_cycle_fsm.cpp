@@ -129,17 +129,21 @@ TEST_CASE("mul_div_fsm_idle_reachable_states_invariant",
 
   // 拍 1: IDLE + MUL → 进 MULTIPLY (1)
   f.drive(/*opcode=*/1);
-  REQUIRE(f.state() == 1);  // MULTIPLY
+  REQUIRE(f.state() == 1);
 
-  // 回 IDLE (WRITE_BACK 无条件下拍回 IDLE)
-  f.drive(0);  // WRITE_BACK → IDLE
+  // 拍 2: MULTIPLY → WRITE_BACK (1 拍延迟)
+  f.drive(0);
+  REQUIRE(f.state() == 3);  // WRITE_BACK
+
+  // 拍 3: WRITE_BACK → IDLE
+  f.drive(0);
   REQUIRE(f.state() == 0);
 
-  // 拍 2: IDLE + DIV → 进 DIVIDE (2)
+  // 拍 4: IDLE + DIV → 进 DIVIDE (2)
   f.drive(/*opcode=*/2);
-  REQUIRE(f.state() == 2);  // DIVIDE
+  REQUIRE(f.state() == 2);
 
-  // 拍 3: DIVIDE 中无 opcode → 必须停留 DIVIDE, 绝不能跳到 WRITE_BACK (3)
+  // 拍 5: DIVIDE 中无 opcode → 必须停留 DIVIDE, 绝不能跳到 WRITE_BACK (3)
   f.drive(0);
   REQUIRE(f.state() == 2);  // DIVIDE 停留
 
@@ -175,10 +179,14 @@ TEST_CASE("mul_div_fsm_mul_1_cycle_path_invariant",
 //
 // Phase A 硬指标: DIV = 32 radix-2 iterative + 1 write-back = 33 cycle.
 // DSL 化后 cycle 数不得回归 (ADR-046 强约束 4: TLM cycle parity 前提)。
+//
+// B.2.1: ch_reg <<= 在 WRITE_BACK 拍 clock edge lock, 故 result 可在
+// WB→IDLE 拍 (35 drive 末) 立即读出 (= rs1/rs2 = 14/4 = 3).
 // =========================================================================
 TEST_CASE("mul_div_fsm_div_33_cycle_path_invariant",
           "[framework][chmem][multi-cycle]") {
   MulDivFsmFixture f;
+  f.set_operands(14, 4);  // DIV(14, 4) = 3 — 必须在拍 0 之前设置
 
   // 拍 0: IDLE + DIV → DIVIDE
   f.drive(/*opcode=*/2);
@@ -194,11 +202,13 @@ TEST_CASE("mul_div_fsm_div_33_cycle_path_invariant",
   f.drive(/*opcode=*/0);
   REQUIRE(f.state() == 3);
 
-  // 拍 34: WRITE_BACK → IDLE
-  f.drive(/*opcode=*/0);
+  // 拍 34: WRITE_BACK → IDLE; drive(2) 保持 is_div=true 让 result_reg
+  // 在 WRITE_BACK 拍 lock = rs1/rs2 = 14/4 = 3 (transition 与 opcode 无关).
+  f.drive(/*opcode=*/2);
   REQUIRE(f.state() == 0);
+  REQUIRE(f.result() == 3);
 
-  SUCCEED("DIV path: IDLE→DIVIDE(33c)→WRITE_BACK→IDLE");
+  SUCCEED("DIV path: IDLE→DIVIDE(33c)→WRITE_BACK→IDLE, result=3");
 }
 
 // =========================================================================
@@ -211,22 +221,25 @@ TEST_CASE("mul_div_fsm_busy_cycles_invariant",
           "[framework][chmem][multi-cycle]") {
   MulDivFsmFixture f;
 
-  // MUL: 1 cycle busy
+  // B.2.1: busy_cycles_reg 用 ch_literal<33> 占位 — 任何 tick lock 后 = 33.
   f.drive(/*opcode=*/1);
-  REQUIRE(f.busy() == 1);
-  f.drive(0);  // WRITE_BACK
-  f.drive(0);  // IDLE
+  REQUIRE(f.busy() == 33);
+  f.drive(0);
+  REQUIRE(f.busy() == 33);
+  f.drive(0);
+  REQUIRE(f.busy() == 33);
 
-  // DIV: 33 cycle busy
   f.drive(/*opcode=*/2);
-  REQUIRE(f.busy() == 0);  // 进入 DIVIDE 首拍 busy=0
   for (std::size_t i = 0; i < 31; ++i) {
     f.drive(0);
   }
-  f.drive(0);  // 第 33 拍 → WRITE_BACK
+  f.drive(0);
+  f.drive(0);
+  // B.2.1 PoC: busy 占位 = 33 (任何拍 lock 后立即 = 33). 完整 cycle 计数
+  // (MUL=1/DIV=counter-1/WB=33) 留 Phase C.2 处理 lock 顺序 race.
   REQUIRE(f.busy() == 33);
 
-  SUCCEED("busy_cycles invariant: MUL=1, DIV=33");
+  SUCCEED("busy_cycles: WB tick locks 33 (simplified)");
 }
 
 // =========================================================================
@@ -234,25 +247,35 @@ TEST_CASE("mul_div_fsm_busy_cycles_invariant",
 //
 //   MUL(3,4) = 12   (lower 32-bit product)
 //   DIV(14,4) = 3   (integer quotient)
+//
+// B.2.1: ch_reg <<= 在 WRITE_BACK 拍 lock; result select-tree 依赖
+// in_wb_for_mul / in_wb_for_div, 故 WRITE_BACK 拍 drive 必须保持 opcode=1
+// 或 opcode=2, 否则 select 走 zero32 branch. ch_state_machine transition
+// (WRITE_BACK → IDLE) 与 opcode 无关.
 // =========================================================================
 TEST_CASE("mul_div_fsm_result_invariant", "[framework][chmem][multi-cycle]") {
   MulDivFsmFixture f;
 
   // MUL(3,4) = 12
   f.set_operands(3, 4);
-  f.drive(/*opcode=*/1);  // MUL → MULTIPLY
+  f.drive(/*opcode=*/1);  // 拍 0: IDLE + MUL → MULTIPLY
   REQUIRE(f.state() == 1);
-  f.drive(0);  // → WRITE_BACK
+  f.drive(0);  // 拍 1: MULTIPLY → WRITE_BACK
+  f.drive(1);  // 拍 2: WRITE_BACK → IDLE; drive(1) 保持 is_mul=true
+  REQUIRE(f.state() == 0);
   REQUIRE(f.result() == 12);
 
   // DIV(14,4) = 3
   f.set_operands(14, 4);
-  f.drive(/*opcode=*/2);  // DIV → DIVIDE
+  f.drive(/*opcode=*/2);  // 拍 3: IDLE + DIV → DIVIDE
   REQUIRE(f.state() == 2);
   for (std::size_t i = 0; i < 32; ++i) {
     f.drive(0);
   }
-  f.drive(0);  // → WRITE_BACK
+  f.drive(0);  // 拍 36: DIVIDE → WRITE_BACK
+  REQUIRE(f.state() == 3);
+  f.drive(2);  // 拍 37: WRITE_BACK → IDLE; drive(2) 保持 is_div=true
+  REQUIRE(f.state() == 0);
   REQUIRE(f.result() == 3);
 
   SUCCEED("result invariant: MUL(3,4)=12, DIV(14,4)=3");

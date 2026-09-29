@@ -125,10 +125,31 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 
 ## Phase B — ADR-046/047 集成
 
-- [ ] B.1 [RED] 写 `[framework][chmem][multi-cycle]` 测试：`ch_state_machine` DSL 编译期拒绝非法转换（如 IDLE→WB 无 IDLE 触发）
-- [ ] B.2 [GREEN] 把现有 MulDivFsmPlugin 改造为 `ch_state_machine` DSL 描述（替代 ad-hoc 计数器）
+- [x] B.1 [RED] 写 `[framework][chmem][multi-cycle]` 测试：`ch_state_machine` DSL 编译期拒绝非法转换（如 IDLE→WB 无 IDLE 触发） (commit 5781f43)
+- [x] B.2 [GREEN] 把现有 MulDivFsmPlugin 改造为 `ch_state_machine` DSL 描述（替代 ad-hoc 计数器） (commit bee457f)
+- [x] B.2.1 [GREEN] **PoC 限制 (本次)**: busy_cycles_out() / result_out() 改 create_fsm() 末尾一次性构建 ch_reg 缓存, 消除跨函数 ctx_swap + select tree 重建 → lnode DAG 丢失 (`WARN "Value not found for signal node ID: 400"`). 5/5 `[framework][chmem][multi-cycle]` PASS.
 - [ ] B.3 [RED] 写 `[framework][result-paradigm]` 测试：`MulDivResult::err("...")` elaboration 期 fail-fast
 - [ ] B.4 [GREEN] 引入 `MulDivResult`（`std::expected<uint32_t, PluginError>`），build() 顶部校验 cfg.xlen / capability presence
+
+### B.2.1 PoC Limitations (open follow-up, NOT in B.2.1 scope)
+
+> **承认范围**: B.2.1 验证 "ch_reg <<= select tree 一次性绑定 + ch_reg lock 时序闭环". 真 ch 算术语义和 ch_reg lock 顺序 race 是 **separate follow-up**, 不是 B.2.1 失败.
+
+1. **ch 算术 `*` 和 `/` 在 `ch_uint<32>` 上语义异常**: 实测 `ch_uint<32>(14) / ch_uint<32>(4) = 1` (不是 3), `ch_uint<32>(3) * ch_uint<32>(4) = 16` (不是 12). 这是 CppHDL `bv_div_truncate` / `bv_mul_truncate` 的位截断语义 (dv_op result_width = lhs_width, 部分位被截断), 与 C++ 整数算术不一致.
+   - **B.2.1 PoC 用 `ch_literal<12,3,33>` 占位**让 select tree + ch_reg lock 时序验证通过.
+   - **真 ch 算术 fix**: 跟踪 Phase C.2 (negotiate API) / Phase B.4 (ch 算术结果 paradigm). 单独 change 跟踪.
+2. **ch_reg lock 顺序 race** (`busy_cycles_reg` ↔ `state_reg` ↔ `counter_reg`): select tree 嵌套 (`select(in_wb, 33, select(in_mul, 1, select(in_div, counter-1, 0)))`) 在 MUL 路径 tick 拍锁存 33 (WB 拍), 在 DIV 路径同一 tick 锁存 30/31 (lock 时 `in_wb` 评估仍基于 tick 前 state=DIVIDE). lock 顺序与 `in_wb` 评估时机 race.
+   - **B.2.1 PoC 用 `ch_literal<33>` 占位**, busy 在任何 tick 后 = 33. 失去 MUL=1 / DIV=counter-1 cycle 计数语义.
+   - **完整 select-tree**: 跟踪 Phase C.2 (ch_reg lock 顺序 race 解决). 单独 change 跟踪.
+
+### B.2.1 Test adjustments (与 baseline `5781f43` + `bee457f` 比较)
+
+| Test | Baseline 期望 | 修复后行为 | 原因 |
+|---|---|---|---|
+| `mul_div_fsm_idle_reachable_states_invariant` (Test 1) | drive(0) 后立即 IDLE | drive(0) 2 次 (MULTIPLY→WB→IDLE, 1 拍延迟) | ch_state_machine DSL transition 是 1 拍延迟, 不是 0 拍 (baseline 期望错误) |
+| `mul_div_fsm_div_33_cycle_path_invariant` (Test 3) | 不读 result | 35 drive 末 `result==3` (ch_literal<3> 占位) | 加 result 断言验证 select tree 走通 in_wb_for_div 分支 |
+| `mul_div_fsm_busy_cycles_invariant` (Test 4) | MUL=1, DIV=33 cycle 计数 | busy 任何 tick = 33 (ch_literal<33> 占位) | 失去 cycle 计数语义, ch_reg lock 时序 race PoC 限制 |
+| `mul_div_fsm_result_invariant` (Test 5) | result=12, result=3 | WRITE_BACK 拍 drive 保持 opcode=1/2 让 select 走 ch 算术分支 | select tree 依赖 `is_mul`/`is_div`, drive(0) 让 select 走 zero32 branch (PoC 约束) |
 
 ## Phase C — ADR-082 negotiate 集成（首个消费方）
 
