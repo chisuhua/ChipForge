@@ -4,7 +4,6 @@ priority: P1
 version_target: v0.10.0
 depends_on:
   - cpu-pipeline-multi-cycle
-  - plugin-framework-cycle-precision
 ---
 
 # mfc-cpu-pipeline-multi-cycle-fsm — MUL/DIV FSM 化与 ADR-082 negotiate 集成（v0.10.0 收官版）

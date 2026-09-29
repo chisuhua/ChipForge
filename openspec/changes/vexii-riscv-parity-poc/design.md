@@ -10,7 +10,7 @@
   - single-issue 官方 CoreMark/MHz：**2.4–2.6**
   - dual+prefetch 官方 CoreMark/MHz：**5.24**
   - dual-issue 官方 DMIPS/MHz：**2.50**
-- **ChipForge v0.10.0 (2027 Q1) 起**：PoC-1 (MUL/DIV FSM) + PoC-2 (RV32C) + PoC-3 (ICache) + `plugin-framework-cycle-precision` cycle counter
+- **ChipForge v0.10.0 (2027 Q1) 起**：PoC-1 (MUL/DIV FSM) + PoC-2 (RV32C) + PoC-3 (ICache) + `plugin-framework-cycle-precision` cycle counter（Phase F optional per 2026-09-29 (b) 决策, 兜底 = `tools/cpu_sim/main.cpp:230-242` `actual_cycles`）
 - **ChipForge v1.0.0 (2027 Q3)**：BTB+GShare+RAS + S/U + RV32A + Cache 4-way + FreeRTOS demo → 理论具备 single-issue 追平能力
 
 **核心设计问题**：如何把 VexiiRiscv 官方公开数值变成 CI 可机械校验的 HARD 门禁？

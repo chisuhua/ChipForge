@@ -15,7 +15,7 @@ related_to:
   - ADR-083 (write-back FSM, v1.x 净新增)
 ---
 
-> **initiative 注册状态说明**：`wave6-linux-and-productization` 当前为 proposed 状态。正式注册需待 `wave3-mmu-real-memory-and-cycle` 残余 change（`plugin-framework-cycle-precision` 25/25 tasks 闭环 + `mmu-config-json-driven` archive）闭环后，按 §4.2 OpenSpec 同步流程追加注册。本 change 已通过 frontmatter `initiative:` 字段预声明占用编号，避免后续撞号。
+> **initiative 注册状态说明**：`wave6-linux-and-productization` 当前为 proposed 状态。正式注册需待 `wave3-mmu-real-memory-and-cycle` 残余 change（`plugin-framework-cycle-precision` Phase F optional 实装 [2026-09-29 (b) 决策降级, 当前 0/25 NOT STARTED] + `mmu-config-json-driven` archive）闭环后，按 §4.2 OpenSpec 同步流程追加注册。本 change 已通过 frontmatter `initiative:` 字段预声明占用编号，避免后续撞号。
 
 # vexii-riscv-parity-poc — VexiiRiscv 客观对拍 HARD 门禁（PoC-14 + PoC-15）
 
@@ -52,7 +52,7 @@ related_to:
 
 - **目标**：FPGA 实测 CoreMark/MHz 与 VexiiRiscv single-issue 官方配置（2.4–2.6 CoreMark/MHz）偏差 ≤ 10%
 - **触发节点**：v1.0.0 archive 前必须通过
-- **依赖实装**：`mfc-cpu-pipeline-multi-cycle-fsm`（v0.10.0 PoC-1/2 实装）+ `plugin-framework-cycle-precision`（v0.10.0 cycle-accurate CoreMark 测量）+ `cache-icache-fence-i`（v0.10.0 L1 ICache ≥90% 命中）。**PoC-15 额外依赖** `cache-phase1.5-4way`（v1.2.0 PoC-8 4-way RRIP）。
+- **依赖实装**：`mfc-cpu-pipeline-multi-cycle-fsm`（v0.10.0 PoC-1/2 实装）+ `plugin-framework-cycle-precision`（v0.10.0+ cycle-accurate CoreMark 测量; **Phase F optional per 2026-09-29 (b) 决策**, 当前 0/25 NOT STARTED, 兜底路径 = `tools/cpu_sim/main.cpp:230-242` `actual_cycles`）+ `cache-icache-fence-i`（v0.10.0 L1 ICache ≥90% 命中）。**PoC-15 额外依赖** `cache-phase1.5-4way`（v1.2.0 PoC-8 4-way RRIP）。
 - **实现内容**：
   - 在 `tests/cpu/parity/` 新建 `vexii_riscv_runner.cpp`（按 AGENTS.md tests-family 约定，与 `tests/cpu/riscv-tests-fixture/` 平级）：
       - 加载 ChipForge v1.0.0 配置生成的 FPGA bitstream
@@ -140,7 +140,7 @@ related_to:
 
 - **启动条件**：
   1. `mfc-cpu-pipeline-multi-cycle-fsm` v0.10.0 archive（提供 cycle-accurate MUL/DIV）
-  2. `plugin-framework-cycle-precision` v0.10.0 25/25 tasks.md checkbox 闭环（提供 `pb.run(N)` API + cycle_counter）
+  2. `plugin-framework-cycle-precision` v0.10.0+ **Phase F optional** 实装（提供 `pb.run(N)` API + cycle_counter; 当前 0/25 NOT STARTED per 2026-09-29 (b) 决策; 兜底路径 = `tools/cpu_sim/main.cpp:230-242` `actual_cycles`）
   3. v0.10.0 L1 ICache 实装（PoC-3 PoC-3 ≥ 90% 命中）
 - **PoC-14 估时**：2 周（PoC-14 单发射追平，2027 Q3 之前 = v1.0.0 archive 前）
 - **PoC-15 估时**：3 周（v1.4+ 启动时，2029 Q3+）

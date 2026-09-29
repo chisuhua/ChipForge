@@ -7,7 +7,7 @@
 
 > **重要前置决策**：
 > 1. **路径**：`tests/cpu/parity/`（新建目录，与既有 `tests/cpu/riscv-tests-fixture/` 平级）
-> 2. **依赖锁定**：v0.10.0 阶段只建骨架 + baseline.json + failing test，**不实现** 实测逻辑（依赖 `plugin-framework-cycle-precision` archive）
+> 2. **依赖锁定**：v0.10.0 阶段只建骨架 + baseline.json + failing test，**不实现** 实测逻辑（依赖 `plugin-framework-cycle-precision` archive; 当前 0/25 NOT STARTED, **Phase F optional** per 2026-09-29 (b) 决策, 兜底路径 = `cpu_sim actual_cycles`）
 > 3. **VexiiRiscv baseline SSOT**：所有数值在仓库文件而非外部文档，Git LFS 跟踪 `history/` 子目录
 > 4. **CoreMark v1.01 锁定**：与 VexiiRiscv 官方使用同版本，跨版本基准不可比
 > 5. **PoC-15 [v1.4-pending]**：v1.4+ 启动前 SKIP，不阻塞 PoC-14
@@ -91,7 +91,7 @@
 
 ## Phase B — CoreMark v1.01 ELF 加载 + FPGA cycle 采集（v1.0.0 archive 前）
 
-> **依赖**：`plugin-framework-cycle-precision` 25/25 tasks.md checkbox 闭环（提供 `pb.run(N)` API + cycle_counter Payload Key）
+> **依赖**：`plugin-framework-cycle-precision` Phase F optional 实装（提供 `pb.run(N)` API + cycle_counter Payload Key; 当前 0/25 NOT STARTED per 2026-09-29 (b) 决策; 兜底路径 = `cpu_sim actual_cycles`）
 
 ### B.1 [RED] 写 `[vexii-parity][single][fpga]` failing test：CoreMark ELF 加载 + cycle 采集
 
@@ -117,7 +117,7 @@
 - [ ] **CoreMark 输出协议**：监听 `tohost` 寄存器（Picolibc HTIF 协议）等待 `tohost != 0` 退出
 - [ ] **运行 B.1 测试**：期望 PASS（TLM 仿真可跑，FPGA 跑可后续）
 
-### B.3 [GREEN] 实现 `cycle_counter` 集成（依赖 P1#4 plugin-framework-cycle-precision）
+### B.3 [GREEN] 实现 `cycle_counter` 集成（依赖 P1#4 plugin-framework-cycle-precision, Phase F optional per 2026-09-29 (b) 决策; 兜底 = cpu_sim actual_cycles）
 
 - [ ] **新建文件**：`tests/cpu/parity/cycle_collector.{h,cpp}`（~100 LOC）
 - [ ] **核心逻辑**：

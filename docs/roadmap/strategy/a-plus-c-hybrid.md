@@ -32,7 +32,7 @@
 | Initiative ID | Title | 包含 Change | 版本节点 | Status |
 |---------------|-------|-------------|----------|--------|
 | `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | ✅ 已收官（archived, commit cba5e53 + 8909165 + d98a9dd） |
-| `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | 🟡 **部分收官（2026-09-26）**：P1#3 已 archive（commit 8a14402）；P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede；P1#4 实装完成但 tasks.md 未回填（0/19 checkbox）；P1#6 满足启动条件（P1#3 已 archive）待启动。**Initiative 形式 archive 待 P1#4/P1#6 闭环**；follow-up `[cpu-l1-mmu-demo]` 5/6 FAIL 修复待独立 debug change |
+| `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | 🟡 **部分收官（2026-09-29 Oracle 审计）**：P1#3 已 archive（commit 8a14402）；P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede（8/60 IN_PROGRESS）；**P1#4 0/25 NOT STARTED, Phase F optional**（2026-09-29 (b) 决策降级, Oracle 审计代码考古零痕迹: 无 CURRENT_CYCLE/cycle_count_t/test_pb_run_cycle_precision.cpp/ADR-050）；P1#6 满足启动条件（P1#3 已 archive）待启动。**Initiative 形式 archive 待 P1#4 Phase F 实装 + P1#6 archive** |
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
 | **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare + P3#14 soc-freertos-demo + ADR-070~083（14 条新规划，含 083=write-back FSM 净新增） | **v0.10.0 → v1.0.0** | exploring（待启动）；详见 [`soc/cpu/docs/roadmap/execution-roadmap.md`](../../../soc/cpu/docs/roadmap/execution-roadmap.md) §3 |
 
@@ -97,7 +97,7 @@ graph TD
 | `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 0 18 |
 | `cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 27 0 |
 | `mmu-config-json-driven` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 0 0 |
-| `plugin-framework-cycle-precision` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 19 0 |
+| `plugin-framework-cycle-precision` | wave3-mmu-real-memory-and-cycle | P1 | TODO (Phase F optional per 2026-09-29 (b) 决策) | 0/25 NOT STARTED |
 | `2026-09-26-mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | ✅ DONE (archived) | 0 36 |
 | `cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | TODO | 32 0 |
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
@@ -106,7 +106,7 @@ graph TD
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
 
-> **⚠️ 手动补充 (2026-09-29)**: `vexii-riscv-parity-poc` (wave6-linux-and-productization 提案) 暂未出现在自动派生表内——`wave6-linux-and-productization` initiative 待 `plugin-framework-cycle-precision` 25/25 闭环 + `mmu-config-json-driven` archive 后正式注册（per vexii frontmatter `initiative:` 字段预声明占用编号）。同步脚本按 `~/.local/share/openspec/context-stores/chipforge/initiatives/*/` 过滤，wave6 目录缺失时静默丢弃该 change。当前条目**手补**，下次 sync 前需重新注册或手工保留。
+> **⚠️ 手动补充 (2026-09-29)**: `vexii-riscv-parity-poc` (wave6-linux-and-productization 提案) 暂未出现在自动派生表内——`wave6-linux-and-productization` initiative 待 `plugin-framework-cycle-precision` **Phase F optional 实装**（per 2026-09-29 (b) 决策, 当前 0/25 NOT STARTED, 兜底 `cpu_sim actual_cycles`）+ `mmu-config-json-driven` archive 后正式注册（per vexii frontmatter `initiative:` 字段预声明占用编号）。同步脚本按 `~/.local/share/openspec/context-stores/chipforge/initiatives/*/` 过滤，wave6 目录缺失时静默丢弃该 change。当前条目**手补**，下次 sync 前需重新注册或手工保留。
 >
 > | `vexii-riscv-parity-poc` | wave6-linux-and-productization (PROPOSED) | P1 | TODO | 0 74 |
 
