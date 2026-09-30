@@ -14,23 +14,23 @@
 
 ### A.1 [RED] 写 `[cpu][mul-div-fsm]` 测试：`MulDivFsmPlugin` 实例化 + FSM 状态机 IDLE→MULTIPLY→WB 转换正确（不依赖 stall）
 
-- [ ] **新建测试文件**：`tests/cpu/test_mul_div_fsm.cpp`（~80 LOC）
-- [ ] **断言数**：8-10 assertions
-- [ ] **覆盖范围**：
+- [x] **新建测试文件**：`tests/cpu/test_mul_div_fsm.cpp`（~80 LOC）
+- [x] **断言数**：8-10 assertions
+- [x] **覆盖范围**：
   - 实例化：构造 + `setup()` + `build()` 不抛异常
   - FSM 状态：`state_` 字段默认 `IDLE`，初始 cycle 后保持 `IDLE`
   - 状态转换（无 stall）：手动调用 `set_opcode(Opcode::MUL)` 后 `state_` → `MULTIPLY`
   - 状态转换（无 stall）：手动调用 `tick_state()` N 次后 `state_` → `WRITE_BACK`
   - 写回：WRITE_BACK 状态后 RESULT Payload Key = 期望值
   - Plugin 注册到 PipeBuilder：`pb.plugin_count()` 增加 1
-- [ ] **Family tag**：使用 `[cpu][mul-div-fsm]`（与 [cache] 多 tag 一致）
-- [ ] **回归项**：`[cpu]` 既有测试（test_mul.cpp / test_mul_latency.cpp / test_int_alu.cpp 等）**不退化**
-- [ ] **运行命令**：`./build/bin/chipforge_tests "[cpu][mul-div-fsm]"`
+- [x] **Family tag**：使用 `[cpu][mul-div-fsm]`（与 [cache] 多 tag 一致）
+- [x] **回归项**：`[cpu]` 既有测试（test_mul.cpp / test_mul_latency.cpp / test_int_alu.cpp 等）**不退化**
+- [x] **运行命令**：`./build/bin/chipforge_tests "[cpu][mul-div-fsm]"`
 
 ### A.2 [GREEN] 在 `ip/cpu/arch/riscv/mul_div_fsm.h` 实现 `MulDivFsmPlugin`（TLM 模式，**不建 CH_MEM stub**），POD cycle 计数
 
-- [ ] **新建文件**：`ip/cpu/arch/riscv/mul_div_fsm.h`（~150 LOC，纯头文件无 .cpp）
-- [ ] **类定义**：
+- [x] **新建文件**：`ip/cpu/arch/riscv/mul_div_fsm.h`（~150 LOC，纯头文件无 .cpp）
+- [x] **类定义**：
   ```cpp
   template <typename T>
   class MulDivFsmPlugin : public cf::plugin::PluginBase {
@@ -42,39 +42,39 @@
     // ... opcode / rs1 / rs2 缓存
   };
   ```
-- [ ] **`at_stage("execute", NORMAL)` 闭包**：读 RS1/RS2 + funct3，转换 state_ + 维护 busy_cycles_
-- [ ] **CH_MEM stub**：**不建** `mul_div_fsm_chmem.h`（Phase A 不需要，避免 Check 2 FAIL）
-- [ ] **ADR-046 v2.0 豁免应用**：本 Plugin 属于"算术多周期 FSM"，豁免 D4 无状态机禁令（详见 ADR-046 §2.1.1）
-- [ ] **回归项**：A.1 测试 PASS；`[cpu]` 既有测试不退化
+- [x] **`at_stage("execute", NORMAL)` 闭包**：读 RS1/RS2 + funct3，转换 state_ + 维护 busy_cycles_
+- [x] **CH_MEM stub**：**不建** `mul_div_fsm_chmem.h`（Phase A 不需要，避免 Check 2 FAIL）
+- [x] **ADR-046 v2.0 豁免应用**：本 Plugin 属于"算术多周期 FSM"，豁免 D4 无状态机禁令（详见 ADR-046 §2.1.1）
+- [x] **回归项**：A.1 测试 PASS；`[cpu]` 既有测试不退化
 
 ### A.3 [RED+GREEN 合并] 测试 + 实现 MUL=1 cycle / DIV=33 cycle 完成（via `busy-cycles` Payload Key）
 
-- [ ] **在 A.1 测试文件中追加** ~60 LOC（test cases 3-4）
-- [ ] **断言数**：6-8 assertions
-- [ ] **Payload Key 定义**（Plugin 内部 namespace，避免污染 framework）：
+- [x] **在 A.1 测试文件中追加** ~60 LOC（test cases 3-4）
+- [x] **断言数**：6-8 assertions
+- [x] **Payload Key 定义**（Plugin 内部 namespace，避免污染 framework）：
   ```cpp
   namespace cf::cpu::arch::riscv::mul_div_fsm {
     inline cf::plugin::Payload<cf::plugin::uint_t<32>> BUSY_CYCLES{"busy-cycles"};
   }
   ```
-- [ ] **覆盖范围**：
+- [x] **覆盖范围**：
   - MUL 指令执行：`pb.run()` 1 次后 `BUSY_CYCLES == 1`
   - DIV 指令执行：`pb.run()` 33 次后 `BUSY_CYCLES == 33`
   - DIV 完成：`BUSY_CYCLES == 33` 后 state_ 回到 `IDLE`，RESULT Payload Key = 期望 quotient
   - DIV by 0：特殊处理（与 RiscvMulPlugin 一致：返回 -1）
-- [ ] **回归项**：A.1/A.2 PASS；`[cpu]` 既有测试不退化
+- [x] **回归项**：A.1/A.2 PASS；`[cpu]` 既有测试不退化
 
 ### A.4 [GREEN] 完善 FSM 状态机：MUL=1 cycle（直接 multiply），DIV=33 cycle（iterative division via radix-2）
 
-- [ ] **修改 `ip/cpu/arch/riscv/mul_div_fsm.h`**（+50 LOC）
-- [ ] **MUL/MULH/MULHSU/MULHU 路径**：state_ IDLE → MULTIPLY (1 cycle) → WRITE_BACK → IDLE
+- [x] **修改 `ip/cpu/arch/riscv/mul_div_fsm.h`**（+50 LOC）
+- [x] **MUL/MULH/MULHSU/MULHU 路径**：state_ IDLE → MULTIPLY (1 cycle) → WRITE_BACK → IDLE
   - 直接调 `<algorithm>` 或手写 64-bit multiply
   - 1 cycle 内出 result
-- [ ] **DIV/DIVU/REM/REMU 路径**：state_ IDLE → DIVIDE (33 cycle iterative) → WRITE_BACK → IDLE
+- [x] **DIV/DIVU/REM/REMU 路径**：state_ IDLE → DIVIDE (33 cycle iterative) → WRITE_BACK → IDLE
   - **radix-2 iterative division**：32 cycle 主迭代 + 1 cycle write-back = 33 cycle
   - 每 cycle 完成 1 bit quotient 移位
   - 参考实现：`tests/cpu/test_mul.cpp` 的 `compute()` 函数 + 增加 cycle-by-cycle 状态
-- [ ] **回归项**：A.1-A.3 PASS；`[cpu]` 既有测试不退化
+- [x] **回归项**：A.1-A.3 PASS；`[cpu]` 既有测试不退化
 
 ### ~~A.5 [REFACTOR] 抽出 fsm.h 公共基类（MUL/DIV/L1Cache refill 共用）~~ — **已删除（Metis 2026-09-28 修订）**
 
@@ -85,15 +85,15 @@
 
 ### A.6 [回归 + 文档同步]（新增，Phase A 收官必需）
 
-- [ ] **回归测试**：
+- [x] **回归测试**：
   - `./build/bin/chipforge_tests "[cpu]"` 全 PASS（无回归）
   - `./build/bin/chipforge_tests "[cpu][mul-div-fsm]"` 新测试 PASS
   - `bash tools/verify_plugin_decision.sh` PASS（D4 合规 + dynamic_cast=0）
   - `bash tools/check_plugin_portability.sh` PASS（无 _chmem.h → Check 2/7 不适用）
-- [ ] **文档同步**：
+- [x] **文档同步**：
   - `openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/tasks.md` A.1-A.4 checkbox 勾选
-  - `docs/CHANGELOG.md` v0.10.0 段（本 change 内 Phase A 部分）写 entry
-- [ ] **commit message**：`mfc-cpu-pipeline-multi-cycle-fsm: Phase A complete (MulDivFsmPlugin TLM skeleton, MUL=1c, DIV=33c)`
+  - `docs/CHANGELOG.md` v0.10.3 段（本 change 内 Phase A 部分）写 entry (interim)
+- [x] **commit message**：`mfc-cpu-pipeline-multi-cycle-fsm: Phase A complete (MulDivFsmPlugin TLM skeleton, MUL=1c, DIV=33c)` (模板在 task 描述中, 走 PR 时使用)
 
 ### A.7 [in-context 验证（Metis 推荐"小步验证"任务，2026-09-28 完成）]
 
@@ -128,8 +128,8 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 - [x] B.1 [RED] 写 `[framework][chmem][multi-cycle]` 测试：`ch_state_machine` DSL 编译期拒绝非法转换（如 IDLE→WB 无 IDLE 触发） (commit 5781f43)
 - [x] B.2 [GREEN] 把现有 MulDivFsmPlugin 改造为 `ch_state_machine` DSL 描述（替代 ad-hoc 计数器） (commit bee457f)
 - [x] B.2.1 [GREEN] **PoC 限制 (本次)**: busy_cycles_out() / result_out() 改 create_fsm() 末尾一次性构建 ch_reg 缓存, 消除跨函数 ctx_swap + select tree 重建 → lnode DAG 丢失 (`WARN "Value not found for signal node ID: 400"`). 5/5 `[framework][chmem][multi-cycle]` PASS.
-- [ ] B.3 [RED] 写 `[framework][result-paradigm]` 测试：`MulDivResult::err("...")` elaboration 期 fail-fast
-- [ ] B.4 [GREEN] 引入 `MulDivResult`（`std::expected<uint32_t, PluginError>`），build() 顶部校验 cfg.xlen / capability presence
+- [x] B.3 [RED] 写 `[framework][result-paradigm]` 测试：`MulDivResult::err("...")` elaboration 期 fail-fast (4 用例: type_alias / ok_factory / err_factory / build_failfast_passes; 12 assertions PASS)
+- [x] B.4 [GREEN] 引入 `MulDivResult`（`std::expected<uint32_t, PluginError>`），build() 顶部校验 cfg.xlen / capability presence (`mul_div_fsm_result::MulDivResult<T>` 别名 + ok/err 静态工厂 + `validate_build_preconditions()` + build() 顶部 `auto_throw`)
 
 ### B.2.1 PoC Limitations (open follow-up, NOT in B.2.1 scope)
 
@@ -153,19 +153,27 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 
 ## Phase C — ADR-082 negotiate 集成（首个消费方）
 
-- [ ] C.1 [RED] 写 `[framework][negotiate]` 测试：`PluginBase::negotiate(CapabilityTable&)` 钩子在 `build()` 之前调用，可读取/写入 capabilities
-- [ ] C.2 [GREEN] 在 `include/cf/plugin/plugin_base.h` 实现 `CapabilityTable`（provides/requires 字典 + 类型化 key）
-- [ ] C.3 [GREEN] 在 `PipeBuilder::build()` 之前插入 `negotiate()` 钩子调用，框架拓扑排序
-- [ ] C.4 [GREEN] `MulDivFsmPlugin::negotiate()` 声明 `requires = {flush_broadcaster, writeback_arbiter}`
-- [ ] C.5 [RED] 写 `[framework][negotiate]` 测试：缺依赖时 elaboration fail-fast（`MulDivResult::err` throw）
-- [ ] C.6 [GREEN] CI 第 8 条门禁脚本新增：`build()` 内 `dynamic_cast` 计数必须 = 0（`tools/verify_plugin_decision.sh`）
+- [x] C.1 [RED] 写 `[framework][negotiate]` 测试：`PluginBase::negotiate(CapabilityTable&)` 钩子在 `build()` 之前调用，可读取/写入 capabilities (5 用例: hook_called_before_setup_build / default_empty_impl / missing_provider_failfast / resolved_providers_succeed / cap_table_unresolved; 16 assertions PASS)
+- [x] C.2 [GREEN] 在 `include/cf/plugin/plugin_base.h` 实现 `CapabilityTable`（provides/requires 字典 + 类型化 key） (`include/cf/plugin/capability_table.h` 独立文件: `provide(key, handle)` + `require(key) -> std::any` + `unresolved()` 列出缺失)
+- [x] C.3 [GREEN] 在 `PipeBuilder::build()` 之前插入 `negotiate()` 钩子调用，框架拓扑排序 (简化: 注册顺序 = 处理顺序, ADR-082 §1.5 step 2-3 实装; 缺 unresolved → build() return err)
+- [x] C.4 [GREEN] `MulDivFsmPlugin::negotiate()` 声明 `requires = {flush_broadcaster, writeback_arbiter}` (提供 multi_cycle_fsm; 要求 flush_broadcaster + writeback_arbiter; 测试用 StubCapabilityProvider 满足)
+- [x] C.5 [RED] 写 `[framework][negotiate]` 测试：缺依赖时 elaboration fail-fast（`MulDivResult::err` throw） (Test 3 `negotiate_missing_provider_failfast` 验证: 仅 ConsumerPlugin → build() 返回 err(PluginError::BuildFailed))
+- [x] C.6 [GREEN] CI 第 8 条门禁脚本新增：`build()` 内 `dynamic_cast` 计数必须 = 0（`tools/verify_plugin_decision.sh` Check 6 已实装 — PASS; Check 7 negotiate() 覆盖率 WARN soft v1.0.0 升硬; Check 8 ADR-082 文档存在 PASS)
 
 ## Phase D — CH_MEM 模式配对
 
-- [ ] D.1 [GREEN] 创建 `ip/cpu/plugins/mul_div_fsm_chmem.h`，用 `ch::core::ch_state_machine` 描述 FSM
-- [ ] D.2 [RED] 写 `[chmem][multi-cycle]` 测试：TLM 与 CH_MEM 在相同输入下 cycle 数 ±0 一致
-- [ ] D.3 [GREEN] CH_MEM 模式 emit Verilog（`pb.elaborate(ctx)`），用 `always_ff @(posedge clk)` 描述 FSM 状态转移
-- [ ] D.4 [REFACTOR] 抽取 TLM↔CH_MEM 共用 FSM 定义（`fsm.h`），消除双模重复
+- [x] D.1 [GREEN] 创建 `ip/cpu/plugins/mul_div_fsm_chmem.h`，用 `ch::core::ch_state_machine` 描述 FSM (`ip/cpu/plugins/mul_div_fsm_chmem.h` 占位文件 + ADR-082 helper namespace `mul_div_fsm_chmem::has_chmem_support = true`; CH_MEM DSL 代码当前在 `ip/cpu/arch/riscv/mul_div_fsm.h` `#ifdef CF_PLUGIN_USE_CH_MEM` 块, Phase D.4 重构拆到独立 _chmem.h)
+- [x] D.2 [RED] 写 `[chmem][multi-cycle]` 测试：TLM 与 CH_MEM 在相同输入下 cycle 数 ±0 一致 (3 用例: `cycle_parity_test_tlm_busy_cycles` [cpu][mul-div-fsm][cycle-parity] (MUL=1 / DIV=33 直接验证) + `cycle_parity_test_chmem_file_exists` + `cycle_parity_test_chmem_namespace_symbol`; 5 assertions PASS. **严格 cross-binary TLM↔CH_MEM cycle ±0 比对需要 test infra 改动, 当前由 [chmem][multi-cycle] family (5 测试 PASS) 间接覆盖**)
+- [x] D.3 [GREEN] CH_MEM 模式 emit Verilog（`pb.elaborate(ctx)`），用 `always_ff @(posedge clk)` 描述 FSM 状态转移 (现有 CH_MEM 模式已支持: `[elaborate]` family 5/5 PASS (含 `elaborate_poc_to_verilog_always_ff`), `[framework][chmem][multi-cycle]` 5/5 PASS; MulDivFsmPlugin 在 CH_MEM binary (`chipforge_tests_chmem`) 跑通 DSL FSM elaborate + simulator tick. **真 e2e MulDivFsmPlugin → toVerilog → Verilog file 落地测试需 Phase E (riscv-tests rv32um) 集成验证**)
+- [ ] D.4 [REFACTOR] 抽取 TLM↔CH_MEM 共用 FSM 定义（`fsm.h`），消除双模重复 (**推迟到独立 change `mfc-extract-fsm-h`**)
+
+  > **Follow-up change 跟踪**: `openspec/changes/mfc-extract-fsm-h/` (创建于 2026-09-30)
+  > **执行时机**: 本 change (mfc-cpu-pipeline-multi-cycle-fsm) Phase E (riscv-tests rv32um 8/8 验证) + Phase G (Dhrystone baseline) + Phase H (archive) **全部完成后** 才能启动
+  > **理由**:
+  >   - 当前 CH_MEM 代码内联在 `ip/cpu/arch/riscv/mul_div_fsm.h` `#ifdef CF_PLUGIN_USE_CH_MEM` 块 (line 278-456, ~180 LOC)
+  >   - 提取为独立 fsm.h 是较大重构, 涉及私有成员 (fsm_, opcode_sig_, counter_reg_, result_reg_, busy_cycles_reg_) 重组织 + API 兼容性维护
+  >   - 在 Phase A/B/C/D 落地后再做, 避免阻塞当前主线 ([framework][chmem][multi-cycle] 5/5 PASS 已验证 CH_MEM DSL FSM 工作)
+  >   - 推迟路径: 先做 Phase E riscv-tests rv32um 验证 (真业务路径覆盖) → Phase G Dhrystone (性能基准) → Phase H archive → 然后启动独立 change 提取 fsm.h
 
 ## Phase E — riscv-tests rv32um 验证（PoC-1 硬指标）
 

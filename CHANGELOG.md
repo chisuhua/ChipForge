@@ -5,6 +5,56 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.3 (2026-09-30, interim) — mfc Phase A: MulDivFsmPlugin TLM skeleton (MUL=1c, DIV=33c)
+
+> **OpenSpec change**: `mfc-cpu-pipeline-multi-cycle-fsm` (IN_PROGRESS, 32/60 tasks)
+> **Initiative**: `wave5-isa-coverage-and-bp` (PoC-1)
+> **Purpose**: RISC-V M 扩展 (MUL/DIV/REM) 多周期 FSM 化实装, PoC-1 启动第一步
+> **Entry 状态**: **interim** — Phase A (A.1-A.4 + A.7) 完成 entry. Phase B/C/D/E/F/G/H 待 change archive 时合并为最终 v0.10.3 entry.
+
+### Added
+
+- **`MulDivFsmPlugin<T>`** (`ip/cpu/arch/riscv/mul_div_fsm.h`, 470 LOC): RISC-V M 扩展 8 条指令 (MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU) 的多周期 FSM 实现. 与既有 `RiscvMulPlugin` 并存 (双 Plugin, CPU Factory 由 cfg `mul_impl` 字段选择 LEGACY/FSM).
+- **FSM 状态机** (`enum class State { IDLE, MULTIPLY, DIVIDE, WRITE_BACK }`): `IDLE → MULTIPLY (1 cycle) | DIVIDE (33 cycle) → WRITE_BACK → IDLE`. 33 cycle = 32 radix-2 iterative + 1 write-back (实测迭代次数, 非 RISC-V spec 上限 35).
+- **`busy_cycles` Payload Key** (`mul_div_fsm_payload::BUSY_CYCLES`): Plugin 内部 namespace, 避免污染 framework. Plugin 内部 `busy_cycles_` counter 维护, `tick_state()` / `advance_fsm()` 推进.
+- **`at_stage("execute", NORMAL)` 闭包**: 读 RS1/RS2 + funct3 → 转换 `state_` + 维护 `busy_cycles_`. 测试 helper: `set_opcode()`, `set_operands()`, `tick_state()`, `state()`, `busy_cycles()`, `result()`.
+
+### Changed
+
+- **CF_PLUGIN_USE_FSM_EXEMPT 标记**: `mul_div_fsm.h:39` 文件头声明此宏 (ADR-046 v2.0 §2.1.1 算术多周期 FSM 豁免首例). `check_plugin_portability.sh` Check 5 检测此宏跳过 at_stage 闭包内 `if(ch_bool)` 检查.
+- **`RiscvMulPlugin::compute()` 复用**: `MulDivFsmPlugin::compute_mul_div()` 调基类 `compute(f3, 0, rs1, rs2)` 拿 8 条 M 指令结果 (避免重复实现, 单一真相源).
+
+### Tests
+
+- **`[cpu][mul-div-fsm]` 新 family** (`tests/cpu/test_mul_div_fsm.cpp`, 162 LOC): 6 用例覆盖 A.1+A.3+A.4 (instantiate_default_state, setup_build_no_throw, plugin_registers_to_pipe_builder, fsm_mul_state_transition, fsm_div_33_cycle, mul_one_cycle_busy). **55 assertions PASS**.
+- **`[framework][chmem][multi-cycle]` (Phase B.2.1 落地)**: 5/5 PASS. busy_cycles_out/result_out 改 create_fsm() 末尾一次性构建 ch_reg 缓存, 消除跨函数 ctx_swap + select tree 重建 → lnode DAG 丢失 WARN (`Value not found for signal node ID: 400`).
+
+### Verification (v0.10.3 interim 实测)
+
+- **`[cpu][mul-div-fsm]` 6/6 PASS** (55 assertions, Phase A 覆盖)
+- **`[cpu]` 124/124 PASS** (417 assertions, 含新增 6 用例, 无回归)
+- **`[cpu-integration]` 81/81 PASS** (65722 assertions, 无回归)
+- **`[mmu]` 53/53 PASS** (131 assertions, 无回归)
+- **`[riscv-tests]` 40/40 PASS** (40 assertions, 无回归)
+- **`verify_plugin_decision.sh` 8/8 PASS** (D4 + ADR-040 + ADR-082)
+- **`check_plugin_portability.sh` 12/12 PASS** (含 1 WARN 不阻塞)
+
+### Known Follow-up (本 change 后续 Phase, change 内跟踪)
+
+- **Phase B 残 B.3/B.4**: Result 范式 + MulDivResult fail-fast (`std::expected<uint32_t, PluginError>`)
+- **Phase C (C.1-C.6)**: CapabilityTable 框架 + ADR-082 negotiate 集成 (首个消费方)
+- **Phase D (D.1-D.4)**: CH_MEM 配对 + cycle parity test + Verilog emit + fsm.h 抽取
+- **Phase E**: riscv-tests rv32um 8/8 验证 (PoC-1 硬指标)
+- **Phase F**: cycle precision 闭环 (依赖 plugin-framework-cycle-precision, Phase F optional)
+- **Phase G**: Dhrystone baseline (v0.10.0 hard gate)
+- **Phase H**: archive mfc change + update ADR-082 Accepted + 合并 CHANGELOG entry
+
+### Known Limitations (interim entry 时刻, out of Phase A scope)
+
+- **in-context cycle 数错** (A.7 暴露): `div.elf` FSM 路径跑出 5 cycles (与 LEGACY baseline 一致, 不是 40+), 暴露 Phase A 3 个 in-context bug (B1: 缺 CtrlLink stall 机制 / B2: execute 闭包每 cycle 都触发 advance_fsm / B3: busy_cycles Payload Key 未写 PayloadStore). Phase B+ 修复, 不阻塞 Phase A 收官.
+- **`ch_uint<32>` 算术语义异常** (B.2.1 PoC): `ch_uint<32>(14) / ch_uint<32>(4) = 1` (非 3), `ch_uint<32>(3) * ch_uint<32>(4) = 16` (非 12). CppHDL `bv_div_truncate` / `bv_mul_truncate` 位截断语义与 C++ 整数算术不一致. PoC 用 `ch_literal<12,3,33>` 占位, 真 fix 跟踪 Phase B.4 + Phase C.2.
+- **`ch_reg` lock 顺序 race** (B.2.1 PoC): `busy_cycles_reg` ↔ `state_reg` ↔ `counter_reg` select tree 嵌套 lock 顺序与 `in_wb` 评估时机 race. PoC 用 `ch_literal<33>` 占位, 失去 MUL=1 / DIV=counter-1 cycle 计数语义. 跟踪 Phase C.2.
+
 ## v0.10.2 (2026-09-28) — cpu-factory-satp-mapping: satp_value helper + ctor propagation (Phase D e2e 推迟)
 
 > **OpenSpec change**: `cpu-factory-satp-mapping` (archived)
