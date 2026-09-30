@@ -138,6 +138,20 @@ class PipeBuilder {
   }
 
   Result<void> build() {
+    // Phase C (ADR-082): 在 setup/build 之前跑 negotiate + 检查 unresolved
+    CapabilityTable cap;
+    try {
+      for (auto& p : plugins_) p->negotiate(cap);
+    } catch (const PluginException& /*e*/) {
+      return std::unexpected(PluginError::PluginBuildFailed);
+    } catch (const std::exception& /*e*/) {
+      return std::unexpected(PluginError::BuildFailed);
+    }
+    auto unresolved = cap.unresolved();
+    if (!unresolved.empty()) {
+      return std::unexpected(PluginError::BuildFailed);
+    }
+
     try {
       for (auto& p : plugins_) p->setup(*this);
       for (auto& p : plugins_) p->build(*this);
