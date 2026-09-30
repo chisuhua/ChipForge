@@ -65,6 +65,15 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 - [cpu-l1-mmu-demo]: {{DEMO_STATUS}} (target: 6/6)
 - [riscv-tests]: {{RISCV_STATUS}} (target: 40/40)
 
+### Recent commits (last 5)
+```
+{{RECENT_COMMITS}}
+```
+
+### Workspace health
+- working_tree: {{WORKING_TREE_STATUS}}
+- orphan_changes: {{ORPHAN_CHANGES_STATUS}}
+
 ### Hard prerequisites (v0.10.0 launch gates)
 | # | Item | Status |
 |---|------|--------|
@@ -73,6 +82,14 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 ### Active OpenSpec changes
 {{ACTIVE_CHANGES_LIST}}
+
+### Honesty audit (声称 vs 实测, K3 fix 2026-09-30)
+| 指标 | 声称来源 | 声称数字 | 实测 | 一致? |
+|------|---------|---------|------|------|
+| [cpu] | {{CLAIM_CPU_SRC}} | {{CLAIM_CPU}} | {{CPU_MEASURED}} | {{CPU_HONESTY}} |
+| [cpu-integration] | {{CLAIM_CPUINT_SRC}} | {{CLAIM_CPUINT}} | {{CPUINT_MEASURED}} | {{CPUINT_HONESTY}} |
+| [cpu-l1-mmu-demo] | {{CLAIM_DEMO_SRC}} | {{CLAIM_DEMO}} | {{DEMO_MEASURED}} | {{DEMO_HONESTY}} |
+| doc_link_check | (无显式声称) | — | {{BROKEN_COUNT}} broken | {{DOC_HONESTY}} |
 
 ## 必读 (静态, 见 AGENTS.md):
 - `AGENTS.md §路线 / Roadmap 类文档` — 文档导航入口（首次必读，含 4 类文档职责对照 + 记忆口诀）
@@ -85,13 +102,13 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 | # | 触发场景（关键词） | 加读文件（限 section） | 优先级 vs L1/L2/L5 | 与默认"不读"的区别 |
 |---|---|---|---|---|
-| 1 | PoC-1 / MUL/DIV / multi-cycle / FSM / negotiate 实装 | `references/decision-1-plugin-evolution.md §3` + `docs/architecture/adr/ADR-082-plugin-negotiate-capability.md` §Context+Decision + `references/poics-and-risks.md §1` PoC-1 行 | **高于 L5** | 不读 → negotiate 设计契约靠猜 |
-| 2 | RV32C / 解码 / 跨页 fetch | `references/poics-and-risks.md §1` PoC-2 行 + `ADR-070`（若已起草） | 与 L5 同级 | 不读 → 成功标准（rv32uc ≥95%）缺失 |
-| 3 | ICache / fence.i / 取指一致性 | `references/poics-and-risks.md §1` PoC-3 行 + `ADR-072`（若已起草） | 与 L5 同级 | 不读 → fence.i ≥10 断言要求漏 |
-| 4 | BTB / GShare / 分支预测 / mispredict | `references/decision-1-plugin-evolution.md §1` + `references/poics-and-risks.md §1` PoC-6 行 | 与 L5 同级 | 不读 → 漏 Port 抽象纪律（CI 第 11 条） |
-| 5 | ADR 起草/状态变更/编号 | `references/adr-matrix.md §1+§2+§7` + `docs/architecture/adr.md` 注册表 | **最高**（先于一切写操作）| 不读 → 撞号（050/051 事故重演） |
+| 1 | PoC-1 / MUL/DIV / multi-cycle / FSM / negotiate 实装 | `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §3` + `docs/architecture/adr/ADR-082-plugin-negotiate-capability.md` §Context+Decision + `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-1 行 | **高于 L5** | 不读 → negotiate 设计契约靠猜 |
+| 2 | RV32C / 解码 / 跨页 fetch | `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-2 行 + `ADR-070`（若已起草） | 与 L5 同级 | 不读 → 成功标准（rv32uc ≥95%）缺失 |
+| 3 | ICache / fence.i / 取指一致性 | `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-3 行 + `ADR-072`（若已起草） | 与 L5 同级 | 不读 → fence.i ≥10 断言要求漏 |
+| 4 | BTB / GShare / 分支预测 / mispredict | `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §1` + `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-6 行 | 与 L5 同级 | 不读 → 漏 Port 抽象纪律（CI 第 11 条） |
+| 5 | ADR 起草/状态变更/编号 | `soc/cpu/docs/roadmap/references/adr-matrix.md §1+§2+§7` + `docs/architecture/adr.md` 注册表 | **最高**（先于一切写操作）| 不读 → 撞号（050/051 事故重演） |
 | 6 | CH_MEM / 双模 / elaborate / ch_state_machine / 对拍 | `docs/lessons/phase-6c-elaboration-substrate.md` 陷阱清单节 + `ADR-040 v2.0` Decision 节 | 与 L2 同级 | 不读 → 15 类已知陷阱逐个重踩 |
-| 7 | 对外汇报 / 性能对标 / 决策 3 / chip-selector 定位 | `references/multi-core-comparison.md §1+§2` | 低于 L5（仅此类会话需要）| 不读无执行损失，仅汇报失真 |
+| 7 | 对外汇报 / 性能对标 / 决策 3 / chip-selector 定位 | `soc/cpu/docs/roadmap/references/multi-core-comparison.md §1+§2` | 低于 L5（仅此类会话需要）| 不读无执行损失，仅汇报失真 |
 | 8 | 追溯某版本为什么变（如 8a14402 性质） | `CHANGELOG.md` 仅 `[Unreleased]` + 目标版本节（**不读全文**） | L6 叙事层 | 不读无执行损失，仅缺历史叙事 |
 | 9 | **以上均不涉及** | **零加读**——仅 L1 §3 / L2 §5 / L5 proposal + adr.md | — | **显式默认"惰性 opt-in"**，防清单广播 |
 
@@ -112,12 +129,20 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 {{SMART_RECOMMENDATIONS}}
 
-## 启动清单 (新会话必做的前 5 步):
+## 启动清单 (新会话必做的前 6 步):
 1. `openspec list` — 确认 active changes
 2. `cat soc/cpu/docs/roadmap/execution-roadmap.md | sed -n '/## 5\./,/## 6\./p'` — 确认立即下一步
-3. `./build/bin/chipforge_tests "[cpu-l1-mmu-demo]"` — 确认回归状态（若 FAIL 优先 debug change）
-4. `bash tools/verify_plugin_decision.sh` — 确认 CI 门禁
-5. 报告你看到的状态 + 建议下一步
+3. `cat openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/tasks.md | grep -E "^## Phase |^### Phase "` — 列出所有 phase 头, 确认当前 phase
+4. `./build/bin/chipforge_tests "[cpu-l1-mmu-demo]"` — 确认回归状态（若 FAIL 优先 debug change）
+5. **CI 门禁快验**（PR 阻塞门禁, 任一 FAIL 必须先修/报告才能继续）:
+   ```bash
+   bash tools/verify_adr.sh                  # ADR 注册表与代码实现对齐
+   bash tools/verify_plugin_decision.sh      # D4 Plugin-style 业务代码静态检查
+   bash tools/check_plugin_portability.sh    # ADR-040 移植性约束
+   ```
+   - 三脚本任一 ❌ → **立即报告 + 停止**; 不要绕过门禁继续 implement
+   - `tools/doc_link_check.sh` 不在本步（虽推荐但非 PR 阻塞; 仅当步骤 6 报告 doc 链接异常时单独跑）
+6. 报告你看到的状态 + 建议下一步
 ````
 
 ## Step 3: Inject smart recommendations
@@ -253,11 +278,68 @@ The skill body contains only pointers (file paths, command names). All state is 
 **同步步骤**:
 1. **跑链接检查**: `bash tools/doc_link_check.sh` — 验证 §必读 / 路由表中的路径仍可解析
 2. **检查 §必读 引用**: 若 `AGENTS.md §路线 / Roadmap 类文档` 等导航节的内容变化,本 skill §必读 第 1 条的描述要保持同步
-3. **检查路由表路径**: 若 `references/decision-1-plugin-evolution.md` / `ADR-082` / `references/poics-and-risks.md` 等路径变化,路由表具体路径必须更新
+3. **检查路由表路径**: 若 `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md` / `ADR-082` / `soc/cpu/docs/roadmap/references/poics-and-risks.md` 等路径变化,路由表具体路径必须更新
 4. **检查 MIGRATION_LOG**: 若本次变化足够大(新增/合并/重命名文档),在 `docs/MIGRATION_LOG.md` 追加变更记录
 
-**反向警示**: 避免"因为变了所以同步修所有引用"的反射。文档结构变化时,先问"这个变化是否影响 SKILL.md 的 §必读 / 路由表 / #Maintenance 三处",影响才动;不影响则不动(如 `references/decision-1-plugin-evolution.md §1+§2` 内容调整不影响 skill 路径)。
+**反向警示**: 避免"因为变了所以同步修所有引用"的反射。文档结构变化时,先问"这个变化是否影响 SKILL.md 的 §必读 / 路由表 / #Maintenance 三处",影响才动;不影响则不动(如 `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §1+§2` 内容调整不影响 skill 路径)。
+
+## Known issues in `tools/v0100-bootstrap.sh` (修订时发现, 2026-09-30)
+
+> **触发背景**: 2026-09-30 修订 `last-bootstrap-prompt.md` 时实测 bash script 输出, 发现以下非阻塞腐化。**tools/ scope, 不在 v0.10.0 wave5 scope**, 报告 surface 在此供未来 sessions 知情。
+
+| # | Issue | 症状 | 绕过方法 |
+|---|-------|------|---------|
+| K1 | `:442 BROKEN_COUNT unbound variable` | `set -u` 触发 unbound 错误, `doc_link_check` 行渲染空白（实际全 PASS, exit-code 路径正确） | 输出含 `[WARN]` 标记但不传播; honest audit `doc_link_check` 行显示空 broken 数, 需看 K2 状态 |
+| K2 | bash script 与 SKILL.md 模板**双重权威** | bash script 输出 schema（test_status/hard_prerequisites/honesty_audit 等）≠ SKILL.md 模板全文; 完整 prompt（含按需加载路由/不要做/smart recs/启动清单）需 agent 手工合成 | 接受现状: bash script 提供 state, agent 用 SKILL.md 模板合成最终 prompt |
+| K3 | CHANGELOG.md baseline 漂移不自检 | bash script 不主动 diff `CHANGELOG.md §Verification` vs 实测数字 | Case E 触发时人工对比; 长期修法: bash script 加 `CHANGELOG.md` 行级 regex 对账 |
+| K4 | "不要做" 列表静态, 不随 active changes 演化 | 如 wave6 启动后 vexii-riscv-parity-poc 应进"不要 implement" 列表, 但 skill 模板不感知 | 未来 wave 切换时, agent 手工加条目 (上次 prompt rev 5 加了 5 条) |
+
+**Skill 维护动作**: 若修 K1/K3, 同步更新 SKILL.md §启动清单 step 6 报告模板字段。
+
+## 审查已保存的 prompt（"audit mode", 2026-09-30 新增）
+
+> **触发场景**: 用户问"审查 `last-bootstrap-prompt.md` 是否适合启动"或类似审计类需求 — 既不是 generate 也不是 review mode。
+
+**审计清单** (顺序检查, 任一 FAIL 给出明确改进建议):
+
+| # | 检查项 | 通过标准 | FAIL 行动 |
+|---|--------|---------|---------|
+| A1 | 时间戳新鲜度 | timestamp ≤ 4 小时前 | 建议 `bash tools/v0100-bootstrap.sh > last-bootstrap-prompt.md` regenerate |
+| A2 | HEAD 一致性 | prompt 内 HEAD = `git rev-parse --short HEAD` | regenerate |
+| A3 | 路由表路径可达 | 所有 `soc/cpu/docs/roadmap/references/*.md` 存在 + ADR-082 等存在 | 标 ❌ + 给修复建议 (见 K2) |
+| A4 | 启动清单完整 | 6 步齐 (openspec list / §5 read / tasks phase / chipforge_tests / 3 CI scripts / report) | 标 ❌ + 补缺失步骤 |
+| A5 | "不要做" 防御层 | ≥ 10 条 + 含 archive/vexii/tools-scope/CHANGELOG-stale 等关键禁止 | 补缺 |
+| A6 | Honesty audit 全 ✅ | 4 项对账全 ✅ (无 ❌) | Case E 触发: 报告失配 + 不 implement |
+| A7 | Smart recs 与 hard_prerequisites 一致 | demo PASS + cycle-precision 降级 → 推荐主路径 = mfc Phase A | 不一致: 重写 |
+| A8 | 修订 metadata 存在 | 文件末尾 "修订要点 N 处" + 来源 + 日期 | 加 metadata |
+
+**输出格式** (给用户):
+
+```markdown
+# last-bootstrap-prompt.md 审计报告
+
+**生成时间**: <文件 timestamp>
+**HEAD**: <文件 HEAD> vs `<实际 HEAD>` (一致/不一致)
+**审计结果**: ✅ 适合启动 / 🟡 适合但建议 N 项改进 / 🔴 不适合, 需 regenerate
+
+## 改进项 (按 A1-A8 顺序, 标 FAIL 的)
+1. A3: 路由表行 5 引用 `references/poics-and-risks.md` 缺前缀 → 加 `soc/cpu/docs/roadmap/`
+2. A4: 启动清单缺 CI 门禁 step → 补 3 个 CI 脚本
+
+## 已知 issues (引用 K1-K4)
+- K1: bash script BROKEN_COUNT unbound → 输出 `doc_link_check` 行渲染空白但实际全 PASS (exit-code 路径正确)
+```
+
+**不替代 regenerate**: 审计只 surface 问题, 不自动修。若用户想修, 推荐 regenerate + 手工合成完整 prompt (bash script 输出 + SKILL.md 模板 + 手动 rev notes)。
+
+
 
 # Output to user
 
-The skill should output a single markdown code block containing the session-bootstrap prompt, ready for copy-paste as the first message of
+## Per-mode output contract
+
+- **Generate mode** outputs a single markdown code block containing the complete session-bootstrap prompt (header + Live state + 必读 + 按需加载路由 + 不要做 + Smart recs + 6-step 启动清单), ready for copy-paste as the first message of the new session.
+- **Review mode** outputs a structured review report (state summary + hard prereqs + recent changes + risk assessment + recommendations + questions), NOT a session-bootstrap prompt.
+- **Audit mode** outputs an audit report on an existing saved prompt (freshness / HEAD / paths / checklist completeness / honesty / smart-recs / metadata), NOT a session-bootstrap prompt.
+
+**Self-verification after composition**: before emitting, confirm `HEAD` in output matches `git rev-parse --short HEAD` and timestamp is current; otherwise regenerate.

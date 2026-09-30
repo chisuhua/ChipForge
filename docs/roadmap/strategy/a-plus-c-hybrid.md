@@ -97,18 +97,15 @@ graph TD
 | `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 0 18 |
 | `cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 27 0 |
 | `mmu-config-json-driven` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 0 0 |
-| `plugin-framework-cycle-precision` | wave3-mmu-real-memory-and-cycle | P1 | TODO (Phase F optional per 2026-09-29 (b) 决策) | 0/25 NOT STARTED |
+| `plugin-framework-cycle-precision` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 19 0 |
 | `2026-09-26-mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | ✅ DONE (archived) | 0 36 |
 | `cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | TODO | 32 0 |
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
-| `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (8/60) | 52 8 |
+| `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (43/60) | 17 43 |
+| `mfc-extract-fsm-h` | wave5-isa-coverage-and-bp | P2 | TODO | 15 0 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
-
-> **⚠️ 手动补充 (2026-09-29)**: `vexii-riscv-parity-poc` (wave6-linux-and-productization 提案) 暂未出现在自动派生表内——`wave6-linux-and-productization` initiative 待 `plugin-framework-cycle-precision` **Phase F optional 实装**（per 2026-09-29 (b) 决策, 当前 0/25 NOT STARTED, 兜底 `cpu_sim actual_cycles`）+ `mmu-config-json-driven` archive 后正式注册（per vexii frontmatter `initiative:` 字段预声明占用编号）。同步脚本按 `~/.local/share/openspec/context-stores/chipforge/initiatives/*/` 过滤，wave6 目录缺失时静默丢弃该 change。当前条目**手补**，下次 sync 前需重新注册或手工保留。
->
-> | `vexii-riscv-parity-poc` | wave6-linux-and-productization (PROPOSED) | P1 | TODO | 0 74 |
 
 > **Status 解读**:
 > - `TODO`: tasks.md 全部 open 或不存在

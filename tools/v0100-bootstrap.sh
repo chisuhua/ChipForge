@@ -31,6 +31,20 @@
 
 set -u  # 仅启用未定义变量检查 (不禁用 set -e)
 
+BROKEN_COUNT=""
+DEMO_FAILED="0"
+CPU_FAILED="0"
+CPUINT_FAILED="0"
+DEMO_PASSED="${DEMO_PASSED:-0}"
+DEMO_TOTAL="${DEMO_TOTAL:-0}"
+CPU_PASSED="${CPU_PASSED:-0}"
+CPU_TOTAL="${CPU_TOTAL:-0}"
+CPUINT_PASSED="${CPUINT_PASSED:-0}"
+CPUINT_TOTAL="${CPUINT_TOTAL:-0}"
+HONESTY_MISMATCH_CPU="${HONESTY_MISMATCH_CPU:-0}"
+HONESTY_MISMATCH_CPUINT="${HONESTY_MISMATCH_CPUINT:-0}"
+HONESTY_MISMATCH_DEMO="${HONESTY_MISMATCH_DEMO:-0}"
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
@@ -341,6 +355,50 @@ echo ""
 
 echo "### ctest 实测 (当前 main HEAD)"
 echo ""
+
+extract_claim() {
+  local family="$1" file="$2"
+  [ ! -f "$file" ] && return 1
+  # 匹配 `[family] ... N/M ...` 一行内任意位置 (兼容 `全 81/81 case PASS` / `**117/117 PASS**` / `40/40 PASS`)
+  grep -E "\[\`?${family}\`?\]" "$file" 2>/dev/null | \
+    grep -oE "\[\`?${family}\`?\][^[:cntrl:]]*[0-9]+/[0-9]+" | \
+    head -1 | \
+    grep -oE "[0-9]+/[0-9]+"
+}
+
+CLAIM_CPU_AGENTS=$(extract_claim "cpu" "$AGENTS_FILE")
+CLAIM_CPU_CHANGELOG=$(extract_claim "cpu" "$CHANGELOG_FILE")
+CLAIM_CPU="${CLAIM_CPU_AGENTS:-${CLAIM_CPU_CHANGELOG:-?/?}}"
+if [ -n "$CLAIM_CPU_AGENTS" ]; then
+  CLAIM_CPU_SRC="AGENTS.md"
+elif [ -n "$CLAIM_CPU_CHANGELOG" ]; then
+  CLAIM_CPU_SRC="CHANGELOG.md"
+else
+  CLAIM_CPU_SRC="(无显式声称)"
+fi
+
+CLAIM_CPUINT_AGENTS=$(extract_claim "cpu-integration" "$AGENTS_FILE")
+CLAIM_CPUINT_CHANGELOG=$(extract_claim "cpu-integration" "$CHANGELOG_FILE")
+CLAIM_CPUINT="${CLAIM_CPUINT_AGENTS:-${CLAIM_CPUINT_CHANGELOG:-?/?}}"
+if [ -n "$CLAIM_CPUINT_AGENTS" ]; then
+  CLAIM_CPUINT_SRC="AGENTS.md"
+elif [ -n "$CLAIM_CPUINT_CHANGELOG" ]; then
+  CLAIM_CPUINT_SRC="CHANGELOG.md"
+else
+  CLAIM_CPUINT_SRC="(无显式声称)"
+fi
+
+CLAIM_DEMO_AGENTS=$(extract_claim "cpu-l1-mmu-demo" "$AGENTS_FILE")
+CLAIM_DEMO_CHANGELOG=$(extract_claim "cpu-l1-mmu-demo" "$CHANGELOG_FILE")
+CLAIM_DEMO="${CLAIM_DEMO_AGENTS:-${CLAIM_DEMO_CHANGELOG:-?/?}}"
+if [ -n "$CLAIM_DEMO_AGENTS" ]; then
+  CLAIM_DEMO_SRC="AGENTS.md"
+elif [ -n "$CLAIM_DEMO_CHANGELOG" ]; then
+  CLAIM_DEMO_SRC="CHANGELOG.md"
+else
+  CLAIM_DEMO_SRC="(无显式声称)"
+fi
+
 if [ -x "build/bin/chipforge_tests" ]; then
   CTEST_RESULT=$(./build/bin/chipforge_tests 2>&1 | grep -E "test cases:" | tail -1)
   echo "Total: $CTEST_RESULT"
@@ -414,32 +472,40 @@ echo "### 声称 vs 实测 对账"
 echo ""
 echo "| 指标 | 声称来源 | 声称数字 | 实测 | 一致? |"
 echo "|------|---------|---------|------|------|"
-# v0.10.0+ 起 §honesty_audit 强制实测 ctest (禁止 hardcoded 字符串, 2026-09-28 cpu-factory-satp-mapping archive 后修复)
+# v0.10.0+ 起 §honesty_audit 强制实测 ctest + 解析文档声称 (K3 fix 2026-09-30)
 [ -n "$CPU_TOTAL" ] && [ "$CPU_TOTAL" != "?" ] && {
-  if [ "$CPU_PASSED" = "$CPU_TOTAL" ]; then
+  if [ "$CPU_PASSED" = "$CPU_TOTAL" ] && [ "$CLAIM_CPU" = "$CPU_PASSED/$CPU_TOTAL" ]; then
     CPU_HONESTY="✅"
+  elif [ "$CPU_PASSED" = "$CPU_TOTAL" ] && [ "$CLAIM_CPU" != "$CPU_PASSED/$CPU_TOTAL" ]; then
+    CPU_HONESTY="🟡 文档 stale"
   else
     CPU_HONESTY="❌"
   fi
-  echo "| [cpu] | AGENTS.md §已知测试状态 (baseline = HEAD fbe5e48 v0.10.0+v0.10.1+v0.10.2+mfc Phase B 实测) | 124/124 | $CPU_PASSED/$CPU_TOTAL | $CPU_HONESTY |"
+  echo "| [cpu] | $CLAIM_CPU_SRC | $CLAIM_CPU | $CPU_PASSED/$CPU_TOTAL | $CPU_HONESTY |"
 }
 [ -n "$CPUINT_TOTAL" ] && [ "$CPUINT_TOTAL" != "?" ] && {
-  if [ "$CPUINT_PASSED" = "$CPUINT_TOTAL" ]; then
+  if [ "$CPUINT_PASSED" = "$CPUINT_TOTAL" ] && [ "$CLAIM_CPUINT" = "$CPUINT_PASSED/$CPUINT_TOTAL" ]; then
     CPUINT_HONESTY="✅"
+  elif [ "$CPUINT_PASSED" = "$CPUINT_TOTAL" ] && [ "$CLAIM_CPUINT" != "$CPUINT_PASSED/$CPUINT_TOTAL" ]; then
+    CPUINT_HONESTY="🟡 文档 stale"
   else
     CPUINT_HONESTY="❌"
   fi
-  echo "| [cpu-integration] | AGENTS.md + CHANGELOG.md v0.8.0 | 81/81 | $CPUINT_PASSED/$CPUINT_TOTAL | $CPUINT_HONESTY |"
+  echo "| [cpu-integration] | $CLAIM_CPUINT_SRC | $CLAIM_CPUINT | $CPUINT_PASSED/$CPUINT_TOTAL | $CPUINT_HONESTY |"
 }
 [ -n "$DEMO_TOTAL" ] && [ "$DEMO_TOTAL" != "?" ] && {
-  if [ "$DEMO_PASSED" = "$DEMO_TOTAL" ]; then
+  if [ "$DEMO_PASSED" = "$DEMO_TOTAL" ] && [ "$CLAIM_DEMO" = "$DEMO_PASSED/$DEMO_TOTAL" ]; then
     DEMO_HONESTY="✅"
+  elif [ "$DEMO_PASSED" = "$DEMO_TOTAL" ] && [ "$CLAIM_DEMO" != "$DEMO_PASSED/$DEMO_TOTAL" ]; then
+    DEMO_HONESTY="🟡 文档 stale"
   else
     DEMO_HONESTY="❌"
   fi
-  echo "| [cpu-l1-mmu-demo] | AGENTS.md §已知测试状态 | 6/6 | $DEMO_PASSED/$DEMO_TOTAL | $DEMO_HONESTY |"
+  echo "| [cpu-l1-mmu-demo] | $CLAIM_DEMO_SRC | $CLAIM_DEMO | $DEMO_PASSED/$DEMO_TOTAL | $DEMO_HONESTY |"
 }
-echo "| doc_link_check | (无显式声称) | — | $(echo "$BROKEN_COUNT" | head -c 4) broken | 🟡 待修复 |"
+DOC_HONESTY="✅"
+[ "${BROKEN_COUNT:-0}" != "0" ] && DOC_HONESTY="🟡 待修复"
+echo "| doc_link_check | (无显式声称) | — | ${BROKEN_COUNT:-0} broken | $DOC_HONESTY |"
 echo ""
 echo "完整 baseline 见上文 7.1-7.6 各段。"
 echo ""

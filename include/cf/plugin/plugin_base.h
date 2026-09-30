@@ -23,6 +23,8 @@
 
 #include <cstdint>
 
+#include "cf/plugin/capability_table.h"
+
 // 前向声明 PipeBuilder (避免循环包含)
 // PluginBase 引用 PipeBuilder& 类型, 但只作为虚函数参数;
 // PipeBuilder 完整定义在 pipe_builder.h 中.
@@ -65,6 +67,12 @@ class PluginBase {
   // 派生类必须实现
   // 调用时机: PipeBuilder::build() 期间, 在所有 Plugin 的 setup() 之后
   virtual void build(PipeBuilder& /*pb*/) = 0;
+
+  // negotiate —— capability 协商 (ADR-082 Phase C)
+  // 调用时机: PipeBuilder::build() 期间, 在所有 Plugin 的 setup() 之前
+  // 默认空实现 (向后兼容 ADR-048 注册规范序)
+  // Plugin override 在 cap.provide(key, handle) / cap.require(key) 注册
+  virtual void negotiate(CapabilityTable& /*cap*/) {}
 
   // set_tid —— per-thread tid 派发入口 (M4G-extend G.X)
   // 默认空实现: 多数 Plugin (IBus/DBus/Decoder/RALU/...) 是 ISA-无关且无

@@ -536,8 +536,9 @@ v1.3.0  +1 条（§6 行 11）：ADR-080 双模对拍转硬门禁（v1.2 试点�
 | 5 | CI 第 10 条门禁（核内禁 `#ifdef FPGA`）实装 | ⏳ 待 `tools/check_plugin_portability.sh` 加 grep 规则 + `architecture-gates.yml` 挂接 |
 | 6 | **NEW** 启动 `mfc-cpu-pipeline-multi-cycle-fsm` Phase A (TDD) | 📋 **立即下一步**: 硬前置 #1 已解, 启动 Phase A 写 failing tests for ADR-082 negotiate + MUL/DIV FSM |
 | 7 | **NEW** 修 CPU pipeline MMU exception handler | 📋 跟踪独立 follow-up `cpu-pipeline-mmufault-handler` (P1, 1-2 周): mcause/mepc/mtval + trap entry |
+| 8 | **NEW** mfc 启动后 Phase D.4 抽出独立 change | 📋 **2026-09-30 创建**: `mfc-extract-fsm-h` (proposal+design+tasks 已就绪, 见 `openspec/changes/mfc-extract-fsm-h/`). 启动时机: `mfc-cpu-pipeline-multi-cycle-fsm` Phase E (riscv-tests rv32um 8/8) + Phase G (Dhrystone) + Phase H (archive) **全部完成后**. 理由: 当前 CH_MEM DSL 代码内联在 `mul_div_fsm.h` `#ifdef CF_PLUGIN_USE_CH_MEM` 块 (~180 LOC), 提取为独立 `fsm.h` 是较大重构, 在 mfc 主线内嵌会阻塞 Phase E/G/H 进度 |
 
-**本周唯一关键路径**: #6 启动 mfc change Phase A → TDD Red→Green→Refactor→...→Archive。
+**本周唯一关键路径**: #6 启动 mfc change Phase A → TDD Red→Green→Refactor→...→Archive → #8 启动 `mfc-extract-fsm-h` 重构.
 
 **已知 stale 风险**: 
 - wave3-mmu 残余 change（P1#4/P1#6）尚未闭环 (plugin-framework-cycle-precision 0/19, mmu-config-json-driven 0/0)
