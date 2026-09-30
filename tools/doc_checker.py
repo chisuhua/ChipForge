@@ -61,13 +61,61 @@ DEPRECATED_PATTERNS = [
     ("sc_module", "旧框架引用（应为 ChStreamModuleBase）"),
 ]
 
+# ============================================================
+# Skip / Allowlist 配置 (Phase A: doc-link-check-baseline-cleanup)
+# ============================================================
+# 集中管理需要从检查中排除的路径 / 已知豁免项,避免散落硬编码。
+# 见 openspec/changes/doc-link-check-baseline-cleanup/design.md D1-D5。
+
+# 路径前缀匹配：路径包含任一 pattern 即被跳过。
+# - openspec/changes/archive/** : 已归档 OpenSpec change (历史快照, 不可改)
+# - **/archive/**               : 任何目录被显式标记为 archived
+# - build/_deps/**              : ExternalProject build artifact (非 source-of-truth)
+# - sail-riscv-Linux-x86_64/**  : vendored 第三方 RISC-V 黄金模型
+# - **/cpp-tlm/** + **/CppHDL/**: resolved framework paths under build/ or external checkouts
+DEFAULT_SKIP_PATTERNS: List[str] = [
+    "openspec/changes/archive",
+    "/archive/",
+    "build/_deps/",
+    "sail-riscv-Linux-x86_64/",
+    "cpp-tlm/",
+    "CppHDL/",
+]
+
+# ip_structure_check 豁免：IP 名 -> 豁免理由注释
+# value 必须非空 (decision 注释),保证豁免决策可见 + 可审计
+KNOWN_EXEMPT_TEST_DIRS: Dict[str, str] = {
+    "cpu": "2026-06-17 删除 (ip/cpu/README.md §测试位置 已注明)",
+}
+
+# framework_check 豁免：CppHDL/CppTLM 相对路径 -> pending 状态注释
+# 半年一次 code review 清理已实现的 path (design.md §Risks)
+FRAMEWORK_PENDING_HEADERS: Dict[str, str] = {
+    "CppHDL/include/axi4/axi4_lite.h": "Phase 5+ RTL integration planned (per docs/roadmap/phases/phase-5-rtl.md)",
+    "CppHDL/include/bundle/clock_reset_bundle.h": "Phase 3+ peripheral planned (per docs/roadmap/phases/phase-3-rtos.md)",
+}
+
+
+def _is_skipped(file_path: str) -> bool:
+    """判断给定路径是否应被默认跳过 (archive / build / vendored / framework)。
+
+    Args:
+        file_path: 绝对或相对路径字符串
+
+    Returns:
+        True 表示路径包含任一 DEFAULT_SKIP_PATTERNS, 应被 link_check / deprecated 扫描跳过
+    """
+    return any(p in file_path for p in DEFAULT_SKIP_PATTERNS)
+
 
 class DocChecker:
     """文档检查器主类"""
 
-    def __init__(self, project_root: Path, verbose: bool = False):
+    def __init__(self, project_root: Path, verbose: bool = False,
+                 include_archive: bool = False):
         self.root = project_root
         self.verbose = verbose
+        self.include_archive = include_archive
         # 收集检查过程中的详细信息
         self._details: Dict[str, List[str]] = {}
 
@@ -134,6 +182,9 @@ class DocChecker:
                 # 成熟 IP 应具备所有期望目录
                 for exp_dir in EXPECTED_IP_DIRS:
                     if not (ip_path / exp_dir).exists():
+                        # Phase A.5: 已知豁免 IP 跳过该目录缺失检查 (README 已注明删除)
+                        if exp_dir == "test" and ip_name in KNOWN_EXEMPT_TEST_DIRS:
+                            continue
                         ip_errors.append(f"  ✗ ip/{ip_name}/: 缺少目录 {exp_dir}/")
 
             if ip_errors:
@@ -166,6 +217,9 @@ class DocChecker:
         md_files = self._find_md_files()
 
         for md_file in md_files:
+            file_path_str = str(md_file)
+            if _is_skipped(file_path_str) and not self.include_archive:
+                continue
             try:
                 content = md_file.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
@@ -417,12 +471,11 @@ class DocChecker:
         for framework_path in unique_paths:
             full_path = self.root / framework_path
 
-            # 检查路径是否存在（文件或目录）
-            # 注意：对于目录路径（如 CppHDL/include/lnode/），检查目录是否存在
             if full_path.exists():
                 valid += 1
+            elif framework_path in FRAMEWORK_PENDING_HEADERS:
+                valid += 1
             else:
-                # 可能是目录引用（不带尾斜杠），也检查一下
                 errors.append(f"  ✗ 框架路径不存在: {framework_path}")
 
         return valid, total, errors
@@ -699,9 +752,16 @@ def main():
         default="all",
         help="指定运行的检查项 (默认: all)",
     )
+    parser.add_argument(
+        "--include-archive",
+        action="store_true",
+        default=False,
+        help="扫描 archive 路径 (openspec/changes/archive/**, **/archive/**) 用于历史 drift 审计",
+    )
     args = parser.parse_args()
 
-    checker = DocChecker(PROJECT_ROOT, verbose=args.verbose)
+    checker = DocChecker(PROJECT_ROOT, verbose=args.verbose,
+                         include_archive=args.include_archive)
 
     if args.check == "all":
         results = checker.run_all_checks()
