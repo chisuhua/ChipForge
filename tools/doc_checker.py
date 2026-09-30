@@ -383,8 +383,16 @@ class DocChecker:
         docs_arch_dir = self.root / "docs" / "architecture"
 
         for file_path in files_to_check:
+            file_path_str = str(file_path)
+            if _is_skipped(file_path_str) and not self.include_archive:
+                continue
             rel_path = file_path.relative_to(self.root)
             rel_str = str(rel_path)
+
+            # Active OpenSpec change workspace legitimately documents deprecated
+            # patterns being fixed; skip to avoid self-reference noise.
+            if rel_str.startswith("openspec/changes/") and "/archive/" not in rel_str:
+                continue
 
             # 检查文件名/路径中是否包含旧模式
             for pattern, desc in DEPRECATED_PATTERNS:
