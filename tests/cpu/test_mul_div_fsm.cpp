@@ -134,12 +134,27 @@ TEST_CASE("fsm_div_33_cycle", "[cpu][mul-div-fsm]") {
   REQUIRE(mul.busy_cycles() == 33);    // 32 iterative + 1 write-back
 }
 
+// Phase C (ADR-082) stub provider: 满足 MulDivFsmPlugin 的 capability requires
+//   - provide "flush_broadcaster" + "writeback_arbiter"
+//   - 空 build() (无业务)
+namespace {
+struct StubCapabilityProvider : cf::plugin::PluginBase {
+  void negotiate(cf::plugin::CapabilityTable& cap) override {
+    cap.provide("flush_broadcaster", this);
+    cap.provide("writeback_arbiter", this);
+  }
+  void build(cf::plugin::PipeBuilder&) override {}
+};
+}  // namespace
+
 // 6. MUL 指令 busy_cycles == 1 (A.3 验收: MUL=1 cycle)
 //    通过 pb.run() 触发 execute 闭包 + 内部 counter 自增
 //    验证: pb.run() × 1 后 busy_cycles == 1
 TEST_CASE("mul_one_cycle_busy", "[cpu][mul-div-fsm]") {
   PipeBuilder pb;
   pb.at_stage("execute", Phase::NORMAL, []() {});
+  // Phase C: stub provider 满足 MulDivFsmPlugin 的 capability requires
+  REQUIRE_NOTHROW(pb.register_plugin(std::make_unique<StubCapabilityProvider>()));
   auto mul = std::make_unique<MulDivFsmPlugin<T>>();
   auto* raw = mul.get();
   raw->setup(pb);

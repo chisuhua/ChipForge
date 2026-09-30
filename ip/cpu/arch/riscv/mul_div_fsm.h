@@ -83,6 +83,28 @@ inline cf::plugin::Payload<cf::plugin::uint_t<32>> BUSY_CYCLES{"mul_div_fsm.busy
 }  // namespace mul_div_fsm_payload
 
 // ----------------------------------------------------------------------------
+// MulDivResult<T> — MulDivFsmPlugin 专用 Result 范式类型 (Phase B.4 ADR-047)
+//
+//   - 别名: cf::plugin::Result<T> = std::expected<T, cf::plugin::PluginError>
+//   - 静态工厂: ok(value) / err(PluginError) 简化调用
+//   - 用途: build() 顶部 validate_build_preconditions() fail-fast 校验
+// ----------------------------------------------------------------------------
+namespace mul_div_fsm_result {
+template <typename T>
+using MulDivResult = ::cf::plugin::Result<T>;
+
+template <typename T>
+inline constexpr MulDivResult<T> ok(T value) noexcept {
+  return MulDivResult<T>(std::in_place, std::move(value));
+}
+
+template <typename T>
+inline constexpr MulDivResult<T> err(::cf::plugin::PluginError e) noexcept {
+  return MulDivResult<T>(std::unexpected(e));
+}
+}  // namespace mul_div_fsm_result
+
+// ----------------------------------------------------------------------------
 // MulDivFsmPlugin<T> — RISC-V M 扩展 FSM 化多周期 Plugin (Phase A 骨架)
 //
 // T = xlen 类型 (uint32_t / uint64_t), RV32 主流场景使用 uint32_t
@@ -136,9 +158,25 @@ class MulDivFsmPlugin : public cf::plugin::PluginBase {
     // Phase A: 无跨 Plugin 引用, 仅声明 execute 阶段占用
   }
 
+  // Phase C.4 (ADR-082): negotiate() 声明 requires (flush_broadcaster + writeback_arbiter)
+  // 首个消费 PoC, 验证框架 capability 协商 API
+  void negotiate(::cf::plugin::CapabilityTable& cap) override {
+    // 提供 multi_cycle_fsm capability (FSM handle 指向 *this)
+    cap.provide("multi_cycle_fsm", this);
+    // 要求 flush_broadcaster (BranchPlugin 应 provide) + writeback_arbiter (HazardPlugin 应 provide)
+    (void)cap.require("flush_broadcaster");
+    (void)cap.require("writeback_arbiter");
+  }
+
   // build() — 注册 execute 阶段闭包
-  // 强约束 (ADR-046 v2.0 §2.1.1 之一): 顶部 Result 校验 (Phase B 才加 MulDivResult)
+  // 强约束 (ADR-046 v2.0 §2.1.1 之一): 顶部 Result 校验 (Phase B.4 落地 MulDivResult fail-fast)
   void build(cf::plugin::PipeBuilder& pb) override {
+    // Phase B.4: Result 范式 fail-fast — build 顶部校验模板参数宽度
+    auto vr = validate_build_preconditions();
+    if (!vr.has_value()) {
+      throw ::cf::plugin::to_exception(vr.error(), "execute");
+    }
+
     using KeyType = cf::cpu::core::payload::keys<T, sizeof(T) * 8>;
     using RvKey = payload_keys_riscv<T>;
 
@@ -217,6 +255,24 @@ class MulDivFsmPlugin : public cf::plugin::PluginBase {
   // ------------------------------------------------------------------
   static T compute_mul_div(std::uint8_t f3, T rs1, T rs2) {
     return cf::cpu::arch::riscv::RiscvMulPlugin<T>::compute(f3, 0, rs1, rs2);
+  }
+
+  // ------------------------------------------------------------------
+  // Phase B.4 (ADR-047): build() 顶部静态配置期 fail-fast 校验
+  //
+  // 返回:
+  //   - MulDivResult<void> {}       — 校验通过 (T 是 unsigned 且宽度 ∈ {4, 8} bytes)
+  //   - MulDivResult<void> err(...) — 校验失败 (返回 BuildFailed)
+  //
+  // static_assert 已在编译期校验 std::is_unsigned<T>, 这里是 runtime fail-safe
+  // 兜底 (防御 type punning 等绕过), 业务逻辑上永远返回 ok() (合法 T = uint32/uint64)
+  // ------------------------------------------------------------------
+  mul_div_fsm_result::MulDivResult<void> validate_build_preconditions() const noexcept {
+    if constexpr (std::is_unsigned<T>::value &&
+                  (sizeof(T) == 4 || sizeof(T) == 8)) {
+      return {};  // MulDivResult<void> 默认构造 = ok 状态
+    }
+    return mul_div_fsm_result::err<void>(::cf::plugin::PluginError::BuildFailed);
   }
 
 #ifdef CF_PLUGIN_USE_CH_MEM
