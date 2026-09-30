@@ -145,7 +145,7 @@ cf::bundles::CacheResp resp = helper->read_response(lookup);
 assert(resp.hit == false);  // first access → miss
 ```
 
-详见 [`src/cf_plugin/tests/test_l1_cache_plugin_unit.cpp`](../../src/cf_plugin/tests/test_l1_cache_plugin_unit.cpp) (4 tests: miss / refill / hit-after-refill / D4 runtime)。
+详见 [`tests/cache/test_l1_cache_plugin_unit.cpp`](../../tests/cache/test_l1_cache_plugin_unit.cpp) (4 tests: miss / refill / hit-after-refill / D4 runtime)。
 
 ### 9.2 L1CacheTLMBridge 使用 (cpptlm 适配层)
 
@@ -163,7 +163,7 @@ auto resp = bridge.read_response();
 assert(bridge.pb_run_count() >= 1);  // 验证 tick() 真的跑了
 ```
 
-`set_stream_adapter()` 接口已预留，Phase 1.3d 注入 cpptlm::StreamAdapterBase。详见 [`src/cf_plugin/tests/test_l1_cache_bridge.cpp`](../../src/cf_plugin/tests/test_l1_cache_bridge.cpp)。
+`set_stream_adapter()` 接口已预留，Phase 1.3d 注入 cpptlm::StreamAdapterBase。详见 [`tests/cache/test_l1_cache_bridge.cpp`](../../tests/cache/test_l1_cache_bridge.cpp)。
 
 ### 9.3 SoC JSON 拓扑 (`soc/l1_cache_minimal.json`)
 
@@ -196,7 +196,7 @@ JSON Schema draft-07，4 核心 param 字段 required:
 | `idx_bits` | 8 | idx 位宽 (= log2(num_sets)) |
 | `line_data_bits` | 512 | cache line 数据位宽 (典型 64B) |
 
-forward-compat: `replacement_policy` (LRU/PLRU/Random/FIFO) + `write_policy` (WriteBack/WriteThrough)。详见 [`src/cf_plugin/tests/test_cache_params_schema_json.cpp`](../../src/cf_plugin/tests/test_cache_params_schema_json.cpp) (6 tests: top-level / type const / impl_mode enum / 4-required / strict / defaults)。
+forward-compat: `replacement_policy` (LRU/PLRU/Random/FIFO) + `write_policy` (WriteBack/WriteThrough)。详见 [`tests/soc/test_cache_params_schema_json.cpp`](../../tests/soc/test_cache_params_schema_json.cpp) (6 tests: top-level / type const / impl_mode enum / 4-required / strict / defaults)。
 
 ### 9.5 测试套件汇总 (13 tests PASS in 4.11s)
 

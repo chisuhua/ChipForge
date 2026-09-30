@@ -1,6 +1,6 @@
 # 项目测试入口 (Tests)
 
-> **状态**: 🟢 Catch2 迁移完成 (2026-06-30, [plan](docs/superpowers/plans/2026-06-30-catch2-test-framework.md))
+> **状态**: 🟢 Catch2 迁移完成 (2026-06-30, [plan](../docs/superpowers/plans/2026-06-30-catch2-test-framework.md))
 > **架构**: 按家族 (family) 划分子目录, 而非按物理位置 (src/) 或 IP
 > **框架**: Catch2 v3.7.0 (vendored amalgamated, 与 CppTLM/CppHDL 完全一致)
 > **总数**: 47 个测试文件, 259 个 test cases (M1-M5 累计)

@@ -70,5 +70,5 @@
 ## 5. 进一步阅读
 
 - IP 索引: [`docs/architecture/ip-catalog.md`](../../docs/architecture/ip-catalog.md)
-- 跨 IP 接口约定: [`docs/architecture/interfaces.md`](../../docs/architecture/interfaces.md)
+- 跨 IP 接口约定: [`docs/architecture/interface-design.md`](../../docs/architecture/interface-design.md)
 - 各 IP 可配参数: `ip/<name>/docs/configuration.md`

@@ -30,7 +30,7 @@
 ### A.2 [GREEN] 实现 `vexii_riscv_baseline.json` + 加载模块（最小可跑版本）
 
 - [ ] **新建文件**：`tests/cpu/parity/vexii_riscv_baseline.json`（含 VexiiRiscv 官方数值 + SHA256 + 版本戳 + 阈值常量）
-- [ ] **JSON schema 校验**：参考 [`specs/vexii-riscv-parity-runner/spec.md` §Requirement: VexiiRiscv 官方数值 SSOT 加载](../../specs/vexii-riscv-parity-runner/spec.md)
+- [ ] **JSON schema 校验**：参考 [`specs/vexii-riscv-parity-runner/spec.md` §Requirement: VexiiRiscv 官方数值 SSOT 加载](specs/vexii-riscv-parity-runner/spec.md)
 - [ ] **新建文件**：`tests/cpu/parity/baseline_loader.{h,cpp}`（~80 LOC）
   - `BaselineLoader::load(path)` 解析 JSON + SHA256 校验
   - `BaselineLoader::get_single_issue_coremark_range()` 返回 std::pair<double, double>
