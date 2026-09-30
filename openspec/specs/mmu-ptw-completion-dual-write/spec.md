@@ -5,7 +5,7 @@ TBD - created by archiving change mmu-cache-integration. Update Purpose after ar
 ## Requirements
 ### Requirement: MMUPlugin PTW completion callback MUST dual-write `pl::PADDR` + `pl::MMU_VADDR`
 
-`MMUPlugin::do_lookup()` PTW `WalkCallback` and `FaultCallback` closures (registered via `ptw_->start_walk(vaddr, asid, satp_ppn, on_success, on_fault)`) MUST capture the `vaddr` parameter by value in their capture list (`[node, vaddr](...)`) and MUST write `pl::MMU_VADDR = vaddr` in BOTH the success and fault paths. The producer-side contract guarantees no stale vaddr crosses `pb.run()` boundaries.
+`MMUPlugin::do_lookup()` PTW `WalkCallback` and `FaultCallback` closures (registered via `ptw_->start_walk(vaddr, asid, satp_ppn, on_success, on_fault)`) MUST capture the `vaddr` parameter by value in their capture list (`[node, vaddr]\(\.\.\.\)`) and MUST write `pl::MMU_VADDR = vaddr` in BOTH the success and fault paths. The producer-side contract guarantees no stale vaddr crosses `pb.run()` boundaries.
 
 #### Scenario: PTW WalkCallback writes MMU_VADDR on success
 - **WHEN** `ptw_->start_walk(0x40000000ULL, 0, 0x1000ULL, walk_cb, fault_cb)` is invoked and the walk eventually completes with `paddr = 0x80000000ULL`

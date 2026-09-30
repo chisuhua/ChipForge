@@ -147,4 +147,4 @@ vaddr → MMUPlugin::at_stage("tlb_lookup_loadstore") → 写 pl::PADDR → DBus
 - [docs/configuration.md](docs/configuration.md) — Knobs 详表
 - [docs/integration.md](docs/integration.md) — CPU/SoC 集成契约
 - [docs/methodology/plugin-style-design-methodology-v1.md](../../docs/methodology/plugin-style-design-methodology-v1.md) — D4 范式方法学
-- [openspec/changes/mmu-ip-skeleton/](../../openspec/changes/mmu-ip-skeleton/) — 本 change 完整 artifacts
+- [openspec/changes/archive/2026-06-29-mmu-ip-skeleton/](../../openspec/changes/archive/2026-06-29-mmu-ip-skeleton/) — 本 change 完整 artifacts

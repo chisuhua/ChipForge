@@ -152,7 +152,7 @@ override def setup(pipeline: VexRiscv): Unit = {
 ```
 
 **关键观察**：
-- **服务定位**：`pipeline.service[T](classOf[X])` — 强类型、按 class 唯一性 assert
+- **服务定位**：`pipeline.service\[T\]\(classOf[X]\)` — 强类型、按 class 唯一性 assert
 - **接口契约**：`PredictionInterface`（trait）— 主动暴露给其他 plugin
 - Plugin 通常既**消费**服务（在 `setup` 中调用 `service(...)`），又**实现**服务（`extends XService`）
 
@@ -239,7 +239,7 @@ class Handle[T] extends Nameable {
 **关键观察**：
 - `Handle[T]` 是"未求值的 T"
 - `get` 阻塞当前协程直到 `load(value)` 被调用 → 协程间**类型安全**的值传递
-- `Handle[T]` 隐式转换 → `T`（`implicit def keyImplicit[T](key: Handle[T]): T = key.get`）— 用起来像普通值
+- `Handle[T]` 隐式转换 → `T`（Scala 代码示例：`implicit def keyImplicit(...): T = key.get`，签名含类型参数）— 用起来像普通值
 
 ### 2.3 `Component.addPrePopTask` — 延迟到 describe 全部结束
 
@@ -580,7 +580,7 @@ def connectPorts(self):
 | **Port 连接**     | `connectPorts()` 按名配对                     | `port.connect(other.port)` 手动                              | **可借鉴** |
 | **生命周期**      | `init() / initState() / startup() / ...` 6 步 | `create_ports() → describe() → build()` 3 步                | **需扩展** |
 | **配置驱动**      | Python 元类 + `cxx_class`/`cxx_header` 反射  | 手工 `REGISTER_MODULE` 宏 + JSON 解析                        | **够用** |
-| **服务定位**      | 无 (`service[T](clazz)` 缺失)                | 无                                                           | **需新增** |
+| **服务定位**      | 无 (`service\[T\]\(clazz\)` 缺失)                | 无                                                           | **需新增** |
 | **Stageable**     | 无                                            | 无                                                           | **可选** |
 
 **可直接复用**：
@@ -589,7 +589,7 @@ def connectPorts(self):
 - **`connectPorts()` 的"按名连接"语义**（替代 ChipForge 当前的 `port.connect(other.port)` 手动调用）
 
 **需要重写**：
-- **服务定位器**（VexRiscv 风格 `pipeline.service[T](classOf[X])`）— gem5 没有
+- **服务定位器**（VexRiscv 风格 `pipeline.service\[T\]\(classOf[X]\)`）— gem5 没有
 - **延迟构建回调**（SpinalHDL 风格 `addPrePopTask`）— gem5 缺
 - **类型化 payload key**（VexRiscv 风格 `Stageable[T]`）— gem5 缺
 
@@ -1013,7 +1013,7 @@ private:
 ```
 
 **对照 VexRiscv**：
-- `service[T](classOf[X])` → `context.get<X>()`（C++ 没有 `classOf`，用 `typeid`）
+- `service\[T\]\(classOf[X]\)` → `context.get<X>()`（C++ 没有 `classOf`，用 `typeid`）
 - `PipelineThing` → `ChStageable<T>*`（用指针作 key，因为是 singleton）
 
 **对照 Gem5**：Gem5 缺这个机制，**必须新增**。
@@ -1166,13 +1166,13 @@ int main() {
 
 调研时实际查看的 ChipForge 文件（用于"借鉴 vs 保留"决策）：
 
-- **[/workspace/project/CppHDL/include/component.h](file:///workspace/project/CppHDL/include/component.h)**（100 行）
+- **`/workspace/project/CppHDL/include/component.h`**（100 行）
   - 已有：`create_ports()` + `describe()` 虚函数 + `create_child<T>()` 模板
   - 缺：`setup` 钩子、服务定位器、Stageable 抽象
-- **[/workspace/project/CppHDL/include/module.h](file:///workspace/project/CppHDL/include/module.h)**（97 行）
+- **`/workspace/project/CppHDL/include/module.h`**（97 行）
   - 已有：`ch_module<T>` 工厂模式，借鉴了 Bluespec `mkXxx`
   - 缺：参数化（模板参数）、多实例组合
-- **[/workspace/project/CppHDL/include/ch.hpp](file:///workspace/project/CppHDL/include/ch.hpp)**（33 行）
+- **`/workspace/project/CppHDL/include/ch.hpp`**（33 行）
   - 头文件聚合器，已包含 core / ast / device / module
   - 需要新增 `chipforge/plugin_base.h` 等
 

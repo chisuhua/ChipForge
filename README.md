@@ -43,7 +43,7 @@ The build expects CppTLM and CppHDL to be present. They are typically pulled in 
 
 ## 4. Building an SoC
 
-SoC configs live under [soc/](soc/). A typical config, like [soc/riscv_virt.json](soc/riscv_virt.json), lists the IPs to instantiate, the memory map, and the platform build flags. The CMake build reads these and produces an executable for the chosen target.
+SoC configs live under [soc/](soc/). A typical config, like [soc/cpu_l1_mmu_demo.json](soc/cpu_l1_mmu_demo.json), lists the IPs to instantiate, the memory map, and the platform build flags. The CMake build reads these and produces an executable for the chosen target.
 
 ## 5. Contributing
 

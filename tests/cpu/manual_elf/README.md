@@ -55,6 +55,6 @@ picolibc 约定: 程序把 1 写到 tohost 地址 (0x0) 表示 PASS, 仿真器�
 
 ## 相关文档
 
-- **M4 详细**: [`../../docs/implementation-plan/M4-integration.md`](../../docs/implementation-plan/M4-integration.md)
+- **M4 详细**: [`../../../ip/cpu/docs/implementation-plan/M4-integration.md`](../../../ip/cpu/docs/implementation-plan/M4-integration.md)
 - **picolibc 约定**: https://github.com/picolibc/picolibc
 - **tohost 机制**: picolibc/doc/picolibc.md

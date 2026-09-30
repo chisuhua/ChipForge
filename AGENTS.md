@@ -294,7 +294,7 @@ pre-commit run --all-files                          # 格式化/空白/JSON 检�
 | Workflow | 触发 | 阻塞？ |
 |----------|------|--------|
 | `architecture-gates.yml` | PR to main/develop | ✅ 3 脚本全阻塞 |
-| `doc_check.yml` | PR + push（docs/ip/变更时） | ❌ smoke-only |
+| `doc_check.yml` | PR + push（docs/ip/变更时） | ⚠️ smoke-only (实测全 PASS, 仅 ADR-024 强阻塞, 余 smoke) |
 
 CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/CppTLM' }}`）。
 

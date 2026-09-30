@@ -206,7 +206,7 @@ MMU 不直接暴露 Bundle — 翻译结果通过 `pl::PADDR` Payload Key 传递
 - [ ] L2 Cache PIPT（256KB-1MB，8-16 way）
 - [ ] SoC JSON 拓扑 `soc/cpu/riscv_virt.json`（+CLINT/PLIC）
 - [ ] Bare-metal 固件启动（`firmware.elf` → tohost 退出）
-- [ ] riscv-tests RV64GC 集成（见 [roadmap/phase-2-baremetal.md](roadmap/phase-2-baremetal.md)）
+- [ ] riscv-tests RV64GC 集成（见 [roadmap/archive/phase-2-baremetal.md](roadmap/archive/phase-2-baremetal.md)）
 
 ---
 
