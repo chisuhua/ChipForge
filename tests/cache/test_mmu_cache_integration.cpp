@@ -104,6 +104,14 @@ TEST_CASE("EndToEndTranslationThroughBridge", "[cache][MMUCacheIntegration]") {
   std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
   auto plugin = std::make_unique<MMUPlugin>(cf::ip::mmu::SvMode::Sv39, levels, MMUPlugin::PTWConfig{2});
   MMUPlugin* plugin_raw = plugin.get();
+  // debug-mmu-cache-end-to-end-bridge-regression v0.10.4 (2026-09-30):
+  //   显式 set_satp_ppn(non_zero) 模拟 OS 已写 satp CSR 的 PTW root PPN, 让 do_lookup
+  //   走 TLB lookup 路径 (而非 Bare identity):
+  //     sv_mode_==Sv39 (config 意图,非 Bare) + satp_value_.MODE==8 (ctor 自动编码) +
+  //     satp_ppn_!=0 (显式设) → 三个 Bare shortcut 判定都 miss → TLB lookup 命中
+  //   与 ad48fcf (debug-cpu-l1-mmu-demo-paddr-regression) Phase D 修
+  //   test_ptw_tlb_refill_integration 模式一致: 显式 set_satp_ppn(non_zero) 让 PTW 真走
+  plugin_raw->set_satp_ppn(1);
   plugin_raw->multi_tlb()->level(0)->insert(0x40000000ULL, 0x80000000ULL, 0, 0xFF);
 
   cf::plugin::bridge::MMUTLMBridge bridge(std::move(plugin));

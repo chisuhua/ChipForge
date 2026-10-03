@@ -32,6 +32,24 @@ MMUPlugin::MMUPlugin(SvMode mode, std::vector<TLBConfig> levels_cfg, PTWConfig p
   }
   multi_tlb_ = std::make_unique<MultiLevelTLB>(std::move(levels));
   ptw_ = std::make_unique<PTW>(mode, ptw_cfg.max_inflight);
+
+  // debug-mmu-cache-end-to-end-bridge-regression (2026-09-30):
+  //   ctor 阶段按 sv_mode_ 自动编码 satp_value_ 的 MODE 字段, 让 do_lookup Bare shortcut
+  //   判定使用 sv_mode_ 的真实意图 (而不是看未初始化的 satp_value_ = 0)
+  //   - Sv32 MODE = bit31 = 1
+  //   - Sv39 MODE = bit[63:60] = 8
+  //   - Sv48 MODE = bit[63:60] = 9
+  //   - Bare  -> 0 (走 identity translation)
+  //   satp_ppn_ 保持 0 (PTW root PPN 由 csr_write_satp 后续喂入, 兼容 ad48fcf Phase D workaround)
+  //   RiscvMMUPlugin 派生 ctor 后续调 set_satp_value(make_satp_value(...)) 覆盖此初值,
+  //   此时派生 ctor 显式传 satp_value (含完整 PPN); 基类 ctor 的初值仅作 fallback
+  switch (sv_mode_) {
+    case SvMode::Sv32: satp_value_ = (1ULL << 31); break;
+    case SvMode::Sv39: satp_value_ = (8ULL << 60); break;
+    case SvMode::Sv48: satp_value_ = (9ULL << 60); break;
+    case SvMode::Bare:
+    default:          satp_value_ = 0; break;
+  }
 }
 
 void MMUPlugin::setup(cf::plugin::PipeBuilder& pb) {
@@ -62,7 +80,33 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
     //   debug-cpu-l1-mmu-demo-paddr-regression (Phase C, 2026-09-28):
     //     扩展 Bare shortcut 覆盖 satp_ppn_==0 (production CPU 没写 satp CSR 场景)
     //     [mmu] PTW TLB refill 测试需要显式 set_satp_ppn(non_zero) 来测试 PTW walk 路径
-    if (sv_mode_ == SvMode::Bare || satp_ppn_ == 0) {
+    // debug-mmu-cache-end-to-end-bridge-regression (2026-09-30):
+    //   严格 Bare 判定: satp_value_ 的 MODE 字段 == 0 (RISC-V Spec §4.3.1)
+    //   - Sv32 MODE = bit31
+    //   - Sv39/Sv48 MODE = bit[63:60]
+    //   - satp_value_ 由 ctor 按 sv_mode_ 自动编码 (见 MMUPlugin.cpp ctor 末尾);
+    //     csr_write_satp (RiscvMMUPlugin) 后续覆盖时仍设完整 CSR
+    //   - satp_ppn_ == 0 不等于 Bare: Sv-mode + PPN=0 是合法 Sv-mode 状态
+    //     (TLB prefill 测试场景 / CPU 启动 satp 还没写的瞬态, OS 后续写 satp CSR)
+    //   - ad48fcf (debug-cpu-l1-mmu-demo-paddr-regression Phase C) 引入 satp_value_ 字段注释
+    //   "用于 Bare shortcut 严格判定", 但 do_lookup 仍用 satp_ppn_==0 误判
+    //   → Sv-mode + satp_ppn_==0 也触发 Bare shortcut, 把 vaddr 当 paddr 写
+    //   → 破坏 tests/cache/test_mmu_cache_integration.cpp EndToEndTranslationThroughBridge
+    std::uint8_t satp_mode = 0;
+    switch (sv_mode_) {
+      case SvMode::Sv32:
+        satp_mode = static_cast<std::uint8_t>((satp_value_ >> 31) & 0x1u);
+        break;
+      case SvMode::Sv39:
+      case SvMode::Sv48:
+        satp_mode = static_cast<std::uint8_t>((satp_value_ >> 60) & 0xFu);
+        break;
+      case SvMode::Bare:
+      default:
+        satp_mode = 0;
+        break;
+    }
+    if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0) {
       (*node)(Key::PADDR) = vaddr;
       (*node)(Key::PADDR_VALID) = true;
       (*node)(Key::MMU_VADDR) = vaddr;
