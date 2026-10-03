@@ -104,7 +104,8 @@ set_tests_properties(chipforge_tests PROPERTIES
 # ----------------------------------------------------------------------------
 # chipforge_tests_chmem: 第二测试 target, 编译选项 -DCF_PLUGIN_USE_CH_MEM=ON
 # 验证框架在 CH_MEM 模式下也能 build 通过 (Phase 6c M2 Spike 3)
-# 注: 仅编译 framework/ 测试 (M2/W3 之前 CPU/Cache 测试未适配 CH_MEM)
+# 注: 含 14 个 framework/ + cpu/ + cache/ CH_MEM 测试 (Phase 6c M2/M3/M4/W0 累计),
+# 含 [verilator] e2e (Phase 6d.5 E8 子集, 5 ELF tohost=1; 完整 6d.5 推迟到 Phase 6d 启动)
 # ----------------------------------------------------------------------------
 set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_cppHDL_hello_poc.cpp

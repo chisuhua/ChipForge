@@ -98,6 +98,7 @@ ctest --test-dir build --output-on-failure
 | `[chmem]` | `tests/framework/` + `tests/cpu/` | CH_MEM 模式 elaboration + PoC | 9/9 PASS, 69 assertions |
 | `[cpphdl]` | `tests/framework/test_cppHDL_hello_poc.cpp` | CppHDL 完整链路（ch_device/toVerilog/Simulator） | 6/6 PASS, 15 assertions |
 | `[elaborate]` | `tests/framework/` | PipeBuilder::elaborate() 4 API PoC | 全部 PASS |
+| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` | Verilator 后端 5-ELF tohost=1 (Phase 6d.5 E8 子集) | 1/1 case PASS (5 ELF), 10 assertions |
 | `[cache]` | `tests/cache/` | L1CachePlugin + Bridge + Adapter（5 个） |
 | `[cpu]` | `tests/cpu/` | CPU Plugin 单元测试 |
 | `[cpu-integration]` | `tests/cpu/integration/` | RISC-V 多 stage 集成（4 个） |
@@ -116,6 +117,7 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 **CH_MEM 模式状态** (2026-09-20 实测):
 - ✅ `[cpphdl]` 6/6 PASS (W0 PoC 完整链路)
 - ✅ `[chmem]` 9/9 PASS (PayloadStore + 4 elaboration PoC)
+- ✅ `[verilator]` 1/1 case PASS (5 ELF tohost=1, verilator --cc 0 error, Phase 6d.5 E8 子集, 完整 6d.5 推迟到 Phase 6d)
 - ✅ `pipeline2_stall_matrix` 16/16 PASS (2-stage + stall/flush + Verilog `always_ff @(posedge)` 真实生成)
 - ✅ M3 PoC (`m3_poc_regfile_elaborate`/`m3_poc_alu_elaborate`) 13/13 PASS
 - ✅ `m4_poc_5stage_simulator_tick` 12/12 PASS (v0.3.1 M6 SEGV 修复后)

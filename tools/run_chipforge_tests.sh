@@ -15,6 +15,7 @@
 #   tools/run_chipforge_tests.sh --asan                # ASan 构建 + test
 #   tools/run_chipforge_tests.sh --source-deps         # 源码嵌入模式 build + test
 #   tools/run_chipforge_tests.sh --tag "[cache]"       # 按 Catch2 tag 过滤
+#   tools/run_chipforge_tests.sh --tag "[verilator]"   # 仅 Verilator e2e (Phase 6d.5 E8 子集, 5 ELF tohost=1)
 #   tools/run_chipforge_tests.sh --exclude "[mmu]"     # 排除某 tag (~[mmu] 传给 Catch2)
 #   tools/run_chipforge_tests.sh --verbose             # 详细输出 (--success)
 #   tools/run_chipforge_tests.sh --all                 # ctest (含 139 CppHDL internal 'Not Run')
