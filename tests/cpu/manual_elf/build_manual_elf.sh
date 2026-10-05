@@ -30,24 +30,65 @@ fi
 # 切换到 manual_elf 目录
 cd "$(dirname "$0")"
 
-# 编译 add.S (RV32I)
-echo "[1/3] 编译 add.S → add.elf (RV32I)"
-riscv32-unknown-elf-as -march=rv32i -mabi=ilp32 add.S -o add.o
-riscv32-unknown-elf-ld -T link.ld add.o -o add.elf
-rm -f add.o
+TEMPLATE="${1:-all}"
 
-# 编译 mul.S (RV32IM, MUL 指令)
-echo "[2/3] 编译 mul.S → mul.elf (RV32IM)"
-riscv32-unknown-elf-as -march=rv32im -mabi=ilp32 mul.S -o mul.o
-riscv32-unknown-elf-ld -T link.ld mul.o -o mul.elf
-rm -f mul.o
+# Phase 6d vendor 脚本: 默认 all 编译 add/mul/div (向后兼容), 新增 mmu_bare/l1cache_basic.
 
-# 编译 div.S (RV32IM, DIV 指令)
-echo "[3/3] 编译 div.S → div.elf (RV32IM)"
-riscv32-unknown-elf-as -march=rv32im -mabi=ilp32 div.S -o div.o
-riscv32-unknown-elf-ld -T link.ld div.o -o div.elf
-rm -f div.o
+build_add() {
+  echo "[build_add] 编译 add.S → add.elf (RV32I)"
+  riscv32-unknown-elf-as -march=rv32i -mabi=ilp32 add.S -o add.o
+  riscv32-unknown-elf-ld -T link.ld add.o -o add.elf
+  rm -f add.o
+}
+
+build_mul() {
+  echo "[build_mul] 编译 mul.S → mul.elf (RV32IM)"
+  riscv32-unknown-elf-as -march=rv32im -mabi=ilp32 mul.S -o mul.o
+  riscv32-unknown-elf-ld -T link.ld mul.o -o mul.elf
+  rm -f mul.o
+}
+
+build_div() {
+  echo "[build_div] 编译 div.S → div.elf (RV32IM)"
+  riscv32-unknown-elf-as -march=rv32im -mabi=ilp32 div.S -o div.o
+  riscv32-unknown-elf-ld -T link.ld div.o -o div.elf
+  rm -f div.o
+}
+
+# Phase 6d P1 plumbing-only stub probe (verilator-cpu-factory-extensible-params)
+build_mmu_bare() {
+  echo "[build_mmu_bare] 编译 build_mmu_bare.S → mmu_bare.elf (RV32I, plumbing-only)"
+  riscv32-unknown-elf-as -march=rv32i -mabi=ilp32 build_mmu_bare.S -o mmu_bare.o
+  riscv32-unknown-elf-ld -T link.ld mmu_bare.o -o mmu_bare.elf
+  rm -f mmu_bare.o
+}
+
+# Phase 6d P2 placeholder (verilator-l1cache-e2e-coverage wave4 owner)
+build_l1cache_basic() {
+  echo "[build_l1cache_basic] 编译 build_l1cache_basic.S → l1cache_basic.elf (RV32I, cache probe)"
+  riscv32-unknown-elf-as -march=rv32i -mabi=ilp32 build_l1cache_basic.S -o l1cache_basic.o
+  riscv32-unknown-elf-ld -T link.ld l1cache_basic.o -o l1cache_basic.elf
+  rm -f l1cache_basic.o
+}
+
+case "$TEMPLATE" in
+  all|"")
+    build_add
+    build_mul
+    build_div
+    ;;
+  add)       build_add ;;
+  mul)       build_mul ;;
+  div)       build_div ;;
+  mmu_bare)  build_mmu_bare ;;
+  l1cache_basic) build_l1cache_basic ;;
+  *)
+    echo "FAIL: 未知模板 '$TEMPLATE'"
+    echo "      可用: all | add | mul | div | mmu_bare | l1cache_basic"
+    exit 1
+    ;;
+esac
 
 echo ""
-echo "✅ 全部 ELF 编译完成:"
-ls -la *.elf
+echo "✅ 编译完成 (template=$TEMPLATE):"
+ls -la *.elf 2>/dev/null || echo "(no .elf artifacts)"

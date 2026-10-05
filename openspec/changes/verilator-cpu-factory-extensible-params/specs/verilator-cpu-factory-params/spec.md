@@ -23,17 +23,17 @@ ABI-compat rule: existing callsites (4-or-5-positional-arg calls) SHALL compile 
 - **THEN** the function SHALL behave as the original 4-parameter version: no MMU hook, no additional log output, preserving current 7-plugin pipeline contract.
 
 - **WHEN** `build_cpu` is invoked with `enable_mmu = true` AND `mmu_mode = "bare"`
-- **THEN** the function SHALL emit a stderr/log line `"MMU hook enabled (mode=bare) — mmu_chmem.h not yet implemented, see change verilator-mmu-bare-plumbing-e2e"` AND SHALL NOT register any MMU plugin (CH_MEM-mode MMU plugin requires `ip/mmu/tlm/mmu_chmem.h` which is not in scope of this change). The 7-plugin pipeline contract SHALL remain unchanged. The downstream consumer (`cpu_verilator_sim`) SHALL still reach `tohost=1` because MMU is a no-op in this state.
+- **THEN** the function SHALL emit a stderr/log line `"MMU hook enabled (mode=bare) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."` AND SHALL NOT register any MMU plugin (CH_MEM-mode MMU plugin requires `ip/mmu/tlm/mmu_chmem.h` which is not in scope of this change). The 7-plugin pipeline contract SHALL remain unchanged. The downstream consumer (`cpu_verilator_sim`) SHALL still reach `tohost=1` because MMU is a no-op in this state.
 
 - **WHEN** `build_cpu` is invoked with `enable_mmu = true` AND `mmu_mode = "sv32"` (or "sv39"/"sv48")
-- **THEN** the function SHALL emit a stderr/log line `"MMU hook enabled (mode=<mmu_mode>) — mmu_chmem.h not yet implemented, see change verilator-mmu-bare-plumbing-e2e"` AND SHALL NOT register any MMU plugin (same reason as above). NO `RiscvMMUPlugin` instantiation SHALL occur in CH_MEM mode (RiscvMMUPlugin is a TLM-mode class; CH_MEM mode does not reference it).
+- **THEN** the function SHALL emit a stderr/log line `"MMU hook enabled (mode=<mmu_mode>) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."` AND SHALL NOT register any MMU plugin (same reason as above). NO `RiscvMMUPlugin` instantiation SHALL occur in CH_MEM mode (RiscvMMUPlugin is a TLM-mode class; CH_MEM mode does not reference it).
 
 - **WHEN** `build_cpu` is invoked with `enable_mmu = false` (explicit)
 - **THEN** the function SHALL NOT emit any MMU-related log line AND SHALL NOT register any MMU plugin (explicit-disable suppresses hook).
 
 #### Scenario: L1Cache CH_MEM fail-fast (无 silent degradation)
 - **WHEN** `build_cpu` is invoked with `enable_cache = true` (regardless of `enable_mmu`)
-- **THEN** the function SHALL throw `std::runtime_error` with message containing the substring `"L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage"`. The function SHALL NOT silently degrade to no-cache behavior (per v0.10.4 hotfix lesson: silent degradation hides regressions). The throw message SHALL additionally reference the change responsible for wiring replacement (`verilator-l1cache-e2e-coverage` §What Changes will include a task that replaces this throw with L1CachePlugin CH_MEM registration).
+- **THEN** the function SHALL throw `std::runtime_error` with message containing the substring `"L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage"`. The function SHALL NOT silently degrade to no-cache behavior (per v0.10.4 hotfix lesson: silent degradation hides regressions). The throw message SHALL additionally include a wave/ETA reference indicating realistic delivery timing (e.g., `"wave4 P2 placeholder, ETA v0.9.0, 6-12 mo"`) so that users invoking `--enable-cache` immediately understand the delay; the substring requirement above is the MUST, the wave/ETA reference is a SHOULD. The throw SHALL additionally reference the change responsible for wiring replacement (`verilator-l1cache-e2e-coverage` §What Changes will include a task that replaces this throw with L1CachePlugin CH_MEM registration).
 
 ### Requirement: `cpu_verilator_sim` CLI 三个新 flag
 

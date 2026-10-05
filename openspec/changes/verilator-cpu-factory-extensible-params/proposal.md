@@ -40,8 +40,8 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 ```
 
 **实装策略**（修复 C-A Oracle 复审，与 spec.md Scenario 严格对齐）:
-- `enable_mmu.value_or(false) == true` 时 **emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — mmu_chmem.h not yet implemented, see change verilator-mmu-bare-plumbing-e2e"** (修复 C-A: **不**注册任何 MMU plugin; `mmu_chmem.h` 不在本 change scope, 且 4 个 active change 中无人认领真 sv32 CH_MEM 实装 — 详见 design.md §C-C);
-- `enable_cache.value_or(false) == true` 时 `throw std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage")` (fail-fast, 由 Change 2b task group 1.5 翻转);
+- `enable_mmu.value_or(false) == true` 时 **emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."** (修复 C-A + design.md §C-C 诚实表述: **不**注册任何 MMU plugin; `mmu_chmem.h` 不在本 change scope, 且 4 个 active change 中无人认领真 sv32 CH_MEM 实装 — 详见 design.md §C-C);
+- `enable_cache.value_or(false) == true` 时 `throw std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage (wave4 P2 placeholder, ETA v0.9.0, 6-12 mo). No silent degradation per v0.10.4 hotfix lesson.")` (fail-fast, 由 Change 2b task group 1.5 翻转);
 - `enable_mmu` 默认 nullopt 时 **行为等价于原 4 参数调用**（修复 C-A: **不**读 cfg; `build_cpu` 签名无 cfg 参数 — `ip/cpu/cpu_factory_chmem.h:74-79` 仅 5 参数, 未来如需读 cfg 应另加 `CpuFactoryOptions` struct, 不属本 change scope)。
 
 ### 6 文件 / 12 call sites ABI 兼容保证 (修复 S1 Oracle 三轮复审, grep `CpuFactoryChmem.*build_cpu` 实测):

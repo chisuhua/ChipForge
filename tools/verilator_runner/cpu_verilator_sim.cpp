@@ -93,6 +93,15 @@ struct Options {
   std::string verilog_path = "/tmp/cpu.v";
   std::string work_dir = "/tmp/cpu_vl_sim";
   std::uint32_t max_cycles = kDefaultMaxCycles;
+  // Phase 6d P1/P2 plumbing-only hooks. See change
+  // verilator-cpu-factory-extensible-params for scope. These flags forward
+  // through to CpuFactoryChmem::build_cpu's new std::optional parameters.
+  // --enable-mmu / --mmu-mode are no-op stubs at the CH_MEM MMU layer
+  // (mmu_chmem.h not implemented); --enable-cache fail-fast throws because
+  // L1Cache CH_MEM is unimplemented (refer to wave4 P2 placeholder change).
+  bool enable_mmu = false;
+  std::string mmu_mode = "bare";
+  bool enable_cache = false;
 };
 
 bool parse_args(int argc, char** argv, Options& opts) {
@@ -106,13 +115,27 @@ bool parse_args(int argc, char** argv, Options& opts) {
       opts.work_dir = argv[++i];
     } else if (a == "--cycles" && i + 1 < argc) {
       opts.max_cycles = static_cast<std::uint32_t>(std::atoi(argv[++i]));
+    } else if (a == "--enable-mmu") {
+      opts.enable_mmu = true;
+    } else if (a == "--mmu-mode" && i + 1 < argc) {
+      opts.mmu_mode = argv[++i];
+    } else if (a == "--enable-cache") {
+      opts.enable_cache = true;
     } else if (a == "--help" || a == "-h") {
-      std::printf("usage: %s --elf <path> [--verilog <path>] [--cycles <N>]\n",
-                  argv[0]);
-      std::printf("  --elf       vendored rv32ui-p-* ELF path (required)\n");
-      std::printf("  --verilog   output Verilog path (default /tmp/cpu.v)\n");
-      std::printf("  --cycles    max sim cycles (default %u)\n",
+      std::printf("usage: %s --elf <path> [flags]\n", argv[0]);
+      std::printf("  --elf            vendored rv32ui-p-* ELF path (required)\n");
+      std::printf("  --verilog        output Verilog path (default /tmp/cpu.v)\n");
+      std::printf("  --work-dir       dir for verilator artifacts (default /tmp/cpu_vl_sim)\n");
+      std::printf("  --cycles         max sim cycles (default %u)\n",
                   kDefaultMaxCycles);
+      std::printf("  --enable-mmu     emit plumbing-only no-op MMU hook (CH_MEM stub)\n");
+      std::printf("  --mmu-mode <s>   mmu mode string for the log only (default \"bare\")\n");
+      std::printf("  --enable-cache   fail-fast: L1Cache CH_MEM not implemented\n");
+      std::printf("\n");
+      std::printf("Note: --enable-cache requires L1Cache CH_MEM (see change\n");
+      std::printf("      verilator-l1cache-e2e-coverage in wave4 P2 placeholder).\n");
+      std::printf("      --enable-mmu is a no-op log; real sv32 translation is not\n");
+      std::printf("      delivered by this runner (mmu_chmem.h not yet implemented).\n");
       return false;
     } else {
       std::fprintf(stderr, "unknown arg: %s\n", a.c_str());
@@ -127,7 +150,10 @@ bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf)
   ch::core::context ctx("cpu_verilator_sim");
   ch::core::ctx_swap guard(&ctx);
   auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(
-      &ctx, nullptr, ch_uint<32>(kElfBase), true, elf);
+      &ctx, nullptr, ch_uint<32>(kElfBase), true, elf,
+      opts.enable_mmu,
+      opts.mmu_mode,
+      opts.enable_cache);
   if (!pb) {
     std::fprintf(stderr, "build_cpu failed\n");
     return false;

@@ -124,6 +124,8 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 - ⚠️ 1 known issue: `cpphdl_poc_chbool_contextual_conversion` 全量跑受 context pollution 影响失败 (单独跑 PASS), Phase 6d PoC follow-up change 跟踪修复
 - ⏱ **运行时长**：CH_MEM 全套 (6+9+16+13+12 + 1 known issue) 单二进制 `chipforge_tests_chmem` 实测 >300s（`elaborate(ctx)` DAG 发射 + Verilog `always_ff @(posedge)` 验证耗时）—— CI 设默认 ctest timeout 360s+；本地快速回归可 `--test-case` / `[chmem]` 单 family 过滤跳过 PoC 测试。
 
+**v0.10.x `[verilator]` 扩展 (verilator-cpu-factory-extensible-params)**: CLI flags 扩展 3 项 (`--enable-mmu` / `--mmu-mode <s>` / `--enable-cache`), 不增 `[verilator]` test cases (CLI plumbing 扩展属本 change scope; 端到端 MMU/Cache Verilator 测试归 Change 2a / 2b). zero numerical change to `[verilator] 1/1 case PASS`.
+
 ### `ip/{name}/` 标准结构
 
 ```

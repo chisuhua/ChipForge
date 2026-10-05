@@ -104,7 +104,7 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 
 ### D2: L1Cache 路径 fail-fast 而非 silent-disable
 
-**Decision**: `enable_cache=true` 路径显式 throw `std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage")`。
+**Decision**: `enable_cache=true` 路径显式 throw `std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage (wave4 P2 placeholder, ETA v0.9.0, 6-12 mo). No silent degradation per v0.10.4 hotfix lesson.")`。
 
 **Rationale**:
 - 与 `MMUPlugin::do_lookup` Bare shortcut 模式一致（v0.10.4 hotfix 教训: 静默退化会导致难以发现的回归）

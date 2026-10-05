@@ -14,6 +14,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include <ch.hpp>
@@ -21,6 +23,8 @@
 #include <core/context.h>
 #include <core/bool.h>
 #include <core/uint.h>
+
+#include <cstdio>  // std::fprintf (MMU hook plumbing-only stderr log)
 
 #include "cf/plugin/plugin_base.h"
 #include "cf/plugin/pipe_builder.h"
@@ -70,14 +74,55 @@ class CpuFactoryChmem {
   //   initial_pc — PC 起始地址 (默认 0x80000000, PoC 用 0)
   //   preload_elf — 启用 ELF 预载 (同时预载 IMem + DMem)
   //   elf_image — ELF 字节数组
+  //   enable_mmu  (Phase 6d P1 placeholder, **CH_MEM plumbing-only no-op stub**)
+  //     — std::nullopt (默认): 与原 4 参数行为逐位等价（7-plugin 流水线无 MMU hook）
+  //     — true:               emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."
+  //                            **不会** 注册任何 MMU plugin (mmu_chmem.h 不在本 change scope)。
+  //                            sv32 translation 实现 owner 尚未分配 — see change verilator-mmu-bare-plumbing-e2e
+  //                            (CLI plumbing only, also plumbing-only) + cpu-pipeline-mmufault-handler for downstream plan.
+  //     — false:              显式禁用，无 log 无 plugin（与 nullopt 行为一致但显式）
+  //   mmu_mode   (string: "bare"/"sv32"/"sv39"/"sv48"; 默认 "bare") 仅 log 记录，无 functional effect
+  //   enable_cache (Phase 6d P2 placeholder, **fail-fast throw on true**)
+  //     — std::nullopt / false: 显式禁用，无 throw
+  //     — true: throw std::runtime_error — L1Cache CH_MEM not yet implemented.
+  //             不静默退化为无 cache (per v0.10.4 hotfix 教训)。
+  //             实装 owner: change verilator-l1cache-e2e-coverage (wave4 P2 placeholder, ETA v0.9.0, 6-12 mo).
+  //
+  // 三态 std::optional<bool> 语义保证: nullopt = 原 4 参数行为 (现状保持),
+  // 6 文件 / 12 call sites (实测 + 2 .disabled hits) 零修改走 std::nullopt 默认参数即兼容.
+  // 不读 cfg, 不引 CpuConfig 依赖 (NG1, NG2, NG3 显式声明).
   // ==========================================================================
   static std::unique_ptr<PipeBuilder> build_cpu(
       ch::core::context* elaboration_ctx,
       T* memory = nullptr,
       T initial_pc = T{0x80000000},
       bool preload_elf = false,
-      const std::vector<uint8_t>& elf_image = {}) {
+      const std::vector<uint8_t>& elf_image = {},
+      std::optional<bool> enable_mmu = std::nullopt,
+      std::optional<std::string> mmu_mode = std::nullopt,
+      std::optional<bool> enable_cache = std::nullopt) {
     (void)memory;
+
+    // Phase 6d P2 fail-fast: L1Cache CH_MEM 实装 owner 未分配 (wave4 P2 placeholder).
+    // 早 throw 不污染 7-plugin 流水线 (per design.md §D2 fail-fast 决策, v0.10.4 hotfix 教训).
+    if (enable_cache.value_or(false)) {
+      throw std::runtime_error(
+          "L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage "
+          "(wave4 P2 placeholder, ETA v0.9.0, 6-12 mo). "
+          "No silent degradation per v0.10.4 hotfix lesson.");
+    }
+
+    // Phase 6d P1 plumbing-only no-op MMU hook: log only, no MMU plugin 注册, no translation.
+    if (enable_mmu.value_or(false)) {
+      const std::string mode = mmu_mode.value_or("bare");
+      std::fprintf(stderr,
+          "MMU hook enabled (mode=%s) — plumbing-only no-op stub; "
+          "mmu_chmem.h not implemented. NO translation occurs. "
+          "Real sv32 CH_MEM owner TBD; see change verilator-mmu-bare-plumbing-e2e "
+          "(CLI plumbing only) + cpu-pipeline-mmufault-handler.\n",
+          mode.c_str());
+    }
+
     auto pb = std::make_unique<PipeBuilder>(elaboration_ctx);
 
     using KT = cf::cpu::core::payload::keys<T, kXlenBits>;

@@ -5,6 +5,37 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.x (interim) — verilator-cpu-factory-extensible-params: CpuFactoryChmem::build_cpu + cpu_verilator_sim 可选参数化扩展
+
+> **OpenSpec change**: `verilator-cpu-factory-extensible-params` (wave5 P1, IN_PROGRESS)
+> **Initiative**: `wave5-isa-coverage-and-bp`
+> **Purpose**: Phase 6d 5-stage Pipeline Verilator 端到端验证的基础设施扩展, 解锁下游 Change 2a (`verilator-mmu-bare-plumbing-e2e`) + 2b (`verilator-l1cache-e2e-coverage`) + cpu-pipeline-mmufault-handler.
+> **Status**: 基础设施（plumbing-only, 零新验证能力 — `--enable-mmu` 仅 no-op log, `--enable-cache` fail-fast throw）。
+
+### Added
+
+- **`CpuFactoryChmem::build_cpu` 3 个 `std::optional` 可选参数** (`ip/cpu/cpu_factory_chmem.h:74`): `enable_mmu` (三态: nullopt / true / false), `mmu_mode` (string: "bare"/"sv32"/"sv39"/"sv48", 默认 "bare"), `enable_cache` (三态同 enable_mmu). 默认 `std::nullopt` = 原 4 参数行为（向后兼容, **6 文件 / 12 call sites 零修改通过**, 含 `tests/cpu/test_cpu_5stage.cpp` 5 calls + `test_cpu_memory_model_chmem.cpp` 3 calls + 等）。
+- **`cpu_verilator_sim` CLI 3 个新 flag** (`tools/verilator_runner/cpu_verilator_sim.cpp`): `--enable-mmu` (无值 bool flag, plumbing-only no-op log), `--mmu-mode <s>` (字符串, 默认 "bare"), `--enable-cache` (无值 bool flag, **fail-fast throw** on true).
+- **2 个新 ELF 模板 vendor 入口** (`tests/cpu/manual_elf/`): `build_mmu_bare.S` (Phase 6d P1 plumbing-only probe) + `build_l1cache_basic.S` (Phase 6d P2 placeholder probe) + `build_manual_elf.sh` case 分支支持 `mmu_bare` / `l1cache_basic` 模板选择。
+- **PR 内诚实性修正**: MMU hook stderr log 显式标注 "plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs." (修复 Oracle C-A + design.md §C-C, Change 2a 自身 plumbing-only 不实装 mmu_chmem.h).
+- **PR 内诚实性修正**: L1Cache throw 字符串补充 ETA "(wave4 P2 placeholder, ETA v0.9.0, 6-12 mo)", 让用户立即知道撞墙期.
+- **L1Cache fail-fast throw**: `enable_cache=true` 路径显式 `throw std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage (wave4 P2 placeholder, ETA v0.9.0, 6-12 mo). No silent degradation per v0.10.4 hotfix lesson.")` — 拒绝 v0.10.4 hotfix 教训的"静默退化为无 cache"反模式.
+
+### Tests (Verification)
+
+- `[verilator]` 1/1 PASS (10 assertions, **零数字变化**)
+- `[mmu]` 53/53 PASS (131 assertions, **零数字变化**)
+- `[cpu-l1-mmu-demo]` 6/6 PASS (40 assertions, **零数字变化**)
+- 3 架构门禁 (`verify_adr.sh` / `verify_plugin_decision.sh` / `check_plugin_portability.sh`) 0 失败
+- 新 CLI flag 验证: `--enable-mmu` emit plumbing-only log (无副作用); `--enable-cache` 抛 throw 含 spec.md substring "L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage" + ETA reference, exit 134 (SIGABRT)
+
+### Downstream (NOT in this change scope)
+
+- Change 2a `verilator-mmu-bare-plumbing-e2e` (wave5 P2) — 仍 plumbing-only, 真 sv32 CH_MEM 实装 owner 未分配
+- Change 2b `verilator-l1cache-e2e-coverage` (wave4 P2 placeholder, ETA v0.9.0, 6-12 mo)
+- `cpu-pipeline-mmufault-handler` (wave5 P1 placeholder, 真 sv32 Verilator e2e 翻转前置, 依赖 2a)
+- `mfc-cpu-pipeline-multi-cycle-fsm` Phase G (DMIPS/MHz ≥1.4 硬门禁, soft-dep, mfc Phase G 启动前 archive 才能让 mfc 走 enable_mmu 路径)
+
 ## v0.10.3 (2026-09-30, interim) — mfc Phase A: MulDivFsmPlugin TLM skeleton (MUL=1c, DIV=33c)
 
 > **OpenSpec change**: `mfc-cpu-pipeline-multi-cycle-fsm` (IN_PROGRESS, 32/60 tasks)
