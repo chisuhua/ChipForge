@@ -98,13 +98,26 @@ ctest --test-dir build --output-on-failure
 | `[chmem]` | `tests/framework/` + `tests/cpu/` | CH_MEM 模式 elaboration + PoC | 9/9 PASS, 69 assertions |
 | `[cpphdl]` | `tests/framework/test_cppHDL_hello_poc.cpp` | CppHDL 完整链路（ch_device/toVerilog/Simulator） | 6/6 PASS, 15 assertions |
 | `[elaborate]` | `tests/framework/` | PipeBuilder::elaborate() 4 API PoC | 全部 PASS |
-| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` | Verilator 后端 5-ELF tohost=1 (Phase 6d.5 E8 子集) | 1/1 case PASS (5 ELF), 10 assertions |
-| `[mmu-verilator]` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` | Verilator 链路 MMU Bare 模式 plumbing (Phase 6d P2) | 3/3 case PASS (5 ELF cycle cap + elaboration + manual_elf), 26 assertions |
+| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 后端 5-ELF tohost=1 (Phase 6d.5 E8 子集) | 1/1 case PASS (5 ELF), 10 assertions |
+| `[mmu-verilator]` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 链路 MMU Bare 模式 plumbing (Phase 6d P2) | 3/3 case PASS (5 ELF cycle cap + elaboration + manual_elf), 26 assertions |
 | `[cache]` | `tests/cache/` | L1CachePlugin + Bridge + Adapter（5 个） |
 | `[cpu]` | `tests/cpu/` | CPU Plugin 单元测试 |
 | `[cpu-integration]` | `tests/cpu/integration/` | RISC-V 多 stage 集成（4 个） |
 | `[soc]` | `tests/soc/` | SoC JSON 拓扑 |
 | `[bundles]` | `tests/bundles/` | Bundle 定义测试 |
+
+> **测试 binary 归属（Oracle 2026-10-06 修订）**:
+> - `[framework]`/`[cache]`/`[cpu]`/`[cpu-integration]`/`[soc]`/`[bundles]`/`[mmu]`/`[riscv-tests]`/`[cpu-l1-mmu-demo]`/`[tlb-refill]` — 全部在 `chipforge_tests` (TLM binary)
+> - `[chmem]`/`[cpphdl]`/`[elaborate]`/`[verilator]`/`[mmu-verilator]` — **全部在 `chipforge_tests_chmem`** (CH_MEM binary, `-DCF_PLUGIN_USE_CH_MEM`)
+> - **推荐运行**:
+>   - TLM 快速回归：`./build/bin/chipforge_tests` (411 cases, ~0.6s)
+>   - 全量 (TLM + CH_MEM + verilator + gate)：`bash tools/run_chipforge_tests.sh --all`
+>   - Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2)：
+>     ```bash
+>     ./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]   # 4 Catch2 cases (10+26 assertions)
+>     ./build/bin/cpu_verilator_sim --elf tests/cpu/riscv_tests/elf/rv32ui-p-add  # 1 ELF smoke (ctest entry, 开发者 debug 入口)
+>     ```
+> - 详见 `tools/run_chipforge_tests.sh --help`
 
 ### CH_MEM 编译开关 + 第二个测试 target
 
@@ -118,7 +131,7 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 **CH_MEM 模式状态** (2026-09-20 实测):
 - ✅ `[cpphdl]` 6/6 PASS (W0 PoC 完整链路)
 - ✅ `[chmem]` 9/9 PASS (PayloadStore + 4 elaboration PoC)
-- ✅ `[verilator]` 1/1 case PASS (5 ELF tohost=1, verilator --cc 0 error, Phase 6d.5 E8 子集, 完整 6d.5 推迟到 Phase 6d)
+- ✅ `[verilator]` 1/1 case PASS (5 ELF tohost=1, verilator --cc 0 error, Phase 6d.5 E8 子集, 完整 6d.5 推迟到 Phase 6d) — **归属 `chipforge_tests_chmem` binary**，TLM binary 无 `[verilator]` 测试 (实测 `--list-tests [verilator]` 在 chipforge_tests 返回 0 case)
 - ✅ `pipeline2_stall_matrix` 16/16 PASS (2-stage + stall/flush + Verilog `always_ff @(posedge)` 真实生成)
 - ✅ M3 PoC (`m3_poc_regfile_elaborate`/`m3_poc_alu_elaborate`) 13/13 PASS
 - ✅ `m4_poc_5stage_simulator_tick` 12/12 PASS (v0.3.1 M6 SEGV 修复后)

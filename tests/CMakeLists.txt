@@ -161,3 +161,38 @@ set_tests_properties(chipforge_tests_chmem PROPERTIES LABELS "unit;chmem")
 set_tests_properties(chipforge_tests_chmem PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+# ----------------------------------------------------------------------------
+# Standalone Verilator runner smoke (Oracle 2026-10-06 Option A).
+#
+# Why here: CMake's enable_testing() at the root CMakeLists.txt runs *after*
+# add_subdirectory(tools/verilator_runner), so add_test() in tools/verilator_runner/
+# CMakeLists.txt is silently ignored (no CTestTestfile.cmake generated in that
+# subdir). Tests/CMakeLists.txt has the active enable_testing() context — the
+# chipforge_tests / chipforge_tests_chmem add_test() calls above are visible
+# precisely for this reason. We register the cpu_verilator_sim ctest probe
+# alongside them.
+#
+# Coverage scope: 1 ELF (rv32ui-p-add, ~6 cycles) — a smoke. The full 5-ELF
+# tohost=1 verification is already covered by chipforge_tests_chmem's
+# [verilator] family (TEST_CASE "cpu_verilator_sim_tohost1" in
+# tests/cpu/test_cpu_verilator_sim.cpp, 10 assertions). This entry is the
+# developer-facing debug path when Catch2 wrapping hides the failure —
+# running the .exe directly bypasses Catch2 for faster bisection.
+#
+# Guarded by:
+#   - TARGET cpu_verilator_sim  (only present when CHIPFORGE_BUILD_VERILATOR_RUNNER=ON)
+#   - EXISTS ELF path           (fresh builds without vendored ELF)
+# ----------------------------------------------------------------------------
+set(_cf_verilator_smoke_elf "${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf/rv32ui-p-add")
+if(TARGET cpu_verilator_sim AND EXISTS "${_cf_verilator_smoke_elf}")
+    add_test(
+        NAME cpu_verilator_sim_add
+        COMMAND cpu_verilator_sim --elf "${_cf_verilator_smoke_elf}" --cycles 2000
+    )
+    set_tests_properties(cpu_verilator_sim_add PROPERTIES
+        LABELS "verilator;e2e"
+        TIMEOUT 120
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endif()

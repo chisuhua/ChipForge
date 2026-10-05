@@ -79,7 +79,7 @@ bash tools/build.sh --no-build
 bash tools/build.sh -j 8
 
 # 仅运行测试 (假设 build/ 已存在)
-bash tools/run_chipforge_tests.sh
+bash tools/run_chipforge_tests.sh                    # TLM only (411 cases, ~0.6s)
 
 # 一键: 构建 + 测试
 bash tools/run_chipforge_tests.sh --build
@@ -87,9 +87,16 @@ bash tools/run_chipforge_tests.sh --build
 # 一键: ASan 构建 + 测试
 bash tools/run_chipforge_tests.sh --asan
 
-# 按 ctest label 过滤
+# 按 Catch2 tag 过滤 (TLM only)
 bash tools/run_chipforge_tests.sh --tag "[cache]"
 bash tools/run_chipforge_tests.sh --exclude "[mmu]"
+
+# 全量 (TLM + CH_MEM + Verilator smoke + gate, ~130s)
+bash tools/run_chipforge_tests.sh --all
+
+# Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2)
+./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]  # 4 Catch2 cases (10+26 assertions)
+./build/bin/cpu_verilator_sim --elf tests/cpu/riscv_tests/elf/rv32ui-p-add  # 1 ELF smoke (开发者 debug 入口)
 
 # 详细输出
 bash tools/run_chipforge_tests.sh --verbose

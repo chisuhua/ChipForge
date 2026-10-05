@@ -58,3 +58,10 @@ if(VERILATOR_BIN)
         CF_VERILATOR_BIN="${VERILATOR_BIN}"
     )
 endif()
+
+# Note: the ctest entry that drives this exe (cpu_verilator_sim_add) is
+# registered in tests/CMakeLists.txt alongside chipforge_tests /
+# chipforge_tests_chmem. CMake's enable_testing() runs after
+# add_subdirectory(tools/verilator_runner), so add_test() in this file would
+# be silently ignored (no CTestTestfile.cmake generated). Tests/CMakeLists.txt
+# has the active enable_testing() context, so it owns the registration.

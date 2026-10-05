@@ -1,24 +1,37 @@
 #!/usr/bin/env bash
 # tools/run_chipforge_tests.sh
 #
-# 功能描述: 运行 ChipForge 自身测试 (默认 259 cases, 66525 assertions)
-# 默认路径: delegate 到 build/bin/chipforge_tests (Catch2 v3.7.0)
-#           — 涵盖所有 Phase 0+ 测试, 无 whitelist, 无 silent-failure
-# --all:    调 ctest (PA-4b 缓解: 139 个 CppHDL 内部测试预期 'Not Run')
+# 功能描述: 运行 ChipForge 自身测试
+#
+# 默认路径 (Oracle 2026-10-06 修订): delegate 到 build/bin/chipforge_tests (TLM Catch2 binary)
+#   — TLM 全部 ~411 cases, 无 whitelist, 无 silent-failure
+#   — **不**覆盖 chipforge_tests_chmem (CH_MEM/Verilator), 见 --all
+# --all:    调 ctest, 包含 TLM + CH_MEM (含 [verilator]/[mmu-verilator] 4 cases)
+#           + cpu_verilator_sim_add (Phase 6d.5 E8 standalone runner smoke)
+#           + verify_plugin_decision (PA-4b 缓解: 139 CppHDL internal 预期 'Not Run')
+# --tag:    按 Catch2 tag 过滤 (仅作用于默认的 chipforge_tests binary;
+#           [verilator]/[mmu-verilator] family 仅在 chipforge_tests_chmem 中,
+#           需要配合 --all 或直接跑 ./build/bin/chipforge_tests_chmem [tag])
 # 作者: ChipForge Build System
-# 最后修改日期: 2026-07-02
+# 最后修改日期: 2026-10-06
 #
 # 用法:
-#   tools/run_chipforge_tests.sh                       # 运行 ChipForge 全部测试 (259 cases)
+#   tools/run_chipforge_tests.sh                       # TLM 全部 (411 cases, ~0.6s)
 #   tools/run_chipforge_tests.sh --build               # 先 build 再 test (调 tools/build.sh)
 #   tools/run_chipforge_tests.sh --rebuild-deps        # 重建 deps + build + test
 #   tools/run_chipforge_tests.sh --asan                # ASan 构建 + test
 #   tools/run_chipforge_tests.sh --source-deps         # 源码嵌入模式 build + test
-#   tools/run_chipforge_tests.sh --tag "[cache]"       # 按 Catch2 tag 过滤
-#   tools/run_chipforge_tests.sh --tag "[verilator]"   # 仅 Verilator e2e (Phase 6d.5 E8 子集, 5 ELF tohost=1)
+#   tools/run_chipforge_tests.sh --tag "[cache]"       # 按 Catch2 tag 过滤 (TLM only)
+#   tools/run_chipforge_tests.sh --tag "[cpu]"         # 仅 CPU plugin 测试
 #   tools/run_chipforge_tests.sh --exclude "[mmu]"     # 排除某 tag (~[mmu] 传给 Catch2)
 #   tools/run_chipforge_tests.sh --verbose             # 详细输出 (--success)
-#   tools/run_chipforge_tests.sh --all                 # ctest (含 139 CppHDL internal 'Not Run')
+#   tools/run_chipforge_tests.sh --all                 # ctest (TLM + CH_MEM + verilator smoke + gate)
+#
+# Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2):
+#   tools/run_chipforge_tests.sh --all                 # 推荐 (1 个 ctest + 4 个 Catch2 cases)
+#   或:
+#   ./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]   # 4 Catch2 cases (10+26 assertions)
+#   ./build/bin/cpu_verilator_sim --elf tests/cpu/riscv_tests/elf/rv32ui-p-add  # 开发者 debug 入口
 #
 # 退出码:
 #   0 = 全部通过
@@ -28,6 +41,7 @@
 #   - docs/roadmap/roadmap-status.md §3 PA-4b
 #   - CMakeLists.txt (CTest 聚合点)
 #   - tools/build.sh (构建入口)
+#   - AGENTS.md §CH_MEM 编译开关 + 测试家族表格 ([verilator]/[mmu-verilator] 归属 chipforge_tests_chmem)
 
 set -e
 
