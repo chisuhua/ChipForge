@@ -67,8 +67,8 @@ if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0) {
 
 1. **G1**: 引入 5 个 `[mmu-verilator]` TEST_CASE（family tag 与 [verilator] 区分）
 2. **G2**: 验证 `cpu_verilator_sim --enable-mmu --mmu-mode bare` 链路跑通 5 ELF tohost=1
-3. **G3**: 验证 TLB prefill-hit path 在 Verilator 链路返回 vaddr == paddr (Bare identity 语义)
-4. **G4** (核心): **回归防护断言** — sv32+ppn=0 配置不触发 Bare shortcut, Verilator 链路复现 v0.10.4 hotfix 修复
+3. **G3**: `CpuFactoryChmem::build_cpu` w/ `enable_mmu=true` + `mmu_mode="bare"` + CH_MEM elaborate 0 error + verilator --cc 编译通过（修复 C-B: 原 G3 "TLB prefill-hit path" 是已删除 TEST_CASE 2 内容, 同步 proposal 缩 scope 为 3 TEST_CASE）
+4. **G4**: `--enable-mmu --mmu-mode bare` (无 `--enable-cache`) 跑通 manual_elf mmu_bare.elf（修复 C-B: 原 G4 "sv32+ppn=0 回归防护" 是已删除 TEST_CASE 3 内容, 同步 proposal 缩 scope）
 5. **G5**: 5 ELF cycle baseline 表生成 (CH_MEM+enable_mmu vs CPU-only baseline)
 6. **G6**: 零回归: `[verilator]` 1/1 + `[mmu]` 53/53 + `[cpu-l1-mmu-demo]` 6/6 + `[cpu-integration]` 81/81 全部不变
 7. **G7**: 3 架构门禁 0 失败
@@ -97,7 +97,7 @@ if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0) {
 
 **Alternatives considered**:
 - (A) `verilator-mmu-e2e-coverage`: 名字暗示翻译验证, ❌ 误导
-- (B) `verilator-mmu-bare-only-e2e`: `-only-` 易被理解为 "only Bare, no Sv32", 但本 change 不测 Sv32 翻译, 实际仅 Bare mode + sv32+ppn=0 边界 ❌ 过度限制
+- (B) `verilator-mmu-bare-only-e2e`: `-only-` 易被理解为 "only Bare, no Sv32"; 本 change 修复 C2 缩 scope 后**仅** Bare mode CLI plumbing（不测 Sv32 翻译, TLB prefill API 行为, sv32+ppn=0 误判防护——这些由 TLM `[mmu]` 53/53 负责）
 - (C) `verilator-mmu-bare-plumbing-e2e` (✓): 同时表达 "Bare 模式" + "plumbing only" + "e2e"
 
 ### D2: TEST_CASE 注释强制 `**plumbing only — translation semantics NOT verified**` 标记
@@ -127,18 +127,17 @@ if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0) {
 - (B) 10 次取 mean: 浪费 CI, mean 易 outlier
 - (C) 5 次取 median (✓): 平衡成本与稳定性
 
-### D4: TEST_CASE 3 (sv32+ppn=0) 用 manual_elf mmu_bare.S + 自定义 harness 注入 satp CSR 写
+### D4: ~~TEST_CASE 3 (sv32+ppn=0) 用 manual_elf mmu_bare.S + 自定义 harness 注入 satp CSR 写~~ (修复 C-B 废弃)
 
-**Decision**: 不修改 `tests/cpu/manual_elf/build_mmu_bare.S` (Change 1 vendor), 在 harness 侧通过 `mmu_keys::SAT` payload 注入 sv32 mode + satp_ppn=0 配置。
+**原 Decision**: 不修改 `tests/cpu/manual_elf/build_mmu_bare.S` (Change 1 vendor), 在 harness 侧通过 `mmu_keys::SAT` payload 注入 sv32 mode + satp_ppn=0 配置。
 
-**Rationale**:
-- ELF 侧不依赖 CPU 写 satp CSR (production 真实场景: 启动时 satp CSR 还没写)
-- Harness 侧模拟 "CPU pipeline 启动但没写 satp" production 场景, 直接调 MMUPlugin::csr_write_satp(MODE=Bare sv32, PPN=0)
-- 不需要新 vendor ELF (避免 Change 1 修改)
+**废弃原因** (修复 Oracle C-B Critical 复审):
+- popen `cpu_verilator_sim` 拿不到 MMU 内部 `paddr`/`PTW::start_walk()` 状态, e2e 断言在物理上不可达
+- chipforge_tests_chmem 不链接 MMU lib 源码, 直接构造 MMUPlugin/MultiLevelTLB 会 link error
+- v0.10.4 hotfix 类回归防护已在 TLM `[mmu]` 53/53 (含 `[tlb-refill]` 2 cases) 覆盖
+- 真 sv32 翻译由 `cpu-pipeline-mmufault-handler` follow-up (TEST_CASE 6) 闭环后承接
 
-**Alternatives considered**:
-- (A) 新 vendor ELF `build_sv32_ppn0.S` 含 `csrw satp, 0x80000000` 指令: 增加 vendor 工具链复杂度, Change 1 范围溢出
-- (B) harness 调 `cpu_keys::SAT` payload 注入 (✓): 复用 Change 1 留的 hook, 零新 vendor
+**修复后的 D4 内容**: 本 change 缩 scope 为 3 TEST_CASE, D4 替换为 "**`--enable-cache` fail-fast 行为契约**" — 当 `enable_cache=true` 时 `cpu_factory_chmem.h` throw（由 Change 2b task group 1.5 翻转替换为 L1CachePlugin CH_MEM 注册）, 本 change 不涉及此契约（仅消费 Change 1 的 fail-fast 行为）。
 
 ### D5: skip-when-absent 沿用 Change 1 模式
 
@@ -193,7 +192,7 @@ if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0) {
 **Risk** (修复 C1 措辞精确化): Change 1 archive 后, `cpu_verilator_sim --enable-mmu --mmu-mode bare` 在 CH_MEM 下 elaboration 仅 emit TODO log (`MMU hook enabled (mode=bare) — mmu_chmem.h not yet implemented`), **不**实例化任何 MMU plugin（CH_MEM 路径无 RiscvMMUPlugin, 因它是 TLM-only class）。Verilog 输出不含 MMU 电路。
 
 **Mitigation**:
-- 本 change TEST_CASE 2 显式断言 elaboration 0 error + Verilog 产生非空 + verilator --cc 编译通过
+- 本 change TEST_CASE 2 (= 缩 scope 后的第 2 个 case) 显式断言 elaboration 0 error + Verilog 产生非空 + verilator --cc 编译通过（修复 C-B: 原 TEST_CASE 2 是 TLB prefill-hit, 已删除; 新 TEST_CASE 2 是 elaboration）
 - 本 change TEST_CASE 1 跑 tohost=1 cycle 数若异常高 (> baseline × 2), 标记为 "elaboration 退化" 调查
 - 接受 MMU 行为退化 = Bare identity translation (与 Change 1 archive 前一致, 仅多 emit TODO log)
 
@@ -275,7 +274,7 @@ TEST_CASE("mmu_bare_plumbing_tohost1_baseline_5_elf", "[mmu-verilator][e2e]") {
   }
 }
 
-// ... TLB prefill-hit, sv32+ppn=0 guard, elaboration, full-chain ...
+// ... elaboration, full-chain ...  (修复 C-B: 原"TLB prefill-hit, sv32+ppn=0 guard"已删除)
 
 #endif  // CF_PLUGIN_USE_CH_MEM
 ```
@@ -298,13 +297,13 @@ bash tools/verify_adr.sh
 bash tools/verify_plugin_decision.sh
 bash tools/check_plugin_portability.sh
 # 0 失败
-# AGENTS.md §honesty_audit 增加 [mmu-verilator] 5/5 PASS
+# AGENTS.md §honesty_audit 增加 [mmu-verilator] 3/3 PASS (修复 C-B: 5→3 PASS 与缩 scope 后 TEST_CASE 数对齐)
 # CHANGELOG v0.10.x 段新增本 change 条目
 ```
 
 ### Rollback Strategy
 
-若 TEST_CASE 3 (sv32+ppn=0) 触发 hazard 重试循环 (R2):
+若任何 TEST_CASE (1/2/3) 触发 hazard 重试循环 (例如 sv32 PTE 边界配置意外引入):
 1. 接受降级: TEST_CASE 3 仅断言 "不 SEGV + max_cycles 内退出"
 2. 不删 case, 但加注释: "v0.10.4 hotfix class protection deferred to cpu-pipeline-mmufault-handler follow-up"
 3. v0.10.x release 时标注 [mmu-verilator] 4/5 PASS (1 deferred)
@@ -320,12 +319,12 @@ bash tools/check_plugin_portability.sh
 
 倾向 (A): 与现状一致, 后续跨平台时单独评估
 
-### Q2: TEST_CASE 3 sv32+ppn=0 失败降级策略?
+### Q2: TEST_CASE 失败降级策略?（修复 C-B: 原针对已删除 TEST_CASE 3 sv32+ppn=0 提问, 重新定位为通用降级策略）
 
 候选:
 - (A) 硬性失败: 5/5 必须 PASS, 否则阻塞 archive
 - (B) 软性降级: PASS rate ≥ 80% 即可, 4/5 PASS 接受
-- (C) 阻塞但 release 标注: 5/5 PASS 才 release, 4/5 接受 archive 但 release 标注 deferred
+- (C) 阻塞但 release 标注: 3/3 PASS 才 release, 2/3 接受 archive 但 release 标注 deferred（修复 C-B: 5→3 与缩 scope 对齐）
 
 倾向 (C): 与 v0.10.4 hotfix 模式一致 (5 个 regression 修复, archive + release 都标)
 
@@ -341,8 +340,8 @@ bash tools/check_plugin_portability.sh
 ### Q4: AGENTS.md "已知测试状态" 段措辞?
 
 候选:
-- (A) "[mmu-verilator] `5/5 PASS` (plumbing only — translation semantics NOT verified) — change verilator-mmu-bare-plumbing-e2e v0.10.x"
-- (B) "[mmu-verilator-plumbing] `5/5 PASS` ..."
-- (C) "[verilator][mmu] `5/5 PASS` ..."
+- (A) "[mmu-verilator] `3/3 PASS` (plumbing only — translation semantics NOT verified) — change verilator-mmu-bare-plumbing-e2e v0.10.x"（修复 C-B: 5→3 与缩 scope 对齐）
+- (B) "[mmu-verilator-plumbing] `3/3 PASS` ..."
+- (C) "[verilator][mmu] `3/3 PASS` ..."
 
 倾向 (A): 与 change name 一致 (含 `-bare-plumbing-`), grep 友好

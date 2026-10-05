@@ -53,7 +53,7 @@
 - [ ] 9.1 修改 `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` 追加 TEST_CASE 6 `mmu_sv32_translation_verilator_e2e_flipped` (family tags: `[mmu-verilator][e2e][sv32]`)。
 - [ ] 9.2 body 实现: popen `cpu_verilator_sim --enable-mmu --mmu-mode sv32 --elf tests/cpu/manual_elf/sv32_pte.elf --cycles 5000`, REQUIRE TOHOST=1 + cycle ≤ baseline × 1.5 + trap PC 跳转断言 (via CPU_EXCEPTION_CODE payload read)。
 - [ ] 9.3 注释块顶部加 `承接 Change 2a follow-up — 真 sv32 translation 翻转` 标记 + 引用 "v0.10.4 hotfix class"。
-- [ ] 9.4 跑 TEST_CASE 6 (5 次), 验证 PASS rate ≥ 5/5（若 4/5, 触发 design.md §R4 mitigation: cap 放宽至 × 2.0）。
+- [ ] 9.4 跑 TEST_CASE 6 (5 次), 验证 PASS rate ≥ 3/3（若 2/3, 触发 design.md §R4 mitigation: cap 放宽至 × 2.0）。
 - [ ] 9.5 跑 max_cycles=5000 验证 hazard retry 循环清理（cycle ≤ 5000）。
 
 ## 10. Spec Delta 编辑 (TDD Step 8)
@@ -65,9 +65,9 @@
 
 ## 11. Documentation Sync (TDD Step 9)
 
-- [ ] 11.1 修改 `AGENTS.md` "[mmu-verilator]" 行: 5/5 → 6/6 PASS, 并新增 "**[cpu-pipeline-mmufault-handler]** `1 change` (v0.10.x 真 sv32 Verilator e2e 翻转 owner)" 行。
+- [ ] 11.1 修改 `AGENTS.md` "[mmu-verilator]" 行: 3/3 → 4/4 PASS, 并新增 "**[cpu-pipeline-mmufault-handler]** `1 change` (v0.10.x 真 sv32 Verilator e2e 翻转 owner)" 行。
 - [ ] 11.2 修改 `CHANGELOG.md` v0.10.x 段新增条目, 标题 `cpu-pipeline-mmufault-handler`, body 列 5 项 (a-e, 见 spec.md)。
-- [ ] 11.3 跑 `bash tools/v0100-bootstrap.sh review` 输出 §honesty_audit 段, 确认 `[mmu-verilator] 6/6 PASS` + 其他 baseline 数字不变。
+- [ ] 11.3 跑 `bash tools/v0100-bootstrap.sh review` 输出 §honesty_audit 段, 确认 `[mmu-verilator] 4/4 PASS` + 其他 baseline 数字不变。
 
 ## 12. Architecture Gate Final
 
@@ -78,7 +78,7 @@
 
 ## 13. Regression Final Check
 
-- [ ] 13.1 跑 `bash tools/run_chipforge_tests.sh` 全部测试: 期望 0 regression（`[mmu-verilator]` 6/6 PASS, `[mmu]` 53/53, `[cpu-integration]` 81/81（硬不退化）, `[cpu-l1-mmu-demo]` 6/6, `[cpu]` 19/19, `[verilator]` 1/1）。
+- [ ] 13.1 跑 `bash tools/run_chipforge_tests.sh` 全部测试: 期望 0 regression（`[mmu-verilator]` 4/4 PASS, `[mmu]` 53/53, `[cpu-integration]` 81/81（硬不退化）, `[cpu-l1-mmu-demo]` 6/6, `[cpu]` 19/19, `[verilator]` 1/1）。
 - [ ] 13.2 跑 `bash tools/run_chipforge_tests.sh --chmem`（如有）: 验证 CH_MEM 二进制 build 0 error, CH_MEM 测试通过。
 - [ ] 13.3 `git diff main --stat` 检查 diff < 700 LOC（设计目标 ~260 LOC plugin + 30 LOC factory 修复 + 80 LOC test + 40 LOC sv32_pte.S + 200 LOC 文档 + 100 LOC spec delta），无 scope 失控。
 

@@ -34,7 +34,7 @@
 
 - TLM 模式: `[mmu]` 53/53 PASS, 含 `test_ptw_tlb_refill_integration` (用 `satp_ppn_` workaround 跳过真 sv32 翻译, AGENTS.md 明确 "5 ELF baseline 0 不退化")
 - CH_MEM 模式: `test_mmu_ptw_fsm_chmem.cpp` 测 FSM 状态机本身 (5 状态转换), **不挂 CPU pipeline**
-- Verilator 模式: Change 2a `[mmu-verilator]` 5/5 PASS (plumbing-only), TEST_CASE 3 sv32+ppn=0 边界防护
+- Verilator 模式: Change 2a `[mmu-verilator]` 3/3 PASS (plumbing-only), TEST_CASE 3 sv32+ppn=0 边界防护
 
 ### Stakeholders
 
@@ -53,7 +53,7 @@
 4. **G4**: Hazard retry 循环清理 (新增 `HazardPlugin::clear_mmufault()` API)
 5. **G5**: trap handler PC 跳转到 `mtvec` (简化: hardcode 0x80000010, 后续 `mfc-cpu-pipeline-multi-cycle-fsm` 完整 CSR 写)
 6. **G6**: 承接 Change 2a follow-up: 新增 TEST_CASE 6 `mmu_sv32_translation_verilator_e2e_flipped`, 验证真 sv32 translation 跑通 tohost=1
-7. **G7**: 零回归: `[mmu-verilator]` 5/5 → 6/6 PASS (TEST_CASE 6 加入), `[mmu]` 53/53 + `[cpu-integration]` 81/81 + `[cpu]` 19/19 + `[cpu-l1-mmu-demo]` 6/6 全部不变
+7. **G7**: 零回归: `[mmu-verilator]` 3/3 → 4/4 PASS (TEST_CASE 6 加入), `[mmu]` 53/53 + `[cpu-integration]` 81/81 + `[cpu]` 19/19 + `[cpu-l1-mmu-demo]` 6/6 全部不变
 8. **G8**: 3 架构门禁 0 失败
 
 ### Non-Goals
@@ -128,7 +128,7 @@
 **Rationale**:
 - 现有 TEST_CASE 1-5 已是 plumbing-only, 范围清晰
 - TEST_CASE 6 是承接 Change 2a follow-up, 名字 `mmu_sv32_translation_verilator_e2e_flipped` 即声明范围
-- AGENTS.md `[mmu-verilator]` 数字 5/5 → 6/6 升级, 不退化
+- AGENTS.md `[mmu-verilator]` 数字 3/3 → 4/4 升级, 不退化
 
 **Alternatives considered**:
 - (A) 修改 TEST_CASE 1-5 加 sv32 翻译断言: 破坏 plumbing-only 范围, ❌
@@ -181,7 +181,7 @@
 **Mitigation**:
 - tasks.md §11 Regression Final Check 显式 `[cpu-integration] 81/81 PASS` 不退化验证
 - 若任一 case 退化, 走 Phase 6d.8 显式排除 7-stage superscalar config (类似现有模式)
-- 接受标准 cap = 81/81 全部不变 (与 Change 2a `[mmu-verilator] 5/5` 一致)
+- 接受标准 cap = 81/81 全部不变 (与 Change 2a `[mmu-verilator] 3/3` 一致)
 
 ### R4: 真 sv32 translation e2e cycle cap 不确定
 
@@ -322,7 +322,7 @@ tohost: .word 0
 ### Phase 9: Documentation Sync (TDD Step 5)
 
 ```bash
-# AGENTS.md "[mmu-verilator]" 5/5 → 6/6 PASS
+# AGENTS.md "[mmu-verilator]" 3/3 → 4/4 PASS
 # AGENTS.md 段新增 "cpu-pipeline-mmufault-handler v0.10.x 引用" 行
 # CHANGELOG v0.10.x 段新增本 change 条目
 bash tools/v0100-bootstrap.sh review
@@ -343,7 +343,7 @@ bash tools/doc_link_check.sh
 ```bash
 bash tools/run_chipforge_tests.sh
 # 期望:
-# [mmu-verilator] 6/6 PASS (5 + 1 new)
+# [mmu-verilator] 4/4 PASS (3 + 1 new)
 # [mmu] 53/53 PASS
 # [cpu-integration] 81/81 PASS (硬不退化)
 # [cpu-l1-mmu-demo] 6/6 PASS

@@ -34,21 +34,21 @@ static std::unique_ptr<PipeBuilder> build_cpu(
     bool preload_elf = false,
     const std::vector<uint8_t>& elf_image = {},
     // === 新增 (P1) ===
-    std::optional<bool> enable_mmu = std::nullopt,        // 三态: nullopt=cfg 驱动, true/false 显式
+    std::optional<bool> enable_mmu = std::nullopt,        // 三态: nullopt=原 4 参数行为 (no-op), true/false 显式 (修复 C-A Oracle 复审: 不读 cfg, build_cpu 签名无 cfg 参数)
     std::optional<std::string> mmu_mode = std::nullopt,   // "sv32"/"sv39"/"sv48"/"bare", 默认 "bare"
     std::optional<bool> enable_cache = std::nullopt);     // 三态: 同 enable_mmu
 ```
 
-**实装策略**:
-- `enable_mmu.value_or(false) == true` 时注册 `RiscvMMUPlugin`(继承 `cf::ip::mmu::MMUPlugin`),按 `mmu_mode` 编码 `satp_value_`(与 v0.10.4 `RiscvMMUPlugin` ctor 路径行为一致);
-- `enable_cache.value_or(false) == true` 时**留 hook + emit TODO**(L1CachePlugin CH_MEM 完整实装属 Change 2b scope,本 change 不实装,跑测时预期 fail-fast 提示 "L1Cache CH_MEM not implemented");
-- `enable_mmu` 默认 nullopt 时走 `cfg.enable_mmu`(CPUConfig 已有字段,见 `ip/cpu/cpu_factory.h:390`)。
+**实装策略**（修复 C-A Oracle 复审，与 spec.md Scenario 严格对齐）:
+- `enable_mmu.value_or(false) == true` 时 **emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — mmu_chmem.h not yet implemented, see change verilator-mmu-bare-plumbing-e2e"** (修复 C-A: **不**注册任何 MMU plugin; `mmu_chmem.h` 不在本 change scope, 且 4 个 active change 中无人认领真 sv32 CH_MEM 实装 — 详见 design.md §C-C);
+- `enable_cache.value_or(false) == true` 时 `throw std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage")` (fail-fast, 由 Change 2b task group 1.5 翻转);
+- `enable_mmu` 默认 nullopt 时 **行为等价于原 4 参数调用**（修复 C-A: **不**读 cfg; `build_cpu` 签名无 cfg 参数 — `ip/cpu/cpu_factory_chmem.h:74-79` 仅 5 参数, 未来如需读 cfg 应另加 `CpuFactoryOptions` struct, 不属本 change scope)。
 
 ### 3 个现有调用方 ABI 兼容保证:
 | 调用方 | 现状 | 修改 |
 |--------|------|------|
 | `tools/verilator_runner/cpu_verilator_sim.cpp:129` | 4 参数 | 改用新参数 (本 change 内部) |
-| `tests/cpu/test_cpu_chmem_vendored_elf.cpp` | 4 参数 | 零修改 (默认 nullopt 走 None) |
+| `tests/cpu/test_cpu_chmem_vendored_elf.cpp` | 4 参数 | 零修改 (默认 nullopt 走原 4 参数行为) |
 | `tests/cpu/test_cpu_5stage.cpp` | 4 参数 | 零修改 |
 | `tests/cpu/test_cpu_decoded_inst_migration.cpp` | 4 参数 | 零修改 |
 
@@ -118,6 +118,6 @@ static std::unique_ptr<PipeBuilder> build_cpu(
   - 被 Change 2b `verilator-l1cache-e2e-coverage` (wave4 P2 占位) 阻塞依赖
   - 与 `mfc-cpu-pipeline-multi-cycle-fsm` Phase G Verilator DMIPS gate **soft-dep** (mfc 不显式 requires 本 change,但 Phase G 启动前 archive 才能让 mfc 走 enable_mmu 路径)
 - **风险**:
-  - `std::optional<bool>` 三态语义可能与未来 CpuConfig 字段冲突——本 change 写明 "nullopt = 走 cfg",保持向后兼容
+  - `std::optional<bool>` 三态语义对当前 scope 已足够清晰。**注意**：未来若 CpuConfig 字段需被 build_cpu 读取, 应另加 `CpuFactoryOptions` struct 参数（不改 build_cpu 5 参签名）, 不属本 change scope（修复 C-A: 显式承诺不读 cfg）。
   - L1Cache CH_MEM 实装缺失时 `enable_cache=true` 行为——本 change 显式 fail-fast 提示 (不静默退化为 bare)
 - **估时**: 2-3 周

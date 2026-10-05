@@ -18,7 +18,7 @@ depends_on:
 - CPU pipeline 在 vaddr=0 PTW fault 后陷入 hazard 重试循环 (无 exception handler 卸载 fault)
 - AGENTS.md 原文: "真 sv32 translation 测试需 (a) `cpu-pipeline-mmufault-handler` change (CPU pipeline 加 MMU exception handler, P1 priority), 然后 (b) flip `cfg.enable_mmu=true` 在本测试 (独立跟踪)"
 
-后果: Change 2a archive 后, [mmu-verilator] 5/5 PASS 但**仅 plumbing 验证**; wave5 `mfc-cpu-pipeline-multi-cycle-fsm` Phase G "DMIPS/MHz ≥1.4" 硬门禁**仍未达到 sv32 翻译能力**——必须先解决 CPU pipeline MMU exception handler。
+后果: Change 2a archive 后, [mmu-verilator] 3/3 PASS (修复 C-B 缩 scope 后, 从原 5/5 改为 3/3) 但**仅 plumbing 验证**; wave5 `mfc-cpu-pipeline-multi-cycle-fsm` Phase G "DMIPS/MHz ≥1.4" 硬门禁**仍未达到 sv32 翻译能力**——必须先解决 CPU pipeline MMU exception handler。
 
 **本 change 范围**: 填补 CPU pipeline MMU exception handling gap, 作为 Change 2a follow-up 的 owner, 让真 sv32 Verilator e2e 翻转可独立跟踪。
 
@@ -68,8 +68,8 @@ depends_on:
 ### 5. CHANGELOG/AGENTS.md 同步
 
 遵守 AGENTS.md §honesty_audit:
-- CHANGELOG v0.10.x §Verification 段新增 `[mmu-verilator]` 从 5/5 升级到 6/6 PASS (TEST_CASE 6 加入)
-- AGENTS.md "[mmu-verilator]" 行更新 `5/5 PASS` → `6/6 PASS`
+- CHANGELOG v0.10.x §Verification 段新增 `[mmu-verilator]` 从 3/3 (修复 C-B 缩 scope 后) 升级到 4/4 PASS (TEST_CASE 6 加入)
+- AGENTS.md "[mmu-verilator]" 行更新 `3/3 PASS` → `4/4 PASS`
 - AGENTS.md §Verification 段新增 `cpu-pipeline-mmufault-handler` 引用
 
 ## Capabilities

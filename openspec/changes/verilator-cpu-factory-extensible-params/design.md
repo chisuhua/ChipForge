@@ -26,7 +26,7 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 
 - 位置: `ip/cpu/plugins/mmu.cpp` + `ip/mmu/tlm/MMUPlugin.{h,cpp}`
 - TLM 模式: `MMUPlugin::do_lookup` Bare shortcut 用 `satp_value_` MODE 字段判定（v0.10.4 修复点,v0.10.0 hotfix 前用 `satp_ppn_` 误判）
-- CH_MEM 模式: **未实装 `mmu_chmem.h`**——`ip/mmu/tlm/` 仅有 `MMUPlugin.cpp/.h` + `mmu_keys.h`,无任何 `_chmem.h`（这是 Change 2a 的硬阻塞,本 change 仅留 hook）
+- CH_MEM 模式: **未实装 `mmu_chmem.h`**——`ip/mmu/tlm/` 仅有 `MMUPlugin.cpp/.h` + `mmu_keys.h`,无任何 `_chmem.h`（修复 C-C Oracle 复审: 真 sv32 CH_MEM 实装在 4 个 active change 中无人认领 — Change 2a 显式 plumbing-only 不实装, `cpu-pipeline-mmufault-handler` 只做 exception handler 也不实装, **本 change hook 的 log 错误信息** 指向 Change 2a 是死路, 建议新加 follow-up change `mmu-chmem-impl` 或在 `cpu-pipeline-mmufault-handler` 扩展 scope 显式实装）
 - 与 CPU pipeline 集成: TLM 模式 `cpu_factory.h:390` 硬写 `/*satp_value=*/0` 让 `cfg.mmu_mode="sv32"` config inert,Change 2a 后续需修复 cpu_factory.h 才真翻转 sv32 e2e
 
 ### `L1CachePlugin` 当前可用性
@@ -68,7 +68,7 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 
 1. **G1**: `CpuFactoryChmem::build_cpu` API 向后兼容扩展（4 个现有调用方零修改）
 2. **G2**: `cpu_verilator_sim` CLI 新增 3 个 flag (`--enable-mmu`/`--mmu-mode`/`--enable-cache`)
-3. **G3**: `enable_mmu=true` 路径可注册 `RiscvMMUPlugin` 并按 `mmu_mode` 编码 `satp_value_`（**TLM-only**路径, CH_MEM 留 hook 待 Change 2a 实装）
+3. **G3**: `enable_mmu=true` 路径 **emit TODO log only**（CH_MEM 模式 no-op 行为）— 修复 C-A Oracle 复审: `RiscvMMUPlugin` 是 TLM-only class, CH_MEM 路径**不**引用它; Verilog 输出**不**含 MMU 电路
 4. **G4**: `enable_cache=true` 路径**留 hook + 显式 fail-fast 提示**（"L1Cache CH_MEM not implemented, please refer to change verilator-l1cache-e2e-coverage"）
 5. **G5**: 提供 MMU/Cache-aware 汇编模板 vendor 脚本入口（仅脚本,不实装测试用例）
 6. **G6**: 3 架构门禁 0 失败
@@ -91,8 +91,8 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 **Decision**: `enable_mmu` / `enable_cache` 用 `std::optional<bool>` 而非裸 `bool`。
 
 **Rationale**:
-- 三态语义清晰: `nullopt` = 走 cfg 驱动（保持现状 7-plugin 默认）, `true` = 显式启用, `false` = 显式禁用
-- 4 个现有调用方零修改（默认参数 `std::nullopt`, 行为等价于"未指定, 走默认")
+- 三态语义清晰: `nullopt` = 原 4 参数行为（保持现状 7-plugin 默认, no-op）, `true` = 显式启用, `false` = 显式禁用（修复 C-A: **不**读 cfg, `build_cpu` 签名无 cfg 参数）
+- **6 文件 / 12 call sites** 零修改（修复 S1 Oracle 复审数字: grep `tests/cpu tools/verilator_runner` 实测）
 - 未来 `CpuConfig` 加新字段时不必改 `build_cpu` 签名
 
 **Alternatives considered**:
@@ -160,17 +160,17 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 **Risk**: 未来 `CpuConfig::enable_mmu` 字段被删除时,`build_cpu` 的 `std::optional<bool>` 参数语义可能与现状冲突。
 
 **Mitigation**:
-- 显式文档: "`nullopt` = 走 cfg 驱动" 在 proposal.md §1 + design.md §D1 都写明
+- 显式文档: "`nullopt` = 原 4 参数行为（no-op, 不读 cfg）" 在 proposal.md §1 + design.md §D1 + spec.md §Scenario "显式三态语义" 都写明（修复 C-A: 与 spec 严格对齐）
 - 单元测试覆盖 3 种状态 (nullopt/true/false) — Change 2a 加 (本 change 不加 test)
-- 若未来 CpuConfig 字段调整, 仅修改 `build_cpu` 内部 `cfg.enable_mmu.value_or(...)` 调用即可, 调用方零影响
+- 若未来 CpuConfig 字段需被 build_cpu 读取, 应另加 `CpuFactoryOptions` struct 参数（不改 5 参签名）, 不属本 change scope
 
-### R2: 4 个调用方零修改假设被打破
+### R2: 6 文件 / 12 call sites ABI 兼容失败
 
-**Risk**: 若 4 个调用方任一传错参数顺序 (虽然默认参数不破坏), 或编译警告被升级为错误, ABI 兼容失败。
+**Risk**（修复 S1 Oracle 复审数字）: 若 6 文件 / 12 call sites 任一传错参数顺序（虽然默认参数不破坏）, 或编译警告被升级为错误, ABI 兼容失败。
 
 **Mitigation**:
-- tasks.md TDD Step 1 加 **ABI smoke test**: 4 个调用方零修改, build 0 error 0 warning
-- tasks.md TDD Step 2 加 **符号链接测试**: `nm chipforge_tests | grep build_cpu` 签名不变
+- tasks.md TDD Step 1 加 **ABI smoke test**: 6 文件 / 12 call sites 零修改, build 0 error 0 warning（`grep -rn 'CpuFactoryChmem.*build_cpu' tests/cpu tools/verilator_runner` 验证）
+- 签名 hash **会改变**（加默认参数改 mangled name, 接受）— tasks.md §3.5 已正确标注; 本 Mitigation 修正原"签名不变"措辞
 
 ### R3: L1Cache fail-fast 信息不可达
 
@@ -200,7 +200,7 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 
 **Trade-off**: `std::optional<bool>` 让 API 调用方需理解 3 种状态 (`nullopt`/`true`/`false`), 比单 `bool` 略复杂。
 
-**Decision 接受**: 三态语义清晰性 > 单 bool 简洁性, 4 个调用方仅需传默认参数 `std::nullopt`, 实际使用复杂度低
+**Decision 接受**: 三态语义清晰性 > 单 bool 简洁性, 6 文件 / 12 call sites 仅需传默认参数 `std::nullopt`, 实际使用复杂度低
 
 ## Migration Plan
 
@@ -211,7 +211,7 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 cmake --build build
 ./build/bin/chipforge_tests "[verilator]"           # 现有 1 case PASS
 ./build/bin/chipforge_tests "[cpu]" --list-tests | wc -l   # 数量不变
-nm ./build/bin/cpu_verilator_sim | grep build_cpu   # 签名不变
+nm ./build/bin/cpu_verilator_sim | grep build_cpu   # 签名 hash 改变（接受, 默认参数改 mangled name）
 ```
 
 ### Phase 2: std::optional 参数扩展 (TDD Step 2)
@@ -268,7 +268,7 @@ bash tools/check_plugin_portability.sh
 
 ### Rollback Strategy
 
-若 Step 2 触发 ABI 兼容失败 (4 调用方之一 build error):
+若 Step 2 触发 ABI 兼容失败 (6 文件 / 12 call sites 任一 build error):
 1. Revert `cpu_factory_chmem.h` 改动
 2. Re-run Phase 1 smoke
 3. 重设计 (例如改用 struct `CpuFactoryOptions{ bool enable_mmu; std::string mmu_mode; bool enable_cache; }`)

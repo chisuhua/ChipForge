@@ -108,7 +108,7 @@ The assembly source SHALL:
 ### Requirement: 零回归 + 架构门禁
 
 The change SHALL NOT introduce any regression to existing test family counts:
-- `[mmu-verilator]` 5/5 → 6/6 PASS (TEST_CASE 6 加入)
+- `[mmu-verilator]` 3/3 → 4/4 PASS (TEST_CASE 6 加入)
 - `[mmu]` 53/53 PASS
 - `[cpu-integration]` 81/81 PASS (硬不退化, CPU pipeline 改动影响 5+7+10 stage 全部)
 - `[cpu]` 19/19 PASS
@@ -117,7 +117,7 @@ The change SHALL NOT introduce any regression to existing test family counts:
 
 The 3 architecture gates SHALL all pass with exit code 0.
 
-#### Scenario: `[mmu-verilator]` 5/5 → 6/6 PASS
+#### Scenario: `[mmu-verilator]` 3/3 → 4/4 PASS
 - **WHEN** `bash tools/run_chipforge_tests.sh --tag "[mmu-verilator]"` runs (post archive)
 - **THEN** the result SHALL be 6 cases passed, 0 failed.
 
@@ -131,11 +131,11 @@ The 3 architecture gates SHALL all pass with exit code 0.
 
 ### Requirement: AGENTS.md + CHANGELOG 同步
 
-The change SHALL update AGENTS.md "已知测试状态" segment and CHANGELOG.md v0.10.x segment WITH the new `[mmu-verilator]` 6/6 PASS count + cpu-pipeline-mmufault-handler 引用。
+The change SHALL update AGENTS.md "已知测试状态" segment and CHANGELOG.md v0.10.x segment WITH the new `[mmu-verilator]` 4/4 PASS count + cpu-pipeline-mmufault-handler 引用。
 
 #### Scenario: AGENTS.md "[mmu-verilator]" 升级
 - **WHEN** this change's archive step runs
-- **THEN** AGENTS.md SHALL update the existing `[mmu-verilator]` line from `5/5 PASS` to `6/6 PASS` AND append a new line: `**[cpu-pipeline-mmufault-handler]** \`1 change\` (v0.10.x 真 sv32 Verilator e2e 翻转 owner; per design.md §承接 Change 2a follow-up)`。
+- **THEN** AGENTS.md SHALL update the existing `[mmu-verilator]` line from `3/3 PASS` to `4/4 PASS` AND append a new line: `**[cpu-pipeline-mmufault-handler]** \`1 change\` (v0.10.x 真 sv32 Verilator e2e 翻转 owner; per design.md §承接 Change 2a follow-up)`。
 
 #### Scenario: CHANGELOG v0.10.x 新增条目
 - **WHEN** `CHANGELOG.md` is updated
@@ -143,4 +143,4 @@ The change SHALL update AGENTS.md "已知测试状态" segment and CHANGELOG.md 
 
 #### Scenario: honesty_audit 数字按 HEAD 实测
 - **WHEN** `bash tools/v0100-bootstrap.sh review` runs against post-archive tree
-- **THEN** the `§honesty_audit` segment SHALL reflect `[mmu-verilator] 6/6 PASS` AND the `[mmu] 53/53` / `[cpu-integration] 81/81` / `[cpu-l1-mmu-demo] 6/6` counts SHALL be byte-identical to v0.10.4 hotfix baseline (no silent drift).
+- **THEN** the `§honesty_audit` segment SHALL reflect `[mmu-verilator] 4/4 PASS` AND the `[mmu] 53/53` / `[cpu-integration] 81/81` / `[cpu-l1-mmu-demo] 6/6` counts SHALL be byte-identical to v0.10.4 hotfix baseline (no silent drift).
