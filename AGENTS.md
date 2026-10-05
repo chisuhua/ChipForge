@@ -11,14 +11,23 @@
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j$(nproc)
 
-# 跑全部测试（单二进制 chipforge_tests）
+# 跑全部测试（4 个 ctest entry：TLM + CH_MEM + Verilator smoke + 架构 gate）
 ctest --test-dir build --output-on-failure
+# 或封装脚本（默认 = TLM only; --all = 全量 ~167s）
+bash tools/run_chipforge_tests.sh --all
 
 # 按 family tag 过滤
-./build/bin/chipforge_tests "[framework]"       # Plugin 框架
+./build/bin/chipforge_tests "[framework]"       # Plugin 框架 (TLM, ~0.6s)
 ./build/bin/chipforge_tests "[cache]"            # L1Cache IP
 ./build/bin/chipforge_tests "[cpu-integration]"  # RISC-V 集成
 ./build/bin/chipforge_tests "~[mmu]"             # 排除某 family
+
+# CH_MEM family（必加 -DCF_PLUGIN_USE_CH_MEM 才 build 出此 binary）
+./build/bin/chipforge_tests_chmem "[chmem]"
+./build/bin/chipforge_tests_chmem "[verilator]","[mmu-verilator]"  # Verilator 后端完整 (4 cases)
+
+# Phase 6d.5 E8 standalone Verilator runner（开发者 debug 入口，从仓库根运行，ELF 为相对路径）
+./build/bin/cpu_verilator_sim --elf tests/cpu/riscv_tests/elf/rv32ui-p-add
 ```
 
 ### 已知测试状态
@@ -110,7 +119,7 @@ ctest --test-dir build --output-on-failure
 > - `[framework]`/`[cache]`/`[cpu]`/`[cpu-integration]`/`[soc]`/`[bundles]`/`[mmu]`/`[riscv-tests]`/`[cpu-l1-mmu-demo]`/`[tlb-refill]` — 全部在 `chipforge_tests` (TLM binary)
 > - `[chmem]`/`[cpphdl]`/`[elaborate]`/`[verilator]`/`[mmu-verilator]` — **全部在 `chipforge_tests_chmem`** (CH_MEM binary, `-DCF_PLUGIN_USE_CH_MEM`)
 > - **推荐运行**:
->   - TLM 快速回归：`./build/bin/chipforge_tests` (411 cases, ~0.6s)
+>   - TLM 快速回归：`./build/bin/chipforge_tests` (432 catch2 instances / 67026 assertions, ~0.6s)
 >   - 全量 (TLM + CH_MEM + verilator + gate)：`bash tools/run_chipforge_tests.sh --all`
 >   - Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2)：
 >     ```bash
@@ -300,7 +309,8 @@ bash tools/verify_adr.sh                           # ADR 漂移检查
 bash tools/verify_plugin_decision.sh                # D4 业务代码检查（~7 项）
 bash tools/check_plugin_portability.sh              # ADR-040 移植性检查（~4 项）
 bash tools/doc_link_check.sh                        # 文档死链检查
-bash tools/run_chipforge_tests.sh                   # 完整 ctest 运行
+bash tools/run_chipforge_tests.sh                   # 默认: TLM only (432 catch2 instances / 67026 assertions, ~0.6s, fast loop)
+bash tools/run_chipforge_tests.sh --all             # 全量: ctest 4 entries (TLM + CH_MEM + Verilator smoke + gate, ~167s)
 python tools/doc_checker.py --format text --verbose  # 文档健康检查
 pre-commit run --all-files                          # 格式化/空白/JSON 检查
 ```
@@ -317,6 +327,8 @@ pre-commit run --all-files                          # 格式化/空白/JSON 检�
 | `doc_check.yml` | PR + push（docs/ip/变更时） | ⚠️ smoke-only (实测全 PASS, 仅 ADR-024 强阻塞, 余 smoke) |
 
 CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/CppTLM' }}`）。
+
+> **测试脚本不在 CI 自动跑**（Oracle 2026-10-06 决策）：当前 CI workflow 仅运行架构 gate 脚本（`verify_adr.sh` / `verify_plugin_decision.sh` / `check_plugin_portability.sh`）。`tools/run_chipforge_tests.sh --all` 与 `bash tools/run_chipforge_tests.sh` 需 PR 提交者**本地**手动跑并贴结果。原因：CH_MEM binary 已知有 `cpphdl_poc_chbool_contextual_conversion` context-pollution flake（单跑 PASS，全套件场景偶发 FAIL），若加入 PR 阻塞会引入间歇性 CI 失败。Verilator 完整测试 (`run_chipforge_tests.sh --all` 含 `cpu_verilator_sim_add` smoke + `chipforge_tests_chmem [verilator],[mmu-verilator]`) 由 PR 模板强制要求 + 开发者本地执行覆盖。
 
 ---
 
