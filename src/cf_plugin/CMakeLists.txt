@@ -111,31 +111,48 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
 
   # add.elf 自动生成 (Step 6, 2026-09-28): 5 个 stage integration + 5 个 cpu_l1_mmu_demo 测试依赖此 binary
   # 避免"build cache 清理 → ELF 缺失 → 测试全 FAIL" 的隐性 bug
+  #
+  # Phase 6d verilator-mmu-bare-plumbing-e2e 扩展 (2026-10-05):
+  # 同时构建 mmu_bare.elf + l1cache_basic.elf. 输出统一到 ${CMAKE_BINARY_DIR}/
+  # 防止 build src/ 树污染. 测试通过 CF_MMU_BARE_ELF_PATH compile_definition
+  # (tests/CMakeLists.txt 定义) 引用 build/mmu_bare.elf.
   find_program(RISCV_AS riscv64-unknown-elf-as)
   find_program(RISCV_LD riscv64-unknown-elf-ld)
-  if(RISCV_AS AND RISCV_LD AND EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/add.S)
-    add_custom_command(
-      OUTPUT ${CMAKE_BINARY_DIR}/add.elf
-      COMMAND ${RISCV_AS} -march=rv32i -mabi=ilp32
-        ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/add.S
-        -o ${CMAKE_BINARY_DIR}/add.o
-      COMMAND ${RISCV_LD} -m elf32lriscv
-        -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
-        ${CMAKE_BINARY_DIR}/add.o
-        -o ${CMAKE_BINARY_DIR}/add.elf
-      COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/add.o
-      DEPENDS
-        ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/add.S
-        ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
-      COMMENT "Building add.elf from add.S + link.ld"
-      VERBATIM
-    )
-    add_custom_target(add_elf ALL DEPENDS ${CMAKE_BINARY_DIR}/add.elf)
-    add_dependencies(cpu_sim add_elf)
-  elseif(NOT RISCV_AS OR NOT RISCV_LD)
+  if(RISCV_AS AND RISCV_LD)
+    foreach(ELF_PAIR IN ITEMS
+        "add;add.S"
+        "mmu_bare;build_mmu_bare.S"
+        "l1cache_basic;build_l1cache_basic.S")
+      list(GET ELF_PAIR 0 ELF_NAME)
+      list(GET ELF_PAIR 1 SRC_FILE)
+      if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE})
+        add_custom_command(
+          OUTPUT ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
+          COMMAND ${RISCV_AS} -march=rv32i -mabi=ilp32
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
+            -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
+          COMMAND ${RISCV_LD} -m elf32lriscv
+            -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
+            ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
+            -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
+          COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
+          DEPENDS
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
+          COMMENT "Building ${ELF_NAME}.elf from ${SRC_FILE} + link.ld"
+          VERBATIM
+        )
+        add_custom_target(${ELF_NAME}_elf ALL
+          DEPENDS ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf)
+      endif()
+    endforeach()
+    if(TARGET add_elf)
+      add_dependencies(cpu_sim add_elf)
+    endif()
+  else()
     message(STATUS
-      "[ChipForge] add.elf custom target 跳过: 未找到 riscv64-unknown-elf-as/ld "
-      "(CPU stage integration + cpu_l1_mmu_demo 测试需要 riscv 工具链)"
+      "[ChipForge] manual ELF custom targets 跳过: 未找到 riscv64-unknown-elf-as/ld "
+      "(CPU stage integration + cpu_l1_mmu_demo + [mmu-verilator] 测试需要 riscv 工具链)"
     )
   endif()
 endif()

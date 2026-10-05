@@ -41,6 +41,10 @@
 #error "CF_MMU_VERILATOR_BASELINE_CSV must be defined via CMake compile_definitions"
 #endif
 
+#ifndef CF_MMU_BARE_ELF_PATH
+#error "CF_MMU_BARE_ELF_PATH must be defined via CMake compile_definitions"
+#endif
+
 #ifndef TEST_RV32UI_ELF_DIR
 #error "TEST_RV32UI_ELF_DIR must be defined via CMake compile_definitions"
 #endif
@@ -174,7 +178,7 @@ TEST_CASE("mmu_bare_plumbing_no_cache_full_chain", "[mmu-verilator][e2e]") {
             ") — skipping verilator e2e");
     return;
   }
-  const std::string elf_path = "tests/cpu/manual_elf/mmu_bare.elf";
+  const std::string elf_path = CF_MMU_BARE_ELF_PATH;
   std::string cmd = std::string(CF_VERILATOR_SIM_BIN) + " --elf " + elf_path +
                      " --enable-mmu --mmu-mode bare --cycles " +
                      std::to_string(kMaxCycles) + " 2>/dev/null";

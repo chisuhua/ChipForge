@@ -137,6 +137,7 @@ target_compile_definitions(chipforge_tests_chmem PRIVATE
     TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
     CF_VERILATOR_SIM_BIN="${CMAKE_BINARY_DIR}/bin/cpu_verilator_sim"
     CF_MMU_VERILATOR_BASELINE_CSV="${CMAKE_SOURCE_DIR}/tests/mmu/test_mmu_bare_plumbing_verilator_baselines.csv"
+    CF_MMU_BARE_ELF_PATH="${CMAKE_BINARY_DIR}/mmu_bare.elf"
 )
 target_include_directories(chipforge_tests_chmem PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
