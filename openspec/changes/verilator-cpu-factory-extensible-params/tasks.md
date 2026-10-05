@@ -1,8 +1,8 @@
 ## 1. Pre-flight (Spike)
 
-- [ ] 1.1 **Spike 1.1**：`cpu_verilator_sim --elf add.elf --enable-mmu` 跑一次，**预期 FAIL**（当前 build_cpu 无 enable_mmu 参数），记录错误信息（应提及 "build_cpu" 4 参数签名）。确认现状：基础设施确实缺失。
-- [ ] 1.2 **Spike 1.2**：检查 `ip/mmu/tlm/` 和 `ip/cache/tlm/` 确认无任何 `_chmem.h` 完整实装（已确认：本 change 不实装，仅留 hook）。
-- [ ] 1.3 **Spike 1.3**：`tests/cpu/manual_elf/` 检查现有 8 个 .S + 3 个 .elf vendor 入口位置，确认 `build_manual_elf.sh` 模板注册模式。
+- [x] 1.1 **Spike 1.1**：`cpu_verilator_sim --elf add.elf --enable-mmu` 跑一次，**预期 FAIL**（当前 build_cpu 无 enable_mmu 参数），记录错误信息（应提及 "build_cpu" 4 参数签名）。确认现状：基础设施确实缺失。**实测**：`unknown arg: --enable-mmu` (Phase 6d.5 E8 cpu_verilator_sim 无 enable_mmu flag), 基础设施缺失已确认。
+- [x] 1.2 **Spike 1.2**：检查 `ip/mmu/tlm/` 和 `ip/cache/tlm/` 确认无任何 `_chmem.h` 完整实装（已确认：本 change 不实装，仅留 hook）。**实测**：`ip/mmu/tlm/` 无 `_chmem.h` ✓; `ip/cache/tlm/` 仅 `l1_cache_refill_fsm_chmem.h` (独立 refill FSM, 非完整 L1CachePlugin CH_MEM)。
+- [x] 1.3 **Spike 1.3**：`tests/cpu/manual_elf/` 检查现有 8 个 .S + 3 个 .elf vendor 入口位置，确认 `build_manual_elf.sh` 模板注册模式。**实测**：8 个 .S (add/and/div/mul/or/sll/srli/sub) + 3 个 .elf (add/div/mul) + build_manual_elf.sh 模板注册机制确认。
 
 ## 2. ABI Compatibility Smoke Test (TDD Step 1 - Red)
 
