@@ -8,7 +8,7 @@ The function `cf::cpu::CpuFactoryChmem<T>::build_cpu` SHALL accept three additio
 
 ABI-compat rule: existing callsites (4-or-5-positional-arg calls) SHALL compile without modification, because new parameters have defaults (`std::nullopt`).
 
-#### Scenario: 现有调用方零修改 (grep 验证: 6 文件 / 14 call sites)
+#### Scenario: 现有调用方零修改 (grep 验证: 6 文件 / 12 call sites)
 - **WHEN** any of the following 6 CH_MEM-mode callsite files is rebuilt (verified via `grep -rn 'CpuFactoryChmem.*build_cpu\|CpuFactoryChmem<.*>::build_cpu' tests/cpu tools/verilator_runner`):
   - `tools/verilator_runner/cpu_verilator_sim.cpp` (1 call)
   - `tests/cpu/test_cpu_rtl_regfile_alu.cpp` (1 call)

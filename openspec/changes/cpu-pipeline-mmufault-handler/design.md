@@ -34,7 +34,7 @@
 
 - TLM 模式: `[mmu]` 53/53 PASS, 含 `test_ptw_tlb_refill_integration` (用 `satp_ppn_` workaround 跳过真 sv32 翻译, AGENTS.md 明确 "5 ELF baseline 0 不退化")
 - CH_MEM 模式: `test_mmu_ptw_fsm_chmem.cpp` 测 FSM 状态机本身 (5 状态转换), **不挂 CPU pipeline**
-- Verilator 模式: Change 2a `[mmu-verilator]` 3/3 PASS (plumbing-only), TEST_CASE 3 sv32+ppn=0 边界防护
+- Verilator 模式: Change 2a `[mmu-verilator]` 3/3 PASS (plumbing-only, 修复 C-B 缩 scope 后)
 
 ### Stakeholders
 
@@ -347,7 +347,7 @@ bash tools/run_chipforge_tests.sh
 # [mmu] 53/53 PASS
 # [cpu-integration] 81/81 PASS (硬不退化)
 # [cpu-l1-mmu-demo] 6/6 PASS
-# [cpu] 19/19 PASS
+# [cpu-l1-mmu-demo] 6/6 PASS  (修复 S3: 原 [cpu] 19/19 是 fabricated 数字, AGENTS.md 无此计数, 替换为有据可查的数字)
 # [chmem] 9/9 PASS
 # [verilator] 1/1 PASS
 ```

@@ -52,7 +52,7 @@
 3. **G3**: 验证 cache miss path 触发 refill FSM 6d.7 后 tohost=1
 4. **G4**: 验证 L1Cache + MMU 联动 (`--enable-mmu --mmu-mode bare --enable-cache`) 跑通 l1cache_basic.elf
 5. **G5**: L1Cache-only + L1Cache+MMU 联动 cycle baseline 表生成
-6. **G6**: 零回归: `[verilator]` 1/1 + `[mmu-verilator]` 5/5 (Change 2a) + `[mmu]` 53/53 + `[cache]` 既有 21 baseline + `[cpu-integration]` 81/81 全部不变
+6. **G6**: 零回归: `[verilator]` 1/1 + `[mmu-verilator]` 3/3 (Change 2a) + `[mmu]` 53/53 + `[cache]` 既有 21 baseline + `[cpu-integration]` 81/81 全部不变
 7. **G7**: 3 架构门禁 0 失败
 
 ### Non-Goals

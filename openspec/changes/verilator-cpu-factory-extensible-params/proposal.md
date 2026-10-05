@@ -24,7 +24,7 @@ depends_on: []
 
 **位置**: `ip/cpu/cpu_factory_chmem.h:74`
 
-新增三个 `std::optional`-wrapper 可选参数(放在现有参数之后,保持 4 个现有调用方零修改):
+新增三个 `std::optional`-wrapper 可选参数(放在现有参数之后,保持 **6 文件 / 12 call sites** (grep 验证) 中除 `cpu_verilator_sim.cpp` 外的 5 文件 / 11 call sites 零修改):
 
 ```cpp
 static std::unique_ptr<PipeBuilder> build_cpu(
@@ -44,13 +44,15 @@ static std::unique_ptr<PipeBuilder> build_cpu(
 - `enable_cache.value_or(false) == true` 时 `throw std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage")` (fail-fast, 由 Change 2b task group 1.5 翻转);
 - `enable_mmu` 默认 nullopt 时 **行为等价于原 4 参数调用**（修复 C-A: **不**读 cfg; `build_cpu` 签名无 cfg 参数 — `ip/cpu/cpu_factory_chmem.h:74-79` 仅 5 参数, 未来如需读 cfg 应另加 `CpuFactoryOptions` struct, 不属本 change scope)。
 
-### 3 个现有调用方 ABI 兼容保证:
-| 调用方 | 现状 | 修改 |
-|--------|------|------|
-| `tools/verilator_runner/cpu_verilator_sim.cpp:129` | 4 参数 | 改用新参数 (本 change 内部) |
-| `tests/cpu/test_cpu_chmem_vendored_elf.cpp` | 4 参数 | 零修改 (默认 nullopt 走原 4 参数行为) |
-| `tests/cpu/test_cpu_5stage.cpp` | 4 参数 | 零修改 |
-| `tests/cpu/test_cpu_decoded_inst_migration.cpp` | 4 参数 | 零修改 |
+### 6 文件 / 12 call sites ABI 兼容保证 (修复 S1 Oracle 三轮复审, grep `CpuFactoryChmem.*build_cpu` 实测):
+| 调用方 | call 数 | 现状 | 修改 |
+|--------|---------|------|------|
+| `tools/verilator_runner/cpu_verilator_sim.cpp:129` | 1 | 4 参数 | 改用新参数 (本 change 内部) |
+| `tests/cpu/test_cpu_chmem_vendored_elf.cpp:94` | 1 | 4 参数 | 零修改 (默认 nullopt 走原 4 参数行为) |
+| `tests/cpu/test_cpu_5stage.cpp:53,75,122,152,193` | 5 | 4 参数 | 零修改 |
+| `tests/cpu/test_cpu_decoded_inst_migration.cpp:322` | 1 | 4 参数 | 零修改 |
+| `tests/cpu/test_cpu_memory_model_chmem.cpp:127,177,395` | 3 | 4 参数 | 零修改 |
+| `tests/cpu/test_cpu_rtl_regfile_alu.cpp:541` | 1 | 4 参数 | 零修改 |
 
 ### 2. `cpu_verilator_sim.cpp` CLI 扩展
 

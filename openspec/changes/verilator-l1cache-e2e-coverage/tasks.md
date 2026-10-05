@@ -67,7 +67,7 @@
 
 - [ ] 8.1 修改 `AGENTS.md` "已知测试状态" 段新增 `[cache-verilator]` 行: `**[cache-verilator]** \`3/3 PASS\` (cache hit + miss + L1Cache+MMU 联动) — **plumbing only — semantic assertions beyond hit/miss NOT verified** — change verilator-l1cache-e2e-coverage v0.9.x`。
 - [ ] 8.2 修改 `CHANGELOG.md` v0.9.x 段新增条目, 标题 `verilator-l1cache-e2e-coverage`, body 列 5 项 (a-e, 见 spec.md)。
-- [ ] 8.3 跑 `bash tools/v0100-bootstrap.sh review` 输出 §honesty_audit 段, 确认 `[cache-verilator] 3/3 PASS` + `[mmu-verilator] 5/5` + `[verilator] 1/1` + `[mmu] 53/53` + `[cpu-l1-mmu-demo] 6/6` 数字正确。
+- [ ] 8.3 跑 `bash tools/v0100-bootstrap.sh review` 输出 §honesty_audit 段, 确认 `[cache-verilator] 3/3 PASS` + `[mmu-verilator] 3/3` + `[verilator] 1/1` + `[mmu] 53/53` + `[cpu-l1-mmu-demo] 6/6` 数字正确。
 
 ## 9. Architecture Gate Final
 
@@ -78,7 +78,7 @@
 
 ## 10. Regression Final Check
 
-- [ ] 10.1 跑 `bash tools/run_chipforge_tests.sh` 全部测试: 期望 0 regression（`[verilator]` 1/1, `[mmu-verilator]` 5/5, `[mmu]` 53/53, `[cpu-l1-mmu-demo]` 6/6, `[cpu-integration]` 81/81, `[cpu]` 19/19 等 baseline 数字不变 + `[cache-verilator]` 新增 3/3 PASS）。
+- [ ] 10.1 跑 `bash tools/run_chipforge_tests.sh` 全部测试: 期望 0 regression（`[verilator]` 1/1, `[mmu-verilator]` 3/3, `[mmu]` 53/53, `[cpu-l1-mmu-demo]` 6/6, `[cpu-integration]` 81/81, `[cpu]` 19/19 等 baseline 数字不变 + `[cache-verilator]` 新增 3/3 PASS）。
 - [ ] 10.2 跑 `ctest --test-dir build -R chipforge_tests_chmem --output-on-failure`（修复 S10: 原"`--chmem`"分支不存在于 `tools/run_chipforge_tests.sh`）, 验证 CH_MEM 二进制 build 0 error, CH_MEM 测试通过。
 - [ ] 10.3 `git diff main --stat` 检查 diff < 400 LOC（设计目标 ~180 LOC 测试 + 30 LOC CSV + 80 LOC 文档 + 100 LOC spec delta），无 scope 失控。
 

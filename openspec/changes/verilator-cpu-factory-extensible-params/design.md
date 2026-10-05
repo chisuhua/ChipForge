@@ -16,11 +16,13 @@ static std::unique_ptr<PipeBuilder> build_cpu(
     const std::vector<uint8_t>& elf_image = {})
 ```
 
-4 个现有调用方:
-1. `tools/verilator_runner/cpu_verilator_sim.cpp:129` (4 参数硬编码)
-2. `tests/cpu/test_cpu_chmem_vendored_elf.cpp` (4 参数)
-3. `tests/cpu/test_cpu_5stage.cpp` (4 参数)
-4. `tests/cpu/test_cpu_decoded_inst_migration.cpp` (4 参数)
+6 文件 / 12 call sites（grep `CpuFactoryChmem.*build_cpu` 实测，修复 S1 Oracle 三轮复审）:
+1. `tools/verilator_runner/cpu_verilator_sim.cpp:129` (1 call, 4 参数硬编码)
+2. `tests/cpu/test_cpu_chmem_vendored_elf.cpp:94` (1 call, 4 参数)
+3. `tests/cpu/test_cpu_5stage.cpp:53,75,122,152,193` (5 calls, 4 参数)
+4. `tests/cpu/test_cpu_decoded_inst_migration.cpp:322` (1 call, 4 参数)
+5. `tests/cpu/test_cpu_memory_model_chmem.cpp:127,177,395` (3 calls, 4 参数)
+6. `tests/cpu/test_cpu_rtl_regfile_alu.cpp:541` (1 call, 4 参数)
 
 ### `RiscvMMUPlugin` 当前可用性（v0.10.4 hotfix 收官）
 

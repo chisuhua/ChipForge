@@ -54,7 +54,7 @@ The spec file `openspec/specs/mmu-cache-integration-test/spec.md` SHALL be delta
 
 The change SHALL NOT introduce any regression to existing test family counts:
 - `[verilator]` 1/1 PASS
-- `[mmu-verilator]` 5/5 PASS (Change 2a)
+- `[mmu-verilator]` 3/3 PASS (Change 2a)
 - `[mmu]` 53/53 PASS
 - `[cache]` 既有 21 baseline PASS (cache-phase1.5-4way 实装后 ≥24)
 - `[cpu-l1-mmu-demo]` 6/6 PASS
@@ -67,7 +67,7 @@ The 3 architecture gates (`tools/verify_adr.sh`, `tools/verify_plugin_decision.s
 - **WHEN** `bash tools/run_chipforge_tests.sh --tag "[verilator]"` runs
 - **THEN** the result SHALL be 1 case passed (`cpu_verilator_sim_tohost1` for 5 ELF), 0 failed.
 
-#### Scenario: `[mmu-verilator]` 5/5 不退化
+#### Scenario: `[mmu-verilator]` 3/3 不退化
 - **WHEN** `bash tools/run_chipforge_tests.sh --tag "[mmu-verilator]"` runs (post Change 2a archive)
 - **THEN** the result SHALL be 5 cases passed, 0 failed.
 
@@ -93,4 +93,4 @@ The change SHALL update AGENTS.md "已知测试状态" segment and CHANGELOG.md 
 
 #### Scenario: honesty_audit 数字按 HEAD 实测
 - **WHEN** `bash tools/v0100-bootstrap.sh review` runs against post-archive tree
-- **THEN** the `§honesty_audit` segment SHALL reflect the new `[cache-verilator] 3/3 PASS` count AND the `[mmu-verilator] 5/5` / `[verilator] 1/1` / `[mmu] 53/53` / `[cpu-l1-mmu-demo] 6/6` counts SHALL be byte-identical to v0.10.4 hotfix baseline (no silent drift across wave4-wave5 boundary).
+- **THEN** the `§honesty_audit` segment SHALL reflect the new `[cache-verilator] 3/3 PASS` count AND the `[mmu-verilator] 3/3` / `[verilator] 1/1` / `[mmu] 53/53` / `[cpu-l1-mmu-demo] 6/6` counts SHALL be byte-identical to v0.10.4 hotfix baseline (no silent drift across wave4-wave5 boundary).

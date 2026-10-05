@@ -7,14 +7,14 @@
 ## 2. ABI Compatibility Smoke Test (TDD Step 1 - Red)
 
 - [ ] 2.1 在 `ip/cpu/cpu_factory_chmem.h:74` **不修改源码**，先记录 baseline：`nm build/bin/cpu_verilator_sim | grep build_cpu`（记录签名 hash）。
-- [ ] 2.2 **调用方清单 grep 核对**（修复 S1）：`grep -rn 'CpuFactoryChmem.*build_cpu\|CpuFactoryChmem<.*>::build_cpu' tests/cpu tools/verilator_runner` 输出预期 6 文件 / 14 call sites:
+- [ ] 2.2 **调用方清单 grep 核对**（修复 S1）：`grep -rn 'CpuFactoryChmem.*build_cpu\|CpuFactoryChmem<.*>::build_cpu' tests/cpu tools/verilator_runner` 输出预期 6 文件 / 12 call sites:
   - `tools/verilator_runner/cpu_verilator_sim.cpp` (1)
   - `tests/cpu/test_cpu_rtl_regfile_alu.cpp` (1)
   - `tests/cpu/test_cpu_memory_model_chmem.cpp` (3: lines 127, 177, 395)
   - `tests/cpu/test_cpu_decoded_inst_migration.cpp` (1)
   - `tests/cpu/test_cpu_chmem_vendored_elf.cpp` (1)
   - `tests/cpu/test_cpu_5stage.cpp` (5: lines 53, 75, 122, 152, 193)
-- [ ] 2.3 跑 `cmake --build build` 确认上述 **6 文件 / 14 call sites** 当前 build 0 error 0 warning（修复 S1: 原"4 调用方"是事实性错误）。
+- [ ] 2.3 跑 `cmake --build build` 确认上述 **6 文件 / 12 call sites** 当前 build 0 error 0 warning（修复 S1: 原"4 调用方"是事实性错误）。
 - [ ] 2.4 跑 `bash tools/run_chipforge_tests.sh --tag "[verilator]"` 记录 baseline PASS 1 case (`cpu_verilator_sim_tohost1`)。
 - [ ] 2.5 跑 `bash tools/run_chipforge_tests.sh --tag "[mmu]"` 记录 baseline PASS 53 cases。
 - [ ] 2.6 跑 `bash tools/run_chipforge_tests.sh --tag "[cpu-l1-mmu-demo]"` 记录 baseline PASS 6 cases。
@@ -28,7 +28,7 @@
 - [ ] 3.2 在 `build_cpu` 函数体添加 `if (enable_mmu.value_or(false))` 分支（CH_MEM only）：emit stderr/log `"MMU hook enabled (mode=<mmu_mode>) — mmu_chmem.h not yet implemented, see change verilator-mmu-bare-plumbing-e2e"`。**不**注册任何 MMU plugin（`mmu_chmem.h` 不在本 change scope；`RiscvMMUPlugin` 是 TLM-mode class, 不在 CH_MEM 路径）。
 - [ ] 3.3 在 `build_cpu` 函数体添加 `if (enable_cache.value_or(false))` 分支（CH_MEM only）：`throw std::runtime_error("L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage")`。**不**静默退化为无 cache（v0.10.4 hotfix 教训）。
 - [ ] 3.4 跳过 `build_cpu_with_elaborate` 便利包装扩展（修复 S4：grep 验证仅 `tests/cpu/test_cpu_5stage.cpp:63` 注释提及，实际无调用, 改之影响小且不在 spec 承诺范围）。
-- [ ] 3.5 重新跑 2.2-2.7 baseline: **6 文件 / 14 call sites** 零修改 build 0 error 0 warning, 签名 hash 改变（接受）, 4 处 PASS 数（verilator/mmu/cpu-l1-mmu-demo/3 门禁）不变。
+- [ ] 3.5 重新跑 2.2-2.7 baseline: **6 文件 / 12 call sites** 零修改 build 0 error 0 warning, 签名 hash 改变（接受）, 4 处 PASS 数（verilator/mmu/cpu-l1-mmu-demo/3 门禁）不变。
 
 ## 4. cpu_verilator_sim CLI 扩展 (TDD Step 3)
 
