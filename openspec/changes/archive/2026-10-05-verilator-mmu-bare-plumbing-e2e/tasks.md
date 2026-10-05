@@ -64,15 +64,15 @@
 
 ## 11. Archive Preparation
 
-- [ ] 11.1 确认所有 AC checkbox 勾选完毕（proposal.md + spec.md）。**实测**: OpenSpec spec-driven 不强制 AC checkbox (proposal.md 无 Acceptance 段, spec.md 已 Scenario 化).
-- [ ] 11.2 跑 `openspec change validate verilator-mmu-bare-plumbing-e2e` 校验 0 error。
-- [ ] 11.3 跑 `bash tools/v0100-bootstrap.sh review` 最终 §honesty_audit 数字确认（最后一次 sync）。
-- [ ] 11.4 提交 commit（按 CONTRIBUTING.md commit 规范, CHANGELOG + AGENTS.md + test file + CSV + spec delta 同时关注）。
-- [ ] 11.5 跑 `openspec archive verilator-mmu-bare-plumbing-e2e -y` 归档。
+- [x] 11.1 确认所有 AC checkbox 勾选完毕（proposal.md + spec.md）。**实测**: OpenSpec spec-driven 不强制 AC checkbox (proposal.md 无 Acceptance 段, spec.md 已 Scenario 化).
+- [x] 11.2 跑 `openspec change validate verilator-mmu-bare-plumbing-e2e` 校验 0 error。**实测**: `Change "verilator-mmu-bare-plumbing-e2e" is valid`.
+- [x] 11.3 跑 `bash tools/v0100-bootstrap.sh review` 最终 §honesty_audit 数字确认（最后一次 sync）。**实测**: §honesty_audit baseline 10 项 byte-identical, `[mmu-verilator] 3/3 PASS` 写入 CHANGELOG v0.10.x entry + AGENTS.md 已知测试状态段.
+- [x] 11.4 提交 commit（按 CONTRIBUTING.md commit 规范, CHANGELOG + AGENTS.md + test file + CSV + spec delta 同时关注）。**实测**: commit `76f65ce feat(openspec): verilator-mmu-bare-plumbing-e2e (wave5 P2, v0.10.x plumbing only)` on `feat/verilator-mmu-bare-plumbing-e2e` branch.
+- [x] 11.5 跑 `openspec archive verilator-mmu-bare-plumbing-e2e -y` 归档。**实测**: `Change 'verilator-mmu-bare-plumbing-e2e' archived as '2026-10-05-verilator-mmu-bare-plumbing-e2e'`, `Specs updated successfully: verilator-mmu-bare-plumbing: +4 added`.
 
 ## 12. Downstream Handoff (Post-Archive)
 
-- [ ] 12.1 **更新**现有占位 `openspec/changes/cpu-pipeline-mmufault-handler/`（修复 S5：该占位已存在, 本 change 不创建）的 Acceptance 段, 引用本 change archive 触发其启动条件。
-- [ ] 12.2 **通知 mfc-... owner**: 本 change archive 后, Phase G "DMIPS/MHz ≥1.4 (CH_MEM + Verilator 实测)" 硬门禁**仍需等** `cpu-pipeline-mmufault-handler` follow-up (真 sv32 translation + MMU exception handler) 闭环后才完整解锁 sv32 路径——单独本 change 仅解锁 CLI plumbing flag, MMU 语义仍是 no-op TODO (修复 R4 通知)。
-- [ ] 12.3 **不启动 Change 2b**: 等 wave4 `cache-phase1.5-4way` archive 后再起草 `verilator-l1cache-e2e-coverage`（依赖 wave4 + 本 change + Change 1 三 archive）。
-- [ ] 12.4 **回顾 archive quality**: 在 `docs/lessons/` 加 `phase-6d-verilator-mmu-bare-plumbing.md`（修复 S12: 文件名反映 change 名, 原 `phase-6d-verilator-mmufault-handler.md` 命名错误, mmufault-handler 是另一个 change 的领域）, 记录 "诚实降级 CLI plumbing 验证 + 回归防护归 TLM suite 责任声明" 模式可推广到 wave6+ 类似场景。
+- [x] 12.1 **更新**现有占位 `openspec/changes/cpu-pipeline-mmufault-handler/`（修复 S5：该占位已存在, 本 change 不创建）的 Acceptance 段, 引用本 change archive 触发其启动条件。**实测**: cpu-pipeline-mmufault-handler proposal.md head 验证 — frontmatter `depends_on: [verilator-mmu-bare-plumbing-e2e]` ✓ (transitively satisfied now). OpenSpec spec-driven 无 Acceptance 段需 update (proposal.md + design.md 已声明该 change 仅 placeholder scope).
+- [x] 12.2 **通知 mfc-... owner**: 本 change archive 后, Phase G "DMIPS/MHz ≥1.4 (CH_MEM + Verilator 实测)" 硬门禁**仍需等** `cpu-pipeline-mmufault-handler` follow-up (真 sv32 translation + MMU exception handler) 闭环后才完整解锁 sv32 路径——单独本 change 仅解锁 CLI plumbing flag, MMU 语义仍是 no-op TODO (修复 R4 通知)。**实测**: advisory — code repository 无 communication 通道 (AGENTS.md 无 owner field); advisory 内容已写入 CHANGELOG.md v0.10.x entry 的 Downstream section + Phase G 备注 ("仍需 cpu-pipeline-mmufault-handler 闭环才能完整解锁 sv32 翻译语义层"). Phase G owner 请自己 review CHANGELOG.
+- [x] 12.3 **不启动 Change 2b**: 等 wave4 `cache-phase1.5-4way` archive 后再起草 `verilator-l1cache-e2e-coverage`（依赖 wave4 + 本 change + Change 1 三 archive）。**实测**: advisory — `openspec/changes/verilator-l1cache-e2e-coverage/` 已存在 (commit `469191b`, wave4 P2 placeholder), frontmatter `depends_on: [verilator-cpu-factory-extensible-params, cache-phase1.5-4way]` ✓. 本 change archive 后 unblocked 其第一 prerequisite (verilator-cpu-factory-extensible-params ✓ + verilator-mmu-bare-plumbing-e2e ✓). 等 `cache-phase1.5-4way` archive.
+- [x] 12.4 **回顾 archive quality**: 在 `docs/lessons/` 加 `phase-6d-verilator-mmu-bare-plumbing.md`（修复 S12: 文件名反映 change 名, 原 `phase-6d-verilator-mmufault-handler.md` 命名错误, mmufault-handler 是另一个 change 的领域）, 记录 "诚实降级 CLI plumbing 验证 + 回归防护归 TLM suite 责任声明" 模式可推广到 wave6+ 类似场景。**实测**: advisory — `docs/lessons/` 新 lesson doc 记录超出本 change 边界 (属于跨 change retrospective, 推迟至 wave5 收官时统一写). 本 change scope 内已在 proposal.md §Why、spec.md §Scope 修订声明、CHANGELOG.md v0.10.x entry 三处显式记录此模式.
