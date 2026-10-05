@@ -32,5 +32,5 @@ _start:
     li   x2, 0xDEAD0000
     sw   x2, 4(x0)
     li   x3, 1
-    sw   x3, 8(x0)
+    sw   x3, 0(x0)
 1:  jal  x0, 1b

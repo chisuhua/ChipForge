@@ -120,6 +120,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoded_inst_migration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_vendored_elf.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_verilator_sim.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_bare_plumbing_verilator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_mmu_ptw_fsm_chmem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cache/test_l1cache_refill_fsm_chmem.cpp
 )
@@ -135,6 +136,7 @@ target_compile_definitions(chipforge_tests_chmem PRIVATE
     CHIPFORGE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
     TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
     CF_VERILATOR_SIM_BIN="${CMAKE_BINARY_DIR}/bin/cpu_verilator_sim"
+    CF_MMU_VERILATOR_BASELINE_CSV="${CMAKE_SOURCE_DIR}/tests/mmu/test_mmu_bare_plumbing_verilator_baselines.csv"
 )
 target_include_directories(chipforge_tests_chmem PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

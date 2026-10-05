@@ -1,0 +1,7 @@
+elf_name,mode,median_cycles,verilator_version
+# cap=median*1.2 (empirical 20% jitter tolerance, see spec §TEST_CASE 1)
+rv32ui-p-add,bare_mmu,478,5.052
+rv32ui-p-addi,bare_mmu,246,5.052
+rv32ui-p-auipc,bare_mmu,59,5.052
+rv32ui-p-beq,bare_mmu,315,5.052
+rv32ui-p-jal,bare_mmu,55,5.052

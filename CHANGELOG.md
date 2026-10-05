@@ -36,6 +36,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cpu-pipeline-mmufault-handler` (wave5 P1 placeholder, 真 sv32 Verilator e2e 翻转前置, 依赖 2a)
 - `mfc-cpu-pipeline-multi-cycle-fsm` Phase G (DMIPS/MHz ≥1.4 硬门禁, soft-dep, mfc Phase G 启动前 archive 才能让 mfc 走 enable_mmu 路径)
 
+## v0.10.x (interim) — verilator-mmu-bare-plumbing-e2e: Verilator 链路 MMU Bare CLI plumbing 端到端验证
+
+> **OpenSpec change**: `verilator-mmu-bare-plumbing-e2e` (wave5 P2, IN_PROGRESS)
+> **Initiative**: `wave5-isa-coverage-and-bp`
+> **Purpose**: 解锁 Phase 6d 5-stage Pipeline Verilator 链路 MMU plumbing 验证基础设施; CLI plumbing only, **不**验证 sv32 translation 语义.
+> **Status**: 基础设施（plumbing-only, 3 TEST_CASE × `[mmu-verilator]` family; TLM 层 `[mmu]` 53/53 已有 v0.10.4 hotfix 回归防护, CH_MEM+Verilator 链路 MMU 语义层由 `cpu-pipeline-mmufault-handler` follow-up 承接）.
+
+### Added
+
+- **3 个 `[mmu-verilator]` TEST_CASE** (`tests/mmu/test_mmu_bare_plumbing_verilator.cpp`, 183 LOC, CH_MEM-only): `mmu_bare_plumbing_tohost1_baseline_5_elf` (5 ELF × popen cpu_verilator_sim --enable-mmu --mmu-mode bare, REQUIRE TOHOST=1 + cycle ≤ baseline × 1.2) + `mmu_bare_plumbing_elaboration_zero_error` (CpuFactoryChmem<ch_uint<32>>::build_cpu w/ enable_mmu=true + mmu_mode="bare" + elaborate + to_verilog 产生非空) + `mmu_bare_plumbing_no_cache_full_chain` (popen cpu_verilator_sim w/ tests/cpu/manual_elf/mmu_bare.elf full-chain plumbing).
+- **cycle baseline CSV** (`tests/mmu/test_mmu_bare_plumbing_verilator_baselines.csv`): 5 ELF median cycles (add=478, addi=246, auipc=59, beq=315, jal=55) × Verilator 5.052 × median × 5-run sampling. Header `elf_name,mode,median_cycles,verilator_version` + cap 文档注释 `# cap=median*1.2 (empirical 20% jitter tolerance, see spec §TEST_CASE 1)`.
+- **baseline generation script** (`tools/verilator_runner/gen_mmu_bare_baseline.sh`): 5 ELF × 5 runs × median 计算 + Verilator version probe (含 /workspace/main/opt/verilator/bin/verilator + /usr/local/bin/verilator fallback path) + Vertrappable 错误退出 (n<3行/未找到 elf_path).
+- **`mfc-cpu-pipeline-multi-cycle-fsm` Phase G 软解锁**: `cpu_verilator_sim --enable-mmu --mmu-mode bare` 链路验证 plumbing OK, mfc Phase G DMIPS/MHz ≥1.4 硬门禁现可消费 enable_mmu 路径（**仍需 `cpu-pipeline-mmufault-handler` 闭环才能完整解锁 sv32 翻译语义层**）.
+
+### Tests (Verification, 实测)
+
+- `[mmu-verilator]` **3/3 PASS** (26 assertions, real-tested): 5 ELF baseline cycle cap (20 assertions) + elaboration 0 error (4 assertions) + manual_elf full-chain plumbing (2 assertions).
+- `[verilator]` **1/1 PASS** (10 assertions) — **零数字变化**.
+- `[mmu]` **53/53 PASS** (131 assertions) — **零数字变化** (TLM 层 v0.10.4 hotfix 防护归 TLM suite, 见 `test_mmu_cache_integration.cpp::EndToEndTranslationThroughBridge`).
+- `[cpu-l1-mmu-demo]` **6/6 PASS** (40 assertions) — **零数字变化**.
+- 3 架构门禁 `verify_adr.sh` / `verify_plugin_decision.sh` / `check_plugin_portability.sh` 全部 0 失败.
+
+### Scope Declaration (修复 C2 缩 scope)
+
+- **CLI plumbing only**: 本 change **不**验证 sv32 translation 语义、PTW walk、page fault 处理 (`mmu_chmem.h` 未实装, Change 1 archive 后 enable_mmu=true 仅 no-op log).
+- **TLM 端回归防护归 TLM suite**: v0.10.4 hotfix 类回归防护已在 `[mmu]` 53/53 (`test_mmu_cache_integration.cpp::EndToEndTranslationThroughBridge` + `[tlb-refill]` 2 cases 用 `satp_ppn_` workaround) 覆盖; CH_MEM+Verilator 链路 MMU 语义层**承认无防护**这一现状.
+- **CH_MEM+Verilator 链路 MMU 语义层防护**: 由 `cpu-pipeline-mmufault-handler` follow-up（实装真 sv32 translation + MMU exception handler）闭环后承接.
+
+### Downstream (NOT in this change scope)
+
+- `cpu-pipeline-mmufault-handler` (wave5 P1 placeholder, 真 sv32 翻译 + exception handler) — 本 change archive 后可启动 apply, 但 depends_on 链: `verilator-mmu-bare-plumbing-e2e` (本 change) ✓ + `cpu-pipeline-mmufault-handler` self.
+- `verilator-l1cache-e2e-coverage` (wave4 P2) — depends_on `cache-phase1.5-4way` + 本 change; 等 wave4 launch.
+- `mfc-cpu-pipeline-multi-cycle-fsm` Phase G (DMIPS ≥1.4 硬门禁) — 软解锁 enable_mmu 路径, 仍需 mmufault 闭环才能完整 sv32.
+
 ## v0.10.3 (2026-09-30, interim) — mfc Phase A: MulDivFsmPlugin TLM skeleton (MUL=1c, DIV=33c)
 
 > **OpenSpec change**: `mfc-cpu-pipeline-multi-cycle-fsm` (IN_PROGRESS, 32/60 tasks)
