@@ -150,7 +150,9 @@ TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   // 7 TopologyBuilder + 7 lane dispatch + 11 baseline cpu plugins at_stage + 5 MMUPlugin at_stage
   //   + 3 RiscVMMUPlugin at_stage - 3 mul_latency1 baseline at_stage (no-op substages 排除) = 30 stages
   // C9-a fix (RiscvMMUPlugin::build 调基类 build): 35 → 40 (+5 MMU at_stage 闭包)
-  REQUIRE(pb->stage_count() == 40);
+  // cpu-pipeline-mmufault-handler v1 archive (2026-10-06): 40 → 41
+  //   (+1 MmuExceptionHandler at_stage 注册, 条件 enable_mmu && mmu_mode != "bare")
+  REQUIRE(pb->stage_count() == 41);
   // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 增加 4 个 EARLY 闭包
   // commit C: IBusPlugin 增加 1 个 writeback LATE 闭包 (PC 更新)
 }
