@@ -49,6 +49,9 @@ using namespace cf::cpu::arch::riscv;
 // branch_chmem.h 和 hazard_chmem.h 在各自命名空间内, 放在 using 之后确保可见
 #include "ip/cpu/plugins/branch_chmem.h"
 #include "ip/cpu/plugins/hazard_chmem.h"
+#ifndef CF_PLUGIN_USE_CH_MEM
+#include "ip/cpu/plugins/mmu_exception_handler.h"
+#endif
 
 namespace cf {
 namespace cpu {
@@ -305,6 +308,15 @@ class CpuFactoryChmem {
     pb->register_plugin(std::make_unique<IntAlu>());
     pb->register_plugin(std::make_unique<Branch>());
     pb->register_plugin(std::move(dmem));
+
+#ifndef CF_PLUGIN_USE_CH_MEM
+    // cpu-pipeline-mmufault-handler v1 Phase 5: 注册 MmuExceptionHandlerPlugin
+    // 消费 CPU_EXCEPTION_CODE. CH_MEM 版实装推迟到 Phase 4 (mmu_exception_handler_chmem.h).
+    if (enable_mmu.value_or(false) && mmu_mode.value_or("bare") != "bare") {
+      pb->register_plugin(
+          std::make_unique<cf::cpu::plugins::MmuExceptionHandlerPlugin<T>>());
+    }
+#endif
 
     // ======================================================================
     // 2. Stage Linking (5 级流水线数据通路)

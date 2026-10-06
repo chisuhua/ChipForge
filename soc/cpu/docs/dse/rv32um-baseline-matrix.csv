@@ -1,2 +1,9 @@
 elf,status,fail_stage,category,cycles,notes
 rv32um-p-mul,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-mulh,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-mulhsu,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-mulhu,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-div,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-divu,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-rem,FAIL,,timeout,200000,10k cycle cap
+rv32um-p-remu,FAIL,,timeout,200000,10k cycle cap
