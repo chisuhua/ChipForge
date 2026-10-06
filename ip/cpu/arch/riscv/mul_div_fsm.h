@@ -181,22 +181,21 @@ class MulDivFsmPlugin : public cf::plugin::PluginBase {
     using RvKey = payload_keys_riscv<T>;
 
     pb.at_stage("execute", cf::plugin::Phase::NORMAL, [this, &pb]() {
-      // 读 RISCV_DETAIL 获 funct3, 转换为 Opcode
+      // B2 fix (2026-10-06): state 非 IDLE 时不重新 set_opcode, 只推进 cycle counter.
+      // 否则 IF/ID 持续 fetch 新指令触发 EX 闭包, 重置 FSM 永远在 cycle 1.
       auto* n = pb.node_of_logic_stage("execute").get();
       if (n) {
-        const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
-        T rs1_val = n->operator()(KeyType::RS1);
-        T rs2_val = n->operator()(KeyType::RS2);
-
-        // 转换 funct3 → Opcode
-        const std::uint8_t f3 = rv.funct3;
-        Opcode new_opcode = funct3_to_opcode(f3);
-        if (new_opcode != Opcode::NONE) {
-          // 设置 opcode + 操作数 (驱动 state 转换)
-          set_opcode(new_opcode);
-          set_operands(rs1_val, rs2_val);
-
-          // 推进 FSM (advance_fsm 内部维护 busy_cycles_)
+        if (state_ == State::IDLE) {
+          const auto& rv = n->operator()(RvKey::RISCV_DETAIL);
+          T rs1_val = n->operator()(KeyType::RS1);
+          T rs2_val = n->operator()(KeyType::RS2);
+          Opcode new_opcode = funct3_to_opcode(rv.funct3);
+          if (new_opcode != Opcode::NONE) {
+            set_opcode(new_opcode);
+            set_operands(rs1_val, rs2_val);
+            advance_fsm();
+          }
+        } else {
           advance_fsm();
         }
       }

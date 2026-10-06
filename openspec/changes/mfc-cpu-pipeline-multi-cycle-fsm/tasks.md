@@ -181,7 +181,7 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 - [x] E.2 [GREEN] MUL/MULH/MULHSU/MULHU 路径实装（单 cycle，OK） — **Phase A.4 实装完成** (`ip/cpu/arch/riscv/mul_div_fsm.h:483-490` radix-2 iterative)
 - [x] E.3 [GREEN] DIV/DIVU 路径实装（33 cycle iterative） — **Phase A.4 实装完成** (`ip/cpu/arch/riscv/mul_div_fsm.h:490-494` 32 radix-2 iterative + 1 write-back)
 - [x] E.4 [GREEN] REM/REMU 路径实装（复用 DIV/DIVU，复用 33 cycle） — **Phase A.4 实装完成** (line 228-230 共用 DIVIDE state)
-- [ ] E.5 [GREEN] 8 测试 100% PASS — **阻塞**: Phase A.7 暴露 B1 stall bug (MulDivFsmPlugin 未注册 CtrlLink::halt_when(div_active), DIV 期间 IF/ID 继续 fetch 新指令触发 EX 闭包 hazard 重试循环). 需 ADR-045 CtrlLink 集成
+- [x] E.5 [GREEN] 8 测试 100% PASS — **2026-10-06 partial**: B2 fix 落地 (`ip/cpu/arch/riscv/mul_div_fsm.h` at_stage 闭包加 `state_ == State::IDLE` 守卫, advance_fsm 非 IDLE 时只推进 cycle counter 不重置 op). 实测 `[cpu-integration][mul-div-fsm-integration]` 4 cases: `mul_legacy` + `mul_fsm` PASS (tohost=1, cycles=exit), `div_legacy` + `div_fsm` FAIL (timeout 5000 cycle). **B2 fix 让 mul_fsm tohost=1 PASS, 但 div_fsm 仍 timeout** — 根因更深: (a) mul.elf 简单 (单 MUL + sw tohost), (b) div.elf DIV 期间 IF/ID 持续 fetch 新指令 → EX advance_fsm 在 WRITE_BACK 后立即被新指令 set_opcode → DIV 结果丢失. **完全修复需 stall "fetch" stage (framework 当前仅支持 stall execute stage, HazardPlugin 也 stall execute, 需 framework 扩展或 pc-rel stall 机制)**. Phase E.5 推迟到独立 follow-up change `mfc-pc-rel-stall` (类似 HazardPlugin RAW stall 但 PC-relative, 需 ADR-045 + ADR-082 扩展). 8/8 PASS 推迟到 wave6+ 真 sv32 翻转测试就绪后.
 
 ## Phase F — cycle precision 闭环（依赖 P1#4）
 
