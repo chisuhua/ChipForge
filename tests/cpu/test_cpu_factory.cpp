@@ -93,9 +93,10 @@ TEST_CASE("build_cpu_registers_11_real_plugins", "[cpu]") {
   auto pb = cf::cpu::CpuFactory<std::uint64_t>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
   const auto& plugins = pb->plugins();
-  REQUIRE(plugins.size() == 13);  // 11 baseline + 1 RiscVMMUPlugin + 1 StageLinkPlugin
+  REQUIRE(plugins.size() == 14);  // 11 baseline + 1 RiscVMMUPlugin + 1 StageLinkPlugin + 1 MmuExceptionHandlerPlugin
   // mmu-cache-integration commit 7: +1 RiscVMMUPlugin
   // cpu-pipeline-stubs-replace commit B: +1 StageLinkPlugin (阶段间传播)
+  // cpu-pipeline-mmufault-handler v1 Phase 6: +1 MmuExceptionHandlerPlugin
 }
 
 // cpu-factory-satp-mapping change (v0.10.2): RISC-V Spec §4.3.1 satp CSR layout

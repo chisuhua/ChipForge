@@ -45,6 +45,7 @@
 #include "ip/cpu/arch/riscv/lsu.h"
 #include "ip/cpu/arch/riscv/csr.h"
 #include "ip/cpu/plugins/mmu.h"  // mmu-cache-integration commit 6/9: RiscVMMUPlugin 接入 CPU pipeline
+#include "ip/cpu/plugins/mmu_exception_handler.h"  // cpu-pipeline-mmufault-handler v1 Phase 6
 
 // ===== ADR-048: Plugin canonical ordering counters (C++17 inline variable) =====
 // PLUGIN_SEQ increments at each register_plugin call site in build_cpu().
@@ -445,6 +446,9 @@ class CpuFactory {
       pb.register_plugin(std::make_unique<cf::cpu::plugins::RiscvMMUPlugin>(
           sv_mode, mmu_levels, cf::ip::mmu::MMUPlugin::PTWConfig{2},
           satp_value, static_cast<cf::ip::mmu::MemoryInterface*>(mem)));
+      // cpu-pipeline-mmufault-handler v1 Phase 6: mmu_exit 传播 CPU_EXCEPTION_CODE 后卸载 fault.
+      pb.register_plugin(
+          std::make_unique<cf::cpu::plugins::MmuExceptionHandlerPlugin<U>>());
     }
 
     cf::cpu::detail::IBUS_REG_ORDER = ++cf::cpu::detail::PLUGIN_SEQ;
