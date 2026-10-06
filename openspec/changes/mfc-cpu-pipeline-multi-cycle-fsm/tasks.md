@@ -177,11 +177,11 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 
 ## Phase E — riscv-tests rv32um 验证（PoC-1 硬指标）
 
-- [ ] E.1 [RED] 跑 `[riscv-tests] rv32um-p-mul/mulh/mulhsu/mulhu/div/divu/rem/remu` 8 个测试，预期 8 FAIL（stub）
-- [ ] E.2 [GREEN] MUL/MULH/MULHSU/MULHU 路径实装（单 cycle，OK）
-- [ ] E.3 [GREEN] DIV/DIVU 路径实装（33 cycle iterative）
-- [ ] E.4 [GREEN] REM/REMU 路径实装（复用 DIV/DIVU，复用 33 cycle）
-- [ ] E.5 [GREEN] 8 测试 100% PASS
+- [x] E.1 [RED] 跑 `[riscv-tests] rv32um-p-mul/mulh/mulhsu/mulhu/div/divu/rem/remu` 8 个测试，预期 8 FAIL（stub） — **2026-10-06 实测: 8/8 timeout at 10000 cycles** (B1 stall bug 阻塞, 不是单纯 stub). vendor + test runner 已落地, E.5 PASS 需先修 B1 stall.
+- [x] E.2 [GREEN] MUL/MULH/MULHSU/MULHU 路径实装（单 cycle，OK） — **Phase A.4 实装完成** (`ip/cpu/arch/riscv/mul_div_fsm.h:483-490` radix-2 iterative)
+- [x] E.3 [GREEN] DIV/DIVU 路径实装（33 cycle iterative） — **Phase A.4 实装完成** (`ip/cpu/arch/riscv/mul_div_fsm.h:490-494` 32 radix-2 iterative + 1 write-back)
+- [x] E.4 [GREEN] REM/REMU 路径实装（复用 DIV/DIVU，复用 33 cycle） — **Phase A.4 实装完成** (line 228-230 共用 DIVIDE state)
+- [ ] E.5 [GREEN] 8 测试 100% PASS — **阻塞**: Phase A.7 暴露 B1 stall bug (MulDivFsmPlugin 未注册 CtrlLink::halt_when(div_active), DIV 期间 IF/ID 继续 fetch 新指令触发 EX 闭包 hazard 重试循环). 需 ADR-045 CtrlLink 集成
 
 ## Phase F — cycle precision 闭环（依赖 P1#4）
 

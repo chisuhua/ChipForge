@@ -216,6 +216,7 @@ echo ""
 # === Section 5: Hard prerequisites ===
 echo "## hard_prerequisites"
 echo "v0.10.0 launch gates (主控 execution-roadmap.md §3.1):"
+echo "#2 plugin-framework-cycle-precision 已降级为 soft gate — per openspec/changes/plugin-framework-cycle-precision/proposal.md §状态 (2026-09-29 Oracle 核实, 决策: 采纳 (b) 不阻塞 mfc Phase A 启动)"
 echo ""
 DEMO_PASSED="?"
 DEMO_TOTAL="?"
@@ -295,7 +296,7 @@ if [ -f "$CF_TASKS_FILE" ]; then
   else
     CF_MATCH="❌"
   fi
-  echo "| 2 | plugin-framework-cycle-precision | ${CF_DONE:-0}/${CF_TOTAL:-0} tasks | 25/25 (target) | $CF_MATCH |"
+  echo "| 2 | plugin-framework-cycle-precision **(soft gate)** | ${CF_DONE:-0}/${CF_TOTAL:-0} tasks | 25/25 (Phase F optional) | $CF_MATCH (soft, 不阻塞 mfc Phase A) |"
 else
   echo "| 2 | plugin-framework-cycle-precision | tasks.md 缺失 | 25/25 (target) | ❌ N/A |"
 fi
