@@ -83,6 +83,7 @@ depends_on: []
 ### Modified Capabilities
 
 - `pb-stall-loop`: 新增 "`pb.run(cycle_count=N)` SHALL execute N cycles and update CURRENT_CYCLE counter" requirement
+  > **Rebased (2026-10-06)**: 该 capability baseline spec 已迁移到新 schema（`### Requirement:` + `#### Scenario:` + 大写 SHALL），REQ-1 "Stage-level stall 检查" 与本 cycle-precision change 的 `cycle_count=N` API 扩展互补（cycle-precision 在 stall loop 基础上加 cycle 计数维度）。本 change archive 时 MODIFIED delta 按新 schema 提交。
 - `cpu-pipeline-config-schema`: 加 `cpu.cycle_count` 字段 (与 `--cycles` CLI 对应)
 
 ## Impact

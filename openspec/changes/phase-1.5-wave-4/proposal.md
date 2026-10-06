@@ -88,6 +88,7 @@ Phase 1.5 stage doc §"Wave 4" 规划 (见 `soc/cpu/docs/roadmap/phase-1.5-stall
 
 - `cpu-mmu-exception-routing`: 增强 "MMU exception 12/13/15 路由到 exception path" requirement (与 exception 实装集成)
 - `ctrllink-consumption-contract`: 新增 "`flush_when` SHALL trigger pipeline flush when branch mispredicted" requirement
+  > **Rebased (2026-10-06)**: 该 capability baseline spec 已迁移到新 schema（`### Requirement:` + `#### Scenario:` + 大写 SHALL），REQ-6 "不修改 CtrlLink 原 API" 与本 wave-4 新增 requirement 不冲突。本 change archive 时 MODIFIED delta 按新 schema 提交。
 
 ## Impact (估算, 待 wave3 后细化)
 
