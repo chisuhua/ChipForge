@@ -1,0 +1,3 @@
+elf,status,mode,kMaxCycles,dmips_per_mhz_measured,notes
+dhrystone,FAIL,fsm,10000000,0.3514,2000 iter Dhrystone timeout 10M cycle cap; DMIPS/MHz v0.10.0 hard gate >=1.4 不达 (实测 0.35, 差 4 倍). 根因: B2 fix 让 mul_fsm PASS 但 DIV stall 仍卡 Dhrystone 算法 (Proc_1..8 含多次 DIV + 多次 MUL + 循环). 修复路径: mfc-pc-rel-stall follow-up (选项 A).
+dhrystone,FAIL,legacy,10000000,0.3514,LEGACY mode (RiscvMulPlugin<U,1> 单周期) 也 timeout 10M, 说明 Dhrystone 算法 stall timeout 非 MUL/DIV stall bug 单因素 (CPU pipeline 每 cycle 平均执行指令数太少).
