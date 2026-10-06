@@ -141,6 +141,23 @@ class HazardPlugin : public Plugin {
 };
 ```
 
+**契约 D — HazardPlugin::clear_mmufault() capability (cpu-pipeline-mmufault-handler v1, 2026-10-06 follow-up)**：
+
+cpu-pipeline-mmufault-handler v1 archive (commit `2d79a48`, archive `2026-10-06-cpu-pipeline-mmufault-handler`) 在 HazardPlugin TLM 版新增 `mark_mmufault() / clear_mmufault() / mmufault_pending()` API（private 字段 `bool mmufault_pending_`）。该 capability 在 ADR-082 v2 升级时需正式 declare：
+
+```cpp
+class HazardPlugin : public Plugin {
+    void negotiate(CapabilityTable& cap) override {
+        cap.provide<WritebackArbiterHandle>("writeback_arbiter");
+        cap.provide<HazardDetectionHandle>("hazard_detection");
+        // ADR-082 v2 follow-up: provide mmufault coordination capability
+        cap.provide<MmufaultCoordinationHandle>("mmufault_coordination");
+    }
+};
+```
+
+MmuExceptionHandlerPlugin CH_MEM combinational 实装时 (mmu_chmem.h Phase 6d.6) consume `mmufault_coordination`，通过 CapabilityTable 拿 HazardPlugin handle 而非 dynamic_cast（CI 第 8 条门禁 grep `dynamic_cast` in `build()` 必须 = 0，per §1.7 约束 1）。v1 tasks.md 12.4 已记录此 follow-up，避免 future refactor 误删 HazardPlugin::clear_mmufault() 导致 MmuExceptionHandler CH_MEM 无 consumer 时 link fail。
+
 ### 1.7 行为约束
 
 1. **强制走 negotiate 拿 handle**（禁止类型猜）：CI 第 8 条门禁 grep `dynamic_cast` in `build()` 必须 = 0
