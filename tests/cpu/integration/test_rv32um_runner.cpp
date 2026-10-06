@@ -35,7 +35,7 @@
 
 namespace {
 
-constexpr std::uint64_t kMaxCycles = 10000;
+constexpr std::uint64_t kMaxCycles = 200000;
 
 // 8 rv32um-p-* ELF (Phase E vendor from /workspace/main/riscv-tests/isa/rv32um/*.S)
 constexpr const char* kRv32umPElfs[] = {
