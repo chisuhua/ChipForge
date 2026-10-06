@@ -70,6 +70,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `verilator-l1cache-e2e-coverage` (wave4 P2) — depends_on `cache-phase1.5-4way` + 本 change; 等 wave4 launch.
 - `mfc-cpu-pipeline-multi-cycle-fsm` Phase G (DMIPS ≥1.4 硬门禁) — 软解锁 enable_mmu 路径, 仍需 mmufault 闭环才能完整 sv32.
 
+## v0.10.x (2026-10-06, interim) — cpu-pipeline-mmufault-handler: CPU pipeline MMU exception handler + HazardPlugin::clear_mmufault
+
+> **OpenSpec change**: `cpu-pipeline-mmufault-handler` (IN_PROGRESS, 43/60 tasks)
+> **Initiative**: `wave5-isa-coverage-and-bp` P1
+> **Purpose**: CPU pipeline 卸载 MMU exception (page fault 12/13/15) + 复位 hazard retry 循环, 为真 sv32 e2e 翻转铺路 (v0.10.1 deep-rca Part (a) follow-up)
+> **Entry 状态**: **interim** — Phase 1-6 实装完成 (5 commits: a95b822 + a78ccf2 + 13b3492 + 284354b + 596c4d6). Phase 7-12 (spec + doc + archive) 待 archive 时合并.
+
+### Added
+
+- **`HazardPlugin::clear_mmufault()` API** (`ip/cpu/plugins/hazard.h`): `mark_mmufault()` / `clear_mmufault()` / `mmufault_pending()` getter. reset hazard cache + mmufault_pending 标志. Trap 入口完成 mepc/mcause 写后调用.
+- **`MmuExceptionHandlerPlugin<T>`** (`ip/cpu/plugins/mmu_exception_handler.h`, ~86 LOC): at_stage("memory", Phase::LATE) 闭包消费 `cpu_keys::CPU_EXCEPTION_CODE`. 非零时设 `mmu_exception_pending_ = true` 触发 `CtrlLink::flush_when()` 卸载 pipeline. public `reset()` 方法供 trap 入口调.
+- **CH_MEM API 对齐 stub** (`ip/cpu/plugins/hazard_chmem.h`): `mark_mmufault() / clear_mmufault() / mmufault_pending()` 方法 stub (CH_MEM HazardPlugin 是 combinational RAW detection, 不维护 mmufault state, 协调由 MmuExceptionHandlerPlugin CH_MEM 拉高 stall_ctrl_).
+- **cpu_factory 联动**: TLM (`ip/cpu/cpu_factory.h`) 在 `if (config.enable_mmu)` 内 RiscvMMUPlugin 后注册 MmuExceptionHandlerPlugin. CH_MEM (`ip/cpu/cpu_factory_chmem.h`) 在 dmem 注册后注册 (用 `#ifndef CF_PLUGIN_USE_CH_MEM` 守护, CH_MEM binary 编译时跳过).
+
+### Changed
+
+- `tests/cpu/test_cpu_factory.cpp:96`: `plugins.size()` 期望值 13 → 14 (新增 MmuExceptionHandlerPlugin, 11 baseline + 1 RiscVMMUPlugin + 1 StageLinkPlugin + 1 MmuExceptionHandlerPlugin).
+
+### Spec Delta
+
+- `openspec/specs/mmu-cache-integration-test/spec.md`: 新增 `## ADDED Requirements` + Requirement "MMU exception propagation to CPU pipeline" + 4 Scenarios (code 12/13/15 + successful no-fault).
+- `openspec/specs/cpu-mmu-exception-routing/spec.md`: Purpose 从 TBD 升级为具体 spec, 记录 MMUPlugin.cpp:139-141 (生产者) + `ip/cpu/plugins/mmu.cpp:128-130` (传播者) + mmu_exception_handler.h (消费者) 三点路径.
+
+### Tests
+
+- `tests/cpu/test_mmu_exception_handler.cpp` (~95 LOC, 4 TEST_CASE): page_fault_sets_pending / no_fault_no_pending / reset_clears_pending / abi_smoke_reusable. `[cpu][mmu-exception-handler]` family tag.
+
+### Verification (v0.10.x interim 实测, 2026-10-06 HEAD commit)
+
+- **`[cpu]` 129/129 PASS** (461 assertions, 含 test_mmu_exception_handler.cpp 4 cases)
+- **`[cpu-l1-mmu-demo]` 6/6 PASS** (40 assertions, cfg.enable_mmu=false workaround 仍生效)
+- **`[mmu]` 53/53 PASS** (131 assertions)
+- **`[verilator]` 1/1 PASS** (chipforge_tests_chmem binary, plumbing-only)
+- **`[cpu-integration]` 81 cases / 65725 assertions pass + 11 pre-existing failed** (mfc work: test_rv32um_runner 8/8 + test_mul_div_fsm_integration div_legacy/div_fsm, 不阻塞 v1 mmufault-handler archive)
+
 ## v0.10.3 (2026-09-30, interim) — mfc Phase A: MulDivFsmPlugin TLM skeleton (MUL=1c, DIV=33c)
 
 > **OpenSpec change**: `mfc-cpu-pipeline-multi-cycle-fsm` (IN_PROGRESS, 32/60 tasks)

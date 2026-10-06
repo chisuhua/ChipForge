@@ -27,3 +27,29 @@ The test SHALL directly write `pl::MMU_VADDR` / `pl::PADDR` Keys to the lookup n
 - **WHEN** `tests/cache/test_mmu_cache_integration.cpp` is read
 - **THEN** it SHALL NOT `#include "ip/mmu/tlm/MMUPlugin.h"` and SHALL NOT call `pb.register_plugin<MMUPlugin>(...)`
 
+## ADDED Requirements
+
+### Requirement: MMU exception propagation to CPU pipeline (cpu-pipeline-mmufault-handler v1)
+
+When MMU PTW walk raises a fault, the exception code MUST propagate through `cpu_keys::CPU_EXCEPTION_CODE` Payload Key to `MmuExceptionHandlerPlugin::at_stage("memory", Phase::LATE)` closure. The Plugin MUST set `mmu_exception_pending_ = true` when the code is non-zero, triggering `CtrlLink::flush_when(mmu_exception_pending_)` to unload the fault via pipeline flush + trap PC jump.
+
+#### Scenario: Page fault (code 12) sets CPU_EXCEPTION_CODE + flush
+- **WHEN** `RiscvMMUPlugin::at_stage` walks L0/L1 PTE and finds V=0
+- **AND** `mmu_exit` closure (`ip/cpu/plugins/mmu.cpp:128-130`) writes `cpu_keys::CPU_EXCEPTION_CODE = 12`
+- **THEN** `MmuExceptionHandlerPlugin::at_stage("memory", Phase::LATE)` MUST consume code 12 and set `mmu_exception_pending_ = true`
+- **AND** `CtrlLink::flush_when(mmu_exception_pending_)` MUST return true, causing PipeBuilder to skip `memory` stage all 3 phases
+
+#### Scenario: Access fault (code 13) sets CPU_EXCEPTION_CODE + flush
+- **WHEN** MMU walk encounters permission violation and writes `cpu_keys::CPU_EXCEPTION_CODE = 13`
+- **THEN** `MmuExceptionHandlerPlugin` MUST set `mmu_exception_pending_ = true` and trigger `flush_when`
+
+#### Scenario: Reserved encoding (code 15) sets CPU_EXCEPTION_CODE + flush
+- **WHEN** MMU walk encounters R=1,W=1,X=1 PTE and writes `cpu_keys::CPU_EXCEPTION_CODE = 15`
+- **THEN** `MmuExceptionHandlerPlugin` MUST set `mmu_exception_pending_ = true` and trigger `flush_when`
+
+#### Scenario: Successful translation does NOT set CPU_EXCEPTION_CODE
+- **WHEN** MMU walk completes successfully (TLB hit or PTW success)
+- **THEN** `cpu_keys::CPU_EXCEPTION_CODE` MUST remain at default 0
+- **AND** `MmuExceptionHandlerPlugin::mmu_exception_pending()` MUST be false
+- **AND** pipeline continues normally without flush
+

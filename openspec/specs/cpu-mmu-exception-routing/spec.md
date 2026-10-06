@@ -1,7 +1,7 @@
 # cpu-mmu-exception-routing Specification
 
 ## Purpose
-TBD - created by archiving change cpu-mmu-integration. Update Purpose after archive.
+MMU exception routing through `cpu_keys::CPU_EXCEPTION_CODE` Payload Key from MMU PTW fault to CPU pipeline exception handler. Producer is `ip/mmu/tlm/MMUPlugin.cpp:139-141` (PTW fault writes `mmu_keys::EXCEPTION_CODE`); propagator is `ip/cpu/plugins/mmu.cpp:128-130` `mmu_exit` closure (reads `mmu_keys::EXCEPTION_CODE` and writes `cpu_keys::CPU_EXCEPTION_CODE`); consumer is `ip/cpu/plugins/mmu_exception_handler.h` `MmuExceptionHandlerPlugin::at_stage("memory", Phase::LATE)` (cpu-pipeline-mmufault-handler v1, 2026-10-06). Direction: MMU → CPU (one-way, MMU never reads CPU_EXCEPTION_CODE).
 ## Requirements
 ### Requirement: MMU exception code 12/13/15 MUST propagate to CPU exception path
 
