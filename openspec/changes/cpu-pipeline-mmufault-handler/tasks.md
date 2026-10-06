@@ -11,10 +11,10 @@
 
 ## 1. Pre-flight (Spike)
 
-- [ ] 1.1 **依赖校验**: `openspec change validate verilator-mmu-bare-plumbing-e2e` 必须 PASS（Change 2a archive）。
-- [ ] 1.2 **CPU pipeline current state 检查**: 检查 `ip/cpu/plugins/` 确认无 `mmu_exception_handler.h`（现状；已确认 17 个 plugin 文件）。
-- [ ] 1.3 **Payload Key 现状**: 检查 `ip/cpu/tlm/cpu_keys.h` 确认 `cpu_keys::CPU_EXCEPTION_CODE` Payload Key 已声明（已确认 line 48，消费方无）。
-- [ ] 1.4 **MMU 写入路径确认**: 检查 `ip/mmu/tlm/MMUPlugin.cpp:139-141` PTW fault 写入 `mmu_keys::EXCEPTION_CODE` 路径（已确认）+ `ip/cpu/plugins/mmu.cpp:126-134` mmu_exit 闭包传播到 `cpu_keys::CPU_EXCEPTION_CODE` 路径（已确认）。
+- [x] 1.1 **依赖校验**: `verilator-mmu-bare-plumbing-e2e` archive 完整性 — `openspec/changes/archive/2026-10-05-verilator-mmu-bare-plumbing-e2e/` 存在（proposal.md + design.md + tasks.md + specs/）+ git log commits `8f78653` + `76f65ce` + spec baseline merged to `openspec/specs/verilator-mmu-bare-plumbing/spec.md`。注：`openspec change validate` 对已 archive change 返回 "not found"（OpenSpec v1.4.1 不再支持 archive 后 validate），改用 archive 目录 + git history + spec baseline 存在性证明依赖就绪。
+- [x] 1.2 **CPU pipeline current state 检查**: `ls ip/cpu/plugins/*.h | wc -l` = 17, `mmu_exception_handler.h` 不存在（已确认）。
+- [x] 1.3 **Payload Key 现状**: `ip/cpu/tlm/cpu_keys.h:48` `static inline cf::plugin::Payload<std::uint8_t> CPU_EXCEPTION_CODE{"cpu.exception_code"}` 已声明（消费方无）。
+- [x] 1.4 **MMU 写入路径确认**: `ip/mmu/tlm/MMUPlugin.cpp:141` `(*node)(Key::EXCEPTION_CODE) = fault_code` (PTW fault 写入) + `ip/cpu/plugins/mmu.cpp:128-130` mmu_exit 闭包传播到 `cpu_keys::CPU_EXCEPTION_CODE`。
 
 ## 2. HazardPlugin clear_mmufault() API 实装 (TLM + CH_MEM)
 
