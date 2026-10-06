@@ -2,7 +2,6 @@
 initiative: wave5-isa-coverage-and-bp
 priority: P1
 version_target: v0.10.0
-status: placeholder
 depends_on:
   - verilator-mmu-bare-plumbing-e2e
 ---
