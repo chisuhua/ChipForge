@@ -51,6 +51,9 @@ target_compile_features(chipforge_tests PRIVATE cxx_std_23)
 target_compile_definitions(chipforge_tests PRIVATE
     TEST_RV32UI_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
     RV32UI_CSV_PATH="${CMAKE_SOURCE_DIR}/soc/cpu/docs/dse/rv32ui-baseline-matrix.csv"
+    # Phase E: mfc-cpu-pipeline-multi-cycle-fsm rv32um 8/8 PASS (PoC-1 硬指标)
+    TEST_RV32UM_ELF_DIR="${CMAKE_SOURCE_DIR}/tests/cpu/riscv_tests/elf"
+    RV32UM_CSV_PATH="${CMAKE_SOURCE_DIR}/soc/cpu/docs/dse/rv32um-baseline-matrix.csv"
 )
 
 # tests/ 子目录加入 include 路径（让 #include "catch_amalgamated.hpp" 解析）
