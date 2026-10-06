@@ -153,6 +153,15 @@ class HazardPlugin : public cf::plugin::PluginBase {
     }
   }
 
+  // MMU fault coordination: MmuExceptionHandlerPlugin calls mark_mmufault on
+  // EXCEPTION_CODE consume and clear_mmufault after trap entry writes mepc.
+  void mark_mmufault() noexcept { mmufault_pending_ = true; }
+  void clear_mmufault() noexcept {
+    mmufault_pending_ = false;
+    reset_hazard_cache();
+  }
+  bool mmufault_pending() const noexcept { return mmufault_pending_; }
+
   // 当前飞行中寄存器数量 (默认 tid=0, 行为不变)
   std::size_t in_flight_count(std::uint8_t tid = 0) const {
     if (tid >= N_THREADS) return 0;
@@ -229,6 +238,7 @@ class HazardPlugin : public cf::plugin::PluginBase {
  private:
   std::array<std::array<bool, kNumRegs>, N_THREADS> scoreboard_{};
   std::uint8_t tid_ = 0;
+  bool mmufault_pending_ = false;
   HazardKind last_decoded_hazard_ = HazardKind::NONE;  // plugin-framework-stall B
 };
 

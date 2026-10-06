@@ -146,6 +146,12 @@ class HazardPlugin : public cf::plugin::PluginBase {
     return (ex_match && ex_valid) || (mem_match && mem_valid) || (wb_match && wb_valid);
   }
 
+  // CH_MEM 模式 mmufault API 对齐 stub: combinational RAW detection 不维护
+  // mmufault state, 协调由 MmuExceptionHandlerPlugin CH_MEM 拉高 stall_ctrl_ 实现.
+  void mark_mmufault() noexcept {}
+  void clear_mmufault() noexcept {}
+  bool mmufault_pending() const noexcept { return false; }
+
   // --------------------------------------------------------------------------
   // setup — 创建 CtrlLink 并注册到 decode stage
   //
