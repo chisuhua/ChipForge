@@ -155,6 +155,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ch_uint<32>` 算术语义异常** (B.2.1 PoC): `ch_uint<32>(14) / ch_uint<32>(4) = 1` (非 3), `ch_uint<32>(3) * ch_uint<32>(4) = 16` (非 12). CppHDL `bv_div_truncate` / `bv_mul_truncate` 位截断语义与 C++ 整数算术不一致. PoC 用 `ch_literal<12,3,33>` 占位, 真 fix 跟踪 Phase B.4 + Phase C.2.
 - **`ch_reg` lock 顺序 race** (B.2.1 PoC): `busy_cycles_reg` ↔ `state_reg` ↔ `counter_reg` select tree 嵌套 lock 顺序与 `in_wb` 评估时机 race. PoC 用 `ch_literal<33>` 占位, 失去 MUL=1 / DIV=counter-1 cycle 计数语义. 跟踪 Phase C.2.
 
+## v0.10.x (2026-10-07, interim) — mfc-defer-v0.11.0: mfc partial advance + scope handoff (Metis D' defer 决策)
+
+> **OpenSpec change**: `mfc-defer-v0.11.0` (IN_PROGRESS, 10/16 tasks)
+> **Initiative**: `wave5-isa-coverage-and-bp` (P0)
+> **Purpose**: Oracle 双复审 (2026-10-07, 2m39s Metis plan + 19m20s Oracle tech) 确认 mfc-cpu-pipeline-multi-cycle-fsm 在 v0.10.0 launch budget 内**完不成**, 推迟到 v0.11.0 重启
+> **Entry 状态**: **interim scope handoff doc** — 本 change 仅写 evidence file + v0.11.0 启动 checklist, 不实装新功能
+
+### Why (Oracle 双复审结论)
+
+mfc Phase G (DMIPS/MHz ≥1.4 硬门禁) 在 v0.10.4 hotfix 后实测:
+
+- **`[riscv-tests]` rv32um 0/8 FAIL** (commit c6a0275): 8 ELF (mul/mulh/mulhsu/mulhu/div/divu/rem/remu) 全部 FAIL, cycles=43-55, exit_code=1
+- **真 root cause**: `ip/cpu/arch/riscv/mul_div_fsm.h:475-500` `advance_fsm` 是 ad-hoc busy counter, 不是真 radix-2 iterative (注释 "实装真 radix-2" 未实现)
+- **Dhrystone 100M cap livelock confirmed** (commits 76ac53f + c4035e5): DMIPS/MHz 0.0351 vs hard gate 1.4 (差 40x)
+- **3 个独立 root cause 估时 3-6 周**, 超 v0.10.0 budget (8+14 天)
+
+Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
+
+### Added (partial advance 保留)
+
+- **`A' commit 722eca6`** (negotiate fail Fix): `MulDivFsmPlugin::negotiate()` 删两条 `requires` (`flush_broadcaster` + `writeback_arbiter`), 保留 `provide("multi_cycle_fsm", this)`. `[cpu-integration][mul-div-fsm-integration]` 4/4 PASS (`mul_legacy` + `mul_fsm` + `div_legacy` + `div_fsm` 全部 tohost=1)
+- **`C' commit 76ac53f`** (cycle cap 升 100M): `kMaxCycles` 10M → 100M, 暴露 FSM mode in-context livelock (in-context cycle 永远计不满 33)
+- **`commit c4035e5`** (Dhrystone 真实 baseline matrix): `soc/cpu/docs/dse/dhrystone-baseline-matrix.csv` 写实测 0.0351 DMIPS/MHz
+- **`B2 fix commit b8f4769`** (state_==IDLE 守卫): at_stage 闭包内 `state_==IDLE` 早返, `mul_fsm` tohost=1 PASS
+- **`commit 81f3c82`** (7stage stage_count baseline 40 → 41): v1 mmufault-handler archive 触发
+- **`v1 cpu-pipeline-mmufault-handler archive`** (commits 4429896 等): MFC + StageLink check 之外的链路
+- **`openspec/changes/mfc-defer-v0.11.0/{proposal,tasks}.md`** (commit 9e83222): scope handoff doc, 启动 checklist 1-6 写明 v0.11.0 启动期任务
+- **`soc/cpu/docs/dse/rv32um-baseline-matrix.csv` 写真实 cycle** (commit c6a0275): 8 rv32um ELF FAIL status 从 timeout → 真 bug + cycle counts (43-55)
+
+### Verification (v0.10.x interim 实测, 2026-10-07 HEAD)
+
+- **`[cpu-l1-mmu-demo]` 6/6 PASS** (40 assertions, 硬门禁 PASS)
+- **`[riscv-tests] rv32ui 40/40 PASS`** (无回归, 累计 40/40 since v0.6.0 P0#2)
+- **`[riscv-tests] rv32um 0/8 FAIL`** (mul/div/REM 真 bug, defer v0.11.0; 累计 0/8)
+- **`[mmu]` 53/53 PASS** (131 assertions, 无回归)
+- **`[cpu-integration]` 81/81 PASS** (含 mfc-related `mul-div-fsm-integration` 4/4 PASS)
+- **`[cpu][mul-div-fsm]` 6/6 PASS** (55 assertions, 无回归)
+- **3 架构门禁** (`verify_adr.sh` / `verify_plugin_decision.sh` / `check_plugin_portability.sh`) 0 失败 (含 1 WARN: `mul_div_fsm.h` TLM-only 文件内 ch_reg/ch_uint 实例化, D.4 refactor 推迟到 `mfc-extract-fsm-h` 后拆 `_chmem.h`)
+
+### v0.11.0 推迟 scope (follow-up changes, v0.11.0 launch 期启动)
+
+1. **`mfc-extract-fsm-restore`** (新建 change): advance_fsm 真 radix-2 iterative, 32 cycle quotient bit-by-bit + 1 cycle write-back. 估时 1-2 周.
+2. **fetch stall framework 扩展** (协同 wave5-bp): 类似 HazardPlugin RAW stall 模式, 阻止新指令进 EX 而非 stall EX 本身. 估时 1-2 周.
+3. **`wave5-bp-btb`** (新建 change): BTB 分支预测, 5-stage flush 减少 ~50%. 估时 2-4 周, 解锁 DMIPS/MHz ≥1.4 硬门禁.
+
+总计 3-6 周, 推迟到 v0.11.0 重启 mfc.
+
+### Scope Declaration (修复 C2 缩 scope)
+
+- **mfc-cpu-pipeline-multi-cycle-fsm 不 archive**: 维持 48/60 partial advance, 12 task 推迟 (D.4/F/G/H); proposal §Out of Scope 明确 "不修 advance_fsm / fetch stall / BTB"
+- **mfc-defer-v0.11.0 archive 时机**: 本 change 实施完成 (tasks 10/16) 后 archive, **不在 v0.10.0 期内启动 §3 v0.11.0 prep tasks** (有意的 unchecked)
+- **不重命名 mfc tasks.md phase**: 当前 D.4/F/G/H 保持 unchecked, 等 v0.11.0 重启后由 `mfc-extract-fsm-restore` 承接
+
+### Downstream (NOT in this change scope)
+
+- `mfc-extract-fsm-h` (wave5 P2 placeholder) — 等 v0.11.0 启动期作为承接位
+- `mmufault-verilator-sv32-e2e-flip` (wave5 P1) — depends_on `cpu-pipeline-mmufault-handler` v1 archive ✓, 本 change archive 后可启动
+- `wave5-bp-btb` (新建, v0.11.0+) — 解锁 DMIPS/MHz ≥1.4 硬门禁
+- `vexii-riscv-parity-poc` (wave6 P1) — v0.11.0+ 启动
+
 ## v0.10.2 (2026-09-28) — cpu-factory-satp-mapping: satp_value helper + ctor propagation (Phase D e2e 推迟)
 
 > **OpenSpec change**: `cpu-factory-satp-mapping` (archived)
