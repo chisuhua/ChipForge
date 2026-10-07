@@ -74,11 +74,11 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 - working_tree: {{WORKING_TREE_STATUS}}
 - orphan_changes: {{ORPHAN_CHANGES_STATUS}}
 
-### Hard prerequisites (v0.10.0 launch gates)
+### Hard prerequisites (v0.10.0 launch gates; #2 软门禁 — per `openspec/changes/plugin-framework-cycle-precision/proposal.md §状态` 2026-09-29 Oracle 核实, 决策: 采纳 (b) 不阻塞 mfc Phase A)
 | # | Item | Status |
 |---|------|--------|
-| 1 | [cpu-l1-mmu-demo] 6/6 | {{DEMO_BLOCKER}} |
-| 2 | plugin-framework-cycle-precision 25/25 | {{CF_BLOCKER}} |
+| 1 | [cpu-l1-mmu-demo] 6/6 (hard gate) | {{DEMO_BLOCKER}} |
+| 2 | plugin-framework-cycle-precision 25/25 **(soft gate, Phase F optional)** | {{CF_BLOCKER}} (soft) |
 
 ### Active OpenSpec changes
 {{ACTIVE_CHANGES_LIST}}
@@ -149,31 +149,33 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 Based on parsed `## hard_prerequisites` table, generate `{{SMART_RECOMMENDATIONS}}`:
 
-### Case A: `[cpu-l1-mmu-demo]` FAIL + cycle-precision incomplete
+### Case A: `[cpu-l1-mmu-demo]` FAIL (hard gate)
 ```markdown
-🔴 **PoC-1 启动被双重阻塞**:
-- [cpu-l1-mmu-demo] 1/6 FAIL → 执行 `debug-cpu-l1-mmu-demo-paddr-regression/`
-- plugin-framework-cycle-precision 0/25 → P1#4 owner 收官
+🔴 **PoC-1 启动被 [cpu-l1-mmu-demo] 回归阻塞** (hard gate 唯一)
 
-📋 **推荐下一步**: 先修回归（按优先级），再收官 cycle-precision
-```
-
-### Case B: `[cpu-l1-mmu-demo]` FAIL + cycle-precision done
-```markdown
-🔴 **PoC-1 启动被 [cpu-l1-mmu-demo] 回归阻塞**
-
-📋 **推荐下一步**: 执行 `debug-cpu-l1-mmu-demo-paddr-regression/`
+📋 **推荐下一步**: 执行 `debug-cpu-l1-mmu-demo-paddr-regression/` (或 `debug-cpu-l1-mmu-demo-deep-rca/`)
    - Phase A: 加 trace 到 `ibus.h` + `picolibc_host_memory.h`
    - Phase B: 二分定位真凶 (4 嫌疑 A/B/C/D)
    - Phase C: 修
    - Phase D: 回归验证
    - Phase E: 清理 trace
    - Phase F: archive
+
+> 注: plugin-framework-cycle-precision 即使 0/25 也不再阻塞 (soft gate, 2026-09-29 决策)
 ```
 
-### Case C: Both prerequisites PASS
+### Case B: cycle-precision incomplete + demo PASS (soft gate)
 ```markdown
-✅ **v0.10.0 启动硬前置全过**
+🟡 **PoC-1 启动 [cpu-l1-mmu-demo] PASS, 但 plugin-framework-cycle-precision 仍 0/25 (soft gate)**
+
+📋 **推荐下一步**: 
+   - 主路径: 启动 `mfc-cpu-pipeline-multi-cycle-fsm` Phase A (MulDivFsmPlugin TLM 骨架 + ADR-046/047/082 集成)
+   - 旁路 (Phase F 触发时): 同步推进 `plugin-framework-cycle-precision` (启动条件: mfc Phase F 进入 或 wave4 DSE Pareto 启动)
+```
+
+### Case C: `[cpu-l1-mmu-demo]` PASS (cycle-precision 软门禁已豁免)
+```markdown
+✅ **v0.10.0 启动硬前置全过** (cycle-precision 已豁免为 soft gate per 2026-09-29)
 
 📋 **推荐下一步**: 启动 `mfc-cpu-pipeline-multi-cycle-fsm` Phase A
 (MulDivFsmPlugin TLM 骨架 + ADR-046/047/082 集成)
