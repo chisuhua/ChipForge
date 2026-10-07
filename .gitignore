@@ -122,3 +122,6 @@ worktrees/
 /3rdparty/riscv-arch-test/.pre-commit-config.yaml
 /3rdparty/riscv-arch-test/.python-version
 Testing/
+
+# Session-local artifacts (v0100-bootstrap skill output snapshot, 每次 session 内容独立, 不入 git)
+last-bootstrap-prompt.md
