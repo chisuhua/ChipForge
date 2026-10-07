@@ -95,17 +95,24 @@ graph TD
 |--------|-----------|----------|--------|-------|
 | `2026-09-24-cpu-pipeline-canonical-ordering-assert` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 1 22 |
 | `2026-09-24-cpu-pipeline-fix-rv32ui-load-width` | wave3-cpu-pipeline-debt | P0 | ✅ DONE (archived) | 0 18 |
-| `cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 27 0 |
 | `mmu-config-json-driven` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 0 0 |
 | `plugin-framework-cycle-precision` | wave3-mmu-real-memory-and-cycle | P1 | TODO | 19 0 |
 | `2026-09-26-mmu-paddr-consume-and-real-memory` | wave3-mmu-real-memory-and-cycle | P1 | ✅ DONE (archived) | 0 36 |
+| `2026-10-05-cpu-pipeline-multi-cycle` | wave3-mmu-real-memory-and-cycle | P1 | ✅ DONE (archived) | 27 0 |
 | `cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | TODO | 32 0 |
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
-| `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (43/60) | 17 43 |
+| `verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | TODO | 52 0 |
+| `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (48/60) | 12 48 |
+| `mfc-defer-v0.11.0` | wave5-isa-coverage-and-bp | P0 | IN_PROGRESS (10/16) | 6 10 |
 | `mfc-extract-fsm-h` | wave5-isa-coverage-and-bp | P2 | TODO | 15 0 |
+| `mmufault-verilator-sv32-e2e-flip` | wave5-isa-coverage-and-bp | P1 | TODO | 36 0 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
+| `2026-10-05-verilator-cpu-factory-extensible-params` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 5 42 |
+| `2026-10-05-verilator-mmu-bare-plumbing-e2e` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 0 42 |
+| `2026-10-06-cpu-pipeline-mmufault-handler` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 7 |
+| `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
 
 > **Status 解读**:
 > - `TODO`: tasks.md 全部 open 或不存在
