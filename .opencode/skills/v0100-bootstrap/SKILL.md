@@ -145,6 +145,31 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 6. 报告你看到的状态 + 建议下一步
 ````
 
+## Step 2.5: Save complete prompt to `last-bootstrap-prompt.md` (跨 session reference, 推荐)
+
+**Why this step**: bash script 输出 (§Step 1) 只是 **raw state** (Layer 3, 仅数据, 缺 SKILL.md 模板 + LLM 决策); **LLM 合成结果** (§Step 2 + §Step 3) 才是**完整 paste-ready prompt** (Layer 4, 含数据 + 模板 + 决策). 把 LLM 合成结果用 **write 工具** save 到文件, 让新 session 可以直接 read 文件作为 context, **无需手工 copy-paste**.
+
+**如何执行**:
+
+1. 在 §Step 2 + §Step 3 完成后, LLM 已经合成完整 paste-ready markdown code block
+2. Agent **用 `write` 工具** (opencode 提供) 把完整 markdown code block 内容 save 到:
+   - **路径**: `./last-bootstrap-prompt.md` (CWD, 即仓库根)
+   - **内容**: LLM 合成的完整 prompt (含 live state + 必读 + 按需加载路由 + 不要做 + Smart recs + 6-step 启动清单 + 修订 metadata)
+   - **不要**用 `bash tools/v0100-bootstrap.sh > last-bootstrap-prompt.md` (只 save bash raw state, 不是 LLM 合成)
+3. 在 chat 里 **emit 同一个 markdown code block** 给用户 (可视化 + 手工 copy-paste fallback)
+4. **Self-verify**: emit 后用 `read` 工具读 `last-bootstrap-prompt.md`, 确认 file 内容 = emitted markdown (避免 race / 截断)
+
+**Properties**:
+- **Git**: 不应 commit (`last-bootstrap-prompt.md` 已在 `.gitignore`, commit `e3781a9`)
+- **性质**: session-local artifact (不是 source of truth, 仅作跨 session reference)
+- **生命周期**: 每次 Generate mode 覆盖 (timestamp + HEAD 验证 freshness)
+- **新 session 使用**: 第一条消息 "请读 `last-bootstrap-prompt.md`, 按 §启动清单 6 步推进, 报告状态 + 建议下一步"
+
+**错误模式 (避免)**:
+- ❌ 用 `bash tools/v0100-bootstrap.sh > last-bootstrap-prompt.md` (只 save bash raw state, 不是 LLM 合成结果)
+- ❌ 复制 chat emit 的 markdown code block 后**手工**粘贴到文件 (容易截断 / 格式丢失, 应该用 write 工具)
+- ❌ commit `last-bootstrap-prompt.md` 进 git (session-local artifact, 每次 session 内容独立)
+
 ## Step 3: Inject smart recommendations
 
 Based on parsed `## hard_prerequisites` table, generate `{{SMART_RECOMMENDATIONS}}`:
@@ -242,7 +267,8 @@ Same data collection as Generate mode, but output a structured review report ins
 
 # What NOT to do
 
-- Do NOT modify any project files (this skill is read-only)
+- Do NOT modify any project source files (this skill 自身是 read-only metadata + bash script); 但允许 LLM 用 `write` 工具 save LLM 合成 prompt 到 `last-bootstrap-prompt.md` (session-local artifact, git-ignored, 非项目源文件)
+- Do NOT use `bash tools/v0100-bootstrap.sh > last-bootstrap-prompt.md` to save prompt — 只 save bash raw state (Layer 3, 不含 SKILL.md 模板 + LLM 决策), 不是完整 prompt. 正确做法: 用 LLM `write` 工具 save Layer 4 合成结果 (详见 §Step 2.5)
 - Do NOT run cmake/build (read-only session)
 - Do NOT make any commits
 - Do NOT bypass the bash script and hardcode state — always run script for live state
@@ -257,6 +283,8 @@ Cross-session continuity problem: opencode sessions are stateless. Without this 
 4. Construct a session-start prompt manually
 
 This skill automates all 4 steps in one invocation, with intelligent recommendations based on parsed state.
+
+**v0.10.x 扩展 (2026-10-07)**: Generate mode 现在自动用 `write` 工具 save LLM 合成的完整 paste-ready prompt 到 `last-bootstrap-prompt.md` (git-ignored session-local artifact). 新 session 第一条消息 "请读 `last-bootstrap-prompt.md`, 按 §启动清单 6 步推进" 即可获得完整 context, **无需手工 copy-paste**. 详见 §Step 2.5.
 
 # Underlying tools
 
@@ -285,6 +313,19 @@ The skill body contains only pointers (file paths, command names). All state is 
 
 **反向警示**: 避免"因为变了所以同步修所有引用"的反射。文档结构变化时,先问"这个变化是否影响 SKILL.md 的 §必读 / 路由表 / #Maintenance 三处",影响才动;不影响则不动(如 `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §1+§2` 内容调整不影响 skill 路径)。
 
+## 当 workflow 变化时同步本 skill (新增, 2026-10-07)
+
+> **触发条件**: skill 输出行为变化 (如新增 save-to-file 步骤, 详见 §Step 2.5).
+
+**同步步骤**:
+1. **§Output to user**: 描述新的产出形式 (如 Generate mode 现在产出 saved file + inline markdown code block)
+2. **§Step 2.5 / §Step X.X**: 新增步骤文档 (含 why + how + properties + 错误模式)
+3. **§What NOT to do**: 加严禁的反模式 (如 `bash redirect` 只 save raw state)
+4. **§Self-verification**: 加新的验证步骤 (如 write + read 双验证)
+5. **§Known issues K2 / K1-K4**: 更新 bash vs LLM 边界描述, 加新发现
+6. **§Audit mode A1-A8 FAIL 行动**: 引用新步骤 (如 A1 FAIL 行动 = regenerate via `/v0100-bootstrap`, agent 自动 save)
+7. **§Why this skill exists**: 加 v0.10.x 扩展说明
+
 ## Known issues in `tools/v0100-bootstrap.sh` (修订时发现, 2026-09-30)
 
 > **触发背景**: 2026-09-30 修订 `last-bootstrap-prompt.md` 时实测 bash script 输出, 发现以下非阻塞腐化。**tools/ scope, 不在 v0.10.0 wave5 scope**, 报告 surface 在此供未来 sessions 知情。
@@ -292,7 +333,7 @@ The skill body contains only pointers (file paths, command names). All state is 
 | # | Issue | 症状 | 绕过方法 |
 |---|-------|------|---------|
 | K1 | `:442 BROKEN_COUNT unbound variable` | `set -u` 触发 unbound 错误, `doc_link_check` 行渲染空白（实际全 PASS, exit-code 路径正确） | 输出含 `[WARN]` 标记但不传播; honest audit `doc_link_check` 行显示空 broken 数, 需看 K2 状态 |
-| K2 | bash script 与 SKILL.md 模板**双重权威** | bash script 输出 schema（test_status/hard_prerequisites/honesty_audit 等）≠ SKILL.md 模板全文; 完整 prompt（含按需加载路由/不要做/smart recs/启动清单）需 agent 手工合成 | 接受现状: bash script 提供 state, agent 用 SKILL.md 模板合成最终 prompt |
+| K2 | bash script 与 SKILL.md 模板**双重权威** | bash script 输出 schema（test_status/hard_prerequisites/honesty_audit 等）≠ SKILL.md 模板全文; 完整 prompt（含按需加载路由/不要做/smart recs/启动清单）需 agent 手工合成 | 接受现状: bash script 提供 state (**Layer 3 raw data only**), agent 用 SKILL.md 模板合成完整 paste-ready prompt (**Layer 4: data + template + LLM decision**), 然后用 `write` 工具 save 到 `last-bootstrap-prompt.md` (git-ignored, 详见 §Step 2.5); **不要**用 `bash tools/v0100-bootstrap.sh > last-bootstrap-prompt.md` (只 save Layer 3 raw state, 不是 Layer 4 LLM 合成) |
 | K3 | CHANGELOG.md baseline 漂移不自检 | bash script 不主动 diff `CHANGELOG.md §Verification` vs 实测数字 | Case E 触发时人工对比; 长期修法: bash script 加 `CHANGELOG.md` 行级 regex 对账 |
 | K4 | "不要做" 列表静态, 不随 active changes 演化 | 如 wave6 启动后 vexii-riscv-parity-poc 应进"不要 implement" 列表, 但 skill 模板不感知 | 未来 wave 切换时, agent 手工加条目 (上次 prompt rev 5 加了 5 条) |
 
@@ -306,7 +347,7 @@ The skill body contains only pointers (file paths, command names). All state is 
 
 | # | 检查项 | 通过标准 | FAIL 行动 |
 |---|--------|---------|---------|
-| A1 | 时间戳新鲜度 | timestamp ≤ 4 小时前 | 建议 `bash tools/v0100-bootstrap.sh > last-bootstrap-prompt.md` regenerate |
+| A1 | 时间戳新鲜度 | timestamp ≤ 4 小时前 | 建议调 `/v0100-bootstrap` regenerate, agent 会用 `write` 工具自动 save 新版 LLM 合成 prompt 到 `last-bootstrap-prompt.md` (替代 bash redirect, 详见 §Step 2.5) |
 | A2 | HEAD 一致性 | prompt 内 HEAD = `git rev-parse --short HEAD` | regenerate |
 | A3 | 路由表路径可达 | 所有 `soc/cpu/docs/roadmap/references/*.md` 存在 + ADR-082 等存在 | 标 ❌ + 给修复建议 (见 K2) |
 | A4 | 启动清单完整 | 6 步齐 (openspec list / §5 read / tasks phase / chipforge_tests / 3 CI scripts / report) | 标 ❌ + 补缺失步骤 |
@@ -340,8 +381,12 @@ The skill body contains only pointers (file paths, command names). All state is 
 
 ## Per-mode output contract
 
-- **Generate mode** outputs a single markdown code block containing the complete session-bootstrap prompt (header + Live state + 必读 + 按需加载路由 + 不要做 + Smart recs + 6-step 启动清单), ready for copy-paste as the first message of the new session.
+- **Generate mode** outputs **two artifacts**:
+  1. **Saved file** `last-bootstrap-prompt.md` (via LLM write tool, **LLM-synthesized complete prompt**, Layer 4: bash raw state + SKILL.md template + LLM decision; git-ignored per `.gitignore` rule)
+  2. **Inline markdown code block** in chat (same content as #1, for user visibility + manual copy-paste fallback)
+  
+  Both ready for cross-session reference (新 session read #1 or copy-paste #2).
 - **Review mode** outputs a structured review report (state summary + hard prereqs + recent changes + risk assessment + recommendations + questions), NOT a session-bootstrap prompt.
 - **Audit mode** outputs an audit report on an existing saved prompt (freshness / HEAD / paths / checklist completeness / honesty / smart-recs / metadata), NOT a session-bootstrap prompt.
 
-**Self-verification after composition**: before emitting, confirm `HEAD` in output matches `git rev-parse --short HEAD` and timestamp is current; otherwise regenerate.
+**Self-verification after composition**: before emitting, (a) confirm `HEAD` in output matches `git rev-parse --short HEAD`, (b) confirm timestamp is current, (c) after write tool save, use `read` tool to verify `last-bootstrap-prompt.md` content matches emitted markdown code block (avoid race / truncation); otherwise regenerate.
