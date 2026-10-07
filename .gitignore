@@ -125,3 +125,4 @@ Testing/
 
 # Session-local artifacts (v0100-bootstrap skill output snapshot, 每次 session 内容独立, 不入 git)
 last-bootstrap-prompt.md
+old.md

@@ -215,6 +215,54 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - `wave5-bp-btb` (新建, v0.11.0+) — 解锁 DMIPS/MHz ≥1.4 硬门禁
 - `vexii-riscv-parity-poc` (wave6 P1) — v0.11.0+ 启动
 
+## v0.10.x (2026-10-07, interim) — mmufault Part a BLOCKED + mmu-chmem-pipeline-integration change 占位
+
+> **OpenSpec change**: `mmufault-verilator-sv32-e2e-flip` Part a (BLOCKED) + 新建 `mmu-chmem-pipeline-integration` (v0.11.0 占位)
+> **Initiative**: `wave5-isa-coverage-and-bp`
+> **Purpose**: 记录 Part a 实装失败 outcome + 显式认领 MMU CH_MEM pipeline 集成层 owner 真空
+> **Entry 状态**: **interim owner handoff** — Part a tasks §5.1-§5.4 整体移交到 `mmu-chmem-pipeline-integration` change (v0.11.0)
+
+### Context
+
+`mmufault-verilator-sv32-e2e-flip` Part a 计划 1-4h 实装 (`tests/soc/test_cpu_l1_mmu_demo.cpp:113` flip `cfg.enable_mmu=false → true`, 移除 workaround, 走真 sv32 translation 路径)。2026-10-07 Sisyphus bootstrap session 实装 3 次尝试均 FAIL:
+
+- **尝试 1**: `cfg.enable_mmu=true` + `plant_identity_page_table(mem, window_base+60*1024, elf.entry_addr)` — 5 个 ELF (add/addi/auipc/jal/beq) 10000 cycles 卡住, `exit_code=-1`
+- **尝试 2**: 加 `cfg.satp_ppn = (window_base+60*1024)>>12 = 0x80000` 修复 PPN 路径 — 仍然 5/5 FAIL
+- **尝试 3**: 加 DEBUG 探针但破坏 macro 结构 — 回滚到 workaround 状态 (`[cpu-l1-mmu-demo] 6/6 PASS` 不退化)
+
+### Root cause 假设 (待 Oracle / deep debug 验证)
+
+- `MMUPlugin::do_lookup` (`ip/mmu/tlm/MMUPlugin.cpp:100`) Bare shortcut 条件 `satp_ppn_ == 0` 仍存在 (v0.10.4 hotfix `ad48fcf` 仅引入 `satp_value_` 字段注释, **未修复**判定逻辑)
+- `RiscvMMUPlugin::csr_write_satp()` (`ip/cpu/plugins/mmu.cpp:34`) 未被调用时, 派生 `set_satp_value` shadow 可能覆盖 ctor 注入的 `satp_value_`
+- 真 sv32 TLM 翻译路径需要更深层 MMU plugin 修订 (1-3 周, 超出 `mmufault-verilator-sv32-e2e-flip` Part a scope, **不**符合 1-4h ship 估算)
+
+### Added
+
+- **新建 change `mmu-chmem-pipeline-integration`** (v0.11.0 placeholder, decision 2026-10-07): 显式认领 CH_MEM MMU/PTW pipeline 集成层 owner 真空
+  - Scope: `ip/cpu/cpu_factory_chmem.h` 修改 + `mmu_ptw_chmem.h` + `ibus_chmem.h` + `mmu_exception_handler_chmem.h` 修改 + `MMUPlugin` Bare shortcut 严格化 + `RiscvMMUPlugin::csr_write_satp` 注入时机审查 + Verilator TEST_CASE 6 实装 + `[cpu-l1-mmu-demo]` 真 sv32 翻转 (承接 Part a) + AGENTS.md workaround 行更新
+  - depends_on: `cpu-pipeline-mmufault-handler` v1 archive ✓ + `phase-6d-prerequisites` (待 archive)
+  - 与 `wave5-bp-btb` 同窗口规划 (共享 fetch stage, 避免 fetch path ownership 冲突)
+- **`mmufault-verilator-sv32-e2e-flip/tasks.md` §5 BLOCKED 标注**: Part a tasks §5.1-§5.4 整体移交到 `mmu-chmem-pipeline-integration` §5-§6, tasks.md checkbox 标 ~~strikethrough~~ + DEFERRED 注释
+
+### Not changed (K3 honesty 保持)
+
+- **`[cpu-l1-mmu-demo]` 6/6 PASS** (40 assertions, workaround 状态维持, **零数字变化**)
+- **AGENTS.md §已知测试状态** (K3 fix 已 ship, **未修改**, workaround 标记仍存在, 等 v0.11.0 落地后由 `mmu-chmem-pipeline-integration` §6 更新)
+- **`mmufault-verilator-sv32-e2e-flip` change 不 archive**: 维持 active placeholder, Part b (Verilator sv32 + baseline CSV) 也 defer v0.11.0
+- **`mfc-cpu-pipeline-multi-cycle-fsm` 不 archive**: 维持 48/60 partial advance, 不动
+
+### Scope Declaration (修复 Part a scope 假设 v0.10.x vs v0.11.0)
+
+- **Part a 1-4h 估算失败**: v0.10.0 launch budget 内**完不成**真 sv32 TLM flip, 推迟到 v0.11.0
+- **D4 scope 隔离**: 不把 `mmu_chmem.h` 实装塞进 `mmufault-verilator-sv32-e2e-flip` scope, 避免 acceptance criteria 污染
+- **owner 真空正式认领**: `mmu-chmem-pipeline-integration` change (v0.11.0) 显式占位, 不再是 dangling reference
+
+### Downstream (NOT in this entry scope)
+
+- v0.11.0 启动期由 `mmu-chmem-pipeline-integration` owner 起草 tasks.md 详细实施计划
+- `wave5-bp-btb` (v0.11.0+) 共享 fetch stage, 不冲突
+- `vexii-riscv-parity-poc` (wave6 P1) v0.11.0+ 启动, 与本 entry 无依赖
+
 ## v0.10.2 (2026-09-28) — cpu-factory-satp-mapping: satp_value helper + ctor propagation (Phase D e2e 推迟)
 
 > **OpenSpec change**: `cpu-factory-satp-mapping` (archived)

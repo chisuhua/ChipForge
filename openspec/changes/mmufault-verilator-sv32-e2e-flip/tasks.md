@@ -32,10 +32,22 @@
 
 ## 5. [cpu-l1-mmu-demo] 真 sv32 翻转
 
-- [ ] 5.1 修改 `tests/soc/test_cpu_l1_mmu_demo.cpp:113` flip `cfg.enable_mmu=false → true`（移除 workaround）
-- [ ] 5.2 新增 TEST_CASE 7 `cpu_l1_mmu_demo_sv32_translation_flipped` ([soc][cpu-l1-mmu-demo][sv32] family tags): 用 sv32_pte.elf 替换 add ELF, REQUIRE tohost=1
-- [ ] 5.3 跑 `[cpu-l1-mmu-demo]` 7/7 PASS（6 旧 + 1 新）
-- [ ] 5.4 修改 AGENTS.md `[cpu-l1-mmu-demo]` workaround line 40 → 移除 workaround 标记, 加 `[v0.10.x follow-up]` 标记
+> **2026-10-07 BLOCKED (Sisyphus bootstrap session 实装 3 次失败)**:
+> - 尝试 1: `cfg.enable_mmu=true` + `plant_identity_page_table` — 5/5 ELF 10000 cycles 卡住, exit_code=-1
+> - 尝试 2: 加 `cfg.satp_ppn = (window_base+60*1024)>>12 = 0x80000` — 仍然 5/5 FAIL
+> - 尝试 3: 加 DEBUG 探针但破坏 macro 结构 — 回滚到 workaround 状态
+>
+> **Root cause 假设** (待 Oracle / deep debug 验证):
+> - `MMUPlugin::do_lookup` (ip/mmu/tlm/MMUPlugin.cpp:100) Bare shortcut 条件 `satp_ppn_ == 0` 仍存在 (v0.10.4 hotfix ad48fcf 仅引入 `satp_value_` 字段注释未修复判定逻辑)
+> - `RiscvMMUPlugin::csr_write_satp()` (ip/cpu/plugins/mmu.cpp:34) 未被调用时,派生 set_satp_value shadow 可能覆盖 ctor 注入
+> - 真 sv32 TLM 翻译路径需要更深层 MMU plugin 修订 (1-3 周, 超出 mmufault Part a scope)
+>
+> **Follow-up owner**: `mmu-chmem-pipeline-integration` change (v0.11.0, decision 2026-10-07) 显式认领 owner 真空,本节 tasks §5.1-§5.4 整体移交.
+
+- [ ] ~~5.1 修改 `tests/soc/test_cpu_l1_mmu_demo.cpp:113` flip `cfg.enable_mmu=false → true`（移除 workaround）~~ → **DEFERRED to `mmu-chmem-pipeline-integration` §5 (v0.11.0)**
+- [ ] ~~5.2 新增 TEST_CASE 7 `cpu_l1_mmu_demo_sv32_translation_flipped` ([soc][cpu-l1-mmu-demo][sv32] family tags): 用 sv32_pte.elf 替换 add ELF, REQUIRE tohost=1~~ → **DEFERRED to `mmu-chmem-pipeline-integration` §5 (v0.11.0)**
+- [ ] ~~5.3 跑 `[cpu-l1-mmu-demo]` 7/7 PASS（6 旧 + 1 新）~~ → **DEFERRED to `mmu-chmem-pipeline-integration` §5 (v0.11.0)**
+- [ ] ~~5.4 修改 AGENTS.md `[cpu-l1-mmu-demo]` workaround line 40 → 移除 workaround 标记, 加 `[v0.10.x follow-up]` 标记~~ → **DEFERRED to `mmu-chmem-pipeline-integration` §6 (v0.11.0)**
 
 ## 6. Spec Delta 编辑
 
