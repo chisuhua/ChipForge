@@ -158,14 +158,13 @@ class MulDivFsmPlugin : public cf::plugin::PluginBase {
     // Phase A: 无跨 Plugin 引用, 仅声明 execute 阶段占用
   }
 
-  // Phase C.4 (ADR-082): negotiate() 声明 requires (flush_broadcaster + writeback_arbiter)
-  // 首个消费 PoC, 验证框架 capability 协商 API
+  // Phase C.4 (ADR-082): negotiate() 声明 capabilities
+  // 首个消费 PoC, 验证框架 capability 协商 API.
+  // 注 (2026-10-07 Phase E.5 fix): 移除 flush_broadcaster + writeback_arbiter requires
+  // (无 provider, pb.build() 返回 BuildFailed → FSM mode timeout). Phase D.4
+  // (mfc-extract-fsm) follow-up 真需要时再恢复 + 提供 HazardPlugin/BranchPlugin providers.
   void negotiate(::cf::plugin::CapabilityTable& cap) override {
-    // 提供 multi_cycle_fsm capability (FSM handle 指向 *this)
     cap.provide("multi_cycle_fsm", this);
-    // 要求 flush_broadcaster (BranchPlugin 应 provide) + writeback_arbiter (HazardPlugin 应 provide)
-    (void)cap.require("flush_broadcaster");
-    (void)cap.require("writeback_arbiter");
   }
 
   // build() — 注册 execute 阶段闭包
