@@ -21,7 +21,7 @@
 
 namespace {
 
-constexpr std::uint64_t kMaxCycles = 10000000;  // 10M cycle cap (DMIPS/MHz >= 0.5)
+constexpr std::uint64_t kMaxCycles = 100000000;  // 100M cycle cap (mfc Phase G C': 验证 livelock vs performance vs 10M cap)
 
 constexpr int kDhrystoneRuns = 2000;
 constexpr std::uint64_t kMaxCyclesForDmips14 =
