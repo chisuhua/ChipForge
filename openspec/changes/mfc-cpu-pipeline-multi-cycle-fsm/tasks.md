@@ -191,9 +191,14 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 
 ## Phase G — Dhrystone baseline（v0.10.0 hard gate）
 
-- [ ] G.1 [RED] 集成 Dhrystone benchmark 到 ctest `[dhrystone]` family
-- [ ] G.2 [GREEN] DMIPS/MHz ≥1.4（CH_MEM + Verilator 实测）
-- [ ] G.3 [REFACTOR] Dhrystone ELF vendor（if not already vendored）
+> **K3 honesty 同步 (2026-10-07 Sisyphus session)**:
+> - G.1 + G.3 部分实装在 commit `91c790a` (2026-10-07 00:31): `tests/cpu/integration/test_dhrystone.cpp` (3 TEST_CASE: dhrystone_legacy_tohost_pass + dhrystone_fsm_dmips_mhz_minimum_1_4 + dhrystone_fsm_dmips_mhz_metric) + `tests/cpu/manual_elf/dhrystone/dhrystone.elf` + `dhrystone.c`. tasks.md checkbox 0/3 是代码 vs tasks 漂移, 已纠正 (G.1 + G.3 ✅).
+> - G.2 hard gate DMIPS/MHz ≥1.4 当前 FAIL (实测 0.0351 per c4035e5 CSV, 100M cap livelock, 差 40x). **defer v0.11.0** per archive `2026-10-07-mfc-defer-v0.11`. 维持 unchecked 等 v0.11.0 重启.
+> - K3 fix: commit `91c790a` message 标题 "0.3514 vs 1.4" 是早期 10M cap 估算, 真实实测 (per c4035e5 CSV, 100M cap) 是 **0.0351**. 已 push commit 不能 amend, 修复路径 = v0.10.0-interim tag message K3 诚实性声明 + 本 tasks.md G.1/G.3 同步勾选.
+
+- [x] G.1 [RED] 集成 Dhrystone benchmark 到 ctest `[dhrystone]` family (实装在 91c790a)
+- [ ] G.2 [GREEN] DMIPS/MHz ≥1.4（CH_MEM + Verilator 实测）→ **defer v0.11.0** (实测 0.0351 per c4035e5 CSV)
+- [x] G.3 [REFACTOR] Dhrystone ELF vendor（if not already vendored） (实装在 91c790a)
 
 ## Phase H — 归档
 
