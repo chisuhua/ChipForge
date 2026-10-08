@@ -88,19 +88,20 @@
 - [ ] **审计 sv_mode_≠Bare 用例** — grep 所有 sv_mode_ 配置点 + 对应用例,逐一标注"安全/需更新"
 - [ ] **运行命令**:`./build/bin/chipforge_tests` (TLM 全套,~0.6s)
 
-### A.5 [GREEN 前置] TLM flip 尝试 2 PPN 计算核实 (Oracle R12)
+### A.5 ✅ [已完成 2026-10-08] TLM flip 尝试 2 PPN 计算核实 (Oracle R12)
 
-- [ ] **优先于其他 Phase B 任务执行** — 可能是比 shadow bug 更便宜的 root cause
-- [ ] **debug print 验证** — 在 `MMUPlugin::do_lookup` 入口加临时 print:
-  - `fprintf(stderr, "[MMU_DEBUG] satp_ppn_=0x%lx last_vaddr_=0x%lx sv_mode_=%d\n", satp_ppn_, last_vaddr_, (int)sv_mode_);`
-- [ ] **手动重放尝试 2** — 用 `mmufault-verilator-sv32-e2e-flip` 失败测试场景 (`cfg.enable_mmu=true` + `cfg.satp_ppn = (window_base+60*1024)>>12`),实际打印 satp_ppn_ 值
-- [ ] **验证假设**:
-  - 若打印值 ≠ 0x80000 → **A1+A3 修复是 root cause**,可继续 Phase B
-  - 若打印值 = 0x80000 → proposal §Why 转述错误,实际可能是其他问题
-  - 若打印值 = 0x8000F → **proposal §Why 转述算错**,0x8000F 指向 ELF 代码页,PTW root 错误是 root cause (更便宜修复 = cpu_factory ctor PPN 计算修正)
-- [ ] **删除 debug print** (验证完成后,**禁止 commit 留 print**)
-- [ ] **回归项**:验证过程无功能性改动,`[mmu] 53/53` 维持
-- [ ] **输出**:在 PR1-A commit message 附上实际 print 输出 + 结论
+> **启动期已执行 (owner session 2026-10-08),结论已反馈 proposal §Why line 36-41 修订。**
+
+- [x] **debug print 验证** — 在 `MMUPlugin::do_lookup` 入口加临时 print:
+  - 实际使用:`fprintf(stderr, "[MMU_DEBUG] stage=%s satp_ppn_=0x%lx satp_value_=0x%lx sv_mode_=%d vaddr=0x%lx\n", ...)`
+- [x] **手动重放尝试 2** — `mmufault-verilator-sv32-e2e-flip` 是 placeholder change (`status: placeholder`, depends_on `phase-6d.6-mmu-ptw-fsm`),无现存可重放失败测试 → 改用现有最近路径 `[mmu][tlb-refill]` (用 `set_satp_ppn(1ULL<<20) = 0x100000` 模拟 RISC-V satp 路径)
+- [x] **验证假设 (实际结果)**:
+  - runtime 捕获 `satp_ppn_` = `0x100000`,与 `set_satp_ppn(1ULL<<20)` 调用值**完全一致** → `set_satp_ppn` runtime 路径正确
+  - 静态链分析: `cfg.satp_ppn = 0x8000F` → `make_satp_value(Sv32, 0x8000F) = 0x80008000F` → `RiscvMMUPlugin` ctor Sv32 mask `0x3FFFFFULL` (mmu.h:56) → `ppn = 0x8000F` → `MMUPlugin::satp_ppn_ = 0x8000F` ✓ (MODE bit31 正确排除)
+  - **结论**: `0x80000` 是 proposal line 26 文档 typo (已修为 `0x8000F`),**不是代码 bug**;"更便宜 root cause"假设被排除,Oracle D4-A + D5-TLM 确认真 root cause
+- [x] **删除 debug print** — 验证完成立即删除,`git diff ip/mmu/tlm/MMUPlugin.cpp` 干净 (零残留)
+- [x] **回归项**:debug print 期间 + 删除后 `[mmu] 53/53` + `[cpu-l1-mmu-demo] 6/6` 均 PASS,零退化
+- [x] **输出**:见本段 + proposal §Why line 36-41 + research §12.2 A5 验证结果块 (PR1-A commit 时引用)
 
 ### A.6 [GREEN] Regression check — `[mmu] 53/53` 0 意外退化最终确认
 

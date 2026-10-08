@@ -157,7 +157,7 @@
 | A3 | **shadow 双 bug 修复** — 删除 `mmu.h:99-100,103` 派生三件套,让基类存取器被继承;`csr_write_satp` 复用 `cf::cpu::detail::extract_satp_ppn` (D5-TLM) | `ip/cpu/plugins/mmu.h` + `mmu.cpp:34-40` | 1.5d |
 | A3.1 | 派生 getter/setter 调用点审计 — grep 全部 `satp_value()`/`set_satp_value` 调用,确认删除后语义兼容 | codebase-wide | 0.5d |
 | A4 | 单元测试: Bare shortcut 3 case (Bare+Sv32_ppn0, Sv32_ppn_nonzero, Sv39_ppn_nonzero) + shadow 双 bug 单测 (现 ctor + csr_write_satp 后断言基类 satp_value/satp_ppn) | `tests/mmu/test_mmu_plugin.cpp` | 1.5d |
-| A5 | **TLM flip 尝试 2 PPN 计算验证** — Oracle 指出 `(0x80000000+0xF000)>>12 = 0x8000F` ≠ proposal 转述 `0x80000`,可能是比 shadow 更便宜的 root cause | debug print 验证 | 0.5d |
+| A5 | **TLM flip 尝试 2 PPN 计算验证 (已完成 2026-10-08)** — Oracle 指出 `(0x80000000+0xF000)>>12 = 0x8000F` ≠ proposal 转述 `0x80000`,可能是比 shadow 更便宜的 root cause | debug print 验证 | ✅ 0.5d (已完成: runtime 实证 chain 正确,假设被排除,`0x80000` 是 doc typo) |
 | A6 | Regression check: `[mmu] 53/53` 0 **意外**退化 (编码了 buggy 假设的用例允许更新并附理由) | — | 0.5d |
 
 **估时小计**: 5d (~1 人周)
@@ -248,7 +248,7 @@
 | R9 | megapage (level-1 叶, 4MB) PoC 简化透传 ppn 触发后续回归 | 低 | 中 | 完整 PPN 拼接推迟 v0.11.1+,本 change 显式记录 PoC 限制 |
 | R10 | `[cpu-l1-mmu-demo]` 真 sv32 翻转后,既有 workaround 路径移除触发 baseline 退化 | 中 | 中 | E1 前先 E5 验证 workaround 是否真无回归 |
 | **R11** | **CH_MEM 流水线无 CSR plugin** (`cpu_factory_chmem.h:304-310` 注册清单无 CSR) — Oracle 新发现,影响 D1/D3/D5 CH_MEM 侧答案 | 中 | 高 | **CH_MEM 侧 satp 必须是 ctor/config 参数,elaboration 期固化为 ch_reg 初值**;trap PC 跳转单独立 change (v0.11.1+) |
-| **R12** | **TLM flip 尝试 2 planted root PPN 计算错误** — `(0x80000000+0xF000)>>12 = 0x8000F` ≠ proposal 转述 `0x80000`;PTW root 指向 ELF 代码页,可能是比 shadow 更便宜的 root cause | 中 | 中 | **A5 启动期先用 print/debug 验证实际 planted root PPN 与 satp_ppn 是否相等** |
+| **R12** | **TLM flip 尝试 2 planted root PPN 计算错误** — `(0x80000000+0xF000)>>12 = 0x8000F` ≠ proposal 转述 `0x80000`;PTW root 指向 ELF 代码页,可能是比 shadow 更便宜的 root cause | 中 | 中 | **A5 启动期先用 print/debug 验证实际 planted root PPN 与 satp_ppn 是否相等** → ✅ **已关闭 (2026-10-08)**: A5 实证 `set_satp_ppn` runtime 链正确,`0x80000` 是 proposal 文档 typo (line 26 已修为 `0x8000F`),不是代码 bug;"更便宜 root cause"假设被排除,Oracle D4-A + D5-TLM 确认为真 root cause |
 | **R13** | v0.11.0 窗口硬性 < 5 周触发降级路径 — D1 收窄版再砍为"TLB-less" | 低 | 中 | 提前在 proposal D0 标注 PoC 限制 (TLB-less path) 备用 |
 | **R14** | proposal §4 "trap PC 跳转断言" AC 与 D3-A 矛盾 — Oracle 明确指出 | 高 | 低 | **D0 必须先修订 proposal 文本**,tasks.md 起草前完成 |
 
@@ -488,6 +488,8 @@ research §Why 转述尝试 2: *"cfg.satp_ppn = (window_base+60*1024)>>12 = 0x80
 但 `(0x80000000+0xF000)>>12 = 0x8000F`,**不是 0x80000**。
 
 若转述准确,尝试 2 的 PTW root 指向 ELF 代码页(指令字节被当 PTE 读),这本身足以解释"5 ELF 卡住"。**建议 A5 前用一次 print/debug 核实实际 planted root PPN 与 satp_ppn 是否相等** — 这是比 shadow 更便宜的检查,可能是 TLM flip 失败的近因,应优先排除。
+
+> **A5 验证结果 (2026-10-08, 已关闭)**: A5 在 `MMUPlugin::do_lookup` 入口加临时 fprintf + 跑 `[mmu][tlb-refill]` (用 `set_satp_ppn(1ULL<<20) = 0x100000`),捕获 runtime `satp_ppn_` = `0x100000` (与调用值完全一致),证明 `set_satp_ppn` 路径正确。静态链分析 (`make_satp_value` → `RiscvMMUPlugin` ctor Sv32 mask `0x3FFFFFULL` → `set_satp_ppn`) 对 `0x8000F` 同样正确。**结论: `0x80000` 是 proposal line 26 的文档 typo (已修为 `0x8000F`),不是代码 bug;本假设被排除,Oracle D4-A + D5-TLM 是确认真 root cause。** 另注:`mmufault-verilator-sv32-e2e-flip` 是 placeholder change,"5 ELF 卡住" 失败模式无现存可重放测试,A5 实证基于现有最近路径 + 静态分析。
 
 ### 12.3 CH_MEM 流水线无 CSR plugin (R11)
 

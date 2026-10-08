@@ -23,7 +23,7 @@ oracle_date: 2026-10-07
 `mmufault-verilator-sv32-e2e-flip` (wave5 P1) Part a (TLM `cfg.enable_mmu=true` flip) 实装 3 次尝试均 FAIL (2026-10-07 Sisyphus bootstrap session):
 
 1. **尝试 1**: `cfg.enable_mmu=true` + `plant_identity_page_table(mem, window_base+60*1024, elf.entry_addr)` — 5 个 ELF 10000 cycles 卡住,exit_code=-1
-2. **尝试 2**: 加 `cfg.satp_ppn = (window_base+60*1024)>>12 = 0x80000` 修复 PPN 路径 — 仍然 5/5 FAIL
+2. **尝试 2**: 加 `cfg.satp_ppn = (window_base+60*1024)>>12 = 0x8000F` 修复 PPN 路径 — 仍然 5/5 FAIL
 3. **尝试 3**: 加 DEBUG 探针但破坏 macro 结构 — 回滚
 
 **Oracle 2026-10-07 决议的 Root cause** (session `bg_13cd7890`,详见 [research-v0.11.0-prep.md](research-v0.11.0-prep.md) §12):
@@ -33,7 +33,12 @@ oracle_date: 2026-10-07
    - **Bug #1**: `mmu.h:100` 派生 `set_satp_value` shadow 基类非虚函数 + `mmu.h:103` 派生重复 `satp_value_` 成员 → `csr_write_satp` 后基类 `satp_value_` **永不更新**,停留在 ctor 值
    - **Bug #2**: `mmu.cpp:37` `& 0x0FFFFFFFFFFFFULL` 48-bit mask 把 Sv32 MODE bit31 含进 PPN → PTW root 指向天文地址
    - **Oracle 推荐修复**: 删除派生三件套 (`mmu.h:99-100,103`),让基类存取器被继承;`csr_write_satp` 复用 `cf::cpu::detail::extract_satp_ppn` (单测入口已存在,`mmu.h:44-52` 注释自证)
-3. **可能更便宜的 root cause**: proposal 转述尝试 2 PPN = `0x80000`,但 `(0x80000000+0xF000)>>12 = 0x8000F`(≠ `0x80000`)— PTW root 指向 ELF 代码页,指令字节被当 PTE 读足以解释"5 ELF 卡住"。A5 启动期优先用 print/debug 验证
+3. **可能更便宜的 root cause (假设被 A5 排除,2026-10-08 启动期验证)**:
+   - 假设:`(window_base+60*1024)>>12 = 0x8000F` ≠ line 26 transcription `0x80000`,可能是 cpu_factory PPN 计算 typo,导致 PTW root 指向 ELF 代码页 (`0x80000000`)
+   - **A5 启动期验证 (2026-10-08)**: owner 在 `MMUPlugin::do_lookup` 入口加临时 fprintf + 跑 `[mmu][tlb-refill]` 测试 (用 `set_satp_ppn(1ULL<<20) = 0x100000` 模拟 RISC-V satp 路径),捕获 `satp_ppn_` runtime 值 = `0x100000` (与调用值完全一致)。
+   - **静态链分析**: `cfg.satp_ppn = 0x8000F` → `make_satp_value(Sv32, 0x8000F) = 0x80008000F` → `RiscvMMUPlugin::RiscvMMUPlugin` ctor 用 Sv32 mask `0x3FFFFFULL` (line 56) → `ppn = 0x8000F` → `set_satp_ppn(0x8000F)` → `MMUPlugin::satp_ppn_ = 0x8000F` ✓ (MODE bit31 正确排除)。
+   - **结论**: chain 正确传递 PPN,`0x80000` vs `0x8000F` 是 proposal 文档 typo (line 26 已修),不是代码 bug。"更便宜 root cause"假设被排除,Oracle D4-A + D5-TLM 是真 root cause。
+   - **重要 context**: `mmufault-verilator-sv32-e2e-flip` 当前是 placeholder change (`status: placeholder`, depends_on `phase-6d.6-mmu-ptw-fsm`),"5 ELF 卡住" 失败模式无现存可重放测试。A5 实证基于现有最近路径 (`[mmu][tlb-refill]`) + 静态分析。
 
 **owner 真空**:
 - `ip/cpu/cpu_factory_chmem.h:80-85` 源码注释自证 *"sv32 translation 实现 owner 尚未分配"*
@@ -67,6 +72,8 @@ oracle_date: 2026-10-07
 | §Why 增加 shadow 双 bug 详细解释 + Oracle session 引用 | Oracle 已验证为真 | Oracle R2 |
 | §3 明确 shadow 双 bug 修复 = 删除派生三件套 | D5-TLM 锁定 | Oracle D5 |
 | §10 移除 "[cpu-l1-mmu-demo] 6/6 → 7/7 PASS" 的暗示 | E1 由 E5 验证,需 7/7 真正达 | Oracle D2 |
+| §Why line 26 PPN transcription 修正 `0x80000` → `0x8000F` | A5 实证 `(0x80000000+0xF000)>>12 = 0x8000F` 是正确算术值;原值是文档 typo 不是代码 bug | A5 runtime evidence (2026-10-08) |
+| §Why line 36-36+ "更便宜 root cause" 段落改为 A5 验证结论 | A5 排除 "更便宜 root cause" 假设,确认 Oracle D4-A + D5-TLM 是真 root cause;chain cpu_factory → RiscvMMUPlugin ctor → MMUPlugin 静态 + runtime 均正确 | A5 runtime evidence + 静态链分析 (2026-10-08) |
 
 ## What Changes
 

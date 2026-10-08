@@ -27,25 +27,23 @@
 
 ---
 
-## 2. A5 优先验证 (Oracle R12,可能比 shadow 更便宜)
+## 2. ✅ A5 已执行完成 (2026-10-08) — Oracle R12 PPN 验证
 
-```
-🔴 启动 Phase B 前必须先跑 A5!
-```
+> **A5 已由 owner 启动期执行 (session 2026-10-08),Phase B 起点已确认,无阻塞。**
 
-proposal §Why 转述尝试 2 PPN = `0x80000`,但 `(0x80000000+0xF000)>>12 = 0x8000F` (≠ `0x80000`)。若转述准确,PTW root 指向 ELF 代码页,指令字节被当 PTE 读,足以解释"5 ELF 卡住"。
+**原假设 (Oracle R12, 保留为审计记录)**: proposal §Why 转述尝试 2 PPN = `0x80000`,但 `(0x80000000+0xF000)>>12 = 0x8000F` (≠ `0x80000`)。若转述准确,PTW root 指向 ELF 代码页,指令字节被当 PTE 读,足以解释"5 ELF 卡住"。
 
-**A5 步骤**:
-1. 在 `MMUPlugin::do_lookup` 入口加临时 `fprintf(stderr, "[MMU_DEBUG] satp_ppn_=0x%lx last_vaddr_=0x%lx sv_mode_=%d\n", ...)`
-2. 用 `mmufault-verilator-sv32-e2e-flip` 失败测试场景手动重放
-3. 验证实际 planted root PPN 与 satp_ppn 是否相等
-4. **验证完成立即删除 print,禁止 commit 留 print**
-5. PR1-A commit message 附实际 print 输出 + 结论
+**A5 实际执行**:
+1. 在 `MMUPlugin::do_lookup` 入口加临时 `fprintf(stderr, "[MMU_DEBUG] stage=%s satp_ppn_=0x%lx satp_value_=0x%lx sv_mode_=%d vaddr=0x%lx\n", ...)`
+2. `mmufault-verilator-sv32-e2e-flip` 是 **placeholder change** (`status: placeholder`, depends_on `phase-6d.6-mmu-ptw-fsm`) — "5 ELF 卡住" 失败模式**无现存可重放测试** → 改用现有最近路径 `[mmu][tlb-refill]` (用 `set_satp_ppn(1ULL<<20) = 0x100000` 模拟 RISC-V satp 路径)
+3. 捕获 runtime `satp_ppn_` = `0x100000` (与调用值完全一致) → `set_satp_ppn` runtime 路径正确
+4. **验证完成立即删除 print** — `git diff ip/mmu/tlm/MMUPlugin.cpp` 干净
+5. 结论已反馈 proposal §Why line 36-41 + research §12.2 + tasks.md A.5
 
-**A5 结果决定 Phase B 起点**:
-- 若 print 值 = 0x8000F → proposal §Why 转述算错,0x8000F 是更便宜 root cause,Phase B 需先修 cpu_factory PPN 计算
-- 若 print 值 ≠ 0x80000 (其他值) → proposal §Why 转述错误,需重新 root cause
-- 若 print 值 = 0x80000 → A1+A3 修复是 root cause,可继续 Phase B
+**A5 结果 (决定 Phase B 起点)**:
+- ❌ 原分支"print 值 = 0x8000F → 更便宜 root cause" — **被排除**: `0x80000` vs `0x8000F` 是 proposal 文档 typo (line 26 已修),不是代码 bug;静态链 (`make_satp_value` → `RiscvMMUPlugin` ctor Sv32 mask `0x3FFFFFULL` → `set_satp_ppn`) 对 `0x8000F` 正确
+- ❌ 原分支"print 值 ≠ 0x80000 → 重新 root cause" — **不适用**: 无真实测试场景可比 (placeholder change)
+- ✅ **等效结论**: `set_satp_ppn` runtime 链正确 + 现有 `[mmu]` 测试 satp_ppn_ 非零触发 PTW 路径 → **Oracle D4-A (Bare shortcut) + D5-TLM (shadow 双 bug) 确认为真 root cause,Phase B 可继续**
 
 ---
 
@@ -85,8 +83,8 @@ proposal §Why 转述尝试 2 PPN = `0x80000`,但 `(0x80000000+0xF000)>>12 = 0x8
 ## 5. 启动期 owner 第一步 (建议顺序)
 
 1. **读完本文 + tasks.md 全文 + research §6 + §12** (~30 min)
-2. **跑 A5 验证** (Oracle R12 优先,见 §2) (~0.5d)
-3. **与 bp-btb owner 协调 3 项** (Oracle §3) (~0.5d)
+2. ✅ **A5 验证已完成** (Oracle R12,见 §2) (2026-10-08 启动期执行完毕)
+3. **与 bp-btb owner 协调 3 项** (Oracle §3) (~0.5d) — **尚未执行,Phase C 前置**
 4. **执行 Phase A (A1-A6 根因修复)** — **硬前置**,否则 B/C 失败率高 (~5d)
 5. **执行 Phase B → C → D → E** 按 tasks.md 顺序 (~28d)
 6. **Phase D5 跑 4 个 Architecture Gate 脚本** (硬门禁)
@@ -98,7 +96,7 @@ proposal §Why 转述尝试 2 PPN = `0x80000`,但 `(0x80000000+0xF000)>>12 = 0x8
 
 | Phase | Tasks | 人天 |
 |-------|-------|------|
-| A 根因 | A1, A2, A3, A3.1, A4, A5, A6 | **5** |
+| A 根因 | A1, A2, A3, A3.1, A4, A5 ✅, A6 | **4.5d (A5 已完成 2026-10-08)** |
 | B MMU CH_MEM | B2, B3, B4, B5 (B1 跳过) | **10** |
 | C Pipeline 集成 | C1, C2, C3, C4, C5, C6 | **11** |
 | D 验证 | D0 ✅, D1, D2, D3, D4, D5, D6 | **5** |

@@ -31,7 +31,7 @@ The 7 cases SHALL be: `add`, `addi`, `auipc`, `jal`, `beq`, `cpu_l1_mmu_demo_jso
 #### Scenario: TEST_CASE 7 sv32_translation_flipped (新增, mmu-chmem-pipeline-integration)
 - **WHEN** TEST_CASE `cpu_l1_mmu_demo_sv32_translation_flipped` runs with:
   - `cfg.enable_mmu = true` (从原 6/6 的 false 翻转为 true)
-  - `cfg.satp_ppn = (window_base+60*1024)>>12` (per A5 验证后的修正值,如实际是 0x8000F 则用 0x8000F)
+  - `cfg.satp_ppn = (window_base+60*1024)>>12 = 0x8000F` (A5 2026-10-08 验证确认,`(0x80000000+0xF000)>>12 = 0x8000F`;proposal line 26 原 typo `0x80000` 已修)
   - `plant_identity_page_table(mem, window_base+60*1024, elf.entry_addr)`
 - **AND** ELF (e.g., `add` or `addi` from `tests/cpu/manual_elf/`) loaded
 - **THEN** `tohost == 1` SHALL be reached within 10000 cycles
