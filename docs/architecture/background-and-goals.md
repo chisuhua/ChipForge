@@ -1,26 +1,27 @@
 # 背景与目标
 
-> 基于 [CppTLM](https://github.com/chisuhua/CppTLM) + [CppHDL](https://github.com/chisuhua/CppHDL)
+> 基于 [CppHDL](https://github.com/chisuhua/CppHDL) 作为 Plugin-style 的硬件后端设施
 > 支持 Bare-metal / RTOS / Linux 三级测试框架，可扩展至 GPU 等多芯片形态
 
 ---
 
 ## 1.1 项目目标
 
-构建一个基于 **CppTLM**（事务级建模）与 **CppHDL**（C++ 硬件描述）的 RISC-V 虚拟验证平台，实现：
+构建一个用 **Plugin-style**（D4 决策，ADR-083）设计硬件 IP、用 **CppHDL** 作硬件后端的 RISC-V 虚拟验证平台：
 
-- **类 Gem5 的 TLM 建模风格**：以事务为核心驱动，支持松散定时（LT）到近似定时（AT）多粒度仿真
-- **TLM 与 RTL 接口一致**：同一套 Bundle 定义，TLM 模型用 `ch_stream<T>`，RTL 模型用 `Signal<T>`，在 SoC 组合层可按模式混插
-- **CppHDL 渐进演进**：前期直接 C++ 仿真，后期生成 Verilog 并引入 Verilator
+- **Plugin-style 单一 source of truth**（ADR-083）：业务 IP 用 `cf::plugin::PluginBase` + `at_stage()` + `Payload<T>` 编写；同一份代码经由两个编译模式产出不同仿真后端
+- **TLM 模式**（默认）：`cf::plugin::uint_t<N>` 解析为 POD，`pb.run()` 每周期执行 → C++ 直仿（~0.6s 全套）
+- **CH_MEM 模式**（`-DCF_PLUGIN_USE_CH_MEM`）：`cf::plugin::uint_t<N>` 解析为 `ch::core::ch_uint<N>`，`pb.elaborate(ctx)` 发射 lnode DAG → ① CppHDL `Simulator::tick()` ② `ch::toVerilog(ctx)` → `.v` ③ Verilator 联合仿真
 - **三级测试覆盖**：裸机（bare-metal）→ RTOS（FreeRTOS/Zephyr）→ Linux（OpenSBI + Linux Kernel）
-- **多芯片可扩展**：`cpu/`, `cache/`, `memory/`, `interconnect/`, `peripheral/` 各为独立组件库，可按产品形态组合成不同 SoC（RISC-V、GPU 等）
+- **多芯片可扩展**：`cpu/`, `cache/`, `memory/`, `interconnect/`, `peripheral/` 各为独立 Plugin-style IP 库，可按产品形态组合成不同 SoC（RISC-V、GPU 等）
 
 ## 1.2 核心约束
 
-- 主要语言：**C++17**
+- 主要语言：**C++17**（Plugin-style 业务代码）/ **C++20**（chipforge_tests target，因为链接 CppHDL 头文件）
 - 构建系统：**CMake >= 3.16**
-- TLM 框架：**CppTLM**（不依赖 SystemC，使用 `ch_stream<T>` 接口）
-- RTL 框架：**CppHDL**（`Component` 基类，支持 C++ 直仿与 Verilog 生成）
+- **设计模式**：**Plugin-style**（D4 决策，ADR-037 + ADR-083）——业务 IP 不再分别为 TLM 和 RTL 各写一份
+- **硬件后端**：**CppHDL**（CH_MEM 模式必依赖，提供 ch_uint/ch_reg/ch_mem + elaboration + Simulator + toVerilog + Verilator backend）
+- **Legacy 仿真内核**：**CppTLM**（保持依赖以兼容 bridge 适配层，业务 IP 不使用 ch_stream/Module/Port/ModuleFactory）
 - ISS 参考：**Spike**（官方黄金参考模型）
 
 ---
@@ -31,52 +32,55 @@
 
 | 项目 | 位宽 | 流水线 | HDL | 流片 | 特点 |
 |------|------|--------|-----|------|------|
-| **VexRiscv** | 32 | 2-5 级顺序 | SpinalHDL | 否 | 插件化，极高可定制性，FPGA 优化 |
+| **VexRiscv** | 32 | 2-5 级顺序 | SpinalHDL | 否 | **插件化，极高可定制性，FPGA 优化**（Plugin-style 灵感来源） |
 | **CVA6** | 64 | 6 级顺序 | SystemVerilog | 是 | 应用级，core-v-verif 验证环境完整 |
 | **BOOM v3** | 64 | 10 级乱序 | Chisel | 是（测试） | 高性能乱序，Chipyard 生态 |
 | **Rocket Core** | 64 | 5 级顺序 | Chisel | 是 | Berkeley 参考实现，生态完善 |
 | **ibex** | 32 | 2-3 级顺序 | SystemVerilog | 是（OpenTitan） | 安全特性，UVM 验证标杆 |
 | **CV32E40P** | 32 | 4 级顺序 | SystemVerilog | 是 | PULP DSP 扩展 |
 
-### CppTLM 框架特性
+> **ChipForge 与 VexRiscv 的设计同构**：VexRiscv 用 SpinalHDL 的 Plugin Scala 组合实现流水线骨架，ChipForge 用 `cf::plugin` C++ Plugin 组合 + CppHDL elaboration 实现等价效果。差异：VexRiscv 通过 Scala 宏隐式插入 stage reg，ChipForge 通过 `pb.elaborate(ctx)` 显式发射 lnode DAG。
 
-**CppTLM v2.0** 采用四层分层架构：
+### CppHDL 框架特性（CH_MEM 模式后端）
 
-```
-Application Layer   - 用户模块业务逻辑，操作 ch_stream<T>
-Framework Layer     - 自动适配与连接管理，ModuleRegistry，生命周期管理
-Mapper Layer        - 协议转换（AXI4/CHI/TileLink），Port <-> Stream 转换
-Bundle Layer        - Generic Payload 定义，TLM/RTL 共享数据结构
-```
+**CppHDL** 为 Plugin-style CH_MEM 模式提供：
 
-核心特性：
+- **硬件类型**：`ch::core::ch_uint<N>` / `ch::core::ch_bool` / `ch::core::ch_reg` / `ch::core::ch_mem`（Plugin 通过 `cf::plugin::uint_t<N>` 类型抽象间接访问，业务代码不感知差异）
+- **elaboration DSL**：`ch::core::Context` + `node_builder` 单例，`pb.elaborate(ctx)` 把 at_stage 闭包发射为 lnode DAG
+- **仿真器**：`ch::core::Simulator::tick()` 周期精确直仿（C++ 仿真器，无需 EDA 工具）
+- **Verilog 代码生成**：`ch::toVerilog(ctx)` AST → `.v` 文件
+- **Verilator backend**：`verilator --cc file.v` → linked library → `ch::core::VerilatorBackend` 联合仿真
+- **chlib 高级组件**：`chlib::ch_state_machine` 多周期 FSM、`chlib::stream` 流协议、`chlib::fifo`/`chlib::pipeline` 等 25 个 .h 文件（5881 行）
 
-- `ch_stream<T>` 统一通信接口，类型安全
-- `TransactionTracker` 端到端事务追踪（含 JSON/VCD 导出）
-- `ImplMode`：`TLM_ONLY` / `RTL_ONLY` / `COMPARE` / `SHADOW` 四种运行模式
-- 纯 TLM 仿真速度目标：> 1000 KIPS；混合模式额外开销 < 10%
+**与 CppTLM 共享同一套 Bundle 类型系统**（基于 `ch_uint<N>` + `bundle_base<Self>`），消除 TLM（Plugin-style POD）与 HDL（Plugin-style CH_MEM）之间的手工桥接层——业务代码直接用 `cf::plugin::uint_t<N>` 即可。
 
-### CppHDL 框架特性
+### CppTLM 框架角色（legacy 仿真内核）
 
-**CppHDL** 提供：
+**CppTLM v2.0** 仍作为外部依赖保留（`extern/CppTLM` 符号链接），**仅** Bridge 适配层（`src/cf_plugin/bridge/`）依赖：
 
-- `Component` 基类：通过 `describe()` 方法声明硬件逻辑，使用 `__io()` 宏定义端口，`ch_reg<T>` 定义时序逻辑
-- `LogicNode` DAG 系统：数据流图，支持常数传播和死码消除
-- `Simulator`：直接 C++ 仿真，`tick(N)` 驱动 N 个时钟周期，支持配置文件加载和 VCD 追踪导出
-- `VerilogCodeGen`：AST -> Verilog，支持 DAG 优化后输出
-- **与 CppTLM 共享同一套 Bundle 定义**——这是两者集成的核心纽带
+- Bridge 适配层用于桥接外部 CppTLM-based 系统到 ChipForge
+- CppTLM 核心特性（`ch_stream<T>` / `TransactionTracker` / `ModuleFactory`）**业务 IP 不使用**
 
-### 关键集成点
+业务 IP 跨阶段通信由 `cf::plugin::Payload<T>` + `PipeNode` 替代。`ImplMode` enum 已在 doc-code-realignment 2026-06-17 废弃。
+
+### 关键集成点（修订）
 
 ```
-bundles/common_bundles.h
+bundles/<bundle>.h
         |
-        +-- CppTLM 使用 ch_stream<MemReqBundle>    (TLM 高速仿真)
+        +-- Plugin-style TLM 模式: cf::plugin::uint_t<N> = POD
+        |    -> pb.run() -> C++ 直仿 (~0.6s)
         |
-        +-- CppHDL 使用 Port<MemReqBundle>         (RTL 周期精确 / Verilog 生成)
+        +-- Plugin-style CH_MEM 模式: cf::plugin::uint_t<N> = ch::core::ch_uint<N>
+        |    -> pb.elaborate(ctx) -> lnode DAG
+        |    -> ch::toVerilog(ctx) -> .v 文件
+        |    -> verilator --cc -> VerilatorBackend 联合仿真
+        |
+        +-- Legacy Bridge 适配层: cpptlm::ch_stream<Bundle>
+             (仅 src/cf_plugin/bridge/ 使用, 业务 IP 不使用)
 ```
 
-同一份 Bundle 定义，消除 TLM 与 RTL 之间的手工桥接层。
+同一份 Bundle 定义 + 同一份 Plugin-style 业务代码，消除 TLM 与 CH_MEM/Verilog 之间的手工桥接层。
 
 ### 验证生态参考
 
@@ -89,5 +93,5 @@ bundles/common_bundles.h
 | **FreeRTOS** | 嵌入式 RTOS，RISC-V 官方移植 |
 | **Zephyr** | 完整 RTOS，HWMv2 架构，RISC-V 全系列扩展 |
 | **OpenSBI** | M-mode 固件，SBI 接口规范 |
-| **Verilator** | Verilog 转 C++ 周期精确仿真（Phase 5） |
+| **Verilator** | Verilog 转 C++ 周期精确仿真（CH_MEM 模式 backend） |
 

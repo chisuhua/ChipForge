@@ -119,6 +119,7 @@
 | ADR-048 | Plugin 注册规范序 (MMU before IBus/DBus, C++17 inline int 计数器) | Plugin | ✅ v0.7.0 落地 (2026-09-24) | [`adr/ADR-048-plugin-registration-canonical-order.md`](./adr/ADR-048-plugin-registration-canonical-order.md) |
 | ADR-049 | MMU PADDR Consumption Contract + MemoryInterface 抽象 (PADDR-first + `MemoryInterface` + PTW 真内存读) | IP 架构 | ✅ v0.8.0 落地 (2026-09-25, P1#3 mmu-paddr-consume) | [`adr/ADR-049-mmu-paddr-consumption-contract.md`](./adr/ADR-049-mmu-paddr-consumption-contract.md) |
 | ADR-082 | Plugin::negotiate() capability 协商 (provides/requires + 拓扑排序 + elaboration fail-fast) | Plugin | 🚧 Drafting (2026-09-27, v0.10.0 内嵌) | [`adr/ADR-082-plugin-negotiate-capability.md`](./adr/ADR-082-plugin-negotiate-capability.md) |
+| ADR-083 | **Plugin-style 作为硬件模块的单一 source of truth（CppHDL 设施后端 + CppTLM 降级为 bridge 依赖）** | **范式** | ✅ **Accepted (2026-10-08)** | [`adr/ADR-083-plugin-style-single-source-of-truth.md`](./adr/ADR-083-plugin-style-single-source-of-truth.md) |
 
 ### 2.2 部分实现决策（⚠️）— 1 条
 
@@ -175,11 +176,12 @@
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | ✅ 已实现 |
+| 状态 | ⚠️ **部分过时**（2026-10-08） |
 | 来源 | `declarative-hybrid-framework.md` §1.2 |
 | 决策 | ChipForge 仓库通过 `CppTLM/` + `CppHDL/` 符号链接组织代码；应用层 IP 位于 `ip/<name>/`；SoC 顶层位于 `soc/` |
 | 理由 | 三层分工明确各层职责：ChipForge = 应用、CppHDL = 硬件 IR、CppTLM = 仿真内核 |
 | 后果 | ✅ 职责清晰；✅ 可独立升级 CppTLM/CppHDL 子模块；⚠️ 需要符号链接或子模块管理 |
+| **2026-10-08 修订（ADR-083）** | 仓库结构仍 3 层（应用 + CppHDL 设施 + CppTLM legacy），但**角色变更**：CppHDL = Plugin-style 硬件后端设施（CH_MEM 模式必依赖），CppTLM = legacy 仿真内核（仅 bridge 适配层依赖，业务 IP 不使用）；详见 [ADR-083](adr/ADR-083-plugin-style-single-source-of-truth.md) |
 
 **验证命令**：
 ```bash
@@ -1550,6 +1552,7 @@ Summary:
 | 2026-06-17 | 1.2.2 | 新增 ADR-041-bridge-tick-pattern.md（Bridge 适配层允许 tick，编号与 CI 门禁 ADR-041 冲突；本版本未发现） |
 | 2026-06-23 | 1.3 | **冲突修复**：ADR-040 → ADR-042（Plugin 推迟决策，消除 §3 重复编号）；ADR-041 → ADR-043（CI 强制门禁，消除与 openspec spec 强约束的"ADR-041=Bridge"冲突，移至 J 目录与组织）；Plugin (G) 6→7、目录 (J) 1→2、合计 40→42 |
 | 2026-06-23 | 1.3.1 | **组织修复**：§3 章节顺序 K/J → J/K（按字母序）；§2.1 主表新增 ADR-037 行（33→34 条）；§2.4 统计表新增 K 范式决策行（合计 42→43 条，Plugin 类别数 5→6 不变）；TOC J 锚点 2-条→3-条 同步 |
+| 2026-10-08 | 1.4 | **新增 ADR-083**：Plugin-style 作为硬件模块的单一 source of truth（CppHDL 设施后端 + CppTLM 降级为 bridge 依赖）；同步修订 `overview.md` / `AGENTS.md` / `background-and-goals.md` / `tech-selection.md` / `code-framework-mapping.md` 描述 Plugin-style + CppHDL 后端双模式架构 |
 
 ---
 

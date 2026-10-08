@@ -28,35 +28,52 @@
 
 ## 1. 总体架构层次
 
+> **修订（ADR-083, 2026-10-08）**：业务 IP 用 **Plugin-style**（D4 决策）编写，**单一 source of truth**——同份 Plugin-style 代码经由两个编译模式产出不同仿真后端。**CppHDL 是 Plugin-style 的硬件后端设施**；**CppTLM 是 legacy 仿真内核**，仅 bridge 适配层依赖，业务 IP 不使用。
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ ChipForge 应用层                                            │
-│ ├── ip/*/tlm/   → TLM 模块实现 (空目录，参见 §7)            │
-│ ├── ip/*/rtl/   → RTL 模块实现 (空目录，参见 §7)            │
-│ ├── bundles/    → 共享 Bundle 定义 (目录为空，参见 §7)       │
+│ ChipForge 应用层 (Plugin-style, D4 强制, ADR-083)           │
+│ ├── ip/<area>/plugins/<name>.{h,_chmem.h}                   │
+│ │     → Plugin-style 业务代码（双文件分离: TLM + CH_MEM）   │
+│ ├── ip/<area>/lib/                                          │
+│ │     → 纯 C++ 算法层（不依赖 cf::plugin, 但用 uint_t<N>） │
+│ ├── bundles/    → 共享 Bundle/Payload Key 定义               │
 │ └── soc/        → JSON 配置 + 组装                          │
 ├─────────────────────────────────────────────────────────────┤
-│ CppTLM 框架层                                               │
+│ Plugin 框架层 (cf::plugin, ADR-037)                         │
+│ ├── PluginBase + 禁 tick() (ADR-025)                        │
+│ ├── PipeBuilder + at_stage() + Phase + CtrlLink             │
+│ ├── PipeNode + Payload<T> + PayloadStore                    │
+│ ├── uint_t<N>/bool_t 类型抽象 (TLM=POD, CH_MEM=ch_uint<N>)  │
+│ ├── storage::array_store<T,N> + commit_hook                 │
+│ ├── capability_table (ADR-082)                              │
+│ └── src/cf_plugin/bridge/ → CppTLM 适配层（L1Cache/MMU）    │
+├─────────────────────────────────────────────────────────────┤
+│ CppHDL 设施层 (chipforge 必依赖, Plugin-style 硬件后端)        │
+│ ├── ch::core::{ch_uint, ch_bool, ch_reg, ch_mem, Context}  │
+│ ├── chlib::{ch_state_machine, fifo, stream, axi4lite, ...} │
+│ ├── ch::core::elaborate() + lnode DAG                       │
+│ ├── ch::toVerilog(ctx) → .v 文件                            │
+│ ├── Simulator::tick() → C++ 周期精确直仿                    │
+│ ├── VerilatorBackend → verilator --cc 联合仿真             │
+│ ├── Component + ch_module<T> + ch_device<T>                │
+│ └── bundle_base<Self> + chlib 25 个组件（§3.5）            │
+├─────────────────────────────────────────────────────────────┤
+│ CppTLM (legacy, 仅 bridge 适配层依赖)                       │
 │ ├── SimObject / EventQueue   → 仿真引擎                     │
 │ ├── ChStreamModuleBase       → ch_stream 模块               │
-│ ├── StreamAdapter            → 自动适配层（已实现 ~800 行） │
+│ ├── StreamAdapter            → 自动适配层                   │
 │ ├── ChStreamAdapterFactory   → JSON 类型注册中心            │
-│ ├── CoherenceDomain / VC     → NoC / 一致性原语（§2.7）     │
 │ ├── ModuleFactory            → JSON 配置驱动                │
-│ └── Metrics                  → 统计收集                     │
-├─────────────────────────────────────────────────────────────┤
-│ CppHDL 框架层                                               │
-│ ├── Component                → RTL 组件基类                 │
-│ ├── ch_module<T>             → 子模块实例化                 │
-│ ├── bundle_base<Self>        → Bundle 类型系统              │
-│ ├── chlib/*                  → 25 个 HDL 高级组件（§3.5）   │
-│ ├── axi4/*                   → AXI4 参考实现（§3.6）        │
-│ ├── codegen_verilog.h        → Verilog 代码生成             │
-│ └── Simulator                → RTL 仿真引擎                 │
+│ └── CoherenceDomain / VC     → NoC / 一致性原语（§2.7）     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-> **实现边界说明**：上述架构图中，**框架层（CppTLM/CppHDL）**部分全部已实现。ChipForge 应用层仅 `soc/riscv_virt.json` 与 IP 目录骨架（`README.md` / `.gitkeep`）存在，具体 IP 实现 / Bundle 定义 / SoC 装配类尚未构建，详见第 7 节"实现状态与设计目标对比"。
+> **实现边界说明**：
+> - **Plugin 框架层 + CppHDL 设施层**全部已实现
+> - **ChipForge 应用层**：Plugin-style 业务代码已实装 L1CachePlugin / MMUPlugin / CPU 11 Plugin
+> - **CppTLM**：仍作为外部依赖（`extern/CppTLM` 符号链接），仅 `src/cf_plugin/bridge/` 适配层使用
+> - 详细实现状态与设计目标对比见第 7 节
 
 ## 2. CppTLM 框架映射
 
@@ -299,61 +316,99 @@
 
 ### 4.1 目录职责
 
+> **修订（ADR-083, 2026-10-08）**：业务 IP 用 **Plugin-style** 编写（不在 `ip/*/tlm/`、`ip/*/rtl/` 双层目录）。`tlm/` 子目录名为历史遗留，实际是 Plugin-style in TLM mode（参见 [§"不显而易见"约定](#不显而易见的约定)）。
+
 | ChipForge 目录 | 对应框架 | 职责 | 开发者角色 |
 |---------------|---------|------|-----------|
-| `ip/*/tlm/` | CppTLM | TLM 模块实现（继承 ChStreamModuleBase） | IP 开发者 |
-| `ip/*/rtl/` | CppHDL | RTL 模块实现（继承 Component） | IP 开发者 |
-| `ip/*/test/` | 两者 | 验证测试（Level A/B/C） | 验证工程师 |
-| `ip/*/configs/` | 独立 | JSON 参数配置和 Schema | IP 开发者 |
-| `bundles/` | 共享层 | Bundle 定义（基于 CppHDL 类型系统） | 架构师 |
-| `soc/` | CppTLM | SoC 顶层配置（JSON 驱动 ModuleFactory） | SoC 集成者 |
+| `ip/<area>/plugins/<name>.h` | cf::plugin (TLM 模式) | Plugin-style 业务代码 TLM 部分（默认编译） | IP 开发者 |
+| `ip/<area>/plugins/<name>_chmem.h` | cf::plugin + CppHDL (CH_MEM 模式) | Plugin-style 业务代码 CH_MEM 部分（`-DCF_PLUGIN_USE_CH_MEM`） | IP 开发者 |
+| `ip/<area>/lib/` | 独立 | 纯 C++ 算法层（不依赖 PluginBase/PipeBuilder/Payload，但可用 `cf::plugin::uint_t<N>` 类型抽象） | IP 开发者 |
+| `ip/<area>/policies/` | 独立 | 可插拔策略实现（替换/预取/分支预测） | IP 开发者 |
+| `ip/<area>/docs/` | 独立 | IP 级设计文档 + ADR | 架构师 |
+| `ip/<area>/configs/` | 独立 | JSON 测试拓扑配置 | IP 开发者 |
+| `ip/<area>/rtl/` | CppHDL | **预留**：未来 Phase 7+ 真实 RTL 实体（暂空） | IP 开发者 |
+| `include/cf/plugin/` | cf::plugin | Plugin 框架核心头（PluginBase/PipeBuilder/Payload/CtrlLink/uint_t） | 框架开发者 |
+| `src/cf_plugin/bridge/` | cf::plugin + CppTLM | Bridge 适配层（L1Cache/MMU），依赖 CppTLM 接口以桥接外部 CppTLM-based 系统 | 框架开发者 |
+| `bundles/` | cf::plugin + CppHDL | 共享 Bundle 类型（`mem_bundles.h` 等） + Payload Key 定义 | 架构师 |
+| `soc/` | cf::plugin | SoC 顶层配置（JSON 驱动 Plugin 实例化 + at_stage 注册） | SoC 集成者 |
 
 ### 4.2 典型开发流程映射
 
 ```
-1. 定义 Bundle（bundles/）
-   └── 使用 CppHDL: bundle_base<Self> + ch_uint<N>
+1. 定义 Bundle/Payload Key（bundles/）
+   └── 基于 CppHDL: bundle_base<Self> + ch_uint<N>
+   └── 定义 cf::plugin::Payload<T> 全局单例
 
-2. 实现 TLM 模块（ip/*/tlm/）
-   └── 继承 CppTLM: ChStreamModuleBase
-   └── 内部使用 ch_stream<MyBundle>
-   └── 注册：REGISTER_MODULE("TypeName", ClassName)
+2. 实现 Plugin-style 业务代码（ip/<area>/plugins/）
+   └── 继承 cf::plugin::PluginBase
+   └── 强制实现 build(pb): pb.at_stage(name, phase, lambda)
+   └── 双文件分离: <name>.h (TLM) + <name>_chmem.h (CH_MEM)
+   └── 不继承 ChStreamModuleBase / Component
+   └── 不调 REGISTER_MODULE("TypeName", ClassName)
+   └── 不写 ch_stream<T>
 
-3. 实现 RTL 模块（ip/*/rtl/）
-   └── 继承 CppHDL: Component
-   └── 在 describe() 中实现逻辑
-   └── 使用相同 Bundle 类型
+3. （可选）实现纯算法层（ip/<area>/lib/）
+   └── 0 引用 cf::plugin::PluginBase/PipeBuilder/Payload
+   └── 唯一例外：可使用 cf::plugin::uint_t<N> 类型抽象
+   └── Plugin-style 代码持 lib/ 算法为成员
 
-4. 编写测试（ip/*/test/）
-   └── Level A: 单元测试（直接调用模块方法）
-   └── Level B: 集成测试（最小 JSON 拓扑）
-   └── Level C: 系统测试（完整 SoC）
+4. 编写测试（tests/<area>/）
+   └── Level A: 单元测试（直接构造 Plugin 实例 + setup + build + run/elaborate）
+   └── Level B: 集成测试（最小 CpuFactory + Plugin 组合）
+   └── Level C: 端到端测试（JSON 拓扑 + ELF 加载 + tohost=1 验证）
 
 5. 配置 SoC（soc/）
-   └── JSON 定义模块实例和连接
-   └── ModuleFactory 自动装配
+   └── JSON 定义 Plugin 实例化 + at_stage 拓扑
+   └── CpuFactory（TLM/CH_MEM）自动装配
+   └── （可选）通过 src/cf_plugin/bridge/ 桥接到外部 CppTLM-based 系统
 ```
 
 ## 5. 关键接口对照
 
-### 5.1 ch_stream（模块内部）vs Port（框架外部）
+> **修订（ADR-083, 2026-10-08）**：业务 IP 不使用 `ch_stream<T>` / `Port<T>` / `ModuleFactory`。以下对照表保留作为 legacy CppTLM 知识（bridge 适配层仍在用），并补充 Plugin-style 替代。
+
+### 5.1 Plugin-style PayloadStore 替代 ch_stream（业务 IP 用）
+
+| 特征 | `cf::plugin::Payload<T>` + `PipeNode` (业务 IP) | `cpptlm::ch_stream<T>` (legacy, bridge 用) |
+|------|----------------------------------------------|------------------------------------------|
+| 使用者 | 业务 IP 开发者 | bridge 适配层 / 外部 CppTLM-based 系统 |
+| 定义位置 | `cf::plugin::Payload<T>` 全局静态单例 + `PipeNode` 阶段节点 | 模块类内部 `ch_stream<MyBundle>` 成员 |
+| 数据类型 | `T` 在 TLM 模式 = POD，在 CH_MEM 模式 = `ch::core::ch_uint<N>` | 泛型 Bundle（基于 `bundle_base<Self>`） |
+| 跨阶段通信 | `node(key)` 取值 / `node[key] = val` 赋值；编译期类型检查 | `stream.valid` / `stream.payload` 握手 |
+| 连接方式 | PipeBuilder 自动按 at_stage 注册顺序连线 | StreamAdapter 自动映射到 Port |
+| 多周期控制 | `CtrlLink::halt_when/throw_when/flush_when/bypass` | ch_stream 本身无（需自建） |
+| 编译期模式 | `uint_t<N>` 类型抽象双模式统一 | ch_stream 仅 TLM 模式可用 |
+
+### 5.2 Plugin-style TLM 类型 vs Plugin-style CH_MEM 类型
+
+| 特征 | TLM 模式 | CH_MEM 模式 |
+|------|---------|-------------|
+| 类型抽象 | `cf::plugin::uint_t<N>` = POD (`uint32_t`) | `cf::plugin::uint_t<N>` = `ch::core::ch_uint<N>` |
+| bool 类型 | `cf::plugin::bool_t` = `bool` | `cf::plugin::bool_t` = `ch::core::ch_bool` |
+| 调度入口 | `pb.run()` 每周期执行闭包 | `pb.elaborate(ctx)` 一次性发射 lnode DAG |
+| 仿真后端 | C++ 直仿（~0.6s 全套） | CppHDL Simulator / Verilog / Verilator |
+| 存储 | `array_store<T,N>` 单缓冲（commit 是 no-op） | `array_store<T,N>` 双缓冲（commit swap） |
+| 控制流 | `if (cond) { ... }` 全分支（D4 §2.3） | `select(ch_bool, a, b)` 条件赋值（ch_bool 编译期常量传播） |
+| 业务代码 | 同份源码 | 同份源码（`#ifdef CF_PLUGIN_USE_CH_MEM`） |
+
+### 5.3 ch_stream（模块内部，bridge 适配层用）vs Port（框架外部）
 
 | 特征 | ch_stream | Port |
 |------|-----------|------|
-| 使用者 | IP 开发者 | SoC 集成者/框架 |
+| 使用者 | bridge 适配层 (`src/cf_plugin/bridge/`) | 外部 CppTLM-based 系统集成者 |
 | 定义位置 | 模块类内部 | ModuleFactory 自动创建 |
 | 数据类型 | 泛型 Bundle | Packet（序列化） |
 | 连接方式 | 不可直接连接 | JSON 配置连接 |
 | 转换机制 | StreamAdapter 自动映射 | 直接使用 |
 
-### 5.2 CppTLM Bundle vs CppHDL Bundle
+### 5.4 CppTLM Bundle vs CppHDL Bundle（Bundle 类型系统一致性）
 
 | 特征 | CppTLM 中的 Bundle | CppHDL 中的 Bundle |
 |------|-------------------|-------------------|
 | 基类 | 无固定基类（POD 结构） | `bundle_base<Self>` (CRTP) |
 | 字段类型 | C++ 原生类型（uint64_t 等） | `ch_uint<N>` / `ch_bool` |
-| 用途 | ch_stream 传输载体 | RTL 信号线组 |
-| 共享方式 | 通过 bundle_serialization.hh 序列化 | 直接使用 |
+| 用途 | bridge 适配层 ch_stream 传输载体 | Plugin-style RTL 信号线组（CH_MEM 模式） |
+| 共享方式 | 通过 `bundle_serialization.hh` 序列化 | 直接使用 |
 | TLM 互操作 | 原生支持 | 通过 `tlm_bundle_converter.h` 转换 |
 
 ## 6. 相关文档

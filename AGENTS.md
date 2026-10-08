@@ -1,6 +1,13 @@
 # ChipForge — Agent 简明手册
 
-本项目是 CppTLM + CppHDL 上的 RISC-V 虚拟验证平台。使用声明式 Plugin 范式（D4）构建硬件 IP。
+本项目用 **Plugin-style**（D4 决策）设计所有硬件 IP（单一 source of truth, 详见 [ADR-083](docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md)）。**业务 IP 不再分别维护 TLM 副本和 RTL 副本**——同份 Plugin-style 代码经由**两个编译模式**产出不同仿真后端：
+
+| 模式 | 编译开关 | `uint_t<N>` 解析为 | 调度入口 | 仿真后端 |
+|------|---------|-------------------|---------|---------|
+| **TLM** | 默认（不加 flag） | POD (`uint8_t`/`uint16_t`/`uint32_t`/`uint64_t`) | `pb.run()` 每周期执行 | C++ 直仿（~0.6s 全套） |
+| **CH_MEM** | `-DCF_PLUGIN_USE_CH_MEM` | `ch::core::ch_uint<N>` | `pb.elaborate(ctx)` 发射 lnode DAG | ① CppHDL Simulator ② `ch::toVerilog(ctx)` ③ Verilator 联合仿真 |
+
+**CppHDL 是 Plugin-style 的底层设施**（提供 ch_uint / ch_reg / ch_mem / lnode DAG / toVerilog / Verilator backend）。**CppTLM 是 legacy 仿真内核**，仅 `src/cf_plugin/bridge/` 适配层依赖——**业务 IP 不使用** ch_stream / Module / Port / ModuleFactory。
 
 ---
 
@@ -89,7 +96,7 @@ bash tools/run_chipforge_tests.sh --all
 
 | 目录 | 内容 | 状态 |
 |------|------|------|
-| `ip/{cpu,cache,mmu,memory,...}/` | 硬件 IP，每个独立，lib/ + tlm/ 双层切分 | 不同 IP 不同阶段 |
+| `ip/{cpu,cache,mmu,memory,...}/` | 硬件 IP，每个独立，`plugins/` (双文件) + `lib/` 切分（ADR-083 单一 source of truth） | 不同 IP 不同阶段 |
 | `include/cf/plugin/` | Plugin 框架头文件（PluginBase/Payload/PipeNode/PipeBuilder/CtrlLink） | ✅ Phase 0 完成 |
 | `src/cf_plugin/bridge/` | Bridge 适配层（CppTLM ↔ Plugin 桥接） | ✅ L1Cache 完成 |
 | `tests/{framework,cache,cpu,mmu,soc,bundles}/` | 测试按 family 分目录，非按源码位置 | |
@@ -159,8 +166,9 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 ip/{name}/
 ├── README.md       # IP 总览
 ├── STATUS.md       # 当前阶段/状态
-├── tlm/            # CppTLM Plugin 层（D4 强制）
-├── rtl/            # CppHDL RTL 层（Phase 5+）
+├── plugins/        # Plugin-style 业务代码（ADR-083 单一 source of truth）
+│   ├── <name>.h        # TLM 模式（默认编译）
+│   └── <name>_chmem.h  # CH_MEM 模式（#ifdef CF_PLUGIN_USE_CH_MEM）
 ├── lib/            # 纯 C++ 算法层（与 Plugin 框架解耦）
 ├── configs/        # JSON 配置 + params_schema.json
 ├── docs/           # 设计文档
@@ -170,14 +178,23 @@ ip/{name}/
 │   ├── integration.md
 │   └── adr/        # IP 级 ADR
 ├── policies/       # 替换策略（mmu 特有）
+├── rtl/            # 预留：未来 Phase 7+ 真实 RTL 实体（暂空）
 └── test/           # 预留（实际在 tests/{name}/）
 ```
 
-### lib/ vs tlm/ 严格切分（核心架构规则）
+> **历史命名**：`tlm/` 子目录命名是 Phase 1 早期遗留，实际是 Plugin-style in TLM mode。新 IP 应使用 `plugins/` 子目录 + 双文件分离（`<name>.h` + `<name>_chmem.h`）。
+
+### lib/ vs plugins/ 严格切分（核心架构规则）
 
 - `lib/` — 纯 C++ 算法，**0 引用** `cf::plugin::PluginBase`/`PipeBuilder`/`Payload`（唯一例外：`cf::plugin/uint_t.h`）
-- `tlm/` — Plugin 框架集成，依赖 `cf::plugin::*`，持 `lib/` 算法为成员
-- `lib/` → HDL 1:1 转换，`tlm/` → Phase 6 才转换
+- `plugins/` — Plugin 框架集成，依赖 `cf::plugin::*`，持 `lib/` 算法为成员
+- `lib/` → CH_MEM elaboration 1:1 转换（`ch::core::ch_uint<N>` 直接用于 elaboration DAG），`plugins/<name>_chmem.h` → Phase 6d 才转换
+
+### `tlm/` vs `rtl/` 双层目录概念（已废弃）
+
+- ❌ **不再使用** `ip/{area}/tlm/` 单独维护 TLM 副本 + `ip/{area}/rtl/` 单独维护 RTL 副本
+- ✅ **替代**：单一 `plugins/<name>.h` (TLM) + `plugins/<name>_chmem.h` (CH_MEM) 双文件分离
+- ✅ CH_MEM 模式由 `-DCF_PLUGIN_USE_CH_MEM` 编译开关控制，**编译期**选择后端
 
 ---
 
