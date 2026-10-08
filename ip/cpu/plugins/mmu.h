@@ -47,8 +47,7 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
   RiscvMMUPlugin(cf::ip::mmu::SvMode mode, std::vector<cf::ip::mmu::MMUPlugin::TLBConfig> levels_cfg,
                  cf::ip::mmu::MMUPlugin::PTWConfig ptw_cfg, std::uint64_t satp_value = 0,
                  cf::ip::mmu::MemoryInterface* mem = nullptr)
-      : cf::ip::mmu::MMUPlugin(mode, std::move(levels_cfg), ptw_cfg, mem),
-        satp_value_(satp_value) {
+      : cf::ip::mmu::MMUPlugin(mode, std::move(levels_cfg), ptw_cfg, mem) {
     cf::ip::mmu::MMUPlugin::set_satp_value(satp_value);  // qualified: 调用基类 (派生 shadow)
     std::uint64_t ppn = 0;
     switch (mode) {
@@ -95,12 +94,7 @@ class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin {
   void set_exception_code(std::uint8_t code) { last_exception_code_ = code; }
   std::uint8_t exception_code() const { return last_exception_code_; }
 
-  // satp value (4-byte aligned; low 4 bits = MODE)
-  std::uint64_t satp_value() const { return satp_value_; }
-  void set_satp_value(std::uint64_t v) { satp_value_ = v; }
-
  private:
-  std::uint64_t satp_value_ = 0;
   std::uint8_t last_exception_code_ = 0;
   cf::plugin::PipeBuilder* pb_for_vaddr_ = nullptr;  // debug-cpu-l1-mmu-demo-paddr-regression Phase C
 };

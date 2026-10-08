@@ -23,6 +23,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/cpu_factory.h"
 #include "ip/cpu/tlm/cpu_keys.h"
 #include "ip/mmu/lib/multi_level_tlb.h"
 #include "ip/mmu/tlm/mmu_keys.h"
@@ -32,9 +33,8 @@ namespace cpu {
 namespace plugins {
 
 void RiscvMMUPlugin::csr_write_satp(std::uint64_t satp_value) {
-  satp_value_ = satp_value;
-  set_satp_value(satp_value);
-  set_satp_ppn(satp_value & 0x0FFFFFFFFFFFFULL);
+  cf::ip::mmu::MMUPlugin::set_satp_value(satp_value);
+  set_satp_ppn(cf::cpu::detail::extract_satp_ppn(mode(), satp_value));
   if (auto* tlb = multi_tlb()) {
     tlb->invalidate_all();
   }

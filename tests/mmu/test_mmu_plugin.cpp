@@ -4,6 +4,7 @@
 
 #include "ip/cpu/plugins/mmu.h"
 #include "ip/mmu/tlm/MMUPlugin.h"
+#include "ip/mmu/tlm/mmu_keys.h"
 
 namespace cf {
 namespace ip {
@@ -206,6 +207,102 @@ TEST_CASE("PTWAdvanceFromStubIsNoOpWhenNotBusy", "[mmu][MMUPlugin][PTW]") {
   CHECK(level_before == level_after);
   CHECK_FALSE(ptw.is_busy());
   CHECK_FALSE(ptw.is_done());
+}
+
+// mmu-chmem-pipeline-integration Phase A RED tests (HANDOFF §1 D4/D5)
+
+TEST_CASE("BareShortcut_Sv32ZeroPpnInitiatesPTW", "[mmu][bare-shortcut]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  cf::plugin::PipeBuilder pb;
+  auto plugin = std::make_unique<MMUPlugin>(SvMode::Sv32, levels, MMUPlugin::PTWConfig{2});
+  MMUPlugin* plugin_raw = plugin.get();
+  pb.register_plugin(std::move(plugin));
+  pb.build();
+
+  CHECK(plugin_raw->satp_value() == (1ULL << 31));
+  CHECK(plugin_raw->satp_ppn() == 0);
+
+  plugin_raw->issue_request(0x40000000ULL);
+  pb.run();
+
+  using Key = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+  auto* node = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+  REQUIRE(node != nullptr);
+
+  const bool paddr_valid = static_cast<bool>((*node)(Key::PADDR_VALID));
+  CHECK_FALSE(paddr_valid);
+}
+
+TEST_CASE("BareShortcut_Sv32NonZeroPpnTLBHitBypassesBare", "[mmu][bare-shortcut]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  cf::plugin::PipeBuilder pb;
+  auto plugin = std::make_unique<MMUPlugin>(SvMode::Sv32, levels, MMUPlugin::PTWConfig{2});
+  MMUPlugin* plugin_raw = plugin.get();
+  pb.register_plugin(std::move(plugin));
+  pb.build();
+
+  plugin_raw->set_satp_ppn(0x12345ULL);
+  plugin_raw->multi_tlb()->level(0)->insert(0x40000000ULL, 0x80000000ULL, 0, 0xFF);
+  REQUIRE(plugin_raw->multi_tlb()->level(0)->lookup(0x40000000ULL, 0).hit);
+
+  plugin_raw->issue_request(0x40000000ULL);
+  pb.run();
+
+  using Key = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+  auto* node = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+  REQUIRE(node != nullptr);
+
+  const bool paddr_valid = static_cast<bool>((*node)(Key::PADDR_VALID));
+  const std::uint64_t paddr = static_cast<std::uint64_t>((*node)(Key::PADDR));
+  CHECK(paddr_valid);
+  CHECK(paddr == 0x80000000ULL);
+}
+
+TEST_CASE("BareShortcut_Sv39NonZeroPpnTLBHitBypassesBare", "[mmu][bare-shortcut]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  cf::plugin::PipeBuilder pb;
+  auto plugin = std::make_unique<MMUPlugin>(SvMode::Sv39, levels, MMUPlugin::PTWConfig{2});
+  MMUPlugin* plugin_raw = plugin.get();
+  pb.register_plugin(std::move(plugin));
+  pb.build();
+
+  plugin_raw->set_satp_ppn(0xABCDEULL);
+  plugin_raw->multi_tlb()->level(0)->insert(0x40000000ULL, 0x80000000ULL, 0, 0xFF);
+
+  plugin_raw->issue_request(0x40000000ULL);
+  pb.run();
+
+  using Key = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+  auto* node = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+  REQUIRE(node != nullptr);
+
+  const bool paddr_valid = static_cast<bool>((*node)(Key::PADDR_VALID));
+  const std::uint64_t paddr = static_cast<std::uint64_t>((*node)(Key::PADDR));
+  CHECK(paddr_valid);
+  CHECK(paddr == 0x80000000ULL);
+}
+
+TEST_CASE("ShadowBug_CtorSetsBaseSatpValue", "[mmu][shadow-bug]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  cf::cpu::plugins::RiscvMMUPlugin mmu(SvMode::Sv32, levels, MMUPlugin::PTWConfig{2},
+                                        /*satp_value=*/0x80000000ULL);
+  CHECK(mmu.MMUPlugin::satp_value() == (1ULL << 31));
+}
+
+TEST_CASE("ShadowBug_CsrWriteSatpUpdatesBaseNotShadow", "[mmu][shadow-bug]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  cf::cpu::plugins::RiscvMMUPlugin mmu(SvMode::Sv32, levels, MMUPlugin::PTWConfig{2},
+                                        /*satp_value=*/0x80000000ULL);
+  mmu.csr_write_satp(0x80040000ULL);
+  CHECK(mmu.MMUPlugin::satp_value() == 0x80040000ULL);
+}
+
+TEST_CASE("ShadowBug_CsrWriteSatpPpnExtractionModeAware", "[mmu][shadow-bug]") {
+  std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
+  cf::cpu::plugins::RiscvMMUPlugin mmu(SvMode::Sv32, levels, MMUPlugin::PTWConfig{2},
+                                        /*satp_value=*/0x80000000ULL);
+  mmu.csr_write_satp(0x80040000ULL);
+  CHECK(mmu.MMUPlugin::satp_ppn() == 0x40000ULL);
 }
 
 }  // namespace mmu

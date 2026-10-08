@@ -235,9 +235,9 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 - [ADR-037](ADR-037-plugin-as-design-paradigm.md)：Plugin 作为设计范式（v2.0 Phase 6c M5 落地）
 - [ADR-040](ADR-040-tlm-hdl-portability-constraints.md)：TLM→HDL 移植性约束 v2.0（CH_MEM 是新正道）
 - [ADR-046](ADR-046-multi-cycle-fsm-exemption.md)：多周期 FSM 豁免
-- [docs/methodology/plugin-style-design-methodology-v1.md](../methodology/plugin-style-design-methodology-v1.md) v2：Plugin 声明式电路设计方法学（TLM + CH_MEM 双模）
+- [docs/methodology/plugin-style-design-methodology-v1.md](../../methodology/plugin-style-design-methodology-v1.md) v2：Plugin 声明式电路设计方法学（TLM + CH_MEM 双模）
 - [docs/architecture/plugin-framework.md](../plugin-framework.md)：Plugin 框架架构
-- [docs/lessons/phase-6c-elaboration-substrate.md](../lessons/phase-6c-elaboration-substrate.md)：Phase 6c 行级教训
+- [docs/lessons/phase-6c-elaboration-substrate.md](../../lessons/phase-6c-elaboration-substrate.md)：Phase 6c 行级教训
 
 ---
 

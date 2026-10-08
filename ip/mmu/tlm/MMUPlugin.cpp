@@ -106,7 +106,7 @@ void MMUPlugin::build(cf::plugin::PipeBuilder& pb) {
         satp_mode = 0;
         break;
     }
-    if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0) {
+    if (sv_mode_ == SvMode::Bare || satp_mode == 0) {
       (*node)(Key::PADDR) = vaddr;
       (*node)(Key::PADDR_VALID) = true;
       (*node)(Key::MMU_VADDR) = vaddr;
