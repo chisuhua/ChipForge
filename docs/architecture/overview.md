@@ -10,9 +10,9 @@
 > - ✅ **Phase 1.4 完成**（2026-06-13）：L1CachePlugin 设计方法学复盘（[`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md)）
 > - ✅ **CPU M4/M5 完成**（2026-06-24）：11 Plugin 套件 CpuFactory 真实注册 + DSE 576-config sweep
 > - ✅ **MMU 实装 + VIPT 集成 + CPU Pipeline**（2026-09-14）：`mmu-tlb-ptw-impl`（TLB/PTW 算法 + MMUTLMBridge）→ `mmu-cache-integration`（L1Cache 消费 MMU_VADDR VIPT + PIPT fallback）→ `cpu-mmu-integration`（RiscvMMUPlugin 注册 CpuFactory + 3 substage）→ `ptw-walk-bridge-fix`（PTW at_stage 接线 + Bridge 真实 issue_request/read_response）。**317/317 tests PASS**
-> - 🚧 **下一里程碑**：`soc-cpu-l1-mmu-demo`（CPU+MMU+L1+Memory 完整 SoC，真 RISC-V 程序 tohost 退出）→ `cache-phase1.5-4way`（VIPT 正式安全 ADR-044 §2.5）→ `mmu-chmem-pipeline-integration`（CH_MEM 真 sv32 translation owner 闭合）。SoC 路线图见 [`soc/cpu/docs/roadmap/`](../../soc/cpu/docs/roadmap/)
+> - 🚧 **下一里程碑**：`soc-cpu-l1-mmu-demo`（CPU+MMU+L1+Memory 完整 SoC，真 RISC-V 程序 tohost 退出）→ `cache-phase1.5-4way`（VIPT 正式安全 ADR-044 §2.5）→ `mmu-chmem-pipeline-integration`（CH_MEM 真 sv32 translation owner 闭合）。SoC 路线图见 [`.rddf/roadmap/`](../../.rddf/roadmap/)
 >
-> **本文档描述目标架构**；具体实现进度以 [`roadmap/roadmap-status.md`](../roadmap/roadmap-status.md) 为准。
+> **本文档描述目标架构**；具体实现进度以 [`.rddf/roadmap.md`](../../.rddf/roadmap.md) 为准。
 
 ## 架构总览
 

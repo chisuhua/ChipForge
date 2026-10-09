@@ -1,6 +1,6 @@
 # Reference 4：14 PoC 详细规范 + PoC↔change 映射 + 8 风险反向决策树（2026-09-29 扩展：新增 PoC-13 占位 + PoC-14 + PoC-15）
 
-> **主控文档**：[`../execution-roadmap.md`](../execution-roadmap.md) §3.3 PoC 速查 + §3.4 风险速查
+> **主控文档**：[`docs/architecture/roadmap-evolution.md`](../architecture/roadmap-evolution.md) §3.3 PoC 速查 + §3.4 风险速查
 > **关联**：本文是 §3.3 / §3.4 的展开版
 
 ---

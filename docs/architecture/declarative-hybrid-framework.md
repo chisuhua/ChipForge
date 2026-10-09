@@ -768,7 +768,7 @@ private:
 
 `L1CachePlugin`（Phase 1 Hello World）是**第一个验证 Phase 0 脚手架**的真实 Plugin：
 
-- **位置**: 详见 `soc/cpu/docs/roadmap/archive/phase-1-tlm-foundation.md` §1.2
+- **位置**: 详见 `.rddf/roadmap/archive/phase-1-tlm-foundation.md` §1.2
 - **目的**: 验证 Plugin-style 业务逻辑在 Phase 0 脚手架下能端到端跑通
 - **设计约束**: 业务代码无 `tick()`、无状态机、Bundle 字段用 `uint_t<N>`（D4 强制）
 - **不修改**: Phase 0 接口承诺的稳定性（§6.8 关联承诺）
@@ -1131,7 +1131,7 @@ CppTLM AGENTS.md 明确：
 **v2.0.3 行动项**: 用户指派 Owner 后,需同步:
 1. 更新本表"当前 Owner"列
 2. 在 `.omo/plans/` 下创建对应 Phase 实施计划(由 Owner 起草)
-3. 在 `docs/roadmap/roadmap-status.md` §3 "当前未决项" 中关闭对应 PA-2 项
+3. 在 `(已迁移, 见 .rddf/roadmap.md)` §3 "当前未决项" 中关闭对应 PA-2 项
 
 ### 12.1 已实现项 ✅（可直接使用）
 
@@ -1154,8 +1154,8 @@ CppTLM AGENTS.md 明确：
 > - **Phase 0**：Plugin 最小**脚手架**（5 个 P0 组件，~2-3 周）—— 让 Plugin-style 业务逻辑能跑起来
 > - **Phase 6**：完整 **PipeBuilder 框架** + RTL 生成（~12-20 周）—— 完整调度算法、JSON 解析、验证基础设施、RTL 集成
 >
-> 详细任务清单：见 [`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md)
-> 详细 Phase 6 任务：见 [`docs/roadmap/phases/phase-6-declarative.md`](../../docs/roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，预留）
+> 详细任务清单：见 [`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md)
+> 详细 Phase 6 任务：见 [`.rddf/roadmap/archive/phase-6-declarative.md`](../../.rddf/roadmap/archive/phase-6-declarative.md)（v2.0.2 暂未创建，预留）
 > 决策依据：见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`（已归档为 gitignored 草稿，不链接）
 
 #### 12.2.1 Phase 0 范围（5 个 P0 交付物）

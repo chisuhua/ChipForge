@@ -646,7 +646,7 @@ static int run_hello_pipeline() {
 - 想给上述 Cache 注入"tag lookup 逻辑"——实现 `Plugin`，用 `Payload<T>` 共享状态，由 `at_stage` 阶段调度
 - 二者通过**配置层**（JSON 模块列表 + C++ Plugin 注册）组合，而非通过**代码继承**组合
 
-> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 `soc/cpu/docs/roadmap/archive/phase-1-tlm-foundation.md`）。
+> **v1.0 阶段标记**：§4.1 的"挂载接口"在 Phase 0 尚未实现——目前两套机制各自独立运行。集成路径将在 Phase 1 L1CachePlugin 实施时定义（参见 `.rddf/roadmap/archive/phase-1-tlm-foundation.md`）。
 
 ### 4.2 Component
 
@@ -757,13 +757,13 @@ D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业�
 | Phase 6 | 🚧 待开发 | 完整 PipeBuilder 框架 + RTL 生成（12-20 周）；推迟的 Phase 1a/1b/1c 内容合并到此阶段 |
 
 > **详细阶段定义**：
-> - Phase 0：[`docs/roadmap/phases/phase-0-plugin-scaffolding.md`](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
-> - Phase 1：`soc/cpu/docs/roadmap/archive/phase-1-tlm-foundation.md`（L1CachePlugin 业务实现）
-> - Phase 6：[`docs/roadmap/phases/phase-6-declarative.md`](../../docs/roadmap/phases/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
+> - Phase 0：[`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
+> - Phase 1：[`.rddf/roadmap/archive/phase-1-tlm-foundation.md`](../../.rddf/roadmap/archive/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
+> - Phase 6：[`.rddf/roadmap/archive/phase-6-declarative.md`](../../.rddf/roadmap/archive/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
 
 ### 5.2 Phase 0 接口稳定性承诺
 
-> **引用**：[`phase-0-plugin-scaffolding.md` §6.1](../../docs/roadmap/phases/phase-0-plugin-scaffolding.md) + [`declarative-hybrid-framework.md` §12.2.3](declarative-hybrid-framework.md)
+> **引用**：[`phase-0-plugin-scaffolding.md` §6.1](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md) + [`declarative-hybrid-framework.md` §12.2.3](declarative-hybrid-framework.md)
 
 Phase 0 完成后，以下 **5 个接口**在 Phase 1-5 期间**保持稳定**（仅 Phase 6 才升级）：
 

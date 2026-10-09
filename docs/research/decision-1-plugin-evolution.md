@@ -1,6 +1,6 @@
 # Reference 1：决策 1 深度展开 — VexiiRiscv 5 病灶 × ChipForge 机制级回应
 
-> **主控文档**：[`../execution-roadmap.md`](../execution-roadmap.md) §2（决策 1）
+> **主控文档**：[`docs/architecture/roadmap-evolution.md`](../architecture/roadmap-evolution.md) §2（决策 1）
 > **关联**：执行路径图决策 1 的全部论证细节；引用本文档的结论做 v0.10.0 / v1.0.0 / v1.2.0 / v1.3.0 实施依据
 
 ---

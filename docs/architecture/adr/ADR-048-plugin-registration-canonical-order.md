@@ -147,8 +147,8 @@ D1=A 被选中因为：最小侵入、compile-time 断言不可行（`inline int
 - **预估时长**: ≤ 1 周
 - **约束**: JSON 字段缺失时 fallback 硬编码（保证现有 `[cpu-l1-mmu-demo]` 6 用例不破坏）
 - **关联文档**: 
-  - 决策记录: `docs/roadmap/strategy/execution-roadmap.md §2.4`
-  - 战略同步: `docs/roadmap/strategy/a-plus-c-hybrid.md §3/§4/§5/§6`
+  - 决策记录: `docs/architecture/roadmap-evolution.md §2.4`
+  - 战略同步: `.rddf/roadmap/strategy.md §3/§4/§5/§6`
   - Proposal: `openspec/changes/mmu-config-json-driven/proposal.md`
 
 ---
@@ -158,4 +158,4 @@ D1=A 被选中因为：最小侵入、compile-time 断言不可行（`inline int
 - **变更工作区**: `openspec/changes/cpu-pipeline-canonical-ordering-assert/`
 - **ADR-040 v2.0**: TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）
 - **ADR-045**: Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop
-- **策略**: `docs/roadmap/strategy/a-plus-c-hybrid.md` §6.1 P0#1 条目
+- **策略**: `.rddf/roadmap/strategy.md` §6.1 P0#1 条目

@@ -1,7 +1,7 @@
 # Reference 2：ADR 落地矩阵（8 条已落地 + 10 条规划中 + 3 条候选 + 2 CI 门禁）
 
-> **主控文档**：[`../execution-roadmap.md`](../execution-roadmap.md) §2 决策 + §3 实施路径
-> **关联**：ADR 文档源 [`../../../../../docs/architecture/adr.md`](../../../../../docs/architecture/adr.md)
+> **主控文档**：[`docs/architecture/roadmap-evolution.md`](../architecture/roadmap-evolution.md) §2 决策 + §3 实施路径
+> **关联**：ADR 文档源 [`../../architecture/adr.md`](../architecture/adr.md)
 
 ---
 

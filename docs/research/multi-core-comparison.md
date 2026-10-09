@@ -1,6 +1,6 @@
 # Reference 3：多核对比矩阵（VexRiscv / VexiiRiscv / XiangShan / ChipForge）
 
-> **主控文档**：[`../execution-roadmap.md`](../execution-roadmap.md) §1 目标表（差异化目标行 + 超越目标行）
+> **主控文档**：[`docs/architecture/roadmap-evolution.md`](../architecture/roadmap-evolution.md) §1 目标表（差异化目标行 + 超越目标行）
 > **关联**：本文是 §1 超越目标"8 个 🚀 独占维度（2026-09-29 扩展）"的依据
 
 ---
