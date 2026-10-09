@@ -115,7 +115,7 @@ bash tools/run_chipforge_tests.sh --all
 | `src/cf_plugin/bridge/` | Bridge 适配层（CppTLM ↔ Plugin 桥接） | ✅ L1Cache 完成 |
 | `tests/{framework,cache,cpu,mmu,soc,bundles}/` | 测试按 family 分目录，非按源码位置 | |
 | `bundles/` | 共享 Bundle 定义（`mem_bundles.h`, `tlb_bundles_extension.h`） | |
-| `soc/` | SoC 级 JSON 配置 + 系统架构文档（`soc/cpu/docs/architecture.md` + `soc/cpu/docs/roadmap/`） | |
+| `soc/` | SoC 级 JSON 配置 + 系统架构文档（`soc/cpu/docs/architecture.md` + `.rddf/roadmap/`） | |
 | `docs/` | 架构文档、ADR、流程图、框架级路线图（Phase 0/6） | |
 | `openspec/changes/` | OpenSpec 变更工作区 | |
 | `openspec/specs/` | OpenSpec 跨 change 规范 | |
@@ -232,8 +232,8 @@ ip/{name}/
 | `docs/methodology/plugin-style-design-methodology-v1.md` | **v2** D4 方法学（TLM + CH_MEM 双模, 含 Phase 6c elaboration chapter §8） |
 | `docs/lessons/phase-6c-elaboration-substrate.md` | **Phase 6c 行级教训** (15 类陷阱 + 7 个模式 + 8 项检查) |
 | `docs/research/phase6c-elaboration-pattern-study.md` | **Phase 6c 立项前研究** (SpinalHDL/VexRiscv/CppHDL 借鉴, 910 行) |
-| `docs/roadmap/phases/phase-6-declarative.md` | Phase 6 总览 (v2.0.3, 6c 收官 + 6d 拆分) |
-| `docs/roadmap/phases/phase-6d-rtl-verification.md` | **Phase 6d 独立 phase doc** (5-stage Pipeline CH_MEM + Verilator + MMU FSM) |
+| `.rddf/roadmap/archive/phase-6-declarative.md` | Phase 6 总览 (v2.0.3, 6c 收官 + 6d 拆分) |
+| `docs/architecture/roadmap-evolution.md §1` | **Phase 6d 独立 phase doc** (5-stage Pipeline CH_MEM + Verilator + MMU FSM) |
 | `tests/README.md` | 测试框架详情（Catch2 使用、已知问题） |
 | `tools/README.md` | CI 验证脚本详情（verify_adr.sh 等） |
 
@@ -246,48 +246,49 @@ ip/{name}/
 
 **ADR-037 v2.0 状态 (Oracle 2026-09-20 确认)**: `docs/architecture/adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17, D4 elaboration 语义兑现)`。Phase 6d prereqs change 仅验证内容完整性 + 修正 adr.md:1251 拆分描述不一致 (原 6c/6d/6e 与现行 6a/6b/6c/6d), 不重新写 v2.0。
 
-### 路线 / Roadmap 类文档（2026-09-28 统一导航）
+### 路线 / Roadmap 类文档（2026-10-09 rdd-workflow 单层治理）
 
-> **⚠️ 新会话第一件事**: 项目里**有两个** `execution-roadmap.md`, 不要混淆!
-> 详见 [`docs/MIGRATION_LOG.md`](docs/MIGRATION_LOG.md)（文档结构变更历史）。
+> **migrated 2026-10-09**: 原"双 execution-roadmap.md"模型废除, 改为**分层治理**——rdd-workflow 承担实施规划/决策门禁/跟踪台账, docs/architecture/ 承担架构演进叙事, docs/research/ 承担深度参考。
+> 详见 [`docs/MIGRATION_LOG.md`](docs/MIGRATION_LOG.md) §2026-10-09 rdd-workflow roadmap migration。
 
-#### 4 类路线文档职责对照
+#### 4 类路线文档职责对照（新模型）
 
 | 类型 | 文档 | 范围 | 何时读 |
 |------|------|------|--------|
-| **战略** | [`docs/roadmap/strategy/a-plus-c-hybrid.md`](docs/roadmap/strategy/a-plus-c-hybrid.md) | A+C Hybrid 战略选择（为什么做）| 任何 ADR / PoC 决策时看大方向 |
-| **框架级执行** | [`docs/roadmap/strategy/execution-roadmap.md`](docs/roadmap/strategy/execution-roadmap.md) | v0.8.0 / v0.9.0 框架 + 所有 IP（Phase 6d → v0.9.0 架构图见 §6）| 当前冲刺阶段（v0.8.0 启动 / 实施） |
-| **SoC 级执行** | [`soc/cpu/docs/roadmap/execution-roadmap.md`](soc/cpu/docs/roadmap/execution-roadmap.md) | v0.10.0 → v1.3.0 CPU SoC（产品化路径，架构图见 §3.5）| SoC 路线规划 / PoC 评估 / 商业化决策 |
-| **Phase 独立 doc** | [`docs/roadmap/phases/phase-6d-rtl-verification.md`](docs/roadmap/phases/phase-6d-rtl-verification.md) 等 | 已确定阶段的端到端细节（tasks + 退出标准 + ADR）| 实施具体 phase 前 |
+| **战略 SSOT** | [`.rddf/roadmap/strategy.md`](.rddf/roadmap/strategy.md) | A+C Hybrid 战略选择 + 7 项决策矩阵 + 版本节点 + Go/No-Go（"为什么/做什么"）| 任何 ADR / PoC 决策时看大方向 |
+| **实施规划** | [`.rddf/roadmap/`](.rddf/roadmap/)（phases / features / objectives）| 实施阶段 + 跨阶段特性 + 决策门禁 + 跟踪台账（"怎么做/谁先谁后"）| 任何实施前/进度跟踪/Go-No-Go 判断 |
+| **架构演进 SSOT** | [`docs/architecture/roadmap-evolution.md`](docs/architecture/roadmap-evolution.md) | Phase 6d → v1.3.0 7 版本节点架构图 + 跨版本对比 + 11 条 CI 门禁时间轴（"怎么做架构"）| 实施具体 phase 前必读对应版本章节 |
+| **深度参考** | [`docs/research/`](docs/research/) | decision-1-plugin-evolution / multi-core-comparison / poics-and-risks / adr-matrix / phase6c-elaboration-pattern-study | 写 ADR / PoC 决策时深读 |
 
-#### 当前活跃 versions + 关联架构图
+#### 当前活跃 versions + 关联文档
 
-| 版本 | 时间 | 文档位置 | 架构图 |
-|------|------|---------|--------|
-| **v0.7.0** | ✅ 2026-09-25 archive | strategy §3 + roadmap-status §2 | — |
-| **v0.8.0** | 🟡 2026-12 中旬（Wave 3-mmu） | strategy execution-roadmap §2 + §6.3 | strategy §6.3 |
-| **v0.9.0** | 📋 2027-02 下旬（Wave 4-csr-cache-dse） | strategy execution-roadmap §4 + §6.4 | strategy §6.4 |
-| **v0.10.0** | 📋 2027 Q1（Wave 5-isa-coverage-and-bp） | soc/cpu execution-roadmap §3 + §3.5.2 | soc/cpu §3.5.2 |
-| **v1.0.0** | 📋 2027 Q3（wave6-linux-and-productization） | soc/cpu execution-roadmap §3 + §3.5.3 | soc/cpu §3.5.3 |
-| **v1.2.0** | 📋 2028 Q2 | soc/cpu execution-roadmap §3 + §3.5.4 | soc/cpu §3.5.4 |
-| **v1.3.0** | 📋 2029 Q1 | soc/cpu execution-roadmap §3 + §3.5.5 | soc/cpu §3.5.5 |
+| 版本 | 时间 | 实施规划（rdd-workflow）| 架构演进（docs/architecture/）|
+|------|------|----------------|-----------------|
+| **v0.7.0** | ✅ 2026-09-25 archive | phase-1 | — |
+| **v0.8.0** | 🟡 2026-12 中旬（Wave 3-mmu） | phase-2 | `roadmap-evolution.md` §2 |
+| **v0.9.0** | 📋 2027-02 下旬（Wave 4-csr-cache-dse） | phase-3 | `roadmap-evolution.md` §3 |
+| **v0.10.0** | 📋 2027 Q1（Wave 5-isa-coverage-and-bp） | phase-4 | `roadmap-evolution.md` §4 |
+| **v0.11.0** | 📋 2027 Q1 末（mfc + mmu-chmem 收官） | `objective-v0110-launch.md` | `roadmap-evolution.md` §4 |
+| **v1.0.0** | 📋 2027 Q3（wave6 §1） | `objective-v100-launch.md` | `roadmap-evolution.md` §5 |
+| **v1.2.0** | 📋 2028 Q2（验证基建版） | `objective-v120-launch.md` | `roadmap-evolution.md` §6 |
+| **v1.3.0** | 📋 2029 Q1（产品化版） | `objective-v130-launch.md` | `roadmap-evolution.md` §7 |
 
 #### 记忆口诀（防止新会话混淆）
 
-- **"战略 execution-roadmap"** → 看 [`docs/roadmap/strategy/execution-roadmap.md`](docs/roadmap/strategy/execution-roadmap.md)
-- **"SoC execution-roadmap"** → 看 [`soc/cpu/docs/roadmap/execution-roadmap.md`](soc/cpu/docs/roadmap/execution-roadmap.md)
-- 两者通过 §6.6 / §3.5.7 **互相衔接**（2026-09-28 新增）
-- 详细职责对照见 [`soc/cpu/docs/roadmap/README.md §与框架级 execution-roadmap 的区别`](soc/cpu/docs/roadmap/README.md)
+- **"战略"** → 看 [`.rddf/roadmap/strategy.md`](.rddf/roadmap/strategy.md)（A+C Hybrid + 版本节点 + Go/No-Go）
+- **"实施规划"** → 看 [`.rddf/roadmap/`](.rddf/roadmap/)（phases + features + objectives）
+- **"架构图"** → 看 [`docs/architecture/roadmap-evolution.md`](docs/architecture/roadmap-evolution.md)（7 版本节点架构演进 + 跨版本对比）
+- **"深度参考"** → 看 [`docs/research/`](docs/research/)（决策矩阵 + ADR 矩阵 + 风险砍分叉）
 
 #### Phase 文档拆分粒度判断标准
 
-> 避免预测式文档腐烂。
+> 避免预测式文档腐烂。rdd-workflow 取代了原 phase 独立 doc 模型。
 
-| 状态 | 处理 |
-|------|------|
-| 已有 OpenSpec change + tasks.md + ADR 锚点 | **独立** phase doc（如 `phase-6d-rtl-verification.md`） |
-| 仅"目标" + "PoC 列表"，未启动实施 | **留在** execution-roadmap.md 里（如 v1.0.0/v1.2.0/v1.3.0） |
-| 历史已 archive | 移到 `soc/cpu/docs/roadmap/archive/` 或 `docs/roadmap/phases/` 标注历史 |
+| 状态 | rdd-workflow 落点 |
+|------|------------------|
+| 已有 OpenSpec change + tasks.md + ADR 锚点 | `openspec/changes/*/tasks.md`（SSOT）+ `phases/<id>.md` 完成条件 + `objectives/<id>.md` 决策门禁 |
+| 仅"目标" + "PoC 列表"，未启动实施 | `objectives/<id>.md`（含完成判据 + 反例 + Go/No-Go 决策树）|
+| 历史已 archive | `.rddf/roadmap/archive/`（6 个 git mv 文件，已含 v0.1.x ~ v0.8.0 历史）|
 
 ---
 
@@ -306,13 +307,13 @@ skill(name="openspec-archive-change")
 
 ### Strategy / Initiative 工作流（2026-09-24 新增, A+C Hybrid 战略落地）
 
-战略入口: [`docs/roadmap/strategy/a-plus-c-hybrid.md`](docs/roadmap/strategy/a-plus-c-hybrid.md)
+战略入口: [`.rddf/roadmap/strategy.md`](.rddf/roadmap/strategy.md)
 
 ```bash
 # 查看当前 initiative 状态 (auto-derived from openspec changes)
-bash tools/sync_strategy_status.sh --dry-run          # 仅打印 diff
-bash tools/sync_strategy_status.sh                      # atomic 写入 strategy §7
-bash tools/sync_strategy_status.sh --json               # 输出 JSON (供其他脚本消费)
+bash .rddf/sync_strategy_status.sh --dry-run          # 仅打印 diff
+bash .rddf/sync_strategy_status.sh                      # atomic 写入 strategy.md §7
+bash .rddf/sync_strategy_status.sh --json               # 输出 JSON (供其他脚本消费)
 
 # 查看 initiative 内容 (XDG managed)
 openspec initiative list --store chipforge
@@ -325,7 +326,26 @@ openspec change show <change-name>                     # 查看 change 内容
 openspec archive <change-name> -y                      # 归档到 openspec/changes/archive/
 ```
 
-**当前活跃 initiatives** (2026-09-24, version 节点对齐 `docs/roadmap/strategy/a-plus-c-hybrid.md` §3/§6 — Phase 6d 已消费 v0.4.0/v0.5.0/v0.6.0):
+### Initiative 状态查询指南（2026-10-09 rdd-workflow 迁移，选项 D 混合方案）
+
+> **SSOT 关系**: openspec initiative 存于 `~/.local/share/openspec/context-stores/chipforge/initiatives/*/initiative.yaml`（**XDG 权威写入**）；rdd-workflow 表格存于 [`.rddf/roadmap/strategy.md`](.rddf/roadmap/strategy.md) §3 + §7（**展示用**，§7 脚本派生，§3 手工维护）。`bash .rddf/sync_strategy_status.sh` 末尾会 **warn 漂移**（XDG status vs strategy.md §3 表格），但**不强制同步**（XDG 仍权威）。
+
+| 场景 | 命令 | 备注 |
+|------|------|------|
+| XDG 权威状态 | `openspec initiative show <id> --store chipforge` | CLI 强制 XDG（ADR §2 决策 4）|
+| XDG 全列表 | `openspec initiative list --store chipforge` | 5 active initiatives |
+| rdd-workflow 表格（展示）| `cat .rddf/roadmap/strategy.md` §3 + §7 | §7 脚本派生，§3 手工 |
+| 派生状态总表（dry-run）| `bash .rddf/sync_strategy_status.sh --dry-run` | 显示 §7 拟派生内容 + 末尾漂移 warn |
+| 实际写入 §7 | `bash .rddf/sync_strategy_status.sh` | atomic 写入 + 漂移 warn |
+| **漂移检测** | `bash .rddf/sync_strategy_status.sh`（末尾自动输出）| 5 initiative × 受控枚举 ↔ 自由文本映射 |
+| **写入权威** | `openspec initiative edit <id> --store chipforge`（XDG 优先）| 改 XDG → 跑 sync → §7 派生同步；**不手改** §3 表格 |
+| 漂移修复流程 | (1) 查 XDG 权威状态 → (2) 改 strategy.md §3 表格对齐 → (3) 跑 sync 验证 | 漂移是手工 §3 表格 vs 真实 XDG 状态不一致 |
+
+**常见漂移案例**（2026-10-09 迁移期发现）：
+- `wave3-mmu-real-memory-and-cycle`: XDG=`exploring`，strategy.md=🟡 部分收官。XDG 滞后于实际进度（P1#3 已 archive）→ 决策：保留 XDG 权威，但 strategy.md 表格不漂移（"显示用"），未来可一次性更新 XDG
+- `wave5-isa-coverage-and-bp`: XDG=`exploring`，strategy.md=🔄 active。XDG 同样滞后 → 同上
+
+**当前活跃 initiatives** (2026-09-24, version 节点对齐 `.rddf/roadmap/strategy.md` §3/§6 — Phase 6d 已消费 v0.4.0/v0.5.0/v0.6.0):
 
 | Initiative | Version | 状态 | Changes |
 |---|---|---|---|
@@ -375,7 +395,7 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 - CppTLM/CppHDL 是 **独立仓库**（symlink 引入），git 操作需分别在各目录中执行
 - 测试框架使用 **Catch2 v3.7.0**（vendored 在 `tests/catch2/`，与 CppTLM 同步）
 - **`tests/CMakeLists.txt`** 用 `file(GLOB_RECURSE)` 自动发现测试文件，新增测试不需改 CMake
-- C++17 项目，但 `chipforge_tests` target 需 C++20（因为链接了 CppHDL 头文件）
+- C++23 项目（v0.6 ADR-047 升级，`chipforge_tests` / `chipforge_tests_chmem` / `cpu_verilator_sim` 全部 `cxx_std_23`）
 - **Phase 6c CH_MEM 模式约定**:
   - 业务代码必须**双文件分离**（`<name>.h` TLM + `<name>_chmem.h` CH_MEM），**禁止同一文件混合**
   - **`uint_t<N>` 在两种模式下是不同类型**（TLM=POD, CH_MEM=`ch_uint<N>`），业务代码不感知但 CI 静态检查会抓
@@ -388,7 +408,7 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 
 ## Phase 6d 启动前必知 (2026-09-20 新增, Oracle/Metis 审查修正)
 
-> Phase 6c 已完成 (`plugin-elaboration-substrate` 归档, v0.3.0 + v0.3.1 发布)。Phase 6d 待启动, 见 [`docs/roadmap/phases/phase-6d-rtl-verification.md`](docs/roadmap/phases/phase-6d-rtl-verification.md)。
+> Phase 6c 已完成 (`plugin-elaboration-substrate` 归档, v0.3.0 + v0.3.1 发布)。Phase 6d 待启动, 见 [`docs/architecture/roadmap-evolution.md §1`](docs/architecture/roadmap-evolution.md §1)。
 
 **Phase 6d 范围**: 5-stage Pipeline CH_MEM 端到端 + Verilator + MMU/PTW FSM (11-13 周, Oracle 估时上调 0.5 周因 6d.1 从零建)
 
