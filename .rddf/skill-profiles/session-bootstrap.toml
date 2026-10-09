@@ -15,6 +15,7 @@ order = [
   "recent_commits",        # 内建: git log -5
   "workspace_health",      # 内建: dirty tree + orphan changes
   "test_status",           # 原语: 跑 test_families (见下)
+  "honesty_audit",         # 原语: 声称 vs 实测 对账 (PoC v0.2)
   "preflight_reminders",   # 逃生舱: tools/bootstrap/sections/preflight.sh
   "hard_prerequisites",    # 逃生舱: tools/bootstrap/sections/gates.sh
 ]
@@ -28,3 +29,13 @@ custom_sections = [
   { name = "preflight_reminders", script = "tools/bootstrap/sections/preflight.sh" },
   { name = "hard_prerequisites",  script = "tools/bootstrap/sections/gates.sh" },
 ]
+
+[honesty_audit]
+claim_files = ["AGENTS.md", "CHANGELOG.md"]
+families = [
+  { tag = "[cpu-l1-mmu-demo]", export = "DEMO" },
+  { tag = "[riscv-tests]",     export = "RISCV" },
+]
+
+[review]
+script = "tools/bootstrap/review.sh"
