@@ -10,7 +10,7 @@
 //   - D4 强制: 无 tick(), 无状态机, Bundle 字段用 uint_t<N>, 阶段间通信用 Payload<T>
 //
 // 详见:
-//   - soc/cpu/docs/roadmap/phase-1-tlm-foundation.md §1.2
+//   - .rddf/roadmap/archive/phase-1-tlm-foundation.md §1.2
 //   - .omo/drafts/decision-plugin-framework-2026-06-08.md (D4)
 //   - bundles/mem_bundles.h (CacheReq / CacheResp / MemResp 输入)
 //
