@@ -19,7 +19,7 @@ Invoke this skill in any of these situations:
 1. **Starting a new session** to continue v0.10.0 wave5-isa-coverage-and-bp work
 2. **Returning after ≥1 day gap** to ChipForge
 3. **After major artifact** completion (ADR/archive/change creation)
-4. **Before any PR** touching `soc/cpu/docs/roadmap/` or `openspec/changes/`
+4. **Before any PR** touching `.rddf/roadmap/` or `openspec/changes/`
 
 # Usage
 
@@ -43,7 +43,7 @@ The script outputs structured markdown with these sections:
 | `## generation_time` | `date '+%Y-%m-%d %H:%M:%S'` + HEAD commit |
 | `## test_status` | `[cpu-l1-mmu-demo]` + `[riscv-tests]` pass/fail counts |
 | `## active_changes` | `openspec list` |
-| `## initiative_status` | `tools/sync_strategy_status.sh --dry-run` |
+| `## initiative_status` | `.rddf/sync_strategy_status.sh --dry-run` |
 | `## recent_commits` | `git log --oneline -5` |
 | `## hard_prerequisites` | v0.10.0 launch gates table |
 | `## honesty_audit` | AGENTS.md/CHANGELOG.md 声明 vs ctest/doc_link_check/ip/cpu/test/add.elf 实测对账 |
@@ -93,7 +93,7 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 ## 必读 (静态, 见 AGENTS.md):
 - `AGENTS.md §路线 / Roadmap 类文档` — 文档导航入口（首次必读，含 4 类文档职责对照 + 记忆口诀）
-- `soc/cpu/docs/roadmap/execution-roadmap.md §5` — 立即下一步
+- `.rddf/roadmap/strategy.md §6` + `.rddf/roadmap/objectives/objective-*.md §1 Why now` — 立即下一步（v0.10.0-v0.11.0 收官）
 - `openspec/changes/*/proposal.md` — active change Why 段
 
 ## 按需加载路由 (L3/L4/L6 条件触发)
@@ -102,13 +102,13 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 | # | 触发场景（关键词） | 加读文件（限 section） | 优先级 vs L1/L2/L5 | 与默认"不读"的区别 |
 |---|---|---|---|---|
-| 1 | PoC-1 / MUL/DIV / multi-cycle / FSM / negotiate 实装 | `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §3` + `docs/architecture/adr/ADR-082-plugin-negotiate-capability.md` §Context+Decision + `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-1 行 | **高于 L5** | 不读 → negotiate 设计契约靠猜 |
-| 2 | RV32C / 解码 / 跨页 fetch | `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-2 行 + `ADR-070`（若已起草） | 与 L5 同级 | 不读 → 成功标准（rv32uc ≥95%）缺失 |
-| 3 | ICache / fence.i / 取指一致性 | `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-3 行 + `ADR-072`（若已起草） | 与 L5 同级 | 不读 → fence.i ≥10 断言要求漏 |
-| 4 | BTB / GShare / 分支预测 / mispredict | `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §1` + `soc/cpu/docs/roadmap/references/poics-and-risks.md §1` PoC-6 行 | 与 L5 同级 | 不读 → 漏 Port 抽象纪律（CI 第 11 条） |
-| 5 | ADR 起草/状态变更/编号 | `soc/cpu/docs/roadmap/references/adr-matrix.md §1+§2+§7` + `docs/architecture/adr.md` 注册表 | **最高**（先于一切写操作）| 不读 → 撞号（050/051 事故重演） |
+| 1 | PoC-1 / MUL/DIV / multi-cycle / FSM / negotiate 实装 | `docs/research/decision-1-plugin-evolution.md §3` + `docs/architecture/adr/ADR-082-plugin-negotiate-capability.md` §Context+Decision + `docs/research/poics-and-risks.md §1` PoC-1 行 | **高于 L5** | 不读 → negotiate 设计契约靠猜 |
+| 2 | RV32C / 解码 / 跨页 fetch | `docs/research/poics-and-risks.md §1` PoC-2 行 + `ADR-070`（若已起草） | 与 L5 同级 | 不读 → 成功标准（rv32uc ≥95%）缺失 |
+| 3 | ICache / fence.i / 取指一致性 | `docs/research/poics-and-risks.md §1` PoC-3 行 + `ADR-072`（若已起草） | 与 L5 同级 | 不读 → fence.i ≥10 断言要求漏 |
+| 4 | BTB / GShare / 分支预测 / mispredict | `docs/research/decision-1-plugin-evolution.md §1` + `docs/research/poics-and-risks.md §1` PoC-6 行 | 与 L5 同级 | 不读 → 漏 Port 抽象纪律（CI 第 11 条） |
+| 5 | ADR 起草/状态变更/编号 | `docs/research/adr-matrix.md §1+§2+§7` + `docs/architecture/adr.md` 注册表 | **最高**（先于一切写操作）| 不读 → 撞号（050/051 事故重演） |
 | 6 | CH_MEM / 双模 / elaborate / ch_state_machine / 对拍 | `docs/lessons/phase-6c-elaboration-substrate.md` 陷阱清单节 + `ADR-040 v2.0` Decision 节 | 与 L2 同级 | 不读 → 15 类已知陷阱逐个重踩 |
-| 7 | 对外汇报 / 性能对标 / 决策 3 / chip-selector 定位 | `soc/cpu/docs/roadmap/references/multi-core-comparison.md §1+§2` | 低于 L5（仅此类会话需要）| 不读无执行损失，仅汇报失真 |
+| 7 | 对外汇报 / 性能对标 / 决策 3 / chip-selector 定位 | `docs/research/multi-core-comparison.md §1+§2` | 低于 L5（仅此类会话需要）| 不读无执行损失，仅汇报失真 |
 | 8 | 追溯某版本为什么变（如 8a14402 性质） | `CHANGELOG.md` 仅 `[Unreleased]` + 目标版本节（**不读全文**） | L6 叙事层 | 不读无执行损失，仅缺历史叙事 |
 | 9 | **以上均不涉及** | **零加读**——仅 L1 §3 / L2 §5 / L5 proposal + adr.md | — | **显式默认"惰性 opt-in"**，防清单广播 |
 
@@ -131,7 +131,7 @@ HEAD: `{{HEAD_COMMIT}}` — ⚠️ DO NOT REUSE, regenerate each session
 
 ## 启动清单 (新会话必做的前 6 步):
 1. `openspec list` — 确认 active changes
-2. `cat soc/cpu/docs/roadmap/execution-roadmap.md | sed -n '/## 5\./,/## 6\./p'` — 确认立即下一步
+2. `cat .rddf/roadmap/objectives/objective-v0110-launch.md | sed -n '/## 9\./,/## 10\./p'` — 确认立即下一步（v0.10.0-v0.11.0 收官窗口）
 3. `cat openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/tasks.md | grep -E "^## Phase |^### Phase "` — 列出所有 phase 头, 确认当前 phase
 4. `./build/bin/chipforge_tests "[cpu-l1-mmu-demo]"` — 确认回归状态（若 FAIL 优先 debug change）
 5. **CI 门禁快验**（PR 阻塞门禁, 任一 FAIL 必须先修/报告才能继续）:
@@ -291,7 +291,7 @@ This skill automates all 4 steps in one invocation, with intelligent recommendat
 | Layer | Tool |
 |-------|------|
 | Bash script | `tools/v0100-bootstrap.sh` (project-level, git-tracked) |
-| State sources | `openspec list`, `bash tools/sync_strategy_status.sh --dry-run`, `./build/bin/chipforge_tests`, `git log`, `git rev-parse HEAD` |
+| State sources | `openspec list`, `bash .rddf/sync_strategy_status.sh --dry-run`, `./build/bin/chipforge_tests`, `git log`, `git rev-parse HEAD` |
 | Hardcoded facts | Only file paths and command names (NO state) — all state is fetched live |
 
 # Maintenance
@@ -308,10 +308,10 @@ The skill body contains only pointers (file paths, command names). All state is 
 **同步步骤**:
 1. **跑链接检查**: `bash tools/doc_link_check.sh` — 验证 §必读 / 路由表中的路径仍可解析
 2. **检查 §必读 引用**: 若 `AGENTS.md §路线 / Roadmap 类文档` 等导航节的内容变化,本 skill §必读 第 1 条的描述要保持同步
-3. **检查路由表路径**: 若 `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md` / `ADR-082` / `soc/cpu/docs/roadmap/references/poics-and-risks.md` 等路径变化,路由表具体路径必须更新
+3. **检查路由表路径**: 若 `docs/research/decision-1-plugin-evolution.md` / `ADR-082` / `docs/research/poics-and-risks.md` 等路径变化,路由表具体路径必须更新
 4. **检查 MIGRATION_LOG**: 若本次变化足够大(新增/合并/重命名文档),在 `docs/MIGRATION_LOG.md` 追加变更记录
 
-**反向警示**: 避免"因为变了所以同步修所有引用"的反射。文档结构变化时,先问"这个变化是否影响 SKILL.md 的 §必读 / 路由表 / #Maintenance 三处",影响才动;不影响则不动(如 `soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §1+§2` 内容调整不影响 skill 路径)。
+**反向警示**: 避免"因为变了所以同步修所有引用"的反射。文档结构变化时,先问"这个变化是否影响 SKILL.md 的 §必读 / 路由表 / #Maintenance 三处",影响才动;不影响则不动(如 `docs/research/decision-1-plugin-evolution.md §1+§2` 内容调整不影响 skill 路径)。
 
 ## 当 workflow 变化时同步本 skill (新增, 2026-10-07)
 
@@ -349,7 +349,7 @@ The skill body contains only pointers (file paths, command names). All state is 
 |---|--------|---------|---------|
 | A1 | 时间戳新鲜度 | timestamp ≤ 4 小时前 | 建议调 `/v0100-bootstrap` regenerate, agent 会用 `write` 工具自动 save 新版 LLM 合成 prompt 到 `last-bootstrap-prompt.md` (替代 bash redirect, 详见 §Step 2.5) |
 | A2 | HEAD 一致性 | prompt 内 HEAD = `git rev-parse --short HEAD` | regenerate |
-| A3 | 路由表路径可达 | 所有 `soc/cpu/docs/roadmap/references/*.md` 存在 + ADR-082 等存在 | 标 ❌ + 给修复建议 (见 K2) |
+| A3 | 路由表路径可达 | 所有 `docs/research/*.md` 存在 + ADR-082 等存在 | 标 ❌ + 给修复建议 (见 K2) |
 | A4 | 启动清单完整 | 6 步齐 (openspec list / §5 read / tasks phase / chipforge_tests / 3 CI scripts / report) | 标 ❌ + 补缺失步骤 |
 | A5 | "不要做" 防御层 | ≥ 10 条 + 含 archive/vexii/tools-scope/CHANGELOG-stale 等关键禁止 | 补缺 |
 | A6 | Honesty audit 全 ✅ | 4 项对账全 ✅ (无 ❌) | Case E 触发: 报告失配 + 不 implement |
@@ -366,7 +366,7 @@ The skill body contains only pointers (file paths, command names). All state is 
 **审计结果**: ✅ 适合启动 / 🟡 适合但建议 N 项改进 / 🔴 不适合, 需 regenerate
 
 ## 改进项 (按 A1-A8 顺序, 标 FAIL 的)
-1. A3: 路由表行 5 引用 `references/poics-and-risks.md` 缺前缀 → 加 `soc/cpu/docs/roadmap/`
+1. A3: 路由表行 1-7 引用路径可达检查（migrated 2026-10-09: 原 `soc/cpu/docs/roadmap/references/*.md` → `docs/research/*.md`）
 2. A4: 启动清单缺 CI 门禁 step → 补 3 个 CI 脚本
 
 ## 已知 issues (引用 K1-K4)
