@@ -1,0 +1,274 @@
+# ChipForge .rddf/project.yaml
+# rdd-workflow 项目级配置源 (per ADR-0036)
+# 创建日期: 2026-10-08
+# owner: rdd-planner
+
+# ─────────────────────────────────────────────────────────
+# rdd-workflow 标准字段 (schema 强校验)
+# ─────────────────────────────────────────────────────────
+project:
+  name: chipforge
+  version: v0.10.4 (active) / v0.11.0 (next, per wave5)
+
+# ADR 发现配置 — ChipForge 使用 **3 位** ADR 编号 (ADR-040~083+)
+# per docs/architecture/adr.md §命名规范: NNNN 4 位零填充
+# 现实: 沿用 3 位, schema 兼容 3-4 位 (per ADR-0036 i10 M2)
+adr:
+  pattern: ^ADR-(\d{3,4})-.*\.md$
+  glob: "ADR-*.md"
+  dir: docs/architecture/adr
+
+# Git 工作流: openspec/ **tracked** (per commit history)
+# 5 changes 已 archive 到 openspec/changes/archive/ (2026-10-08)
+# 5 active: mmu-chmem, mfc-fsm, mfc-extract-fsm-h, phase-1.5-wave-4, vexii-riscv-parity-poc
+git:
+  openspec_tracked: true
+
+# 验证提供者: llm (Oracle/Metis 自洽)
+# CI 不跑 LLM 验证 (per AGENTS.md Oracle 2026-10-06 决策)
+verification:
+  provider: llm
+
+# OpenSpec gate (commit 前强制校验)
+# 路径前缀: 跨多个 IP 工作组
+openspec_gate:
+  paths:
+    - ip/
+    - openspec/
+    - docs/
+    - tests/
+  extensions:
+    - .cpp
+    - .h
+    - .hpp
+    - .md
+    - .yaml
+    - .sh
+  exclude:
+    - "**/build/**"
+    - "**/_deps/**"
+    - "**/.rddf/state/**"
+    - "skills"          # symlink → /workspace/main/rdd-workflow/skills (全局)
+  mode: warn            # 当前 warn 模式, 后续可升 block
+
+# ─────────────────────────────────────────────────────────
+# ChipForge 自定义段 (root additionalProperties: true 允许)
+# ─────────────────────────────────────────────────────────
+
+# 主语言 + 构建工具链
+# v0.6 ADR-047: 升级 C++23 (std::expected<T, PluginError> 静态配置 Result 范式)
+languages:
+  primary: c++23           # chipforge_tests + chipforge_tests_chmem + cpu_verilator_sim 统一 C++23
+  build_system: cmake
+  package_manager: none    # ExternalProject (CppTLM/CppHDL)
+  toolchain:
+    riscv: riscv64-unknown-elf-gcc   # RISC-V 测试 ELF vendor
+    verilator: ">=5.020"             # Phase 6d 硬前置
+    yosys: optional
+    iverilog: optional
+
+# 构建配置 (CMake presets + test binary)
+build:
+  cmake:
+    source_dir: .
+    presets:
+      default: "-DCMAKE_BUILD_TYPE=Debug"
+      release: "-DCMAKE_BUILD_TYPE=Release"
+      verilator: "-DCF_PLUGIN_USE_CH_MEM"   # 启用 CH_MEM/Verilator backend
+  binaries:
+    tlm: chipforge_tests              # [-DCF_PLUGIN_USE_CH_MEM] 关闭 (默认)
+    chmem: chipforge_tests_chmem      # -DCF_PLUGIN_USE_CH_MEM 开启
+    verilator_sim: cpu_verilator_sim  # Phase 6d.5 E8 子集
+  rebuild_deps_flag: CHIPFORGE_REBUILD_DEPS   # CppTLM/CppHDL 重 build
+  source_deps_flag: CHIPFORGE_SOURCE_DEPS     # add_subdirectory 嵌入模式
+
+# Architecture Gates (AGENTS.md 阻塞门禁)
+gates:
+  scripts:
+    adr: tools/verify_adr.sh
+    plugin_decision: tools/verify_plugin_decision.sh
+    plugin_portability: tools/check_plugin_portability.sh
+    doc_link: tools/doc_link_check.sh
+  ci_workflow: .github/workflows/architecture-gates.yml
+  blocking: [adr, plugin_decision, plugin_portability]   # doc_link 当前 warn (per AGENTS.md "smoke-only")
+  expected_outcome: 0 failures
+  known_issues:
+    - doc_link: 4 pre-existing broken links (清理 2026-10-08, ADR-037 + ADR-083 path fix 完成)
+
+# 测试家族 + 二进制归属 (per AGENTS.md + audit 2026-10-08)
+test_families:
+  tlm_binary: chipforge_tests
+  chmem_binary: chipforge_tests_chmem
+  families:
+    - name: framework
+      binary: tlm
+      tags: [framework]
+      count: 89
+    - name: cache
+      binary: tlm
+      tags: [cache]
+      count: 22
+    - name: cpu
+      binary: tlm
+      tags: [cpu]
+      count: 100
+    - name: cpu-integration
+      binary: tlm
+      tags: [cpu-integration]
+      count: 81
+    - name: soc
+      binary: tlm
+      tags: [soc]
+      count: 14
+    - name: bundles
+      binary: tlm
+      tags: [bundles]
+      count: 10
+    - name: mmu
+      binary: tlm
+      tags: [mmu]
+      count: 59                       # Phase A 后 (53 + 6 new)
+    - name: riscv-tests
+      binary: tlm
+      tags: [riscv-tests]
+      count: 48                       # 40 PASS + 8 rv32um FAIL (defer v0.11.0)
+    - name: cpu-l1-mmu-demo
+      binary: tlm
+      tags: [cpu-l1-mmu-demo]
+      count: 6
+    - name: tlb-refill
+      binary: tlm
+      tags: [tlb-refill]
+      count: 2
+    - name: chmem
+      binary: chmem
+      tags: [chmem]
+      count: 30
+    - name: cpphdl
+      binary: chmem
+      tags: [cpphdl]
+      count: 6
+    - name: elaborate
+      binary: chmem
+      tags: [elaborate]
+      count: 5
+    - name: verilator
+      binary: chmem
+      tags: [verilator]
+      count: 1                        # 6d.5 E8 子集 (5 ELF smoke)
+    - name: mmu-verilator
+      binary: chmem
+      tags: [mmu-verilator]
+      count: 3                        # plumbing only (真翻译待 6d.6)
+    - name: 6d6-mmu-fsm
+      binary: chmem
+      tags: [6d6, mmu, fsm]
+      count: 3
+    - name: 6d7-cache-refill-fsm
+      binary: chmem
+      tags: [6d7, refill, fsm]
+      count: 3
+  run_full: bash tools/run_chipforge_tests.sh --all
+  run_tlm_only: bash tools/run_chipforge_tests.sh              # default
+  run_family: "./build/bin/chipforge_tests [family]"
+
+# Roadmap 文档位置 (per .rddf/roadmap.md 速查表, migrated 2026-10-09)
+# 分层治理: 战略 .rddf/ + 架构演进 docs/architecture/ + 深度参考 docs/research/
+roadmap:
+  strategic: .rddf/roadmap/strategy.md                        # A+C Hybrid 战略 SSOT
+  architecture_evolution: docs/architecture/roadmap-evolution.md  # 7 版本节点架构图 SSOT
+  rdd_workflow: .rddf/roadmap.md                              # rdd-workflow 实施入口
+  research_dir: docs/research/                                # 深度参考（4 文件: decision-1-plugin-evolution, poics-and-risks, multi-core-comparison, adr-matrix）
+  archive_dir: .rddf/roadmap/archive/                         # 历史 phase 文档 (v0.1.x~v0.8.0)
+  phases_dir: .rddf/roadmap/phases/
+  features_dir: .rddf/roadmap/features/
+  objectives_dir: .rddf/roadmap/objectives/
+  sync_script: bash .rddf/sync_strategy_status.sh             # 自动派生 strategy.md §7
+
+# IP 工作组 (per ip/ directory + AGENTS.md)
+working_groups:
+  framework:
+    path: include/cf/plugin/ src/cf_plugin/
+    conventions:
+      - "无 tick() (PluginBase::tick() = delete)"
+      - "Bundle 字段用 uint_t<N>"
+      - "at_stage 闭包内禁早返"
+      - "TLM = ch_uint POD, CH_MEM = ch::core::ch_uint<N>"
+  cache:
+    path: ip/cache/ tests/cache/
+    conventions:
+      - "Plugin-style 强制"
+      - "TLM/CH_MEM 双文件 (cache.h + cache_chmem.h)"
+  cpu:
+    path: ip/cpu/ tests/cpu/
+    conventions:
+      - "ADR-048 canonical ordering (MMUPlugin 必须先于 IBusPlugin)"
+      - "RISC-V CSR hook: csr_write_satp / sfence_vma / mmu_exit"
+      - "ADB-082 negotiate API"
+  mmu:
+    path: ip/mmu/ tests/mmu/
+    conventions:
+      - "lib/ + tlm/ 分层 (lib/ 纯 C++ 算法, tlm/ 框架集成)"
+      - "ADR-049 paddr 消费契约"
+      - "ADR-040 v2.0 CH_MEM 是新正道"
+  memory:
+    path: ip/memory/
+    status: not_started                  # Phase 2+
+  interconnect:
+    path: ip/interconnect/
+    status: not_started
+  peripheral:
+    path: ip/peripheral/
+    status: not_started
+
+# OpenSpec 上下文 (当前 5 active changes)
+openspec:
+  context_store: ~/.local/share/openspec/context-stores/chipforge/   # XDG managed (per AGENTS.md)
+  initiative_mapping:
+    wave3-cpu-pipeline-debt:
+      version: v0.7.0
+      status: completed                  # archived 2026-09-25
+    wave3-mmu-real-memory-and-cycle:
+      version: v0.8.0
+      status: partially_completed        # P1#3 ✓, P1#4/P1#6 🗑, P1#5 superseded
+    wave4-csr-cache-dse:
+      version: v0.9.0
+      status: deferred                    # phase-1.5-wave-4 placeholder
+    wave5-isa-coverage-and-bp:
+      version: v0.11.0
+      status: active                      # mmu-chmem + mfc-fsm 主路径
+    wave6-linux-and-productization:
+      version: v1.0.0+
+      status: deferred                    # vexii-riscv-parity-poc placeholder
+  active_changes:                         # 2026-10-08 清理后
+    - mmu-chmem-pipeline-integration      # 6/166, Phase A 已 commit a3afcfa
+    - mfc-cpu-pipeline-multi-cycle-fsm    # 50/60, v0.10.0 收官版
+    - mfc-extract-fsm-h                   # 0/20, 等 mfc-fsm Phase H archive
+    - phase-1.5-wave-4                    # 0/51, wave4 启动期
+    - vexii-riscv-parity-poc              # 0/74, wave6 远期
+  archived_changes:                       # 2026-10-08 清理
+    - cache-phase1.5-4way
+    - mmu-config-json-driven
+    - mmufault-verilator-sv32-e2e-flip
+    - plugin-framework-cycle-precision
+    - verilator-l1cache-e2e-coverage
+
+# 模板文件 (per AGENTS.md "新会话第一件事" 速查表)
+onboarding:
+  ai_config_files:
+    - AGENTS.md
+    - .cursorrules
+  entry_points:
+    - AGENTS.md                           # 第一件事: 项目速查
+    - .rddf/roadmap.md              # 路线图导航
+    - .rddf/roadmap.md                    # rdd-workflow 实施入口
+
+# Reporting (ADR-0027 feedback loop) — opt-in, default off per AGENTS.md
+reporting:
+  enabled: false
+  destination: github
+  gh_repo: chisuhua/chipforge             # 假设 (待确认实际仓库 owner)
+  auto_submit: false
+  submit_categories: {}                   # 空 = 全部 opt-out
+  close_on_archive: true
+  retention_days: 30
