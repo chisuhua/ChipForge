@@ -1,0 +1,30 @@
+# ChipForge v0.10.0 wave5 session-bootstrap profile
+# 通用化迁移: 原 v0100-bootstrap (项目特定) → rdd-session-bootstrap (rdd-workflow 通用) + 本 profile
+# 详细 schema 见 /workspace/main/rdd-workflow/skills/rdd-session-bootstrap/SKILL.md
+
+[profile]
+name = "chipforge-v0100"
+title = "ChipForge v0.10.0 wave5 Session Bootstrap"
+version = "1"
+
+[sections]
+order = [
+  "header",                # 内建: timestamp + HEAD + DO NOT REUSE
+  "active_changes",        # 内建: openspec list
+  "initiative_status",     # 内建: .rddf/sync_strategy_status.sh
+  "recent_commits",        # 内建: git log -5
+  "workspace_health",      # 内建: dirty tree + orphan changes
+  "test_status",           # 原语: 跑 test_families (见下)
+  "preflight_reminders",   # 逃生舱: tools/bootstrap/sections/preflight.sh
+  "hard_prerequisites",    # 逃生舱: tools/bootstrap/sections/gates.sh
+]
+
+test_families = [
+  { tag = "[cpu-l1-mmu-demo]", export = "DEMO" },
+  { tag = "[riscv-tests]",     export = "RISCV" },
+]
+
+custom_sections = [
+  { name = "preflight_reminders", script = "tools/bootstrap/sections/preflight.sh" },
+  { name = "hard_prerequisites",  script = "tools/bootstrap/sections/gates.sh" },
+]
