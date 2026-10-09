@@ -6,9 +6,9 @@
 # 最后修改日期: 2026-06-08
 #
 # 详见:
-#   - docs/roadmap/phases/phase-0-plugin-scaffolding.md
+#   - .rddf/roadmap/archive/phase-0-plugin-scaffolding.md (Phase 0 实施记录 + 退出标准)
 #   - .omo/drafts/decision-plugin-framework-2026-06-08.md
-#   - docs/roadmap/roadmap-status.md (Phase 0 进度跟踪)
+#   - .rddf/roadmap.md (Phase 0 进度跟踪)
 
 # ----------------------------------------------------------------------------
 # 公共头文件目录
