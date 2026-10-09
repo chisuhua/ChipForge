@@ -206,7 +206,7 @@
 ### E.2 [REFACTOR] 更新 `references/multi-core-comparison.md` 与 PoC 表
 
 - [ ] **更新 PoC 表**：§1 47 行对比矩阵 + §2 8 个独占维度中 PoC-14 / PoC-15 加入引用
-- [ ] **更新 §3.3 PoC 速查表**：在 `soc/cpu/docs/roadmap/execution-roadmap.md §3.3` 把 PoC-14/PoC-15 与 ADR-090 关联
+- [ ] **更新 §3.3 PoC 速查表**：在 `docs/architecture/roadmap-evolution.md` §8 跨版本对比表（migrated from soc/cpu/docs/roadmap/execution-roadmap.md §3.3）把 PoC-14/PoC-15 与 ADR-090 关联（vexii-riscv-parity-poc owner）
 - [ ] **更新 `references/poics-and-risks.md §1`**：PoC↔change 映射表加 vexii-riscv-parity-poc 条目（Action 3）
 
 ## 实施顺序（汇总）

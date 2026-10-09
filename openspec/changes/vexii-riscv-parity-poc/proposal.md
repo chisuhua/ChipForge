@@ -19,7 +19,7 @@ related_to:
 
 # vexii-riscv-parity-poc — VexiiRiscv 客观对拍 HARD 门禁（PoC-14 + PoC-15）
 
-> **承接关系**：本 change 是 **2026-09-29 新增**，由 [`soc/cpu/docs/roadmap/execution-roadmap.md §3.2 + §3.3`](../../../soc/cpu/docs/roadmap/execution-roadmap.md) 的 HARD 门禁升级衍生。
+> **承接关系**：本 change 是 **2026-09-29 新增**，由 [`docs/architecture/roadmap-evolution.md` §4 (v0.10.0) + §5 (v1.0.0) + §7 (v1.3.0) + §8 跨版本对比](../../../../docs/architecture/roadmap-evolution.md) 的 HARD 门禁升级衍生（migrated 2026-10-09: 原 `soc/cpu/docs/roadmap/execution-roadmap.md §3.2+§3.3` 已并入 evolution）。
 >
 > **技术定位**：把"内部绝对值 CoreMark/MHz ≥ N"升级为"与 VexiiRiscv 官方公开数对拍，偏差 ≤ X%"，作为架构正确性（生成 RTL 可对标行业最佳 in-order）与路线合理性（产品化对标窗口）的**形式化论证门禁**。
 >
@@ -27,7 +27,7 @@ related_to:
 
 ## Why
 
-`soc/cpu/docs/roadmap/execution-roadmap.md §3.2` 中 v1.0.0 / v1.3.0 / v1.4+ 的"关键指标"列原写：
+`docs/architecture/roadmap-evolution.md` §8 跨版本对比表（migrated from soc/cpu/docs/roadmap/execution-roadmap.md §3.2）中 v1.0.0 / v1.3.0 / v1.4+ 的"关键指标"列原写：
 
 | 版本 | 原软指标 | 缺陷 |
 |------|---------|------|
@@ -148,9 +148,9 @@ related_to:
 
 ## 关联文档
 
-- [`soc/cpu/docs/roadmap/execution-roadmap.md §3.2` + `§3.3`](../../../soc/cpu/docs/roadmap/execution-roadmap.md)：HARD 门禁落地位置
-- [`soc/cpu/docs/roadmap/references/multi-core-comparison.md §2`](../../../soc/cpu/docs/roadmap/references/multi-core-comparison.md)：8 个独占维度
-- [`soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md §1(c)`](../../../soc/cpu/docs/roadmap/references/decision-1-plugin-evolution.md)：双追平线（single 2.4–2.6 + dual 5.24）
+- [`docs/architecture/roadmap-evolution.md` §8 跨版本对比 + §4 (v0.10.0) + §5 (v1.0.0) + §7 (v1.3.0)](../../../../docs/architecture/roadmap-evolution.md)：HARD 门禁落地位置（migrated from soc/cpu/docs/roadmap/execution-roadmap.md §3.2+§3.3, 2026-10-09）
+- [`docs/research/multi-core-comparison.md §2`](../../../docs/research/multi-core-comparison.md)：8 个独占维度
+- [`docs/research/decision-1-plugin-evolution.md §1(c)`](../../../docs/research/decision-1-plugin-evolution.md)：双追平线（single 2.4–2.6 + dual 5.24）
 - VexiiRiscv 官方 status：`https://spinalhdl.github.io/VexiiRiscv-RTD/master/VexiiRiscv/Introduction/index.html`
 - VexiiRiscv 官方 Performance：`https://spinalhdl.github.io/VexiiRiscv-RTD/master/VexiiRiscv/Performance/index.html`
 

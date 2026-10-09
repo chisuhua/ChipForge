@@ -77,7 +77,7 @@ status: placeholder
 - [ ] 8.2 `bash tools/verify_plugin_decision.sh` PASS（D4 合规, exception/mispredict 不引入状态机）
 - [ ] 8.3 `bash tools/check_plugin_portability.sh` PASS
 - [ ] 8.4 `CHANGELOG.md` v0.6.0 段本 wave 4 完成条目
-- [ ] 8.5 `soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md` §8 毕业标准全部 ✅
+- [ ] 8.5 `.rddf/roadmap/archive/phase-1.5-stall-and-validate.md` §8 毕业标准全部 ✅
 
 ## 9. Phase 2 kickoff (后续)
 

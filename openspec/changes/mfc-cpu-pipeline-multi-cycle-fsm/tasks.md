@@ -203,7 +203,7 @@ div.elf FSM    (MulDivFsmPlugin<U>):  cycles=5 tohost=1 PASS  ← cycle 数错�
 ## Phase H — 归档
 
 - [ ] H.1 全部 AC 完成 → `openspec validate mfc-cpu-pipeline-multi-cycle-fsm`
-- [ ] H.2 sync_strategy_status.sh 自动派生 strategy §7
+- [ ] H.2 `bash .rddf/sync_strategy_status.sh` 自动派生 `.rddf/roadmap/strategy.md` §7 (migrated from `tools/sync_strategy_status.sh` 2026-10-09)
 - [ ] H.3 `openspec archive mfc-cpu-pipeline-multi-cycle-fsm`
 - [ ] H.4 update ADR-082 Accepted 状态到 `docs/architecture/adr.md`
 - [ ] H.5 update CHANGELOG.md v0.10.0 entry

@@ -16,7 +16,7 @@ depends_on:
 
 ## Why
 
-Phase 1.5 stage doc §"Wave 4" 规划 (见 `soc/cpu/docs/roadmap/phase-1.5-stall-and-validate.md`):
+Phase 1.5 stage doc §"Wave 4" 规划 (见 `.rddf/roadmap/archive/phase-1.5-stall-and-validate.md`):
 
 > **Wave 4 (Wave 3 后, 2 周)**: Phase 1.5 → Phase 2 毕业
 > - `mmu-sv32-ext` (Sv32 PTW decode + megapage, Sv48 砍掉)

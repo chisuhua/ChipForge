@@ -4,7 +4,7 @@
 
 ## Context
 
-当前 `soc/cpu/docs/roadmap/execution-roadmap.md §3.2` 中 v1.0.0 / v1.3.0 / v1.4+ 的"关键指标"列只有内部绝对值（CoreMark/MHz ≥ N），缺少与 VexiiRiscv 官方公开值的客观对拍门禁。
+当前 `docs/architecture/roadmap-evolution.md` §8 跨版本对比表（migrated from soc/cpu/docs/roadmap/execution-roadmap.md §3.2, 2026-10-09）中 v1.0.0 / v1.3.0 / v1.4+ 的"关键指标"列只有内部绝对值（CoreMark/MHz ≥ N），缺少与 VexiiRiscv 官方公开值的客观对拍门禁。
 
 - **VexiiRiscv**（2025-07-01 status）：in-order + Plugin 范式 + SpinalHDL elaboration + FPGA 优先 —— 与 ChipForge 完全同架构赛道
   - single-issue 官方 CoreMark/MHz：**2.4–2.6**
