@@ -140,7 +140,7 @@ CI 门禁：`verify_plugin_decision.sh` 新增**第 8 项**——所有 `build()
 
 ### (b) 不抛弃 Plugin 的演进机制
 
-1. **write-back + dirty 位 FSM**（落新 ADR-083）：refill FSM 从 4 态扩到 6 态（`IDLE/LOOKUP/REFILL/WRITEBACK/DONE/FLUSH`），`ch_state_machine` DSL 实装
+1. **write-back + dirty 位 FSM**（落新 ADR-084）：refill FSM 从 4 态扩到 6 态（`IDLE/LOOKUP/REFILL/WRITEBACK/DONE/FLUSH`），`ch_state_machine` DSL 实装
 2. **Store buffer**（2–4 项，write-back 必备搭档）：作为 L1Cache 内部 `array_store` 实现，**不作为独立 Plugin** —— 避免 D4 交互面扩大
 3. **Non-blocking 是 v1.4 候选**，不进 v1.x hard gate（VexiiRiscv 用 3 年迭代，ChipForge v1.x 拿到 80% 收益即可）
 4. CI 门禁：`array_store` 双缓冲 commit 顺序断言（ADR-040 v2.0 已有）+ write-back FSM 每态的 TLM≡CH_MEM 对拍（ADR-080 协议的第一个真实负载）

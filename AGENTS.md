@@ -77,7 +77,7 @@ bash tools/run_chipforge_tests.sh --all
 
 ## 架构核心约束（D4 / ADR-040 v2.0）
 
-**所有业务 Plugin 必须遵守**（CI 强制执行，`tools/verify_plugin_decision.sh` + `tools/check_plugin_portability.sh` 9/9 PASS）：
+**所有业务 Plugin 必须遵守**（CI 强制执行，`tools/verify_plugin_decision.sh` + `tools/check_plugin_portability.sh` 12/12 PASS）：
 
 1. **无 `void tick()`** — `PluginBase::tick() = delete`，bridge 适配层例外（`src/cf_plugin/bridge/`）
 2. **无状态机** — 禁止 `enum class State` + `switch(state_)`；**多周期协议引擎**豁免（ADR-046：`CF_PLUGIN_USE_FSM_EXEMPT` + `chlib::ch_state_machine` DSL）
@@ -257,7 +257,7 @@ ip/{name}/
 |------|------|------|--------|
 | **战略 SSOT** | [`.rddf/roadmap/strategy.md`](.rddf/roadmap/strategy.md) | A+C Hybrid 战略选择 + 7 项决策矩阵 + 版本节点 + Go/No-Go（"为什么/做什么"）| 任何 ADR / PoC 决策时看大方向 |
 | **实施规划** | [`.rddf/roadmap/`](.rddf/roadmap/)（phases / features / objectives）| 实施阶段 + 跨阶段特性 + 决策门禁 + 跟踪台账（"怎么做/谁先谁后"）| 任何实施前/进度跟踪/Go-No-Go 判断 |
-| **架构演进 SSOT** | [`docs/architecture/roadmap-evolution.md`](docs/architecture/roadmap-evolution.md) | Phase 6d → v1.3.0 7 版本节点架构图 + 跨版本对比 + 11 条 CI 门禁时间轴（"怎么做架构"）| 实施具体 phase 前必读对应版本章节 |
+| **架构演进 SSOT** | [`docs/architecture/roadmap-evolution.md`](docs/architecture/roadmap-evolution.md) | Phase 6d → v1.3.0 8 版本节点架构图 + 跨版本对比 + 11 条 CI 门禁时间轴（"怎么做架构"）| 实施具体 phase 前必读对应版本章节 |
 | **深度参考** | [`docs/research/`](docs/research/) | decision-1-plugin-evolution / multi-core-comparison / poics-and-risks / adr-matrix / phase6c-elaboration-pattern-study | 写 ADR / PoC 决策时深读 |
 
 #### 当前活跃 versions + 关联文档
@@ -268,7 +268,7 @@ ip/{name}/
 | **v0.8.0** | 🟡 2026-12 中旬（Wave 3-mmu） | phase-2 | `roadmap-evolution.md` §2 |
 | **v0.9.0** | 📋 2027-02 下旬（Wave 4-csr-cache-dse） | phase-3 | `roadmap-evolution.md` §3 |
 | **v0.10.0** | 📋 2027 Q1（Wave 5-isa-coverage-and-bp） | phase-4 | `roadmap-evolution.md` §4 |
-| **v0.11.0** | 📋 2027 Q1 末（mfc + mmu-chmem 收官） | `objective-v0110-launch.md` | `roadmap-evolution.md` §4 |
+| **v0.11.0** | 📋 2027 Q1 末（mfc + mmu-chmem 收官） | `objective-v0110-launch.md` | `roadmap-evolution.md` §4.5 |
 | **v1.0.0** | 📋 2027 Q3（wave6 §1） | `objective-v100-launch.md` | `roadmap-evolution.md` §5 |
 | **v1.2.0** | 📋 2028 Q2（验证基建版） | `objective-v120-launch.md` | `roadmap-evolution.md` §6 |
 | **v1.3.0** | 📋 2029 Q1（产品化版） | `objective-v130-launch.md` | `roadmap-evolution.md` §7 |
@@ -444,3 +444,23 @@ phase-6d-rtl-verification (硬门 = poc-follow-up-fixes archive)
 1. `openspec/changes/poc-follow-up-fixes/` 已 archive (含 M3 HazardPlugin 完整 + byte-equal + chbool)
 2. `openspec/changes/phase-6d-prerequisites/` 已 archive (CI 集成 + ADR-037 v2.0 验证)
 3. `tests/cpu/manual_elf` + `tests/cpu/riscv_tests/elf/` 测试 ELF 就绪 (已 vendor 40 ELF, 无需重写)
+
+
+<!-- RDD-WORKFLOW-CORE-USAGE-START -->
+<!-- Layer 0 协议块: rdd-workflow 核心用法声明 --
+     此块由 `rddf setup ai-context` 管理。 -->
+
+本项目已安装 **rdd-workflow**（OpenSpec 工作流技能包），用于管理系统化的变更生命周期。
+
+**推荐入口**：告诉我"使用 guide 流程"或直接调用 `skill_use("guide")` 获得当前状态推荐。
+
+**核心流程**（4 阶段架构）：
+1. `skill_use("rdd-arch")` — 架构定义（ADR + roadmap）
+2. `skill_use("rdd-planner")` — 提案治理（review → approve）
+3. `skill_use("rdd-builder")` — 变更执行（plan → execute → archive）
+4. `skill_use("rdd-verifier")` — AC 验证
+
+**旁路规则**：如果变更 ≤2 个文件、≤3 个任务且无公开 API 变更，可以直接 `skill_use("rdd-quick")` 快速执行。
+
+**自助诊断**：运行 `rddf doctor --category ai-context-bootstrap` 检查本配置块状态。
+<!-- RDD-WORKFLOW-CORE-USAGE-END -->

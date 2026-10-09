@@ -33,9 +33,9 @@
 | Initiative ID | Title | 包含 Change | 版本节点 | Status |
 |---------------|-------|-------------|----------|--------|
 | `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | ✅ 已收官（archived, commit cba5e53 + 8909165 + d98a9dd） |
-| `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | 🟡 **部分收官（2026-09-29 Oracle 审计）**：P1#3 已 archive（commit 8a14402）；P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede（8/60 IN_PROGRESS）；**P1#4 0/25 NOT STARTED, Phase F optional**（2026-09-29 (b) 决策降级, Oracle 审计代码考古零痕迹: 无 CURRENT_CYCLE/cycle_count_t/test_pb_run_cycle_precision.cpp/ADR-050）；P1#6 满足启动条件（P1#3 已 archive）待启动。**Initiative 形式 archive 待 P1#4 Phase F 实装 + P1#6 archive** |
+| `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | ✅ **已收官（2026-10-08 全量 archive）**：P1#3 已 archive（commit 8a14402）；P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede（原 change 已 archive 2026-10-05）；**P1#4 ✅ archive (2026-10-08, Phase F optional 降级落地)**；P1#6 ✅ DONE (archived, 2026-10-08) |
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
-| **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare + P3#14 soc-freertos-demo + ADR-070~083（14 条新规划，含 083=write-back FSM 净新增） | **v0.10.0 → v1.0.0** | exploring（待启动）；详见 [`docs/architecture/roadmap-evolution.md` §4-§5](../../docs/architecture/roadmap-evolution.md) |
+| **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare + P3#14 soc-freertos-demo + ADR-070~082 + ADR-084（14 条新规划，含 084=write-back FSM（重编号，原 083 冲突）净新增）| **v0.10.0 → v0.11.0 → v1.0.0** | IN_PROGRESS（mfc-cpu-pipeline-multi-cycle-fsm 50/60）；详见 [`docs/architecture/roadmap-evolution.md` §4-§4.5](../../docs/architecture/roadmap-evolution.md) |
 | **`wave6-linux-and-productization`**（**2026-10-09 标记, v1.0.0+ 远期**）| Wave 6 Linux + chip-selector 商业化 | P4#15 vexii-riscv-parity-poc (远期 placeholder, v1.0.0+ 启动期启用) | **v1.0.0 → v1.3.0** | deferred (wave6 启动期启用); 详见 [`docs/architecture/roadmap-evolution.md` §5-§7](../../docs/architecture/roadmap-evolution.md) |
 
 ## 4. 依赖图
@@ -165,7 +165,8 @@ graph TD
 | v0.7.0 archive | P0#1 canonical-ordering PASS + 0 新 fail | 暂停, 修复 P0#1 后重试 |
 | v0.8.0 中间检查 | P1#3 PADDR 真消费 + cycle-precision 实装 + multi-cycle stall 注 | **如果评估显示剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) |
 | v0.9.0 archive | Phase 1.5 毕业标准达成 (RV32I ≥85%, SoC demo ≥5 ELF tohost=1, cache-dse-sweep CSV, D4+ADR-040+ADR-044+ADR-045 全合规) | 推迟 1 个 wave, 回填 Open Questions, 重审 |
-| v0.10.0 archive | mfc Phase H archive + mmu-chmem Phase A-E + rv32um 8/8 + DMIPS/MHz ≥1.4 | 推迟 v0.11.0, 修 mfc-extract-fsm-h 残留 |
+| v0.10.0 archive | mfc Phase H archive + mmu-chmem Phase A-E（rv32um 8/8 + DMIPS/MHz ≥1.4 defer v0.11.0）| 推迟 v0.11.0, 修 mfc-extract-fsm-h 残留 |（**v0.10.0 archive 门禁为规划时点快照**：v0.10.4 2026-09-30 已发版；mfc Phase H + mmu-chmem Phase A-E 实际归属 v0.11.0，见 `objective-v0110-launch.md §9.1`）|
+| v0.11.0 archive | rv32um 8/8 + DMIPS/MHz ≥1.4 + [cpu-l1-mmu-demo] 7/7（workaround 移除）+ [mmu-verilator] 5/5 + mfc-extract-fsm-h archive + 4 architecture gates 0 error | 推迟 v1.0.0 启动期，发 v0.11.x hotfix 修 mfc-extract-fsm-h 残留 |
 | v1.0.0 archive | S/U mode + RV32A + BTB + FreeRTOS + CoreMark ≥2.3 | 推迟 v1.2.0, 修 PoC-6 BP 不足 |
 | v1.2.0 archive | lockstep 1M 零分歧 HARD + Linux-sim SOFT + 4-way RRIP + PMP + gdbstub | 触发 R6: 降级 v1.2.0 为"验证基建版", Linux-sim 并入 v1.3.0 合并交付 |
 | v1.3.0 archive | Linux-on-FPGA + chip-selector + ADR-080 转硬门禁 + FPGA CoreMark ≥2.5 | 触发 R3/R7/R8: 商业化定位降级 / soft-float 路线 / FPGA-only 产品化 |
@@ -187,7 +188,7 @@ graph TD
 
 | 字段 | 内容 |
 |------|------|
-| 关联 ADR | **090**（拟新增） + 040 + 080 + 083 |
+| 关联 ADR | **090**（拟新增） + 040 + 080 + **084**（write-back FSM，重编号） |
 | 关联 change | **已创建** [`vexii-riscv-parity-poc`](../../openspec/changes/vexii-riscv-parity-poc/)（proposal 4/4 完成）|
 | 成功标准 | **dual 全家桶**（dual-issue + HW prefetch + write-back + store buffer）**CoreMark/MHz ≥ 4.5**（[估]），**与 VexiiRiscv dual+prefetch 官方 5.24 偏差 ≤15%**（v1.4+ archive gate）；mispredict 率 ~3-5%；DMIPS/MHz ≥ 2.4（追平 VexiiRiscv 2.50 的 96%）|
 | 失败砍分叉 | 偏差 > 15% 持续 8 周 → 砍 dual-issue 分叉（理由 #2 信号 2），v1.4 转 single+late-alu；dual 全家桶永不实装 → PoC-15 标 archived-skipped（**不阻塞 PoC-14**）；FPGA 不可综合 → 走 sim-only，FPGA 综合推迟 v1.4+ |
@@ -205,8 +206,8 @@ graph TD
 
 > 战略 §1-§10 是**为什么/做什么**（稳定）。本文档之外的执行拆解（阶段 / 依赖 / 并行轨道 / 阻塞 / 待启动决策点）见:
 >
-> 📍 **[`docs/architecture/roadmap-evolution.md`](../../docs/architecture/roadmap-evolution.md)** — 7 版本节点架构演进 + 跨版本对比 + 11 条 CI 门禁时间轴（动态执行分解）
+> 📍 **[`docs/architecture/roadmap-evolution.md`](../../docs/architecture/roadmap-evolution.md)** — 8 版本节点架构演进 + 跨版本对比 + 11 条 CI 门禁时间轴（动态执行分解）
 >
-> 📍 **[`.rddf/roadmap/`](.)** — rdd-workflow 实施规划（phases/features/objectives）
+> 📍 **[`.rddf/roadmap/`](.)** — rdd-workflow 实施规划（phases/features/objectives），含 v0.11.0 决策门禁 [objective-v0110-launch.md](objectives/objective-v0110-launch.md)（Wave 5 收官 Go/No-Go）
 >
 > 关联: `openspec/changes/*/tasks.md` (具体 changes) · `.rddf/sync_strategy_status.sh` (§7 SSOT 派生) · `AGENTS.md` 已知测试状态（数字维护原则）

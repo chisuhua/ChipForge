@@ -175,7 +175,7 @@ TEST_CASE("vexii-parity PoC-15 dual 全家桶", "[vexii-parity][dual][v1.4-pendi
 - PoC-15 仍标 `[v1.4-pending]`
 
 ### 阶段 4：PoC-15 激活（v1.4+ 启动时）
-- dual 全家桶实装后（v1.3.0 完成 ADR-083 write-back FSM + dual-issue 实现）
+- dual 全家桶实装后（v1.3.0 完成 ADR-084 write-back FSM + dual-issue 实现）
 - PoC-15 激活为 HARD 门禁
 - **v1.4+ archive gate**
 

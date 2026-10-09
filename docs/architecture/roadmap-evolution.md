@@ -7,39 +7,42 @@
 
 ---
 
-## 0. 演进全景（Phase 6d → v0.8.0 → v0.9.0 → v0.10.0 → v1.0.0 → v1.2.0 → v1.3.0）
+## 0. 演进全景（Phase 6d → v0.8.0 → v0.9.0 → v0.10.0 → v0.11.0 → v1.0.0 → v1.2.0 → v1.3.0）
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────┐
-│  2026 Q4         2026-12         2027-02        2027 Q1        2027 Q3      2028 Q2     2029 Q1   │
-│  ┌────────┐     ┌────────┐      ┌────────┐     ┌────────┐     ┌────────┐   ┌────────┐   ┌────────┐ │
-│  │Phase 6d│ ──► │ v0.8.0 │ ───► │ v0.9.0 │ ──► │v0.10.0 │ ──► │ v1.0.0 │──►│ v1.2.0 │──►│ v1.3.0 │ │
-│  │5-stage │     │ MMU 真  │      │ CSR +  │     │RV32IMAC│     │ S/U +  │   │ 4-way  │   │Linux-on│ │
-│  │CH_MEM  │     │ 端到端  │      │ 4-way  │     │+RV32C  │     │ AMO +  │   │RRIP+   │   │ FPGA + │ │
-│  │+Veril. │     │+cycle- │      │ Cache  │     │+ICache │     │ BTB +  │   │PMP +   │   │chip-   │ │
-│  │+FSM    │     │precis. │      │+except.│     │+MUL/   │     │ PLIC/  │   │Debug + │   │selector│ │
-│  │(前置)  │     │+MUL/DIV│      │+mis-   │     │ DIV    │     │ CLINT  │   │Spike   │   │+ADR-080│ │
-│  │        │     │(Wave 3)│      │predict.│     │(Wave 5)│     │+FreeRTOS   │ lockstep   │商业化   │ │
-│  └────────┘     └────────┘      └────────┘     └────────┘     └────────┘   └────────┘   └────────┘ │
-│      │              │                │              │              │            │            │    │
-│  ADR-040 v2.0  ADR-049         ADR-046+FSM    ADR-082        ADR-070~076  ADR-080    ADR-079           │
-│  CH_MEM 双模   PADDR 真消费    CSR/exception  negotiate      S/U+AMO+     RRIP+PMP+  chip-selector      │
-│  elaboration   +MemoryInter-   +4-way LRU     capability     BTB+PLIC/    Spike      商业化             │
-│  +Verilog 生成  face+cycle-    +mispredict    +MUL/DIV FSM   CLINT        lockstep                       │
-│               precision       recovery                      +FreeRTOS                                      │
-│               +mfc multi-                                                                                 │
-│               cycle+mmu-                                                                                  │
-│               config-json                                                                                 │
-│                                                                                                            │
-│  通用架构能力演进（7 版本累积）:                                                                            │
-│  ├─ Phase 6d: CH_MEM elaboration substrate + Verilator 后端 + 多周期 FSM 框架                                │
-│  ├─ v0.8.0:   ADR-049 PADDR-first 真消费 + cycle-accurate 仿真 + 多周期 Plugin 框架                          │
-│  ├─ v0.9.0:   CSR/exception 完整 + 4-way LRU + mispredict recovery + Phase 1.5 毕业                          │
-│  ├─ v0.10.0:  ADR-082 negotiate + MUL/DIV FSM（真 radix-2）+ RV32C + ICache + Zicsr/Zifencei                 │
-│  ├─ v1.0.0:   S/U mode + RV32A + BTB/GShare/RAS + PLIC/CLINT + FreeRTOS demo                                │
-│  ├─ v1.2.0:   4-way RRIP + PMP + Debug（gdbstub）+ Spike lockstep + Linux-sim SOFT                          │
-│  └─ v1.3.0:   Linux-on-FPGA + chip-selector CLI（ADR-079）+ ADR-080 双模对拍硬门禁                            │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│  2026 Q4 🔄    2026-12 ✅    2027-02 🔄    2027 Q1 ✅    2027 Q1末 🔄    2027 Q3 🔄    2028 Q2 🔄  2029 Q1 🔄 │
+│  （图例：✅=已发版/发布，🔄=进行中/规划中。v0.10.0 ✅ 指 v0.10.4 已 2026-09-30 发版，但 rv32um 8/8 + DMIPS ≥1.4 推迟 v0.11.0）        │
+│  ┌────────┐     ┌────────┐      ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐   ┌────────┐   ┌────────┐ │
+│  │Phase 6d│ ──► │ v0.8.0 │ ───► │ v0.9.0 │ ──► │v0.10.0 │ ──► │v0.11.0 │ ──► │ v1.0.0 │──►│ v1.2.0 │──►│ v1.3.0 │ │
+│  │5-stage │     │ MMU 真  │      │ CSR +  │     │RV32IMAC│     │rv32um 8/8│    │ S/U +  │   │ 4-way  │   │Linux-on│ │
+│  │CH_MEM  │     │ 端到端  │      │ 4-way  │     │+RV32C  │     │+ BTB基础│     │ AMO +  │   │RRIP+   │   │ FPGA + │ │
+│  │+Veril. │     │+cycle- │      │ Cache  │     │+ICache │     │+DMIPS   │     │GShare+RAS│  │PMP +   │   │chip-   │ │
+│  │+FSM    │     │precis. │      │+except.│     │+MUL/   │     │≥1.4     │     │ PLIC/  │   │Debug + │   │selector│ │
+│  │(前置)  │     │+MUL/DIV│      │+mis-   │     │ DIV    │     │+mmu-    │     │ CLINT  │   │Spike   │   │+ADR-080│ │
+│  │        │     │(Wave 3)│      │predict.│     │(Wave 5)│     │veril.   │     │+FreeRTOS   │ lockstep   │商业化   │ │
+│  │        │     │        │      │        │     │        │     │5/5      │     │        │   │        │   │        │ │
+│  └────────┘     └────────┘      └────────┘     └────────┘     └────────┘     └────────┘   └────────┘   └────────┘ │
+│      │              │                │              │              │              │            │            │    │
+│  ADR-040 v2.0  ADR-049         ADR-046+FSM    ADR-082        ADR-082 实装    ADR-070~076  ADR-080    ADR-079           │
+│  CH_MEM 双模   PADDR 真消费    CSR/exception  negotiate      + mfc Phase H  S/U+AMO+     RRIP+PMP+  chip-selector      │
+│  elaboration   +MemoryInter-   +4-way LRU     capability                   BTB+PLIC/    Spike      商业化             │
+│  +Verilog 生成  face+cycle-    +mispredict    +MUL/DIV FSM                 CLINT        lockstep                       │
+│               precision       recovery       (v0.10 部分)                 +FreeRTOS                                      │
+│               +mfc multi-                                                                                                 │
+│               cycle+mmu-                                                                                                  │
+│               config-json                                                                                                 │
+│                                                                                                                            │
+│  通用架构能力演进（8 版本累积）:                                                                                            │
+│  ├─ Phase 6d: CH_MEM elaboration substrate + Verilator 后端 + 多周期 FSM 框架；ADR-083 Plugin-style SSOT（双模叙事根基，v0.10.0 起）                                              │
+│  ├─ v0.8.0:   ADR-049 PADDR-first 真消费 + cycle-accurate 仿真 + 多周期 Plugin 框架                                        │
+│  ├─ v0.9.0:   CSR/exception 完整 + 4-way LRU + mispredict recovery + Phase 1.5 毕业                                        │
+│  ├─ v0.10.0:  ADR-082 negotiate + MUL/DIV FSM 化（ad-hoc counter，真 radix-2 defer v0.11.0）+ RV32C + ICache + Zicsr/Zifencei          │
+│  ├─ v0.11.0:  rv32um 8/8 + mfc Phase H archive + mmu-verilator 5/5 真 sv32 + DMIPS/MHz ≥1.4 + BTB 4K-entry（基础）+ ADR-082 negotiate 完整集成 │
+│  ├─ v1.0.0:   S/U mode + RV32A + BTB/GShare/RAS + PLIC/CLINT + FreeRTOS demo                                              │
+│  ├─ v1.2.0:   4-way RRIP + PMP + Debug（gdbstub）+ Spike lockstep + Linux-sim SOFT                                          │
+│  └─ v1.3.0:   Linux-on-FPGA + chip-selector CLI（ADR-079）+ ADR-080 双模对拍硬门禁                                          │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -52,15 +55,15 @@
 
 | 子阶段 | 内容 | 工时 | 依赖 |
 |--------|------|------|------|
-| 6d.1 | DecoderPlugin 完整 CH_MEM | 1 周 | 6d prereqs |
+| 6d.1 | DecoderPlugin 完整 CH_MEM | 1.5 周（Oracle 修订，6d.1 从零建） | 6d prereqs |
 | 6d.2 | BranchPlugin + HazardPlugin 完整 CH_MEM | 1.5 周 | 6d prereqs + 6d.1 |
-| 6d.3 | CpuFactoryChmem 完整 5-stage 集成（IF/ID/EX/MEM/WB + 4 plugin 正确 stage wiring） | 1.5 周 | 6d.1 + 6d.2 |
+| 6d.3 | CpuFactoryChmem 完整 5-stage 集成（IF/ID/EX/MEM/WB + 4 plugin 正确 stage wiring） | 2 周（含 ibus_chmem.h / dmem_chmem.h fetch/memory model 新增，Oracle 关键发现） | 6d.1 + 6d.2 |
 | 6d.4 | riscv-tests RV32I 5 指令（add/addi/auipc/jal/beq）端到端 `tohost=1` CppHDL sim | 2 周 | 6d.3 + riscv64 工具链 |
 | 6d.5 | Verilator 后端集成（Verilog → Verilator 编译 → VL1Cache/VRegFile） | 1.5 周 | 6d.4 + Verilator |
 | 6d.6 | MMU/PTW 多周期 FSM（`chlib::ch_state_machine` + `CF_PLUGIN_USE_FSM_EXEMPT`，sv32 5 状态 IDLE→L0_WAIT→L1_WAIT→DONE→FAULT）| 1 周 | 6d.5 + ADR-046 |
 | 6d.7 | L1Cache refill FSM（同 ch_state_machine，4 状态 IDLE→LOOKUP→MISS→REFILL_WAIT）| 0.5 周 | 6d.6 |
 | 6d.8 | Harness 迁移（`pb.run()` → `pb.elaborate()` + CppHDL sim/Verilator runner）| 1 周 | 6d.4 |
-| **总计** | | **10-12 周** | — |
+| **总计** | | **11-13 周（Oracle 上调 0.5 周）** | — |
 
 **退出标准**（最小 M6d.1 = E1-E6 + 标准 M6d.2 = E7-E14）:
 
@@ -68,11 +71,11 @@
 
 | # | 标准 | 验证命令 |
 |---|------|----------|
-| E1 | `m4_poc_5stage_simulator_tick` 升级为完整 5-stage 版本 | `./bin/chipforge_tests_chmem "m4_poc_5stage_full_simulator"` |
+| E1 | `m4_poc_5stage_simulator_tick` 升级为完整 5-stage 版本 | `./build/bin/chipforge_tests_chmem "m4_poc_5stage_full_simulator"` |
 | E2 | DecoderPlugin/BranchPlugin/HazardPlugin 完整 CH_MEM 实现 | `git log` + `tests/cpu/test_cpu_5stage.cpp` PASS |
-| E3 | riscv-tests RV32I 5 指令 (add/addi/auipc/jal/beq) `tohost=1` CppHDL sim 端到端 PASS | `./bin/chipforge_tests_chmem "riscv_tests_rv32ui_*"` |
+| E3 | riscv-tests RV32I 5 指令 (add/addi/auipc/jal/beq) `tohost=1` CppHDL sim 端到端 PASS | `./build/bin/chipforge_tests_chmem "riscv_tests_rv32ui_*"` |
 | E4 | 生成 `cpu.v` 含 5-stage 完整 Verilog | `ch::toVerilog("cpu.v", ctx)` 输出含 5 个 stage `always_ff` |
-| E5 | 8/8 `check_plugin_portability.sh` 仍 PASS（含新增 Check 9: `_chmem.h` 必须有 `CF_PLUGIN_USE_FSM_EXEMPT` 标注 if FSM）| `bash tools/check_plugin_portability.sh` |
+| E5 | 12/12 `check_plugin_portability.sh` 仍 PASS（Check 9 FSM_EXEMPT 已实装，Phase 6d 需维持）| `bash tools/check_plugin_portability.sh` |
 | E6 | `verify_adr.sh` 0 FAILED + `verify_plugin_decision.sh` PASS | 同上 |
 
 #### 1.2 标准退出标准 (M6d.2, "+ Verilator + MMU FSM")
@@ -83,8 +86,8 @@
 | E8 | Verilator sim 跑 riscv-tests add.elf `tohost=1` 与 CppHDL sim byte-equal | TLM↔Verilog 对比 trace |
 | E9 | MMU PTW 5 状态 FSM (`chlib::ch_state_machine`) 实装 + `CF_PLUGIN_USE_FSM_EXEMPT` 标记 | `ip/cpu/plugins/mmu_ptw_chmem.h` |
 | E10 | L1Cache refill FSM (4 状态) 实装 | `ip/cache/tlm/l1_cache_refill_fsm_chmem.h` |
-| E11 | Harness 切换 (`tools/cpu_sim/main.cpp` → CppHDL sim runner) + 保留 CLI 兼容 | `tools/cpu_sim --elf add.elf` 跑 CppHDL sim |
-| E12 | `chipforge_tests` TLM baseline 0 回归（v0.10.0 基线 419 PASS / 1 known FAIL / 420 total）| `ctest -R chipforge_tests` |
+| E11 | Harness 切换 (`tools/cpu_sim/main.cpp` → CppHDL sim runner) + 保留 CLI 兼容 | `build/src/cf_plugin/cpu_sim --elf add.elf` 跑 CppHDL sim |
+| E12 | `chipforge_tests` TLM baseline 0 回归（数字维护原则：以 archive 时 AGENTS.md 已知测试状态为准，禁止快照引用硬编码数字；当前 v0.10.4 实测 432/432 PASS, 67026 assertions）| `ctest -R chipforge_tests` |
 | E13 | `chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS | `ctest -R chipforge_tests_chmem` |
 | E14 | CHANGELOG v0.10.0/v0.11.0 entry + ADR-037 v2.0 Accepted 状态 + ADR-040 v3.0 (Verilator 集成段) | `CHANGELOG.md` + `docs/architecture/adr.md` |
 
@@ -121,16 +124,16 @@ MMUPlugin(SvMode, TLBConfig[], PTWConfig, MemoryInterface* mem = nullptr)
 
 | 轨道 | change | 内容 | 工时 |
 |------|--------|------|------|
-| L4 vendor | — | rv32um M 扩展 ELF（mul/mulh/div/... 8 个）| 1-2 天 |
+| L4 vendor | ✅ 已闭环 (commit b12c920, v0.10.0) | rv32um M 扩展 ELF vendor | 0d |
 | P1#3 主路径 | `mmu-paddr-consume-and-real-memory` | IBus/DBus 真消费 PADDR + PTW 真内存 | 2.5-3 周 |
 | P1#4 并行 | `plugin-framework-cycle-precision` | `pb.run(N)` 真 cycle 数（已 🗑️ archive 2026-10-08, Phase F optional 降级）| 1-2 周 |
 | P1#5 SUPERSEDED | `cpu-pipeline-multi-cycle` | 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` 取代（FSM 化 + ADR-082 negotiate 集成）| — |
 | P1#6 并行 | `mmu-config-json-driven` | MMU 配置 JSON 化（已 archive 2026-10-08，由 mmu-chmem-pipeline-integration 承担）| ≤1 周 |
 
 **验证**:
-- `[cpu-l1-mmu-demo]` ≥8/8（含 ≥2 个新 PADDR 传播用例）
+- `[cpu-l1-mmu-demo]` ≥8/8（含 ≥2 个新 PADDR 传播用例）*（收官时实际 6/6，v0.11.0 target 调整为 7/7，见 `objective-v0110-launch.md §9.2`）*
 - ≥3/5 MUL/DIV ELF 0% diff（cycle-identical）
-- riscv-tests ≥40/40 + 0 新 fail
+- rv32ui 40/40 + rv32um 0/8 维持（=40/48，0 新 fail）
 - 3 门禁全 PASS
 
 ---
@@ -154,7 +157,7 @@ MMUPlugin(SvMode, TLBConfig[], PTWConfig, MemoryInterface* mem = nullptr)
 - + TLM+CH_MEM 双轨（ADR-040 v2.0）
 - + cache-dse-sweep CSV（size × assoc × repl × line）
 - + ADR-044 §2.5 VIPT 正式安全
-- **E8 约束**: 与 Phase 6d 6d.5 baseline byte-equal
+- **Phase 6d E8 约束**: 与 6d.5 baseline byte-equal
 
 **验证**:
 - RV32I ≥ 85% riscv-tests PASS
@@ -180,7 +183,7 @@ pb.build() 编排:
      if plugin->validate() returns err → throw
   4. for each Plugin in topo order: build()
 
-CI 第 8 条门禁: build() 内 dynamic_cast = 0
+CI 门禁（adr-matrix §6 行 5 / 决策 1）： build() 内 dynamic_cast = 0
 ```
 
 ### 4.2 5-stage Pipeline（CH_MEM 完整，来自 Phase 6d）
@@ -194,9 +197,9 @@ CI 第 8 条门禁: build() 内 dynamic_cast = 0
 
 | 能力 | 来源 | 关联 PoC |
 |------|------|---------|
-| MUL/DIV FSM（真 radix-2）| mfc Phase H | PoC-1 |
+| MUL/DIV FSM 化（ad-hoc counter，真 radix-2 defer v0.11.0 mfc-extract-fsm-h）| mfc Phase H | PoC-1 |
 | RV32C 16-bit 压缩 | ADR-070 | PoC-2 |
-| ICache ≥90% 命中 | ADR-040 v3.0 | PoC-3 |
+| ICache ≥90% 命中 | ADR-072 | PoC-3 |
 | Zicsr/Zifencei | Zicsr ext | — |
 | MUL/DIV FSM 实例契约 | ADR-082 | — |
 
@@ -204,6 +207,24 @@ CI 第 8 条门禁: build() 内 dynamic_cast = 0
 - `MulDivFsmPlugin::negotiate()` → `cap.provide<MCFHandle>("multi_cycle_fsm")` + `cap.require<FlushBroad>(...)` + `cap.require<WBArbiter>(...)`
 - `BranchPlugin::negotiate()` → `cap.provide<FlushBroad>("flush_broadcaster")`
 - `HazardPlugin::negotiate()` → `cap.provide<WBArbiter>(...)`
+
+---
+
+### 4.5 v0.11.0 架构目标（2027 Q1 末，Wave 5 收官）
+
+> 数据源: [`.rddf/roadmap/objectives/objective-v0110-launch.md`](../../.rddf/roadmap/objectives/objective-v0110-launch.md)（7 项完成判据 + Go/No-Go 决策门禁）
+
+**核心**: rv32um 8/8 + BP 基础（fetch stall + BTB 4K-entry）+ mmu-verilator 5/5 真 sv32 + DMIPS/MHz ≥1.4 硬门禁 + ADR-082 negotiate 完整集成。
+
+| 关键能力 | 完成判据 | ADR 锚点 | 关联 PoC |
+|---------|---------|---------|---------|
+| rv32um 8/8（真 radix-2 M 扩展覆盖）| `[riscv-tests]` 48/48（rv32um 0/8 → 8/8）| ADR-082（mfc Phase H archive）| PoC-1 |
+| BP 基础（fetch stall + 基础 BTB 4K-entry）| `[cpu-integration]` dhrystone livelock 修 + PoC-6 CoreMark ≥1.9（解锁 DMIPS/MHz ≥1.4 硬门禁）| ADR-075（fetch stall framework 扩展 + BTB 4K-entry 实装）| PoC-6 |
+| mmu-verilator 5/5 真 sv32 | `[mmu-verilator]` 3/3 plumbing → 5/5 真翻译 | ADR-082 + ADR-049（mmu-chmem Phase A-E）| — |
+| DMIPS/MHz ≥ 1.4 | Dhrystone 硬门禁（mfc Phase G）| ADR-082 | PoC-1 复测 |
+| ADR-082 negotiate 完整集成 | mfc Phase H archive（MUL/DIV FSM 化 + negotiate 组装）| ADR-082 | PoC-1/2/3 |
+
+**退出标准**（Go 条件，全满足）: `[riscv-tests]` 48/48 + `[mmu]` 53/53 0 退化 + Phase A 新增 6 测试全过（=59/59）+ `[cpu-l1-mmu-demo]` 7/7 + `[mmu-verilator]` 5/5 + `[cpu-integration]` 全绿 + DMIPS/MHz ≥ 1.4 + `run_chipforge_tests.sh --all` 全 PASS（详见 objective-v0110-launch.md §9.2）。
 
 ---
 
@@ -221,7 +242,7 @@ S-mode (supervisor) ← FreeRTOS / Linux kernel 运行
 U-mode (user) ← Application 运行
 ```
 
-- + satp.MODE = sv32（依赖 v0.9.0 ADR-049 §后续项 JSON 化）
+- + satp.MODE = sv32（v0.8.0 mmu-config-json-driven 已 archive 2026-10-08）
 - + sstatus/sepc/scause/stvec CSR 完整
 
 ### 5.2 关键能力
@@ -232,7 +253,7 @@ U-mode (user) ← Application 运行
 | BTB 4K-entry + GShare 13-bit + RAS 8-entry | — | PoC-6 |
 | PLIC + CLINT 中断控制 | — | PoC-7 |
 | FreeRTOS demo 10M cycle 稳定 | — | PoC-7 |
-| **HARD 门禁**: FPGA CoreMark/MHz 与 VexiiRiscv single-issue 偏差 ≤10% | 2026-09-29 新增 | **PoC-14** |
+| **HARD 门禁**: FPGA CoreMark/MHz 与 VexiiRiscv single-issue 偏差 ≤10%（v1.0.0 阶段 FPGA 板级基础即满足 PoC-14，完整 Linux 板级推迟 v1.3.0）| 2026-09-29 新增 | **PoC-14** |
 
 ---
 
@@ -252,7 +273,7 @@ Cache Line (4 ways × N sets)
   └────────┘ └────────┘ └────────┘ └────────┘
 RRIP 算法: hit → RRPV=0; miss → RRPV=RRIP_MAX
            periodic → RRPV++ (aging)
-E8 约束: 与 Phase 6d 6d.5 baseline byte-equal
+Phase 6d E8 约束: 与 6d.5 baseline byte-equal
 ```
 
 ### 6.2 PMP（Physical Memory Protection）
@@ -313,7 +334,8 @@ FPGA 板级 (Digilent/VexRiscv 风格 board bundle)
   ├─ PLIC/CLINT (来自 v1.0.0)
   ├─ PMP (来自 v1.2.0)
   ├─ Debug (gdbstub, 来自 v1.2.0)
-  └─ DDR controller + UART + VirtIO (新)
+  ├─ v0.11.0 启动 / v1.0.0 就绪 FPGA 板级基础（PoC-14 必需）：DDR 控制器基础版 + UART 早期版（最小 CoreMark 跑通）
+  └─ v1.3.0 阶段 FPGA 板级完整化（Linux 必需）：完整 DDR + VirtIO + 网卡 + 板级 SDK
 OpenSBI → Linux → Shell 实际跑在 FPGA
 FMAX ≥ 100 MHz
 ```
@@ -328,28 +350,28 @@ FMAX ≥ 100 MHz
 
 ## 8. 跨版本节点架构演进对比表
 
-| 架构维度 | Phase 6d | v0.8.0 | v0.9.0 | v0.10.0 | v1.0.0 | v1.2.0 | v1.3.0 |
-|---------|---------|--------|--------|---------|--------|--------|--------|
-| **指令集** | RV32I（5 指令）| RV32I + rv32um | + RV32I ≥85% | RV32IMAC + RV32C | + RV32A | 同 v1.0.0 | + RV32F (soft-float) |
-| **Privilege** | M-only | M-only | M-only | M-only | M+S+U | 同 v1.0.0 | + PMP |
-| **CSR** | 无 | 无 | mstatus/mtvec/mepc/mcause/mtval | + mcycle/minstret/Zicsr | + sstatus/sepc/scause/stvec | + pmpcfg/pmpaddr | + debug CSR |
-| **分支预测** | B-type 6-op | 同 Phase 6d | + flush ROB recovery | Static | BTB + GShare + RAS | 同 v1.0.0 | 同 v1.0.0 |
-| **Cache** | L1Cache 256×1 | 同 Phase 6d | 4-way LRU | L1D 4-way (LRU) | 同 v0.10.0 | 4-way RRIP | + ICache |
-| **MMU** | sv32 PTW FSM (5 状态) | PADDR-first 真消费 | + JSON 配置驱动 | sv32 (v0.9.0 沉淀) | + S-mode satp | 同 v1.0.0 | 同 v1.0.0 |
-| **Cycle 精度** | CppHDL sim + Verilator | + cycle counter | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 |
-| **多周期** | MMU/PTW + L1Cache refill FSM | MUL/DIV 多模板 (mfc supersede) | 持续完善 | MUL/DIV 真 radix-2 FSM | 持续完善 | 持续完善 | 持续完善 |
-| **异常** | CtrlLink::throw_when stub | stub | 12/13/15 路由完整 + trap delivery | 持续完善 | 持续完善 | 持续完善 | 持续完善 |
-| **中断** | 无 | 无 | 无 | 无 | PLIC + CLINT | 同 v1.0.0 | 同 v1.0.0 |
-| **调试** | 无 | 无 | 无 | 无 | 无 | gdbstub + Debug 0.13 | 同 v1.2.0 |
-| **对拍** | 无 | 无 | 无 | 无 | 无 | Spike lockstep HARD | + ADR-080 硬门禁 |
-| **VIPT 安全** | ADR-044 §2.5 风险标记 | 同 Phase 6d | 正式锁 (ADR-044 §2.5 实施) | 持续完善 | 持续完善 | 持续完善 | 持续完善 |
-| **DSE** | 无 | 无 | cache-dse-sweep CSV | 持续完善 | 持续完善 | 持续完善 | chip-selector 商业化 |
-| **工具链** | Verilator + riscv64 集成 | + cycle-precision 框架 | 持续完善 | + ADR-082 negotiate | 持续完善 | 持续完善 | + FPGA board bundle |
-| **OS 验证** | riscv-tests 5 指令 | riscv-tests 40/40 + rv32um 0/8 | RV32I ≥85% | riscv-tests 100% | FreeRTOS demo | Linux-sim SOFT | Linux-on-FPGA HARD |
-| **退出标准** | 8 指令 tohost=1 + Verilator byte-equal | [cpu-l1-mmu-demo] ≥8/8 + MUL/DIV ≥3/5 | Phase 1.5 毕业 | rv32ui+um+uc 100% / DMIPS ≥1.4 | rv32ua+si 100% / CoreMark ≥2.3 | lockstep 1M 零分歧 HARD | FPGA CoreMark ≥2.5 + ADR-080 |
-| **核心 PoC** | — | — | — | PoC-1/2/3 | PoC-4/5/6/7/14 | PoC-8/9/10 | PoC-11/14 复测 |
-| **CI 门禁数** | 8 → 9 | 9 | 9 | 9 → 11 | 11 | 11 (lockstep HARD) | 11 (+ ADR-080) |
-| **Plugin 框架** | ADR-040 v2.0 + ADR-046 | + ADR-049 PADDR-first | + ADR-048 canonical ordering (v0.7.0) | + ADR-082 negotiate | 同 v0.10.0 | 同 v0.10.0 | 同 v0.10.0 |
+| 架构维度 | Phase 6d | v0.8.0 | v0.9.0 | v0.10.0 | v0.11.0 | v1.0.0 | v1.2.0 | v1.3.0 |
+|---------|---------|--------|--------|---------|---------|--------|--------|--------|
+| **指令集** | RV32I（5 指令）| RV32I + rv32um | + RV32I ≥85% | RV32IMAC + RV32C | + rv32um 8/8（真 radix-2 M 扩展）| + RV32A | 同 v1.0.0 | + RV32F (soft-float) |
+| **Privilege** | M-only | M-only | M-only | M-only | 同 v0.10.0 | M+S+U | 同 v1.0.0 | 同 v1.2.0 |
+| **CSR** | 无 | 无 | mstatus/mtvec/mepc/mcause/mtval | + mcycle/minstret/Zicsr | 同 v0.10.0 | + sstatus/sepc/scause/stvec | + pmpcfg/pmpaddr | 同 v1.2.0 |
+| 分支预测 | B-type 6-op | 同 Phase 6d | + flush ROB recovery | Static | BTB 4K-entry（基础，PoC-6 CoreMark ≥1.9 解锁 DMIPS）| + GShare 13-bit + RAS 8-entry（完整）| 同 v1.0.0 | 同 v1.0.0 |
+| **Cache** | L1Cache 256×1 | 同 Phase 6d | 4-way LRU | L1D 4-way (LRU) + ICache (PoC-3, ADR-072) | 同 v0.10.0 | 同 v0.10.0 | 4-way RRIP | 同 v1.2.0 |
+| **MMU** | sv32 PTW FSM (5 状态) | PADDR-first 真消费 | + JSON 配置驱动 | sv32 (v0.9.0 沉淀) | CH_MEM 真 sv32（mmu-chmem Phase A-E）| + S-mode satp | 同 v1.0.0 | 同 v1.0.0 |
+| **Cycle 精度** | CppHDL sim + Verilator | + cycle counter | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 |
+| **多周期** | MMU/PTW + L1Cache refill FSM | MUL/DIV 多模板 (mfc supersede) | 持续完善 | MUL/DIV FSM 化（ad-hoc counter，真 radix-2 defer v0.11.0）| MUL/DIV FSM 化 + ADR-082 negotiate 完整集成（mfc Phase H archive）| 持续完善 | 持续完善 | 持续完善 |
+| **异常** | CtrlLink::throw_when stub | stub | 12/13/15 路由完整 + trap delivery | 持续完善 | 同 v0.10.0 | 持续完善 | 持续完善 | 持续完善 |
+| **中断** | 无 | 无 | 无 | 无 | 无 | PLIC + CLINT | 同 v1.0.0 | 同 v1.0.0 |
+| **调试** | 无 | 无 | 无 | 无 | 无 | 无 | gdbstub + Debug 0.13 | 同 v1.2.0 |
+| **对拍** | 无 | 无 | 无 | 无 | mmu-verilator 5/5 真 sv32（Verilator 后端对拍）| 无 | Spike lockstep HARD | + ADR-080 硬门禁 |
+| **VIPT 安全** | ADR-044 §2.5 风险标记 | 同 Phase 6d | 正式锁 (ADR-044 §2.5 实施) | 持续完善 | 同 v0.10.0 | 持续完善 | 持续完善 | 持续完善 |
+| **DSE** | 无 | 无 | cache-dse-sweep CSV | 持续完善 | 同 v0.10.0 | 持续完善 | 持续完善 | chip-selector 商业化 |
+| **工具链** | Verilator + riscv64 集成 | + cycle-precision 框架 | 持续完善 | + ADR-082 negotiate | + mfc-extract-fsm-h 真 radix-2（1-2 周）+ FPGA board bring-up（DDR 基础 + UART 早期版）| 持续完善 | 持续完善 | + FPGA board bundle |
+| **OS 验证** | riscv-tests 5 指令 | riscv-tests 40/40 + rv32um 0/8 | RV32I ≥85% | riscv-tests 40/48（rv32um 0/8 defer）| riscv-tests 48/48 + dhrystone 全绿 | FreeRTOS demo | Linux-sim SOFT | Linux-on-FPGA HARD |
+| **退出标准** | 8 指令 tohost=1（5 基线 add/addi/auipc/jal/beq + 3 扩展 lui/sw/bne，见 AGENTS.md §Phase 6d 关键交付 6d.4 "接受路径放宽" 注）+ Verilator byte-equal | [cpu-l1-mmu-demo] ≥8/8 + MUL/DIV ≥3/5 | Phase 1.5 毕业 | rv32ui 40/40 + mmu-chmem Phase A-E | rv32um 8/8 + DMIPS ≥1.4 + mmu-verilator 5/5 + mfc Phase H archive | rv32ua+si 100% / CoreMark ≥2.3 | lockstep 1M 零分歧 HARD | FPGA CoreMark ≥2.5 + ADR-080 |
+| **核心 PoC** | — | — | — | PoC-1/2/3 | PoC-1 复测 + PoC-6（BTB 4K-entry 基础）| PoC-4/5/6/7/14 | PoC-8/9/10 | PoC-11/14 复测 |
+| **CI 门禁数** | 9 | 9 | 9 | 9 | 9 | 10 | 10 | 11 |
+| **Plugin 框架** | ADR-040 v2.0 + ADR-046 | + ADR-049 PADDR-first | + ADR-048 canonical ordering | + ADR-082 negotiate | + ADR-082 negotiate 完整集成（mfc Phase H archive）| 同 v0.10.0 | 同 v0.10.0 | 同 v0.10.0 |
 
 ---
 
@@ -357,30 +379,37 @@ FMAX ≥ 100 MHz
 
 ### 9.1 CI 门禁时间轴
 
-> **编号双轨说明**：`adr-matrix.md` §6 用行号 1–11 列 11 条门禁（含 4 条 "各 PoC 相关" 占位）；历史命名 "第 8/10/11 条" 与 §6 行号错位（如 §6 行 5 = "第 8 条"，行 4 = "第 10 条"，行 10 = "第 11 条"）。本文档 §9.1 引用统一改用 **§6 行号**，避免双编号歧义。
+> **编号说明**：门禁按引入版本累积；本文档 §9.1 列出 11 条具体门禁（含子检查），adr-matrix §6 列出 11 条（含 4 条 PoC 占位）；两边总数对齐但组成口径不同，详见 §10 关联文档。本文档 §9.1 采用"门禁名称 + 验证命令 + 引入版本"三列，不再用行号列。
 
 11 条 CI 门禁（按 Phase 6d → v1.3.0 累积生效）:
 
-| §6 行号 | 门禁 | 引入版本 | 验证命令 |
-|--------|------|---------|---------|
-| 行 1-4 | D4 决策 1-4（无 void tick / 无 enum class state / Bundle 字段用 uint_t / at_stage 闭包内禁早返）| Phase 0+ | `bash tools/verify_plugin_decision.sh` |
-| 行 5 | `check_plugin_portability.sh` Check 5（at_stage 闭包内禁运行期 `if(ch_bool)`）| ADR-040 v2.0 | `bash tools/check_plugin_portability.sh` |
-| 行 6 | C++23 编译标志强制（4 CMake 文件禁 cxx_std_17/20）| v0.6 ADR-047 | `check_plugin_portability.sh` Check 12 |
-| 行 7 | static_assert 运行时断言（canonical ordering）| v0.7.0 ADR-048 | `[cpu-integration]` 4 测试 |
-| 行 8 | build() 内 dynamic_cast = 0 | v1.0.0 PoC-4 决策 1 | `check_plugin_portability.sh` Check |
-| 行 9 | 核内禁 `#ifdef FPGA` | v1.0.0 PoC-4 决策 2 | `check_plugin_portability.sh` Check |
-| 行 10 | 静态配置头文件 throw 禁止 | v0.6 ADR-047 | `check_plugin_portability.sh` Check 10 |
-| 行 11 | ADR-080 TLM↔CH_MEM byte-equal 硬门禁 | v1.3.0 §3.5.5 | `check_plugin_portability.sh` Check + 4-way RRIP E8 + Spike lockstep E9 |
+| 门禁 | 验证命令 | 引入版本 |
+|------|---------|---------|
+| `verify_adr.sh`（ADR ↔ 代码对齐，含已落地 ADR）| `bash tools/verify_adr.sh` | ✅ 已生效 (ADR-043) |
+| `verify_plugin_decision.sh`（D4 决策 1-4：无 void tick / 无 enum class state / Bundle 字段用 uint_t / at_stage 闭包内禁早返）| `bash tools/verify_plugin_decision.sh` | ✅ 已生效 (D4) |
+| `check_plugin_portability.sh` Check 1-12（ADR-040 v2.0 双模约束）| `bash tools/check_plugin_portability.sh` | ✅ 已生效 (ADR-040 v2.0) |
+| C++23 编译标志强制（4 CMake 文件禁 cxx_std_17/20）| `check_plugin_portability.sh` Check 12 | v0.6 (ADR-047) |
+| static_assert canonical ordering（Plugin 注册规范序）| `[cpu-integration]` 4 测试 | v0.7.0 (ADR-048) |
+| at_stage 闭包内禁运行期 `if(ch_bool)` | `check_plugin_portability.sh` Check 5 | ADR-040 v2.0 |
+| build() 内 dynamic_cast = 0（ADR-082 生效 enforcement）| `verify_plugin_decision.sh` Check 6（dynamic_cast grep）| **v0.10.0 起效** |
+| 核内禁 `#ifdef FPGA` / `XILINX` / `ALTERA` | `verify_plugin_decision.sh` Check 5（ADR-082 决策 2）| **v0.10.0 起效** |
+| 静态配置头文件 throw 禁止 | `check_plugin_portability.sh` Check 10 | v0.6 (ADR-047) |
+| fetch 族 Port 直引 ≤2 条 | `check_plugin_portability.sh` Check（fetch 族 Port）| v1.0.0 |
+| ADR-080 TLM↔CH_MEM byte-equal 硬门禁 | 4-way RRIP Phase 6d E8 + Spike lockstep PoC-9 + chip-selector PoC-11 | v1.3.0（v1.2.0 试点）|
 
 ### 9.2 OpenSpec 同步规则
 
-- 任何 PoC 状态变更 → 同步本文件 §1-§7 + `.rddf/roadmap/objectives/` 决策门 + `openspec/changes/*/tasks.md` checkbox
-- 任何 ADR 编号变更 → 同步本文件 §1-§7 ADR 引用 + `docs/architecture/adr.md` 注册表
+| 触发点 | 受影响文件 | 验证命令 |
+|--------|-----------|---------|
+| 任何 PoC 状态变更（定义: `openspec/changes/*/tasks.md` 全部 checked 时）| `roadmap-evolution.md` §0/§4/§8 + `objective-*.md` §11 跟踪台账 + `openspec/changes/*/tasks.md` checkbox + `.rddf/roadmap/features/*.md` + `AGENTS.md` 特征片段表（`rddf roadmap --update-agent-md`）| `bash tools/verify_doc_drift.sh --roadmap-vs-strategy`（占位，未来实装）+ `bash .rddf/sync_strategy_status.sh --dry-run` |
+| 任何 ADR 编号变更 | `roadmap-evolution.md` §0-§8 ADR 引用 + `docs/architecture/adr.md` 注册表 + `docs/research/adr-matrix.md` §1-§2 | `bash tools/verify_adr.sh` |
 
 ### 9.3 文档同步规则
 
-- 任何架构变更 → 同步本文件 + `.rddf/roadmap/strategy.md` §6 版本节点表
-- 任何 PoC 完成/失败 → 同步本文件 §4-§7 + `.rddf/roadmap/objectives/objective-*.md` §11 跟踪台账
+| 触发点 | 受影响文件 | 验证命令 |
+|--------|-----------|---------|
+| 任何架构变更 | `roadmap-evolution.md` + `.rddf/roadmap/strategy.md` §6 版本节点表 | `bash tools/verify_doc_drift.sh --roadmap-vs-strategy`（占位，未来实装）|
+| 任何 PoC 完成/失败 | `roadmap-evolution.md` §4-§7 + `.rddf/roadmap/objectives/objective-*.md` §11 跟踪台账 | `bash tools/verify_doc_drift.sh --roadmap-vs-strategy`（占位，未来实装）|
 
 ---
 
@@ -389,6 +418,7 @@ FMAX ≥ 100 MHz
 - 战略 SSOT: [`.rddf/roadmap/strategy.md`](../../.rddf/roadmap/strategy.md)（A+C Hybrid 战略选择 + 版本节点 + Go/No-Go）
 - 实施规划: [`.rddf/roadmap/`](../../.rddf/roadmap/)（phases/features/objectives）
 - 决策门禁: `.rddf/roadmap/objectives/objective-*.md` §9.2 Go/No-Go
+- **v0.11.0 决策门禁**: [`.rddf/roadmap/objectives/objective-v0110-launch.md`](../../.rddf/roadmap/objectives/objective-v0110-launch.md)（7 项完成判据 + Go/No-Go）
 - 跟踪台账: `.rddf/roadmap/objectives/objective-*.md` §11 append-only
 - 任务执行: `openspec/changes/*/tasks.md`
 - ADR 注册表: [`docs/architecture/adr.md`](../architecture/adr.md)
@@ -401,3 +431,5 @@ FMAX ≥ 100 MHz
 | 日期 | 版本 | 变更 | 来源 |
 |------|------|------|------|
 | 2026-10-09 | v1.0 | 由 `docs/roadmap/strategy/execution-roadmap.md §6` + `soc/cpu/docs/roadmap/execution-roadmap.md §3.5` + `docs/roadmap/phases/phase-6d-rtl-verification.md` 合并去重而来（约 30% 重叠描述删除）| rdd-workflow 迁移 |
+| 2026-10-09 | v1.1 | (本次修订) 补 v0.11.0 节点 / §4.5 v0.11.0 目标表 + 修 §9.1 门禁表 (P0-3) / 删 # 列 + ADR-083 仲裁 (write-back → 084, Plugin-style SSOT 锚定) (P0-5/R7) + E12 数字维护原则 (P2-3) + 内部矛盾清理 (§8 PMP v1.3.0 / 多周期真 radix-2 修正 / §4.3 ICache ADR-072) | Oracle + Metis 双审查 |
+| 2026-10-09 | v1.2 | (第四轮 10 项小修) §0 状态徽标改正 (Phase 6d 🔄/v0.8.0 ✅ + legend) + poics-and-risks L28 ADR 084 补全 + §7.2 FPGA 板级基础 v0.11.0 启动/v1.0.0 就绪 + strategy L168 v0.10.0 规划快照注脚 + §2 [cpu-l1-mmu-demo] ≥8/8 收官注脚 + adr-matrix §6 死链改 roadmap-evolution §9.1 + AGENTS.md 9/9→12/12 | 第三轮 Oracle+Metis 双复审 |

@@ -165,7 +165,7 @@
 
 ## Phase D — PoC-15 激活（v1.4+ 启动时）
 
-> **触发**：`mfc-cpu-pipeline-multi-cycle-fsm` v0.10.0 archive + `cache-phase1.5-4way` v1.2.0 archive + ADR-083 write-back FSM 实装 + dual-issue 实现
+> **触发**：`mfc-cpu-pipeline-multi-cycle-fsm` v0.10.0 archive + `cache-phase1.5-4way` v1.2.0 archive + ADR-084 write-back FSM 实装 + dual-issue 实现
 
 ### D.1 [REFACTOR] 移除 PoC-15 `[v1.4-pending]` tag
 

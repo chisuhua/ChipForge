@@ -12,11 +12,11 @@
 | **ADR-001 ~ ADR-049** | 已落地 ADR | 037v2.0 / 040v2.0 / 043 / 045 / 046 / 047 / 048 / 049（7 条）|
 | **ADR-050 ~ ADR-051** | active change 占用 | plugin-framework-cycle-precision（pb-run-cycle-precision）/ cpu-pipeline-multi-cycle（plugin-latency-table）|
 | **ADR-052 ~ ADR-069** | wave3/wave4 active change 备用 | 待 wave3 archive 后分配 |
-| **ADR-070 ~ ADR-083** | 本路线图新规划段 | 070=RVC / 071=Zicsr / 072=ICache / 073=trap / 074=AMO / 075=BP / 076=ASID / 077=PMP / 078=Debug / 079=chip-selector / 080=双模对拍 / 081=LaneArbiter / 082=negotiate / 083=write-back FSM |
+| **ADR-070 ~ ADR-084** | 本路线图新规划段 | 070=RVC / 071=Zicsr / 072=ICache / 073=trap / 074=AMO / 075=BP / 076=ASID / 077=PMP / 078=Debug / 079=chip-selector / 080=双模对拍 / 081=LaneArbiter / 082=negotiate / 084=write-back FSM。**083 = Plugin-style SSOT（已被 adr.md 注册，从本规划段移除）** |
 
 ---
 
-## 2. 21 条 ADR 整合矩阵（8 已落地 + 10 规划中 070–080 + 3 候选 081–083）
+## 2. 21 条 ADR 整合矩阵（8 已落地 + 10 规划中 070–080 + 3 候选 081–082/084）
 
 | ADR | 标题 | 决策依据 | Owner IP | 版本绑定 | 依赖前置 | 硬/软门禁 | PoC 验证范围 | 失败回退动作 |
 |-----|------|----------|----------|----------|---------|------------|--------------|--------------|
@@ -41,7 +41,7 @@
 | **080** | 双模对拍 CI 协议 | 理由 #5 演进方案，双模制度化 | 流程 | v1.2 试点 → **v1.3.0 硬** | 040 | 试点期软 → v1.3.0 **硬** | PoC-9 | 对拍降级核心指令流 |
 | 081（候选） | LaneArbiter 多 lane 仲裁 | 理由 #2 演进方案 | cpu | v1.4.0 预研 | 048 | 软 | PoC-12 | 砍 dual-issue 分叉 |
 | **082**（候选） | negotiate() capability 协商 | 理由 #3 唯一真实缺口 | 框架 | **v0.10.0 内嵌** | 047/048 | **硬**（dynamic_cast=0 grep） | PoC-1–3 全部经由 negotiate 组装 | 重做本 API 单点，不升级范式 |
-| 083（候选） | Write-back D$ + Store buffer | 理由 #4 演进方案 | cache | v1.x 候选 | 046/072 | 软 | write-back FSM 6 态 | 降级 write-through + write buffer |
+| 084（候选） | Write-back D$ + Store buffer | 理由 #4 演进方案 | cache | v1.x 候选 | 046/072 | 软 | write-back FSM 6 态 | 降级 write-through + write buffer |
 | **CI 第 10 条** | 核内禁 `#ifdef FPGA` | 决策 2 硬约束 | 流程 | **v0.10.0** 起效 | 无 | **硬**（PR 阻塞） | grep 全仓 0 命中 | 删除违规宏 + 收 MemoryInterface 适配 |
 | **CI 第 11 条** | fetch 族 Port 通信强制 | 决策 1 理由 #1 | 流程 | **v1.0.0** 起效 | 075 | **硬** | grep 跨 Plugin 直引 ≤2 条 | 演进 Port 抽象 |
 
@@ -70,7 +70,7 @@ graph TD
     A040 --> A080[ADR-080 双模对拍]
     A080 --> A079[ADR-079 chip-selector]
     A048 --> A081[ADR-081 LaneArbiter v1.4 预研]
-    A046 --> A083[ADR-083 write-back FSM]
+    A046 --> A084[ADR-084 write-back FSM]
     G10[CI 门禁 10:禁 FPGA ifdef] --> A079
     G11[CI 门禁 11:fetch 族 Port] --> A075
 ```
@@ -87,7 +87,7 @@ graph TD
     C -->|是| H2[v1.3.0 HARD GATE<br/>080]
     C -->|否| D{阻塞商业化交付?}
     D -->|是| S1[v1.3.0 soft, 产品门禁<br/>079]
-    D -->|否| S2[soft, 可与下版本合并<br/>076/077/078/081/083]
+    D -->|否| S2[soft, 可与下版本合并<br/>076/077/078/081/084]
     H1 --> F[失败 → 回退动作列执行<br/>禁止跳过 gate 发版]
     S2 --> G[失败 → 推迟 v1.4<br/>不影响 v1.3.0 发布]
 ```
@@ -106,7 +106,7 @@ graph TD
 
 ## 6. CI 门禁清单（11 条）
 
-> **编号双轨说明（2026-09-27 校准）**：下表 # 列 = §6 行号（canonical 引用基准）；括号内 "第 N 条" = 历史命名（如 `(第 10 条)` = 决策 2 ASIC 友好的原始命名），与 §6 行号错位（§6 行 4 = "第 10 条"、行 5 = "第 8 条"、行 10 = "第 11 条"）。**外部引用（execution-roadmap §4.1 等）统一使用 §6 行号**。
+> **编号双轨说明（2026-09-27 校准）**：下表 # 列 = §6 行号（canonical 引用基准）；括号内 "第 N 条" = 历史命名（如 `(第 10 条)` = 决策 2 ASIC 友好的原始命名），与 §6 行号错位（§6 行 4 = "第 10 条"、行 5 = "第 8 条"、行 10 = "第 11 条"）。**外部引用（`roadmap-evolution.md §9.1` 等）统一使用 §6 行号**。
 
 | # | 门禁 | 检查内容 | 实施版本 |
 |---|------|---------|---------|
@@ -143,4 +143,6 @@ graph TD
 
 平移原因：active change（plugin-framework-cycle-precision + cpu-pipeline-multi-cycle）已占用 ADR-050/051，避免冲突必须整体让位。新段从 070 起连续分配，把 052–069 留给 wave3/wave4 active change 消化。
 
-**净新增 ADR-083（write-back FSM）**：无原 050~062 对应编号，为 v1.x 候选 ADR 增量（理由 #4 演进方案），单独占 070~083 段尾。完整计数：**070~083 = 13 平移 + 1 净增 = 14 条**。
+**净新增 ADR-084（write-back FSM）**：无原 050~062 对应编号，为 v1.x 候选 ADR 增量（理由 #4 演进方案），单独占 070~084 段尾。
+编号 083 让位给 adr.md 已注册的 ADR-083（Plugin-style SSOT）。
+完整计数：**070~084 = 13 平移 + 1 净增 = 14 条**。

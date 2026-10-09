@@ -12,7 +12,7 @@ related_to:
   - ADR-040 (TLM↔CH_MEM 双模同语义, v2.0)
   - ADR-080 (TLM↔CH_MEM 双模对拍协议, v1.3.0 转硬门禁)
   - ADR-082 (Plugin::negotiate, v0.10.0)
-  - ADR-083 (write-back FSM, v1.x 净新增)
+  - ADR-084 (write-back FSM, v1.x 净新增)
 ---
 
 > **initiative 注册状态说明**：`wave6-linux-and-productization` 当前为 proposed 状态。正式注册需待 `wave3-mmu-real-memory-and-cycle` 残余 change（`plugin-framework-cycle-precision` Phase F optional 实装 [2026-09-29 (b) 决策降级, 当前 0/25 NOT STARTED] + `mmu-config-json-driven` archive）闭环后，按 §4.2 OpenSpec 同步流程追加注册。本 change 已通过 frontmatter `initiative:` 字段预声明占用编号，避免后续撞号。
@@ -70,7 +70,7 @@ related_to:
 
 - **目标**：dual 全家桶（dual-issue + HW prefetch + write-back + store buffer）CoreMark/MHz ≥ 4.5，与 VexiiRiscv dual+prefetch 官方（5.24 CoreMark/MHz）偏差 ≤ 15%
 - **触发节点**：v1.4+ archive 前必须通过（v1.4 当前是远期候选分叉，本 PoC 在 v1.4 启动时激活）
-- **依赖实装**：v1.0.0（BTB+GShare+RAS）+ v1.2.0（4-way RRIP）+ v1.3.0（write-back FSM ADR-083）+ dual-issue（v1.4+ 候选）
+- **依赖实装**：v1.0.0（BTB+GShare+RAS）+ v1.2.0（4-way RRIP）+ v1.3.0（write-back FSM ADR-084）+ dual-issue（v1.4+ 候选）
 - **实现内容**：
   - 复用 PoC-14 的 `vexii_riscv_runner.cpp` 框架
   - 加载 v1.4+ dual 全家桶配置
@@ -118,7 +118,7 @@ related_to:
 - **ADR-040 v2.0**（已落地，2026-09-17）：TLM↔CH_MEM 双模同语义，本 runner 同时验证 TLM 与 CH_MEM 模式 CoreMark/MHz 一致
 - **ADR-080**（v1.2.0 试点 + v1.3.0 HARD 门禁）：TLM↔CH_MEM byte-equal 协议，本 runner 是其性能层面的同源验证
 - **ADR-082**（v0.10.0 落地）：Plugin::negotiate() capability 协商，本 runner 需要 ensure `cycle_counter` capability 提供方
-- **ADR-083**（v1.x 净新增）：write-back FSM，本 runner 的 dual 全家桶指标依赖此 ADR 落地
+- **ADR-084**（v1.x 净新增）：write-back FSM，本 runner 的 dual 全家桶指标依赖此 ADR 落地
 - **新增 ADR 建议**（v1.0.0 archive 前）：`ADR-090 vexii-riscv-parity-runner-credential`（VexiiRiscv 官方数值 SSOT + 偏差公式 + CI gate 触发条件的正式 ADR 化）
 
 ## 失败 → 砍分叉动作
