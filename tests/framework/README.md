@@ -33,5 +33,5 @@ Phase 0 §2.3 集成标准: 与 CppTLM ChStreamModuleBase + CppHDL ch::Component
 ## 相关文档
 
 - **cf_plugin 文档**: `src/cf_plugin/README.md`
-- **Phase 0 退出标准**: `docs/roadmap/phases/phase-0-plugin-scaffolding.md` §2
+- **Phase 0 退出标准**: `.rddf/roadmap/archive/phase-0-plugin-scaffolding.md` §2
 - **ADR-040**: TLM→HDL 移植性约束 (storage.h)
