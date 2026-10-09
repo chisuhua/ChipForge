@@ -28,5 +28,5 @@ This IP has **full TLM implementation with Bridge + Adapter e2e**. L1CachePlugin
 
 ## 参考
 - ADR: ADR-044（L1Cache VIPT 决策，`ip/cache/docs/adr/`）
-- Phase 1 文档: `soc/cpu/docs/roadmap/phase-1-tlm-foundation.md`
+- Phase 1 文档: `.rddf/roadmap/archive/phase-1-tlm-foundation.md`
 - SoC 架构: `soc/cpu/docs/architecture.md`
