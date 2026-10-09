@@ -33,7 +33,7 @@ Active development. See [docs/architecture/overview.md](docs/architecture/overvi
 
 ## 2. How It Works
 
-ChipForge builds a RISC-V virtual prototype by composing reusable IP blocks. CppTLM models bus and memory traffic at the transaction level. CppHDL describes the synthesizable hardware. Both layers share a single C++17/20 codebase, which keeps simulation fast and refactors cheap.
+ChipForge builds a RISC-V virtual prototype by composing reusable IP blocks. CppTLM models bus and memory traffic at the transaction level. CppHDL describes the synthesizable hardware. Both layers share a single C++23 codebase, which keeps simulation fast and refactors cheap.
 
 The [Glossary](docs/GLOSSARY.md) covers the project-specific vocabulary. Newcomers should skim it before diving in.
 

@@ -18,7 +18,7 @@ project(ChipForge
 # ════════════════════════════════════════════════════════════════════
 # C++ 标准
 # - 父项目用 C++23 (v0.6 ADR-047: std::expected<T, PluginError> 静态配置 Result 范式)
-# - CppTLM 内部用 C++17 (Itanium ABI 兼容父项目)
+# - CppTLM 也是 C++23 (Itanium ABI 自然兼容父项目)
 # - CppHDL 已是 C++23
 # ════════════════════════════════════════════════════════════════════
 set(CMAKE_CXX_STANDARD 23)

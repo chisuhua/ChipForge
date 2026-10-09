@@ -126,3 +126,8 @@ Testing/
 # Session-local artifacts (v0100-bootstrap skill output snapshot, 每次 session 内容独立, 不入 git)
 last-bootstrap-prompt.md
 old.md
+
+# rdd-workflow skills/ 是 IDE tool local install (symlink 到 /workspace/main/rdd-workflow/skills), 不入 git
+# 详见 tools/sync_strategy_status.sh → .rddf/sync_strategy_status.sh migration (2026-10-09)
+/skills
+skills

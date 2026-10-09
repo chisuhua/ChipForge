@@ -19,9 +19,12 @@ phase_refs: []
 - [ ] [cpu-l1-mmu-demo] 7/7 PASS (workaround 移除)
 - [ ] [mmu-verilator] 5/5 PASS (真 sv32 translation)
 - [ ] DMIPS/MHz ≥ 1.4 (硬门禁)
+- [ ] **PoC-1**: MUL/DIV 1c/33c rv32um 100% · **PoC-2**: RV32C ≥95% · **PoC-3**: ICache ≥90%
+- [ ] ADR-082 negotiate capability 集成（mfc Phase G）
 - [ ] PoC-6 CoreMark/MHz ≥ 1.9 (BP 完成)
 
 ## 关联
 - OpenSpec: `wave5-isa-coverage-and-bp` initiative
 - 版本节点: v0.10.x → v0.11.0
+- ADRs: ADR-046 (FSM 豁免) + ADR-082 (negotiate) + ADR-070 (RVC)
 - Active changes: `mmu-chmem-pipeline-integration` (6/166), `mfc-cpu-pipeline-multi-cycle-fsm` (50/60), `mfc-extract-fsm-h` (0/20)

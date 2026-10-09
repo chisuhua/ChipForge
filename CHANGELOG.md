@@ -397,7 +397,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - **`bus_halt 检测` (mmu_exit 闭包)**: 读 `tlb_lookup_loadstore` 节点替代 `mmu_exit` 节点 (C9-d fix)
 - **`cpu_l1_mmu_demo.json`**: 加 `mmu.memory_interface` 字段声明 (Oracle C7 rescoped, JSON 声明式, CpuFactory::register_early_plugins 1 行 static_cast 透传)
 - **`ADR-049`** 新增 (v0.8.0): MMU PADDR Consumption Contract + MemoryInterface 抽象 + 5 Decisions + §后续项合入 P1#6 mmu-config-json-driven 草案
-- **`docs/roadmap/strategy/a-plus-c-hybrid.md` + `execution-roadmap.md`**: §2.5 新增 P1#6 mmu-config-json-driven 启动轨道
+- **`.rddf/roadmap/strategy.md` + `execution-roadmap.md`**: §2.5 新增 P1#6 mmu-config-json-driven 启动轨道
 
 ### Fixed
 
@@ -431,7 +431,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - **ADR-048 Plugin 注册规范序**：`cpu_factory.h::register_early_plugins()` 新增运行时断言检查 MMUPlugin 注册在 IBusPlugin 之前
 - **计数器机制**：3 个 `inline int` 跨 TU 计数器 (`PLUGIN_SEQ`, `MMU_REG_ORDER`, `IBUS_REG_ORDER`, `DBUS_REG_ORDER`) 跟踪注册序列
 - **`tests/cpu/integration/test_canonical_ordering.cpp`**：4 个测试用例验证正确顺序(RED)和错误检测(GREEN)双路径
-- **A+C Hybrid 战略文档**：`docs/roadmap/strategy/a-plus-c-hybrid.md` (138 行)
+- **A+C Hybrid 战略文档**：`.rddf/roadmap/strategy.md` (138 行)
 - **`tools/sync_strategy_status.sh`**：从 openspec changes + initiative YAML 派生 strategy §7 状态表
 - **AGENTS.md**: 新增 Strategy/Initiative 工作流小节
 - **openspec changes 进入版本控制**：从 .gitignore 移除 openspec/，7 个 active/archive changes 可团队协作
@@ -440,7 +440,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 
 - **注册顺序调整**：MMUPlugin (if enable_mmu) 从 `build_cpu()` 尾部移入 `register_early_plugins()` 头部，保证在 IBusPlugin 之前注册
 - **版本号声明**：Wave 3 从 v0.7.0 起 (Phase 6d 已消费 v0.4.0-v0.6.0)
-- **`docs/roadmap/roadmap-status.md`**：路线图同步 A+C Hybrid 战略入口
+- **`(已迁移, 见 .rddf/roadmap.md)`**：路线图同步 A+C Hybrid 战略入口
 
 ### Fixed
 
@@ -1408,7 +1408,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 ### Pending (下一阶段入口)
 
 > Phase 1.3 全部 6 子任务完成 (`26fe7d2`..`c8d1dd1`, 14/14 ctest PASS).
-> 以下三项可任意顺序启动, 详见 `docs/roadmap/roadmap-status.md` §3 (PA-6~PA-9).
+> 以下三项可任意顺序启动, 详见 `(已迁移, 见 .rddf/roadmap.md)` §3 (PA-6~PA-9).
 
 | 阶段 | 任务 | 入口 | 前置 |
 |------|------|------|------|
