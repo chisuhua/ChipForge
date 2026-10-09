@@ -127,6 +127,9 @@ Testing/
 last-bootstrap-prompt.md
 old.md
 
+# Backup files (e.g. tools/v0100-bootstrap.sh.bak from rdd-session-bootstrap PoC v0.1 migration)
+*.bak
+
 # rdd-workflow skills/ 是 IDE tool local install (symlink 到 /workspace/main/rdd-workflow/skills), 不入 git
 # 详见 tools/sync_strategy_status.sh → .rddf/sync_strategy_status.sh migration (2026-10-09)
 /skills
