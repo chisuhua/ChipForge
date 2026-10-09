@@ -145,7 +145,7 @@ echo ""
 # === Section 3: Initiative status ===
 echo "## initiative_status"
 echo '```'
-INITIATIVE_OUT=$(safe_run "sync_strategy_status.sh" bash tools/sync_strategy_status.sh --dry-run 2>&1)
+INITIATIVE_OUT=$(safe_run "sync_strategy_status.sh" bash .rddf/sync_strategy_status.sh --dry-run 2>&1)
 if [ -n "$INITIATIVE_OUT" ]; then
   echo "$INITIATIVE_OUT" | grep -A30 "=== Initiative Status" | head -30
 else
@@ -312,7 +312,7 @@ echo "| ADR 编号 | adr-matrix.md + execution-roadmap.md §3.2 + adr.md | verif
 echo "| Plugin API | 更新 Plugin 文件 + 同步 negotiate() 实现 | verify_plugin_decision.sh |"
 echo "| OpenSpec frontmatter | change/proposal.md 头部 + depends_on | openspec validate |"
 echo "| 新 ADR | 必须有 frontmatter 字段 (status + superseded_by) | verify_adr.sh |"
-echo "| soc/cpu/docs/roadmap/* | README.md 表格 + references/* 链接 | doc_link_check.sh |"
+echo "| soc/cpu/docs/roadmap/* | README.md 表格 + references/* 链接 (migrated 2026-10-09 → .rddf/roadmap/archive/ + docs/research/) | doc_link_check.sh |"
 echo ""
 
 # === Section 7: Honesty audit (2026-09-28 新增, Metis 评审驱动) ===

@@ -38,7 +38,7 @@
 #   非 0 = 有测试失败
 #
 # 详见:
-#   - docs/roadmap/roadmap-status.md §3 PA-4b
+#   - `.rddf/roadmap.md` (migrated 2026-10-09: roadmap-status.md 已废弃) §3 PA-4b
 #   - CMakeLists.txt (CTest 聚合点)
 #   - tools/build.sh (构建入口)
 #   - AGENTS.md §CH_MEM 编译开关 + 测试家族表格 ([verilator]/[mmu-verilator] 归属 chipforge_tests_chmem)
