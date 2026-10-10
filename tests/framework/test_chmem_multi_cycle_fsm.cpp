@@ -48,7 +48,9 @@
 #include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
+#include "cf/plugin/multi_cycle_fsm.h"
 #include "ip/cpu/arch/riscv/mul_div_fsm.h"
+#include "ip/cpu/plugins/mul_div_fsm_chmem.h"
 
 using namespace ch;
 using namespace ch::core;

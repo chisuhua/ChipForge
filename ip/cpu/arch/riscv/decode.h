@@ -107,6 +107,9 @@ class RiscvDecodePlugin : public cf::plugin::PluginBase {
       case OpCode::ADD: case OpCode::SUB: case OpCode::SLL:
       case OpCode::SLT: case OpCode::SLTU: case OpCode::XOR:
       case OpCode::SRL: case OpCode::SRA: case OpCode::OR: case OpCode::AND:
+      case OpCode::MUL: case OpCode::MULH: case OpCode::MULHSU:
+      case OpCode::MULHU: case OpCode::DIV: case OpCode::DIVU:
+      case OpCode::REM: case OpCode::REMU:
       case OpCode::LB: case OpCode::LH: case OpCode::LW:
       case OpCode::LBU: case OpCode::LHU:
       case OpCode::JAL: case OpCode::JALR:
@@ -127,6 +130,10 @@ class RiscvDecodePlugin : public cf::plugin::PluginBase {
       case OpCode::ADD: case OpCode::SUB: case OpCode::SLL:
       case OpCode::SLT: case OpCode::SLTU: case OpCode::XOR:
       case OpCode::SRL: case OpCode::SRA: case OpCode::OR: case OpCode::AND:
+      // M 扩展 (RV32M): 全部 R-type 用 rs2
+      case OpCode::MUL: case OpCode::MULH: case OpCode::MULHSU:
+      case OpCode::MULHU: case OpCode::DIV: case OpCode::DIVU:
+      case OpCode::REM: case OpCode::REMU:
       // S-type STORE 用 rs2
       case OpCode::SB: case OpCode::SH: case OpCode::SW:
       // B-type BRANCH 用 rs2
