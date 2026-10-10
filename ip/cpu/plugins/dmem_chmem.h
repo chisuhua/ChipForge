@@ -123,7 +123,7 @@ class DMemPlugin : public PluginBase {
     auto wdata = n->operator()(KT::RS2);
     mem.write(word_addr, wdata, is_sw, "store_write");
 
-    auto rp = mem.sread(word_addr, is_lw, "load_read");
+    auto rp = mem.aread(word_addr, "load_read");
     ch::core::ch_uint<kXlenBits> rdata(rp.impl());
 
     n->operator()(LOAD_DATA) = rdata;
