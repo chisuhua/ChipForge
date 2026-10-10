@@ -158,6 +158,10 @@ bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf)
     std::fprintf(stderr, "build_cpu failed\n");
     return false;
   }
+  // ch::toVerilog does not create parent dirs; build_libvtop's mkdir comes
+  // after the read, so top.v would silently not exist on a fresh --work-dir.
+  std::string mkdir_work = "mkdir -p " + opts.work_dir;
+  if (!run_shell(mkdir_work)) return false;
   pb->elaborate(ctx);
   pb->to_verilog(opts.verilog_path);
   return true;

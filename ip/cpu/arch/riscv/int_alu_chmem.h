@@ -185,7 +185,11 @@ class RiscvIntAluPlugin : public PluginBase {
 
       // ── 计算各 ALU 结果 ──
       // 注: ch_literal<V, W> 显式宽度构造, 避 _d 字面值的字符解析限制
-      auto shift_amount = op2 & ch_uint<5>(ch::core::ch_literal<0x1F, 5>{});
+      // Phase 6d bugfix: AND with 0x1F widened shift_amount back to 32-bit
+      // (and_op::result_width = max(lhs_w, rhs_w)), so shl_op's M+N=64-bit
+      // got truncated to [30:0] 31-bit by codegen — `1 << 31` returned 0.
+      // Use bits<4,0> so shl_op computes 32+5 = 37-bit and bit 31 survives.
+      auto shift_amount = bits<4, 0>(op2);
 
       auto r_add  = rs1_val + op2;
       auto r_sub  = rs1_val - op2;
@@ -208,14 +212,15 @@ class RiscvIntAluPlugin : public PluginBase {
       // XOR
       auto r_xor = rs1_val ^ op2;
 
-      // SRA: 算术右移 (符号扩展填充高位)
+      // SRA: 算术右移 (符号扩展填充高位). The previous `sign_rep >> shft << shft`
+      // lost the high-shift bits when shr truncated them; the correct fill is
+      // sign_rep & ~(all_ones >> shift), i.e. AND sign_rep with the high-shift mask.
       auto sra_sign = bits<kXlenBits - 1, kXlenBits - 1>(rs1_val);
-      // 注: 用 ~ch_uint<N>(ch_literal<0,1>) 取反得到全 1, 避免 ch_uint<N>(~0ULL) 重载歧义
-      auto sign_rep = select(ch_bool(sra_sign),
-                              ~ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{}),
+      auto all_ones = ~ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{});
+      auto sign_rep = select(ch_bool(sra_sign), all_ones,
                               ch_uint<kXlenBits>(ch::core::ch_literal<0, 1>{}));
-      auto shift_wide = zext<kXlenBits>(shift_amount);
-      auto sra_fill   = sign_rep >> shift_wide << shift_wide;
+      auto hi_mask = ~(all_ones >> shift_amount);
+      auto sra_fill = sign_rep & hi_mask;
       auto r_sra = r_srl | sra_fill;
 
       // OR / AND
@@ -234,10 +239,13 @@ class RiscvIntAluPlugin : public PluginBase {
       result = select(is_or,   r_or,   result);
       result = select(is_and,  r_and,  result);
 
-      // 写 RESULT + RD_DATA 到 PayloadStore cell
-      // CH_MEM: 赋值即发射 lnode DAG assign 节点
+      // RESULT: LD/ST = byte_addr (rs1+imm) for dmem; otherwise ALU result.
+      // Phase 6d.7 bugfix: the old code set RESULT = result where result was
+      // is_lw-overwritten to rdata, making RESULT a combinational self-loop
+      // (rd_data → rdata → RESULT) that codegen resolved to 0.
+      auto addr_result = select(is_store || is_load, rs1_val + imm, result);
       n->operator()(KeyType::RD_DATA) = result;
-      n->operator()(KeyType::RESULT)  = result;
+      n->operator()(KeyType::RESULT) = addr_result;
       } else {
         // 单元级 PoC (m3_poc_alu_elaborate): 无 DECODED_INST → 输出零值
         n->operator()(KeyType::RD_DATA) = T(ch::core::ch_literal<0, 32>{});

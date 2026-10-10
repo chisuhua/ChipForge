@@ -3,7 +3,7 @@
 // Phase 6d.5 E8: Verilator runner end-to-end verification.
 //
 // Invokes the standalone tools/verilator_runner/cpu_verilator_sim executable
-// for each of the 5 vendored rv32ui-p-* ELFs and requires tohost == 1.
+// for each of the vendored rv32ui-p-* ELFs and requires tohost == 1.
 // cpu_verilator_sim:
 //   - builds the 5-stage CH_MEM CPU (CpuFactoryChmem) with the ELF preloaded,
 //   - emits Verilog (CppHDL codegen now emits ch_mem arrays — ADR-035 R8),
@@ -11,7 +11,19 @@
 //     drives clock/reset until dmem[tohost] == 1.
 // The runner prints "TOHOST=<v> CYCLES=<n> ELF=<name> PASS/FAIL" on stdout.
 //
+// PR1 (2026-10): Expanded from 5 ELF (Phase 6d.5 E8 子集) to 22 ELF
+// (full RV32I arithmetic + branch subset, validated 2026-10-10).
+//
 // 编译: -DCF_PLUGIN_USE_CH_MEM (mandatory)
+//
+// Known CH_MEM plugin bugs (deferred, NOT PR1 scope):
+//   - lw/sw  FAIL (TOHOST=3): DMemPlugin_chmem load/store data path bug
+//   - jalr   FAIL (TOHOST=3): BranchPlugin_chmem indirect jump not implemented
+//   - lui    FAIL (TOHOST=3): U-type imm path bug in IntAlu_chmem
+//   - slli   FAIL (TOHOST=7): shift-left logic mismatch
+//   - srai   FAIL (TOHOST=3): shift-right arithmetic mismatch
+//   - sll    FAIL: R-type shift-left logic mismatch
+// Re-enable each by adding to kCases after fix lands.
 
 #ifdef CF_PLUGIN_USE_CH_MEM
 
@@ -34,11 +46,28 @@ struct ElfTestCase {
 };
 
 const ElfTestCase kCases[] = {
-    {"rv32ui-p-add",   "rv32ui-p-add"},
+    {"rv32ui-p-add",  "rv32ui-p-add"},
+    {"rv32ui-p-sub",  "rv32ui-p-sub"},
+    {"rv32ui-p-and",  "rv32ui-p-and"},
+    {"rv32ui-p-or",   "rv32ui-p-or"},
+    {"rv32ui-p-xor",  "rv32ui-p-xor"},
+    {"rv32ui-p-slt",  "rv32ui-p-slt"},
+    {"rv32ui-p-sltu", "rv32ui-p-sltu"},
     {"rv32ui-p-addi",  "rv32ui-p-addi"},
+    {"rv32ui-p-andi",  "rv32ui-p-andi"},
+    {"rv32ui-p-ori",   "rv32ui-p-ori"},
+    {"rv32ui-p-xori",  "rv32ui-p-xori"},
+    {"rv32ui-p-slti",  "rv32ui-p-slti"},
+    {"rv32ui-p-sltiu", "rv32ui-p-sltiu"},
+    {"rv32ui-p-srli",  "rv32ui-p-srli"},
+    {"rv32ui-p-beq",  "rv32ui-p-beq"},
+    {"rv32ui-p-bne",  "rv32ui-p-bne"},
+    {"rv32ui-p-blt",  "rv32ui-p-blt"},
+    {"rv32ui-p-bge",  "rv32ui-p-bge"},
+    {"rv32ui-p-bltu", "rv32ui-p-bltu"},
+    {"rv32ui-p-bgeu", "rv32ui-p-bgeu"},
+    {"rv32ui-p-jal", "rv32ui-p-jal"},
     {"rv32ui-p-auipc", "rv32ui-p-auipc"},
-    {"rv32ui-p-beq",   "rv32ui-p-beq"},
-    {"rv32ui-p-jal",   "rv32ui-p-jal"},
 };
 
 std::string read_stdout(const std::string& cmd) {

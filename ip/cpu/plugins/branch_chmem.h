@@ -174,7 +174,10 @@ class BranchPlugin : public PluginBase {
       // ── 3. opcode 判别 (ch 信号, DECODED_INST) ──
       auto is_branch = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_BRANCH, 7>{}));
       auto is_jal    = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_JAL, 7>{}));
-      // JALR 支持推迟 (Phase 6d follow-up): 需 rs1 + imm 目标计算 + rd 写回
+      // Phase 6d.4: JALR target = (rs1 + imm) & ~1 (low bit forced zero per spec).
+      auto is_jalr   = (decoded.opcode == ch_uint<7>(ch::core::ch_literal<opcode::OP_JALR, 7>{}));
+      auto jalr_target = (rs1_val + decoded.imm) &
+                          ~ch_uint<kXlenBits>(ch::core::ch_literal<1, 32>{});
       auto is_beq   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<0, 3>{}));
       auto is_bne   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<1, 3>{}));
       auto is_blt   = is_branch && (decoded.funct3 == ch_uint<3>(ch::core::ch_literal<4, 3>{}));
@@ -217,7 +220,10 @@ class BranchPlugin : public PluginBase {
 
       // ── JAL: 无条件跳转 (pc + imm) ──
       taken = select(is_jal, ch::core::ch_bool(true), taken);
-      // JALR: 推迟 (defer for now — 需 rs1 值计算 target = (rs1 + imm) & ~1)
+
+      // ── JALR: 无条件跳转到 (rs1 + imm) & ~1 ──
+      branch_target = select(is_jalr, jalr_target, branch_target);
+      taken = select(is_jalr, ch::core::ch_bool(true), taken);
 
       // ── 4. 写 PayloadStore ──
       // Phase 6d.4: 分支 flush — 上一周期 branch taken 时, 当前指令是

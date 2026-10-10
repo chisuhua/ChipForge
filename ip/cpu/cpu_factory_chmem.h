@@ -366,15 +366,18 @@ class CpuFactoryChmem {
         mem->operator()(KT::INSTRUCTION) = exe->operator()(KT::INSTRUCTION);
         mem->operator()(KT::RS2)         = exe->operator()(KT::RS2);
         mem->operator()(DecodePlugin::DECODED_INST) = exe->operator()(DecodePlugin::DECODED_INST);
-        // Phase 6d.4: JAL link — rd = pc+4 (return address). The ALU does
-        // not match JAL's opcode, so RD_DATA defaults to 0; override it here
-        // using the execute stage's PC.
+        // Phase 6d.4: JAL/JALR link — rd = pc+4 (return address). The ALU
+        // does not match these opcodes, so RD_DATA defaults to 0; override
+        // here using the execute stage's PC.
         const auto& exe_dec = exe->operator()(DecodePlugin::DECODED_INST);
         auto is_jal = (exe_dec.opcode ==
                        ch::core::ch_uint<7>(ch::core::ch_literal<0x6F, 7>{}));
+        auto is_jalr = (exe_dec.opcode ==
+                        ch::core::ch_uint<7>(ch::core::ch_literal<0x67, 7>{}));
         auto link = exe->operator()(KT::PC) +
                     ch::core::ch_uint<32>(ch::core::ch_literal<4, 32>{});
-        mem->operator()(KT::RD_DATA) = select(is_jal, link, mem->operator()(KT::RD_DATA));
+        mem->operator()(KT::RD_DATA) = select(is_jal || is_jalr, link,
+                                               mem->operator()(KT::RD_DATA));
       }
     });
 
