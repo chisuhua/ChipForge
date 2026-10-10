@@ -126,7 +126,13 @@ class IBusPlugin : public PluginBase {
     ch::core::ch_uint<32> pc_lag_val(pc_lag);
     auto br_taken_buf = ch::core::ch_bool(get_br_taken_buf());
     auto word_addr = bits<15, 2>(pc_val);
-    auto rp = imem.aread(word_addr, "ifetch");
+    // Phase 6d.7 B' follow-up: use sread (not aread) here so imem keeps
+    // its 1-cycle read latency. CppHDL commit 250198a made aread emit a
+    // combinational `assign` in Verilog, which would break pc_lag
+    // alignment (pc_lag is a 1-cycle ch_reg, but aread would give
+    // INSTRUCTION in the same cycle, no longer matching pc_lag).
+    // dmem uses aread for 0-cycle reads; imem stays on sread.
+    auto rp = imem.sread(word_addr, "ifetch");
     ch::core::ch_uint<32> instr(rp.impl());
     n->operator()(KT::INSTRUCTION) = instr;
     n->operator()(KT::PC)          = pc_lag_val;
