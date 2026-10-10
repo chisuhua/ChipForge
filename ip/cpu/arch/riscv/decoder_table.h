@@ -97,6 +97,16 @@ enum class OpCode : std::uint16_t {
 
   // SYSTEM (1 条基础类, 详细 funct12 区分 ECALL/EBREAK/MRET/CSRR*)
   SYSTEM = 70,   // 1110011 (I-type 编码)
+
+  // M 扩展 (8 条 R-type, funct7=0000001; mfc-extract-fsm-h: decoder 补全)
+  MUL    = 71,   // funct3=000, funct7=0000001
+  MULH   = 72,   // funct3=001, funct7=0000001
+  MULHSU = 73,   // funct3=010, funct7=0000001
+  MULHU  = 74,   // funct3=011, funct7=0000001
+  DIV    = 75,   // funct3=100, funct7=0000001
+  DIVU   = 76,   // funct3=101, funct7=0000001
+  REM    = 77,   // funct3=110, funct7=0000001
+  REMU   = 78,   // funct3=111, funct7=0000001
 };
 
 // ----------------------------------------------------------------------------
@@ -239,6 +249,9 @@ constexpr InstructionFormat get_format(OpCode op) {
     case OpCode::ADD: case OpCode::SUB: case OpCode::SLL:
     case OpCode::SLT: case OpCode::SLTU: case OpCode::XOR:
     case OpCode::SRL: case OpCode::SRA: case OpCode::OR: case OpCode::AND:
+    case OpCode::MUL: case OpCode::MULH: case OpCode::MULHSU:
+    case OpCode::MULHU: case OpCode::DIV: case OpCode::DIVU:
+    case OpCode::REM: case OpCode::REMU:
       return InstructionFormat::R_TYPE;
     default:
       return InstructionFormat::I_TYPE;  // 保守默认
@@ -335,6 +348,20 @@ constexpr OpCode decode_rv32(std::uint32_t inst) {
 
   // R-type ALU (OP)
   if (op_field == opcode::OP_OP) {
+    // M 扩展 (funct7=0000001) 优先识别, 与 RV32I R-type 共享 funct3 编码
+    if (f7 == 0b0000001) {
+      switch (f3) {
+        case 0b000: return OpCode::MUL;
+        case 0b001: return OpCode::MULH;
+        case 0b010: return OpCode::MULHSU;
+        case 0b011: return OpCode::MULHU;
+        case 0b100: return OpCode::DIV;
+        case 0b101: return OpCode::DIVU;
+        case 0b110: return OpCode::REM;
+        case 0b111: return OpCode::REMU;
+        default:    return OpCode::UNKNOWN;
+      }
+    }
     switch (f3) {
       case 0b000:
         if (f7 == 0b0000000) return OpCode::ADD;
@@ -375,6 +402,9 @@ constexpr int get_op_class(OpCode op) {
     case OpCode::ADD: case OpCode::SUB: case OpCode::SLL:
     case OpCode::SLT: case OpCode::SLTU: case OpCode::XOR:
     case OpCode::SRL: case OpCode::SRA: case OpCode::OR: case OpCode::AND:
+    case OpCode::MUL: case OpCode::MULH: case OpCode::MULHSU:
+    case OpCode::MULHU: case OpCode::DIV: case OpCode::DIVU:
+    case OpCode::REM: case OpCode::REMU:
       return 0;  // ALU
     case OpCode::JAL: case OpCode::JALR:
     case OpCode::BEQ: case OpCode::BNE: case OpCode::BLT:
