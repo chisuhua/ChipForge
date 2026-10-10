@@ -1,19 +1,29 @@
 ---
 initiative: wave5-isa-coverage-and-bp
-priority: P2
+priority: P1
 version_target: v0.11.0
 depends_on:
-  - mfc-cpu-pipeline-multi-cycle-fsm
+  - mfc-cpu-pipeline-multi-cycle-fsm  # Phase E + G (G deferred to v0.11.0 per mfc-defer D'); H 阶段与本 change 并行
+revision_history:
+  - date: 2026-10-09
+    author: rdd-planner (Sisyphus-orchestrated, Oracle 2026-10-09 P1.5 deps 验证修订)
+    summary: |
+      解除 P1.5 依赖环 (BLOCKED 状态). 原 §1.2 硬门禁 "Phase H archive 后才启动"
+      与 `2026-10-07-mfc-defer-v0.11.0` (已 archive) D' 决策 (G.2/H defer v0.11.0) 互锁.
+      修订为 v0.11.0 启动期与 mfc-cpu-pipeline-multi-cycle-fsm 并行, 仅需 Phase E 完成 (riscv-tests
+      rv32um 8/8) + Phase G 软基线 (deferred to v0.11.0, 见 mfc-defer D' note 2).
+      priority P2 → P1 (per .rddf/improvements/mfc-extract-fsm-h.md + objective-v0110-launch §8 Sprint 1).
 ---
 
 # Change: mfc-extract-fsm-h
 
 > **OpenSpec change**: `mfc-extract-fsm-h` (proposed)
 > **Initiative**: `wave5-isa-coverage-and-bp` (PoC-1 follow-up)
-> **Depends on**: `mfc-cpu-pipeline-multi-cycle-fsm` (must reach Phase H archive first)
+> **Depends on**: `mfc-cpu-pipeline-multi-cycle-fsm` Phase E (rv32um 8/8) + Phase G 软基线 (deferred to v0.11.0)
 > **Authors**: ChipForge Plugin Team
 > **Created**: 2026-09-30
-> **Status**: 📋 PROPOSED (follow-up after mfc Phase H)
+> **Last revised**: 2026-10-09 (P1.5 deps 修订, Oracle 验证)
+> **Status**: 📋 PROPOSED (v0.11.0 启动期, 与 mfc 并行)
 
 ---
 
@@ -29,15 +39,19 @@ mfc-cpu-pipeline-multi-cycle-fsm change Phase D.1 落地了 `ip/cpu/plugins/mul_
 2. **复用难**: 业务 Plugin 想复用 ch_state_machine DSL 模板, 需要 include 整个 `mul_div_fsm.h` (含 TLM 逻辑), 不是干净 reusable header。
 3. **Phase D.4 工作量大**: 涉及私有成员重组织 + API 兼容性维护 + 测试迁移 (`test_chmem_multi_cycle_fsm.cpp` + `test_cycle_parity.cpp` 改 include 路径), 单 PR 不适合阻塞主线。
 
-### 1.2 启动时机约束
+### 1.2 启动时机约束 (修订 2026-10-09, Oracle P1.5 deps 验证)
 
-本 change **必须**在 `mfc-cpu-pipeline-multi-cycle-fsm` 下列阶段全部完成后启动:
+本 change **在 v0.11.0 启动期与 `mfc-cpu-pipeline-multi-cycle-fsm` 并行**, 启动条件修订如下:
 
-| Phase | 内容 | 必要性 |
-|-------|------|--------|
-| **Phase E** | riscv-tests rv32um 8/8 验证 (PoC-1 硬指标) | 验证 MulDivFsmPlugin 真业务路径覆盖, FSM 行为稳定 |
-| **Phase G** | Dhrystone baseline (v0.10.0 hard gate) | 性能基准确立, fsm.h 提取不影响性能 |
-| **Phase H** | archive mfc change | 当前 change 归档后, 独立 change 启动, 避免双向 PR 互相阻塞 |
+| Phase | 修订前要求 | 修订后要求 | 修订理由 |
+|-------|-----------|-----------|----------|
+| **Phase E** | 必须完成 (rv32um 8/8 PASS) | **保持** | rv32um 8/8 是 PoC-1 硬指标, 不可让步 |
+| **Phase G** | 必须完成 (Dhrystone baseline) | **defer to v0.11.0, 软基线** | `2026-10-07-mfc-defer-v0.11.0` D' 决策 note 2: G.2 实测 FAIL 已 defer v0.11.0; 本 change 性能契约由 Phase 4 VERIFY (radix-2 cycle 数核对) 间接验证 |
+| **Phase H** | mfc change 必须先 archive | **不要求先 archive, 与本 change 并行** | 原约束与 mfc-defer D' 决策 (H 阶段亦 defer v0.11.0) 互锁, 形成依赖环; 修订为并行 |
+
+**风险评估**: 与 mfc change 并行, 可能出现 1-2 天双向 PR 阻塞 (P0#1 canonical-ordering 期间经验证可解, 双向 PR 不致命); 接受此风险, 优先级 P1 (per `.rddf/improvements/mfc-extract-fsm-h.md`).
+
+**冲突解决**: 如并行期出现 mfc 本体 archive 紧迫需求, 本 change 临时切 feature 分支独立推进, 待 mfc archive 后回 main 同步. rdd-workflow P2 worktree 模式原生支持此场景.
 
 ---
 

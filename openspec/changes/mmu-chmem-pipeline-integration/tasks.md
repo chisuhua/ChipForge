@@ -171,11 +171,12 @@
 - [ ] **ADR-040 v2.0 强制**:`#ifdef CF_PLUGIN_USE_CH_MEM` 整文件包裹;**不含** `ch_mem`/`ch_reg`/`ch_uint`/`ch::core` 在 TLM 文件中 <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
 - [ ] **CH_MEM 适配**:与 B.2 同样 include 列表 <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
 - [ ] **类定义**:`MMUPluginChmem : public cf::plugin::PluginBase` <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
-- [ ] **单级 ch_mem TLB** (8 项直接映射): <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
-  - `ch_mem<...> tlb_entries_[8]` (ch_mem 数组)
-  - `ch_reg<...> tlb_valid_[8]` (valid 位)
-  - `ch_reg<...> tlb_tag_[8]` (tag)
-  - `ch_reg<...> tlb_paddr_[8]` (paddr 缓存)
+- [ ] **单级 TLB** (8 项直接映射, 收窄版 D1-B, **修订 2026-10-09 per Oracle Q1/Q2 验证**): <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
+  - **存储模式**:`std::vector<ch_reg<ch_uint<kVpnBits>>>` + `std::vector<ch_reg<ch_uint<kPaddrBits>>>` + `std::vector<ch_reg<ch_uint<1>>>` (valid), 8 entries each
+  - **为什么不用 ch_mem 数组**:`include/cf/plugin/storage.h:76` static_assert 要求 T trivially_copyable, `ch::core::ch_uint<N>` 验证非 trivially_copyable (Oracle 2026-10-09 Q1 compile-verified); `ch_mem::aread` 1-cycle latency 破坏单拍命中语义, 须组合读
+  - **铁律** (照抄 `ip/cpu/plugins/reg_file_chmem.h:13-29` 注释): ① 实例成员非 static (跨 context use-after-free 教训) ② lazy init 推迟到 `at_stage` 闭包内 (ch_reg 构造需要活跃 context) ③ 必须显式命名每个 reg (`"tlb_v_0"`, `"tlb_tag_0"` 等), 否则 32 个默认名 `"reg"` 撞名 → Verilator duplicate declaration 错误
+  - **结构**: 8 entries 单级直接映射, 全相联 (无 set-associative), 直写 (write-through, 无 write-back), 替换策略 = FIFO (无 LRU, 满足 D1 收窄版)
+  - **TLB lookup 组合逻辑**:`valid[i] && tag[i] == vaddr_vpn[i]` 三向比较, 命中出 PADDR (单拍)
 - [ ] **复用 PtWalkFsmPlugin**:`#include "ip/cpu/plugins/mmu_ptw_chmem.h"` 直接调其 API,不改其内部 <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
 - [ ] **TLB lookup 组合逻辑**: <!-- sprint-2-5: 2026-10-23 ~ 2026-11-30 owner=mfc-chmem -->
   - 命中:`result_paddr = tlb_paddr_[index]` + `PADDR_VALID = true`
