@@ -134,3 +134,8 @@ old.md
 # 详见 tools/sync_strategy_status.sh → .rddf/sync_strategy_status.sh migration (2026-10-09)
 /skills
 skills
+
+# Graphviz debug artifacts from code-review-graph MCP tool (mem0.dot 等)
+/*.dot
+mem0.dot
+*.dot.bak
