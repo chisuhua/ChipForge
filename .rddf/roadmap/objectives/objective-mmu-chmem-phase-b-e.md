@@ -74,4 +74,5 @@ Phase B-E 全绿 (HANDOFF §10 退出标准):
 | Sprint | kind | 内容 | Decision/调整 | 原因 |
 |--------|------|------|---------------|------|
 | sprint-2026-10 | sprint-review | objective 创建 (Phase A 已 commit) | — | initial |
+| sprint-2026-10-2 | deferral-rationale | **Phase B (B.2-B.5 mmu_chmem.h) 推迟到 Sprint 6+** | Defer Phase B (B.2-B.5) 到 Sprint 6 起头 (12-01) 或 Sprint 7 (12-23),与 Phase D/E 同步推进 | 3 次 deep agent 派发累计 1.5h+ 探查 CppHDL API (ch_uint / ch_reg / ch_mem / ch_state_machine / pipe_node) 均未产出代码 (`ip/mmu/plugins/mmu_chmem.h` 不存在);Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A 真 radix-2 实装 (mfc-extract-fsm-h);Track B 推迟期不阻塞 Track A |
 

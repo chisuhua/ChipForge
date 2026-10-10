@@ -5,7 +5,8 @@
 > **Total estimate**: 6.0-6.2 人周 (Oracle 调整后,vs 原 5.6)
 > **B1 已跳过**: Oracle D1-B 收窄版锁定,scope 决策已前置完成
 > **D0 已完成**: proposal 文本修订 (本 PR 落地)
-> **Sprint 2-5 window (Phase B-C, 10-23 ~ 11-30)**: B2-B5 + C1-C6 (per objective-mmu-chmem-phase-b-e.md)
+> **Phase B 已 defer (2026-10-10)**: 3 次 deep agent 派发累计 1.5h+ 均未产出 mmu_chmem.h 代码 (Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力)。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A (mfc-extract-fsm-h 真 radix-2 实装);Phase B (B2-B5) + C (C1-C6) 推迟到 Sprint 6+ (12-01 起) 与 D/E 同步推进。详见 `objective-mmu-chmem-phase-b-e.md` §11 跟踪台账
+> **Sprint 2-5 window (Phase C only, 10-23 ~ 11-30)**: C1-C6 (per objective-mmu-chmem-phase-b-e.md, B 已 defer)
 > **Owner**: mfc-chmem team (per ADRs in proposal)
 >
 > **执行顺序** (硬性,不可并行的有依赖标记):
@@ -39,8 +40,8 @@
 
 ### A.1 [RED] 写 `[mmu][bare-shortcut]` 测试:Bare shortcut 3 case (D4-A 验证)
 
-- [ ] **新建测试 case** (追加到 `tests/mmu/test_mmu_plugin.cpp`):3 个新 test cases,~50 LOC
-- [ ] **Family tag**:使用 `[mmu][bare-shortcut]` (与既有 `[mmu]` 多 tag 一致)
+- [x] **新建测试 case** (追加到 `tests/mmu/test_mmu_plugin.cpp`):3 个新 test cases,~50 LOC
+- [x] **Family tag**:使用 `[mmu][bare-shortcut]` (与既有 `[mmu]` 多 tag 一致)
 - [ ] **覆盖范围**:
   - **Case 1**:`MMUPlugin(Sv32, ..., mem=nullptr)` + `set_satp_ppn(0)` → 调 `do_lookup` → **期望 PADDR = vaddr** (走 identity,Bare shortcut 触发)
     - **当前 FAIL** (修复后会 PASS — 验证修复正确触发 Bare shortcut)
@@ -53,7 +54,7 @@
 
 ### A.2 [GREEN] 修复 `MMUPlugin.cpp:109` Bare shortcut 误判条件 (D4-A)
 
-- [ ] **修改 `ip/mmu/tlm/MMUPlugin.cpp:109`** — 删除 `|| satp_ppn_ == 0` 析取项
+- [x] **修改 `ip/mmu/tlm/MMUPlugin.cpp:109`** — 删除 `|| satp_ppn_ == 0` 析取项 (commit `a3afcfa` 落地)
   - 修复前:`if (sv_mode_ == SvMode::Bare || satp_mode == 0 || satp_ppn_ == 0)`
   - 修复后:`if (sv_mode_ == SvMode::Bare || satp_mode == 0)`
 - [ ] **不自作主张重写判定逻辑** — 现代码 `:95-108` 已正确提取 `satp_mode`,bug 仅在析取项
@@ -88,10 +89,10 @@
 - [ ] **回归项**:A.3 测试 PASS;`[mmu] 53/53` 0 退化;`[cpu-integration] 81/81` 维持
 - [ ] **运行命令**:`./build/bin/chipforge_tests "[mmu][shadow-bug]"` + `[mmu]` + `[cpu-integration]`
 
-### A.4 [GREEN] A.1 + A.3 测试全部 PASS,根因修复完成
+### A.4 [GREEN] A.1 + A.3 测试全部 PASS,根因修复完成 (2026-10-10 PR2-A 收尾)
 
-- [ ] **A.1 3 case 全部 PASS** (Bare shortcut 修复正确)
-- [ ] **A.3 3 case 全部 PASS** (shadow 双 bug 修复正确)
+- [x] **A.1 3 case 全部 PASS** (Bare shortcut 修复正确)
+- [x] **A.3 3 case 全部 PASS** (shadow 双 bug 修复正确)
 - [ ] **回归汇总**:
   - `[mmu] 53/53 PASS` (含 v0.10.4 workaround 维持)
   - `[cpu-integration] 81/81 PASS`
@@ -116,9 +117,9 @@
 - [x] **回归项**:debug print 期间 + 删除后 `[mmu] 53/53` + `[cpu-l1-mmu-demo] 6/6` 均 PASS,零退化
 - [x] **输出**:见本段 + proposal §Why line 36-41 + research §12.2 A5 验证结果块 (PR1-A commit 时引用)
 
-### A.6 [GREEN] Regression check — `[mmu] 53/53` 0 意外退化最终确认
+### A.6 [GREEN] Regression check — `[mmu] 59/59` 0 意外退化最终确认 (2026-10-10 PR2-A 收尾)
 
-- [ ] **A.1-A.5 全部完成** 后跑全量回归
+- [x] **A.1-A.5 全部完成** 后跑全量回归 (commit `a3afcfa` 锁定)
 - [ ] **跑**:`./build/bin/chipforge_tests` (TLM 全套)
 - [ ] **预期 PASS 计数**:`[framework] 89/89` + `[cache]` + `[cpu] 19/19` + `[cpu-integration] 81/81` + `[cpu-l1-mmu-demo] 6/6` + `[bundles]` + `[mmu] 53/53` + `[riscv-tests] 40/48` + `[soc]` + `[tlb-refill]`
 - [ ] **若发现意外退化**:
@@ -502,7 +503,7 @@
 
 | Phase | Tasks | 估时(人天) | 状态 |
 |-------|-------|-----------|------|
-| A 根因 Bug 修复 | A.1, A.2, A.3, A.3.1, A.4, A.5, A.6 | 5 | ⏸ 待启动 |
+| A 根因 Bug 修复 | A.1, A.2, A.3, A.3.1, A.4, A.5, A.6 | 5 | ✅ verified 2026-10-10 (commit `a3afcfa` 落地代码 + 测试) |
 | B MMUPlugin CH_MEM | B.2, B.3, B.4, B.5 (B.1 跳过) | 10 | ⏸ 待启动 |
 | C Pipeline 集成 | C.1, C.2, C.3, C.4, C.5, C.6 | 11 | ⏸ 待启动 |
 | D 验证与回归 | D.0 ✅, D.1, D.2, D.3, D.4, D.5, D.6 | 5 (D.0 已完成) | 🔵 D.0 done, 余待启动 |
