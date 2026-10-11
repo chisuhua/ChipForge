@@ -11,19 +11,10 @@
 //     drives clock/reset until dmem[tohost] == 1.
 // The runner prints "TOHOST=<v> CYCLES=<n> ELF=<name> PASS/FAIL" on stdout.
 //
-// PR1 (2026-10): Expanded from 5 ELF (Phase 6d.5 E8 子集) to 22 ELF
-// (full RV32I arithmetic + branch subset, validated 2026-10-10).
+// Coverage history: Phase 6d.5 E8 (5 ELF) → PR1 (22) → PR2 (40, full rv32ui;
+// B' commits 5e82970/63a642f/368d6c4 fixed load-store + shift bugs).
 //
 // 编译: -DCF_PLUGIN_USE_CH_MEM (mandatory)
-//
-// Known CH_MEM plugin bugs (deferred, NOT PR1 scope):
-//   - lw/sw  FAIL (TOHOST=3): DMemPlugin_chmem load/store data path bug
-//   - jalr   FAIL (TOHOST=3): BranchPlugin_chmem indirect jump not implemented
-//   - lui    FAIL (TOHOST=3): U-type imm path bug in IntAlu_chmem
-//   - slli   FAIL (TOHOST=7): shift-left logic mismatch
-//   - srai   FAIL (TOHOST=3): shift-right arithmetic mismatch
-//   - sll    FAIL: R-type shift-left logic mismatch
-// Re-enable each by adding to kCases after fix lands.
 
 #ifdef CF_PLUGIN_USE_CH_MEM
 
@@ -46,6 +37,7 @@ struct ElfTestCase {
 };
 
 const ElfTestCase kCases[] = {
+    // R-type ALU (7)
     {"rv32ui-p-add",  "rv32ui-p-add"},
     {"rv32ui-p-sub",  "rv32ui-p-sub"},
     {"rv32ui-p-and",  "rv32ui-p-and"},
@@ -53,20 +45,45 @@ const ElfTestCase kCases[] = {
     {"rv32ui-p-xor",  "rv32ui-p-xor"},
     {"rv32ui-p-slt",  "rv32ui-p-slt"},
     {"rv32ui-p-sltu", "rv32ui-p-sltu"},
+    // I-type ALU (7)
     {"rv32ui-p-addi",  "rv32ui-p-addi"},
     {"rv32ui-p-andi",  "rv32ui-p-andi"},
     {"rv32ui-p-ori",   "rv32ui-p-ori"},
     {"rv32ui-p-xori",  "rv32ui-p-xori"},
     {"rv32ui-p-slti",  "rv32ui-p-slti"},
     {"rv32ui-p-sltiu", "rv32ui-p-sltiu"},
-    {"rv32ui-p-srli",  "rv32ui-p-srli"},
+    {"rv32ui-p-simple", "rv32ui-p-simple"},
+    // Shift (R + I, 6)
+    {"rv32ui-p-sll",  "rv32ui-p-sll"},
+    {"rv32ui-p-slli", "rv32ui-p-slli"},
+    {"rv32ui-p-srl",  "rv32ui-p-srl"},
+    {"rv32ui-p-srli", "rv32ui-p-srli"},
+    {"rv32ui-p-sra",  "rv32ui-p-sra"},
+    {"rv32ui-p-srai", "rv32ui-p-srai"},
+    // Load (6)
+    {"rv32ui-p-lb",  "rv32ui-p-lb"},
+    {"rv32ui-p-lbu", "rv32ui-p-lbu"},
+    {"rv32ui-p-lh",  "rv32ui-p-lh"},
+    {"rv32ui-p-lhu", "rv32ui-p-lhu"},
+    {"rv32ui-p-lw",  "rv32ui-p-lw"},
+    {"rv32ui-p-ld_st", "rv32ui-p-ld_st"},
+    // Store (3)
+    {"rv32ui-p-sb",  "rv32ui-p-sb"},
+    {"rv32ui-p-sh",  "rv32ui-p-sh"},
+    {"rv32ui-p-sw",  "rv32ui-p-sw"},
+    {"rv32ui-p-st_ld", "rv32ui-p-st_ld"},
+    // Branch (6)
     {"rv32ui-p-beq",  "rv32ui-p-beq"},
     {"rv32ui-p-bne",  "rv32ui-p-bne"},
     {"rv32ui-p-blt",  "rv32ui-p-blt"},
     {"rv32ui-p-bge",  "rv32ui-p-bge"},
     {"rv32ui-p-bltu", "rv32ui-p-bltu"},
     {"rv32ui-p-bgeu", "rv32ui-p-bgeu"},
+    // Jump (2)
     {"rv32ui-p-jal", "rv32ui-p-jal"},
+    {"rv32ui-p-jalr", "rv32ui-p-jalr"},
+    // Upper imm (2)
+    {"rv32ui-p-lui",   "rv32ui-p-lui"},
     {"rv32ui-p-auipc", "rv32ui-p-auipc"},
 };
 

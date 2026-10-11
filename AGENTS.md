@@ -130,7 +130,7 @@ bash tools/run_chipforge_tests.sh --all
 | `[chmem]` | `tests/framework/` + `tests/cpu/` | CH_MEM 模式 elaboration + PoC | 9/9 PASS, 69 assertions |
 | `[cpphdl]` | `tests/framework/test_cppHDL_hello_poc.cpp` | CppHDL 完整链路（ch_device/toVerilog/Simulator） | 6/6 PASS, 15 assertions |
 | `[elaborate]` | `tests/framework/` | PipeBuilder::elaborate() 4 API PoC | 全部 PASS |
-| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 后端 22-ELF RV32I subset tohost=1 (PR1 扩 Phase 6d.5 E8 子集) | 1/1 case PASS (22 ELF), 44 assertions |
+| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 后端 40-ELF 全 rv32ui suite tohost=1 (PR2 扩 Phase 6d.5 E8 子集) | 1/1 case PASS (40 ELF), 80 assertions |
 | `[mmu-verilator]` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 链路 MMU Bare 模式 plumbing (Phase 6d P2) | 3/3 case PASS (5 ELF cycle cap + elaboration + manual_elf), 26 assertions |
 | `[cache]` | `tests/cache/` | L1CachePlugin + Bridge + Adapter（5 个） |
 | `[cpu]` | `tests/cpu/` | CPU Plugin 单元测试 |
@@ -163,7 +163,7 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 **CH_MEM 模式状态** (2026-09-20 实测):
 - ✅ `[cpphdl]` 6/6 PASS (W0 PoC 完整链路)
 - ✅ `[chmem]` 9/9 PASS (PayloadStore + 4 elaboration PoC)
-- ✅ `[verilator]` 1/1 case PASS (**22 ELF** RV32I subset tohost=1, verilator --cc 0 error, PR1 2026-10-10 扩 Phase 6d.5 E8 子集) — **归属 `chipforge_tests_chmem` binary**,TLM binary 无 `[verilator]` 测试 (实测 `--list-tests [verilator]` 在 chipforge_tests 返回 0 case)。**PR1 顺带修 pre-existing bug**:`cpu_verilator_sim.cpp` 缺 `mkdir -p work_dir` 在 `pb->to_verilog()` 之前(后者不创建父目录),原 5-ELF 时靠 /tmp 残留掩盖,扩 22 ELF 后稳定暴露 → 1 行修复后 5/5 PASS 稳定。
+- ✅ `[verilator]` 1/1 case PASS (**40 ELF** 全 rv32ui suite tohost=1, verilator --cc 0 error, PR2 2026-10-11 扩 Phase 6d.5 E8 子集) — **归属 `chipforge_tests_chmem` binary**,TLM binary 无 `[verilator]` 测试 (实测 `--list-tests [verilator]` 在 chipforge_tests 返回 0 case)。**PR1 顺带修 pre-existing bug**:`cpu_verilator_sim.cpp` 缺 `mkdir -p work_dir` 在 `pb->to_verilog()` 之前(后者不创建父目录),原 5-ELF 时靠 /tmp 残留掩盖,扩 22 ELF 后稳定暴露 → 1 行修复后 5/5 PASS 稳定。**PR2 22→40 ELF**:B' 提交 `5e82970` (`dmem aread` 解同步 read timing)+ `63a642f` (sub-word ld/st RMW) + `368d6c4` (ALU/JALR/branch prereqs) 修复了 lw/sw/lui/sra/srai/sll/slli/jalr 7 个 CH_MEM plugin bug,kCases 全扩至 40 rv32ui ELF,实测 80 assertions 全 PASS。
 - ✅ `pipeline2_stall_matrix` 16/16 PASS (2-stage + stall/flush + Verilog `always_ff @(posedge)` 真实生成)
 - ✅ M3 PoC (`m3_poc_regfile_elaborate`/`m3_poc_alu_elaborate`) 13/13 PASS
 - ✅ `m4_poc_5stage_simulator_tick` 12/12 PASS (v0.3.1 M6 SEGV 修复后)
