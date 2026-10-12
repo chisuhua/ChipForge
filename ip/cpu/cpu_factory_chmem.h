@@ -77,12 +77,11 @@ class CpuFactoryChmem {
   //   initial_pc — PC 起始地址 (默认 0x80000000, PoC 用 0)
   //   preload_elf — 启用 ELF 预载 (同时预载 IMem + DMem)
   //   elf_image — ELF 字节数组
-  //   enable_mmu  (Phase 6d P1 placeholder, **CH_MEM plumbing-only no-op stub**)
+  //   enable_mmu  (v0.11.0 owner: change mmu-chmem-pipeline-integration; Phase B
+  //                deferred to 2026-12-01 per proposal §11; plumbing-only no-op stub)
   //     — std::nullopt (默认): 与原 4 参数行为逐位等价（7-plugin 流水线无 MMU hook）
   //     — true:               emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."
-  //                            **不会** 注册任何 MMU plugin (mmu_chmem.h 不在本 change scope)。
-  //                            sv32 translation 实现 owner 尚未分配 — see change verilator-mmu-bare-plumbing-e2e
-  //                            (CLI plumbing only, also plumbing-only) + cpu-pipeline-mmufault-handler for downstream plan.
+  //                            **不会** 注册任何 MMU plugin (mmu_chmem.h 不在本 PR scope, 见 owner change)。
   //     — false:              显式禁用，无 log 无 plugin（与 nullopt 行为一致但显式）
   //   mmu_mode   (string: "bare"/"sv32"/"sv39"/"sv48"; 默认 "bare") 仅 log 记录，无 functional effect
   //   enable_cache (Phase 6d P2 placeholder, **fail-fast throw on true**)
