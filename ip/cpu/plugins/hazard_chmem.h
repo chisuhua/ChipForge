@@ -146,11 +146,20 @@ class HazardPlugin : public cf::plugin::PluginBase {
     return (ex_match && ex_valid) || (mem_match && mem_valid) || (wb_match && wb_valid);
   }
 
-  // CH_MEM 模式 mmufault API 对齐 stub: combinational RAW detection 不维护
-  // mmufault state, 协调由 MmuExceptionHandlerPlugin CH_MEM 拉高 stall_ctrl_ 实现.
-  void mark_mmufault() noexcept {}
-  void clear_mmufault() noexcept {}
-  bool mmufault_pending() const noexcept { return false; }
+  // CH_MEM 模式 mmufault API (mmu-chmem-pipeline-integration Phase C.5)
+  //
+  // C.5 [GREEN] 骨架 (2026-10-11): mark/clear 维护 instance state, mmufault_pending
+  // 读回 state. 未实际调 stall_ctrl_->halt_when — CH_MEM 模式下 CtrlLink
+  // 只接 ch::core::ch_bool 句柄, 反复调会累积到 OR 网无法 toggle, 是
+  // CtrlLink API gap (解决路径 = 扩展接受 ch_reg/bit 句柄, 独立 change).
+  // bare path 维持 byte-identical: state 默认 false, 不影响 HazardPlugin RAW stall.
+  void mark_mmufault() noexcept {
+    mmufault_pending_ = true;
+  }
+  void clear_mmufault() noexcept {
+    mmufault_pending_ = false;
+  }
+  bool mmufault_pending() const noexcept { return mmufault_pending_; }
 
   // --------------------------------------------------------------------------
   // setup — 创建 CtrlLink 并注册到 decode stage
@@ -245,6 +254,7 @@ class HazardPlugin : public cf::plugin::PluginBase {
   // CtrlLink shared_ptr: setup() 中创建并注册到 PipeBuilder
   // detect_raw_hazard() 中用此句柄调用 halt_when(ch_bool)
   std::shared_ptr<cf::plugin::CtrlLink> stall_ctrl_;
+  bool mmufault_pending_ = false;
 };
 
 }  // namespace cpu
