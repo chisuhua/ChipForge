@@ -23,7 +23,8 @@
 //     接线,避免 silent cast 风险
 //   - bare path byte-identical: mmufault_clear 恒 ch_bool(false), HazardPlugin
 //     RAW stall 不受影响 (Phase A.6 验证 [mmu] 59/59 + [cpu] 128/129 PASS
-//     维持,1 pre-existing fail: test_cpu_sim_real_tohost RISC-V 工具链)
+//     维持,1 pre-existing fail: test_cpu_sim_real_tohost — cpu_sim CLI 路径
+//     pipeline 不 tick 根因 defer Phase 6d.6+ cpu-pipeline-tick-rca change)
 //
 // API 兼容:setup/build/reset/mark_mmufault/clear_mmufault/mmufault_pending 签名
 // 不变,组合逻辑不维护 instance state (mmufault_pending 恒 false)
@@ -80,13 +81,14 @@ class MmuExceptionHandlerPlugin : public cf::plugin::PluginBase {
   void build(cf::plugin::PipeBuilder& pb) override {
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
-      if (!n || !stall_ctrl_) return;
-      // C.1 接线点 (Phase B post-merge):
-      //   const auto exc_code = n->operator()(cpu_keys<ch_uint<8>>::CPU_EXCEPTION_CODE);
-      //   const auto zero8 = ch::core::ch_uint<8>(ch::core::ch_literal<0, 8>{});
-      //   const auto mmufault_clear = (exc_code != zero8);
-      //   stall_ctrl_->halt_when(mmufault_clear);
-      // 维持 bare path byte-identical 直到 Phase B 落地
+      if (n && stall_ctrl_) {
+        // C.1 接线点 (Phase B post-merge):
+        //   const auto exc_code = n->operator()(cpu_keys<ch_uint<8>>::CPU_EXCEPTION_CODE);
+        //   const auto zero8 = ch::core::ch_uint<8>(ch::core::ch_literal<0, 8>{});
+        //   const auto mmufault_clear = (exc_code != zero8);
+        //   stall_ctrl_->halt_when(mmufault_clear);
+        // 维持 bare path byte-identical 直到 Phase B 落地
+      }
     });
   }
 
