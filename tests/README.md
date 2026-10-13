@@ -73,9 +73,9 @@ TEST_CASE("test description", "[<family>]") {
 5 个 mmu/ 测试因 `ip/mmu/lib/tlb.h` 等库代码 bug (TLBEntry::tag_type 缺失, hits_/misses_ 在 const 方法中修改) 暂从构建中排除 (`tests/CMakeLists.txt` 中用 `list(REMOVE_ITEM)`)。
 等 mmu-tlb-ptw-impl 完成后恢复。
 
-### 3.2 5 个 RISC-V 仿真测试失败 (预先存在)
+### 3.2 5 个 RISC-V 仿真测试失败 (cpu-sim CLI 路径 pipeline 不 tick)
 
-`test_*stage_riscv` (4) + `test_cpu_sim_real_tohost` (1) 失败因 RISC-V 工具链配置 (tohost=1 字符串缺失, riscv64 assembler 不在 PATH), 与 Catch2 迁移无关。
+`test_*stage_riscv::end_to_end` (4) + `test_cpu_sim_real_tohost` (1) 失败因 cpu_sim CLI 路径下 pipeline 不能 tick（PC 通过 writeback +4 推进但 decode/memory 节点 payload 不传播, 写 tohost 永不触发 `check_tohost`）。**注**: 对比同 ELF 走 C++ API 路径（`test_rv32ui_runner.cpp`） PASS 48/48, 证明 pipeline 实际能力可达, 缺陷在 cpu_sim CLI 主循环或 build_cpu_impl 路径。**Workaround 已就位但未修根因**（`openspec/changes/cpu-sim-add-elf-tohost-fix/`, 2026-10-12）: cpu_sim 新增 `--tohost-addr` flag + `link_add.ld` (riscv-tests 风格 base=0x80000000) + add.S 改 `la+sw` 风格。**真根因 defer Phase 6d.6+ `cpu-pipeline-tick-rca` deep-dive**。
 
 ## 4. CMake 集成
 

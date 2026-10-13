@@ -124,7 +124,10 @@ TEST_CASE("3stage_add_elf_end_to_end", "[cpu-integration]") {
   std::string output = exec_cmd(
       "./build/src/cf_plugin/cpu_sim "
       "--config ip/cpu/configs/cpu_embedded.json "
-      "--elf build/add.elf --cycles 100 2>&1");
+      "--elf build/add.elf "
+      "--base-addr 0x80000000 "
+      "--tohost-addr 0x80001000 "
+      "--cycles 1000 2>&1");
   REQUIRE(output.find("tohost=1") != std::string::npos);
   REQUIRE(output.find("pipeline_stages=3") != std::string::npos);
   REQUIRE(output.find("tohost=0") == std::string::npos);

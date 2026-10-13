@@ -48,7 +48,9 @@ TEST_CASE("cpu_sim_real_tohost", "[cpu]") {
       "./build/src/cf_plugin/cpu_sim "
       "--config ./ip/cpu/configs/cpu_default.json "
       "--elf " + elf_path + " "
-      "--cycles 100 2>&1");
+      "--base-addr 0x80000000 "
+      "--tohost-addr 0x80001000 "
+      "--cycles 1000 2>&1");
 
   printf("cpu_sim output:\n%s\n", output.c_str());
 

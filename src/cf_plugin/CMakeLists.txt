@@ -119,12 +119,15 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
   find_program(RISCV_AS riscv64-unknown-elf-as)
   find_program(RISCV_LD riscv64-unknown-elf-ld)
   if(RISCV_AS AND RISCV_LD)
+    # cpu-sim-add-elf-tohost-fix: add.elf uses link_add.ld (riscv-tests style),
+    # other ELF (mmu_bare/l1cache_basic) keep link.ld (legacy base=0x0).
     foreach(ELF_PAIR IN ITEMS
-        "add;add.S"
-        "mmu_bare;build_mmu_bare.S"
-        "l1cache_basic;build_l1cache_basic.S")
+        "add;add.S;link_add.ld"
+        "mmu_bare;build_mmu_bare.S;link.ld"
+        "l1cache_basic;build_l1cache_basic.S;link.ld")
       list(GET ELF_PAIR 0 ELF_NAME)
       list(GET ELF_PAIR 1 SRC_FILE)
+      list(GET ELF_PAIR 2 LINK_SCRIPT)
       if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE})
         add_custom_command(
           OUTPUT ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
@@ -132,14 +135,14 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
             ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
             -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
           COMMAND ${RISCV_LD} -m elf32lriscv
-            -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
+            -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
             ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
             -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
           COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
           DEPENDS
             ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
-            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link.ld
-          COMMENT "Building ${ELF_NAME}.elf from ${SRC_FILE} + link.ld"
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
+          COMMENT "Building ${ELF_NAME}.elf from ${SRC_FILE} + ${LINK_SCRIPT}"
           VERBATIM
         )
         add_custom_target(${ELF_NAME}_elf ALL

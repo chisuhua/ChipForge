@@ -36,8 +36,10 @@ TEMPLATE="${1:-all}"
 
 build_add() {
   echo "[build_add] 编译 add.S → add.elf (RV32I)"
+  # cpu-sim-add-elf-tohost-fix: 使用 link_add.ld (riscv-tests 风格, base=0x80000000, .tohost@0x80001000)
+  # 其他 .S (mul/div/build_mmu_bare/build_l1cache_basic) 仍用 link.ld (base=0x0) 保持向后兼容
   riscv32-unknown-elf-as -march=rv32i -mabi=ilp32 add.S -o add.o
-  riscv32-unknown-elf-ld -T link.ld add.o -o add.elf
+  riscv32-unknown-elf-ld -T link_add.ld add.o -o add.elf
   rm -f add.o
 }
 

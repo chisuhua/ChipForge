@@ -55,6 +55,8 @@ void print_usage(const char* argv0) {
                "(optional, M4.15)\n"
                "  --base-addr HEX      Base address of RAM window (default 0x0; "
                "riscv-tests uses 0x80000000)\n"
+               "  --tohost-addr HEX    Explicit tohost address override for ELF "
+               "without .tohost section\n"
                "  --seed S             Random seed (reserved for future use)\n"
                "  --help, -h           Show this help and exit\n"
                "\n"
@@ -124,6 +126,8 @@ int main(int argc, char** argv) {
   std::string elf_path;    // optional, M4.15
   std::uint64_t base_addr_arg = 0;
   bool base_addr_explicit = false;
+  std::uint64_t tohost_addr_arg = 0;
+  bool tohost_addr_explicit = false;
 
   for (int i = 1; i < argc; ++i) {
     if ((std::strcmp(argv[i], "--help") == 0 ||
@@ -141,6 +145,11 @@ int main(int argc, char** argv) {
     } else if (std::strcmp(argv[i], "--base-addr") == 0 && i + 1 < argc) {
       base_addr_arg = std::strtoull(argv[i + 1], nullptr, 0);
       base_addr_explicit = true;
+      ++i;
+    } else if (std::strcmp(argv[i], "--tohost-addr") == 0 && i + 1 < argc) {
+      // cpu-sim-add-elf-tohost-fix: explicit override for ELF lacking .tohost section
+      tohost_addr_arg = std::strtoull(argv[i + 1], nullptr, 0);
+      tohost_addr_explicit = true;
       ++i;
     } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
       seed = std::strtoull(argv[++i], nullptr, 10);
@@ -178,9 +187,12 @@ int main(int argc, char** argv) {
       if (window_base == 0 && !base_addr_explicit && elf.entry_addr != 0) {
         window_base = elf.entry_addr;
       }
-      std::uint64_t tohost_addr = (elf.tohost_addr != std::numeric_limits<std::uint64_t>::max())
-                                      ? elf.tohost_addr
-                                      : 0;
+      // cpu-sim-add-elf-tohost-fix: explicit --tohost-addr wins; else ELF-driven
+      std::uint64_t tohost_addr = tohost_addr_explicit
+                                      ? tohost_addr_arg
+                                      : ((elf.tohost_addr != std::numeric_limits<std::uint64_t>::max())
+                                            ? elf.tohost_addr
+                                            : 0);
       mem = cf::cpu::PicolibcHostMemory(cf::cpu::PicolibcHostMemory::Config{
           .base_addr = window_base,
           .size = 64 * 1024,
