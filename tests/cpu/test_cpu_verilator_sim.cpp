@@ -85,6 +85,16 @@ const ElfTestCase kCases[] = {
     // Upper imm (2)
     {"rv32ui-p-lui",   "rv32ui-p-lui"},
     {"rv32ui-p-auipc", "rv32ui-p-auipc"},
+    // M extension (rv32um, 8 ELF) — mfc-extract-fsm-h v0.11.0 follow-up
+    // chmem-verilator-rv32um-coverage: 40 -> 48 DYNAMIC_SECTION
+    {"rv32um-p-mul",    "rv32um-p-mul"},
+    {"rv32um-p-mulh",   "rv32um-p-mulh"},
+    {"rv32um-p-mulhsu", "rv32um-p-mulhsu"},
+    {"rv32um-p-mulhu",  "rv32um-p-mulhu"},
+    {"rv32um-p-div",    "rv32um-p-div"},
+    {"rv32um-p-divu",   "rv32um-p-divu"},
+    {"rv32um-p-rem",    "rv32um-p-rem"},
+    {"rv32um-p-remu",   "rv32um-p-remu"},
 };
 
 std::string read_stdout(const std::string& cmd) {
