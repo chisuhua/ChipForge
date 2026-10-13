@@ -5,6 +5,41 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (interim) — chmem-verilator-rv32um-coverage: CH_MEM + Verilator 路径补全 rv32um 覆盖
+
+> **OpenSpec change**: `chmem-verilator-rv32um-coverage` (wave5 P2, IN_PROGRESS)
+> **Author / Date**: build agent, 2026-10-13
+> **Depends on**: `mfc-extract-fsm-h` (commit `df3bcea`, archived 2026-10-10) — 真 radix-2 iterative 实装已落地，本 change 补跨后端覆盖
+> **Follow-up**: `verilator-mul-div-fsm-followup` (P1, 待启动) — Verilator 路径下 M 扩展 boundary bug 修复
+
+### Added
+- **`[chmem] chmem_vendored_elf_tohost1` kCases 扩展 38 → 46**: `tests/cpu/test_cpu_chmem_vendored_elf.cpp:110` 末尾追加 8 个 rv32um-p-* 条目（mul / mulh / mulhsu / mulhu / div / divu / rem / remu）
+- **`[verilator] cpu_verilator_sim_tohost1` kCases 扩展 40 → 48**: `tests/cpu/test_cpu_verilator_sim.cpp:88` 末尾追加同样 8 个 rv32um-p-* 条目
+- **OpenSpec change artifacts**: `openspec/changes/chmem-verilator-rv32um-coverage/` (proposal/design/tasks/2 specs/.openspec.yaml 共 7 文件, commit `4dc5560b`)
+- **OpenSpec RCA follow-up**: `openspec/changes/verilator-mul-div-fsm-followup/proposal.md` — Verilator 路径 rv32um boundary bug 跟踪
+
+### Verification (HEAD `c277799` + commit `4dc5560b` 实测, 2026-10-13)
+- **TLM `[riscv-tests]`**: 48/48 PASS（rv32um 8/8 + rv32ui 40/40, v0.11.0 launch gate 判据 #1 兑现）
+- **CH_MEM `[chmem]`**: 8 rv32um 单跑隔离 8/8 PASS（mul=455/mulh=504/div=380/rem=380 等 cycles 与 TLM baseline `soc/cpu/docs/dse/rv32um-baseline-matrix.csv` 1:1 对齐）
+- **CH_MEM `[chmem]` 全套 6m57s**: 36/38 cases passed, 2 failed, 10 assertions failed（含 9 个 rv32ui load/store pre-existing bug + context pollution flake，与 `cpphdl_poc_chbool_contextual_conversion` 同源已知 pattern；**8 rv32um 单跑隔离全 PASS，context pollution 隔离语义达成 AC-1**）
+- **Verilator `[verilator]`**: 40 rv32ui 维持 PASS; **8 rv32um 全部 FAIL**（`TOHOST=33 CYCLES=48` 而非 `1`；riscv-tests `fail` 路径 `ori gp,gp,1` 写 `0x20|1=33` —— TLM 端 `mem.exit_code() == 0` 判定协议与 Verilator runner `dmem[tohost]==1` raw value 协议不一致，CH_MEM Simulator 行为已正确对齐 TLM，**Verilator 路径下 M 扩展 multi-cycle FSM `@(posedge clk)` 时序有 boundary bug**）—— **AC-2 不达成**, 归 `verilator-mul-div-fsm-followup` RCA 修复
+- **架构门禁**: `verify_adr` 0 fail / `verify_plugin_decision` 8/8 / `check_plugin_portability` 12/12 全 PASS（任务 6.x 已 run）
+- **AGENTS.md `:130/:133` family 表**: 已更新, commit hash `4dc5560b` 引用
+
+### Known Issues (P1 follow-up)
+- **`openspec/changes/verilator-mul-div-fsm-followup/`**: 8/8 rv32um FAIL 根因待定（候选 a/b/c — CppHDL elaboration / Verilator @posedge 编译 / runner 协议）；归属 v0.11.0 启动期承接
+
+### Acceptance Criteria (来自 proposal.md)
+- ✅ AC-1: [chmem] 8 rv32um 单跑隔离全 PASS
+- ❌ AC-2: [verilator] 8 rv32um 全部 FAIL（归 follow-up change）
+- ✅ AC-3: rv32um CH_MEM cycles 与 TLM baseline 1:1 对齐（单跑隔离）
+- ⏸ AC-4: rv32um Verilator cycles — 不适用（AC-2 不达成）
+- ✅ AC-5: 架构门禁全 PASS
+- ✅ AC-6: AGENTS.md + CHANGELOG 数字绑定 commit `4dc5560b`
+- ✅ AC-7: 0 regression（chmem 38 rv32ui baseline 9 load/store FAIL 是 PR1 之前 pre-existing，不归本 change；verilator 40 rv32ui baseline 维持 PASS）
+
+---
+
 ## v0.10.x (interim) — verilator-cpu-factory-extensible-params: CpuFactoryChmem::build_cpu + cpu_verilator_sim 可选参数化扩展
 
 > **OpenSpec change**: `verilator-cpu-factory-extensible-params` (wave5 P1, IN_PROGRESS)

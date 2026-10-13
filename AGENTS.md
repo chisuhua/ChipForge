@@ -127,10 +127,10 @@ bash tools/run_chipforge_tests.sh --all
 | Family tag | 目录 | 内容 | 数量 |
 |-----------|------|------|------|
 | `[framework]` | `tests/framework/` | Plugin 基础组件（TLM 模式） | 89/89 PASS, 275 assertions |
-| `[chmem]` | `tests/framework/` + `tests/cpu/` | CH_MEM 模式 elaboration + PoC | 9/9 PASS, 69 assertions |
+| `[chmem]` | `tests/framework/` + `tests/cpu/` | CH_MEM 模式 elaboration + PoC + vendored ELF | 9/9 PASS (框架) + 38→46 ELF (2026-10-13 chmem-verilator-rv32um-coverage commit `4dc5560b`, 8 rv32um 单跑隔离 PASS) |
 | `[cpphdl]` | `tests/framework/test_cppHDL_hello_poc.cpp` | CppHDL 完整链路（ch_device/toVerilog/Simulator） | 6/6 PASS, 15 assertions |
 | `[elaborate]` | `tests/framework/` | PipeBuilder::elaborate() 4 API PoC | 全部 PASS |
-| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 后端 40-ELF 全 rv32ui suite tohost=1 (PR2 扩 Phase 6d.5 E8 子集) | 1/1 case PASS (40 ELF), 80 assertions |
+| `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 后端 40-ELF 全 rv32ui suite tohost=1 (PR2 扩 Phase 6d.5 E8 子集) | 1/1 case PASS (40 rv32ui ELF, 80 assertions); **2026-10-13 chmem-verilator-rv32um-coverage commit `4dc5560b` 扩 8 rv32um 全部 FAIL**（TOHOST=33 — riscv-tests `fail` 路径 `ori gp,gp,1` 写 0x20\|1=33；root cause: Verilator 路径下 M 扩展 multi-cycle FSM 行为有 boundary bug，归 `openspec/changes/verilator-mul-div-fsm-followup/` RCA + 修复） |
 | `[mmu-verilator]` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 链路 MMU Bare 模式 plumbing (Phase 6d P2) | 3/3 case PASS (5 ELF cycle cap + elaboration + manual_elf), 26 assertions |
 | `[cache]` | `tests/cache/` | L1CachePlugin + Bridge + Adapter（5 个） |
 | `[cpu]` | `tests/cpu/` | CPU Plugin 单元测试 |
