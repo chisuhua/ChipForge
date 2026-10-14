@@ -2,11 +2,11 @@
 initiative: wave5-isa-coverage-and-bp
 priority: P1
 version_target: v0.11.0
-status: draft
+status: ready
 depends_on:
-  - mmu-chmem-pipeline-integration  # C.1 stall_ctrl_ skeleton 复用
-oracle_session: pending
-oracle_date: pending
+  - mmu-chmem-pipeline-integration  # C.1 stall_ctrl_ skeleton 复用 (✅ resolved for R1+R3, ⏸ R2.3 等 mmu C.2 merge)
+oracle_session: bg_pending_2026-10-14
+oracle_date: 2026-10-14
 ---
 
 # csr-chmem-pipeline-integration — CH_MEM 模式 RISC-V CSR (Zicsr) 实装 (v0.11.0 owner)
