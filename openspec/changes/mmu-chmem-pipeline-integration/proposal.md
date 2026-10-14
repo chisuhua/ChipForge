@@ -4,8 +4,8 @@ priority: P1
 version_target: v0.11.0
 status: ready
 depends_on:
-  - cpu-pipeline-mmufault-handler
-  - phase-6d-prerequisites
+  - cpu-pipeline-mmufault-handler  # ✅ resolved (archived 2026-10-06 → openspec/changes/archive/2026-10-06-cpu-pipeline-mmufault-handler/)
+  - phase-6d-prerequisites  # ✅ resolved (archived 2026-09-20 → openspec/changes/archive/2026-09-20-phase-6d-prerequisites/)
 oracle_session: bg_13cd7890
 oracle_date: 2026-10-07
 ---
@@ -40,10 +40,11 @@ oracle_date: 2026-10-07
    - **结论**: chain 正确传递 PPN,`0x80000` vs `0x8000F` 是 proposal 文档 typo (line 26 已修),不是代码 bug。"更便宜 root cause"假设被排除,Oracle D4-A + D5-TLM 是真 root cause。
    - **重要 context**: `mmufault-verilator-sv32-e2e-flip` 当前是 placeholder change (`status: placeholder`, depends_on `phase-6d.6-mmu-ptw-fsm`),"5 ELF 卡住" 失败模式无现存可重放测试。A5 实证基于现有最近路径 (`[mmu][tlb-refill]`) + 静态分析。
 
-**owner 真空**:
-- `ip/cpu/cpu_factory_chmem.h:80-85` 源码注释自证 *"sv32 translation 实现 owner 尚未分配"*
+**owner 真空** (2026-10-14 修订: 引用迁移 + 现状更新):
+- `ip/cpu/cpu_factory_chmem.h:117-126` 运行期 `fprintf` 字符串自证 *"Real sv32 CH_MEM owner TBD; see change verilator-mmu-bare-plumbing-e2e"* — 这是 plumbing-only no-op stub 仍写入 stderr 的明文, 表示本 PR scope 之外的 sv32 真翻译无人持有
+  - 备注: 同一文件 `80-85` 注释 (owner claim 段) 已由 `8bb55a9` (C.4 owner attribution) 改写为 `v0.11.0 owner: change mmu-chmem-pipeline-integration`, 字面 "owner 尚未分配" 已消失; 但运行期 `fprintf` 仍是真真空的活证
 - `tools/verilator_runner/cpu_verilator_sim.cpp:137-138` 自证 *"--enable-mmu is a no-op log; real sv32 translation is not delivered by this runner"*
-- 当前状态 = CH_MEM MMU 集成层 scope **无 change 持有**
+- 当前状态 = CH_MEM MMU 集成层 scope **无 change 持有真 sv32 翻译**; 本 change 范围 = plumbing + PTW FSM 集成层, 不含真 sv32 翻译落 mmu_chmem.h (Phase B deferred Sprint 6+)
 
 **失败教训**:
 - 决策 #2 "接受 Part a/b 拆分" 假设 1-4h 可 ship 是 v0.10.0 window 的工程估算
