@@ -13,10 +13,16 @@
 //   cf_read_pc                       — current PC (diagnostics)
 //   cf_run_sim                       — full reset+loop+verify+report
 //
-// tohost is read directly from the ch_mem array via --public-flat-rw
-// (Option c: rootp->top__DOT__dmem[tohost_word]); no ChipForge code change
-// is needed because CppHDL codegen now emits ch_mem arrays (ADR-035 R8
-// memory backdoor, ChipForge 6d.5 E8).
+// tohost is read from the ch_mem array via --public-flat-rw
+// (Option c: rootp->top__DOT__dmem[tohost_word]). We mask with 0x1 because
+// the riscv-tests harness writes test_num|1 to tohost on failure (the LSB
+// is the "did any test fail" bit — see riscv-tests/env/p/riscv_test.h:
+//   #define TESTNUM gp
+//   fail: ori gp, gp, 1; ... sw gp, 0(tohost); j fail
+// so any failing subtest writes gp = (test_num << 1) | 1, and the harness
+// expects PASS iff `tohost == 1` rather than `tohost & 0x1 == 1`).
+// CppHDL codegen emits ch_mem arrays (ADR-035 R8 memory backdoor,
+// ChipForge 6d.5 E8).
 
 #include "Vtop.h"
 #include "Vtop___024root.h"
@@ -77,7 +83,7 @@ int cf_run_sim(void* top, std::uint32_t max_cycles, const char* elf_name) {
     vtop->default_clock = 0;
     vtop->eval();
     ++cycles;
-    tohost = vtop->rootp->top__DOT__dmem[kToHostWord];
+    tohost = vtop->rootp->top__DOT__dmem[kToHostWord] & 0x1u;
   }
 
   const char* name = elf_name ? elf_name : "?";
