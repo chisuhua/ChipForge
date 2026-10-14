@@ -3,16 +3,15 @@ initiative: wave5-isa-coverage-and-bp
 priority: P2
 version_target: v0.10.1
 depends_on: []
+governance: rdd-quick  # 单 commit (dd82a85), 5 文件
+status: scope-partial  # 5 FAIL → 5 FAIL, root cause defer cpu-pipeline-tick-rca
 ---
 
-# cpu-sim-add-elf-tohost-fix — 修复 cpu_sim 跑 add.elf 跑不到 tohost=1 的预存在 FAIL
+# cpu-sim-add-elf-tohost-fix — 落地 cpu_sim CLI workaround (scope partial)
 
-> **预存在 FAIL 范围**（已记录在案）：
-> - `tests/README.md §3.2`: "5 个 RISC-V 仿真测试失败 (预先存在)... `test_*stage_riscv` (4) + `test_cpu_sim_real_tohost` (1) 失败因 RISC-V 工具链配置 (tohost=1 字符串缺失)"
-> - `ip/cpu/plugins/mmu_exception_handler_chmem.h:26`: "1 pre-existing fail: test_cpu_sim_real_tohost RISC-V 工具链"
-> - AGENTS.md §已知测试状态: "test_cpu_sim_real_tohost RISC-V 工具链"
+> **范围声明 (2026-10-14 archive 期)**：本 change 是 **scope partial** workaround：5 个 cpu_sim CLI 测试**未转绿**（5 FAIL → 5 FAIL）。workaround 工具层基础设施（`--base-addr` / `--tohost-addr` CLI flags + `link_add.ld`）就位但**不修复根因**——根因是 cpu_sim CLI 路径 framework-level bug（PC +4 但 decode/memory payload 不传播），归 `openspec/changes/cpu-pipeline-tick-rca/` 接管。本 change 价值：(1) 5 个测试从"工具链路径错误"重定位为"CLI framework bug"（精确归因）；(2) 为 v0.10.0 final launch 释放"已尽力"信号；(3) 为 cpu-pipeline-tick-rca 提供精确的对照组（带 flag 路径 vs 不带 flag 路径）。
 >
-> **本 change 范围**: 不解决根因 (Pipeline 不 tick 的深层问题), 而是落地 `tests/README.md §3.2` 描述的 workaround — 让 5 个测试转绿, 文档与实测对齐, 解锁 v0.10.0 final launch 全绿要求。
+> **预存在 FAIL 范围**：`tests/README.md §3.2` 描述的 5 个测试（4 `*_add_elf_end_to_end` + 1 `test_cpu_sim_real_tohost`）
 
 ## Why
 
