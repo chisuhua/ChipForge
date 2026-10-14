@@ -38,15 +38,15 @@
 > 2. **Shadow 双 bug** — `mmu.h:100` 派生 `set_satp_value` shadow + `mmu.cpp:37` 48-bit mask 把 Sv32 MODE bit31 含进 PPN (D5-TLM)
 > 3. **可能更便宜 root cause** — TLM flip 尝试 2 PPN 计算错误 `(0x80000000+0xF000)>>12 = 0x8000F ≠ 0x80000` (A5 优先验证)
 >
-> **本 Phase 完成标志**: `[mmu] 53/53 PASS + 0 意外退化 + shadow 双 bug 单元测试 PASS + PPN 计算核实 + 至少 5/5 sv32 PTE ELF 在 TLM pipeline 不卡死`
+> **本 Phase 完成标志** (2026-10-14 修订: 与实测 `test_mmu_bare_plumbing_verilator.cpp` 3 case 对齐): `[mmu] 59/59 PASS + 0 意外退化 + shadow 双 bug 单元测试 PASS + PPN 计算核实 + 1/1 sv32 PTE ELF 在 TLM pipeline 不卡死 (D.3 vendor 单 ELF; D.1 Verilator 侧 1/1 sv32_pte.elf tohost=1)`
 
 ### A.1 [RED] 写 `[mmu][bare-shortcut]` 测试:Bare shortcut 3 case (D4-A 验证)
 
 - [x] **新建测试 case** (追加到 `tests/mmu/test_mmu_plugin.cpp`):3 个新 test cases,~50 LOC
 - [x] **Family tag**:使用 `[mmu][bare-shortcut]` (与既有 `[mmu]` 多 tag 一致)
-- [ ] **覆盖范围**:
-  - **Case 1**:`MMUPlugin(Sv32, ..., mem=nullptr)` + `set_satp_ppn(0)` → 调 `do_lookup` → **期望 PADDR = vaddr** (走 identity,Bare shortcut 触发)
-    - **当前 FAIL** (修复后会 PASS — 验证修复正确触发 Bare shortcut)
+- [ ] **覆盖范围** (2026-10-14 修订: 与 D4-A 实际行为对齐):
+  - **Case 1**:`MMUPlugin(Sv32, ..., mem=nullptr)` + `set_satp_ppn(0)` → 调 `do_lookup` → **期望 PADDR_VALID=false 且 PTW_ACTIVE=true** (Sv32 mode 不可走 Bare shortcut;ppn=0 仍走 Sv32 TLB miss → 启动 PTW)
+    - **当前 FAIL (修复前)** → **PASS (修复后, D4-A 已落 commit `a3afcfa`)** — 验证 Bare shortcut 严格按 MODE 字段判定,不掺杂 satp_ppn
   - **Case 2**:`MMUPlugin(Sv32, ..., mem=nullptr)` + `set_satp_ppn(0x12345)` + 提供 TLB stub 命中 → **期望 PADDR = TLB 命中 paddr** (不走 identity,走 TLB lookup)
     - **当前 PASS** (修复后保持 PASS — 验证修复不影响正常路径)
   - **Case 3**:`MMUPlugin(Sv39, ..., mem=nullptr)` + `set_satp_ppn(0xABCDE)` + 提供 TLB stub 命中 → **期望 PADDR = TLB 命中 paddr** (Sv39 路径不受影响)
@@ -233,15 +233,18 @@
 
 ### C.1 [GREEN] 实装 `mmu_exception_handler_chmem.h` combinational network (D3-A 最小)
 
-- [ ] **修改文件**:`ip/cpu/plugins/mmu_exception_handler_chmem.h` (现 64 行 stub → ~120 LOC)
-- [ ] **保持 `#ifndef CF_IP_CPU_PLUGINS_MMU_EXCEPTION_HANDLER_CHMEM_H` 头守卫**
-- [ ] **combinational network 实装**:
-  - 在 `build()` 注册 `at_stage("memory", NORMAL, [...])` 闭包 (不在 `setup()` — `setup` 应早返回,Plugin 框架约定)
-  - 闭包内读 `cpu_keys<T>::CPU_EXCEPTION_CODE` (ch_uint<8> in CH_MEM mode)
-  - 计算 `ch_bool mmufault_clear = (cpu_keys::CPU_EXCEPTION_CODE != 0)` (D3-A 最小)
-  - 输出 `mmufault_clear` 到 `HazardPlugin::stall_ctrl_->halt_when(...)`
+- [x] **修改文件**:`ip/cpu/plugins/mmu_exception_handler_chmem.h` (现 64 行 stub → ~120 LOC) (skeleton shipped, wiring pending)
+  - **2026-10-14 现状**: commit `1429f5a` (C.1 stall_ctrl_ skeleton) + commit `5403718` (拆 early-return + 注释对齐 cpu-pipeline-tick-rca) 已落地
+  - **已落地**:`#ifndef CF_IP_CPU_PLUGINS_MMU_EXCEPTION_HANDLER_CHMEM_H` 头守卫 + `stall_ctrl_` setup() 注册到 stage `"decode"` + `at_stage("memory", NORMAL, [...])` 闭包注册
+  - **未落地 (wiring 段, Phase B post-merge)**:`CPU_EXCEPTION_CODE` 接线 (`mmu_exception_handler_chmem.h:85-90` 显式注释 "接线点 (Phase B post-merge)")
+- [ ] **保持 `#ifndef CF_IP_CPU_PLUGINS_MMU_EXCEPTION_HANDLER_CHMEM_H` 头守卫** (skeleton shipped)
+- [ ] **wiring 实装** (Phase B post-merge):
+  - 在 `build()` 注册 `at_stage("memory", NORMAL, [...])` 闭包 (不在 `setup()` — `setup` 应早返回,Plugin 框架约定) (skeleton shipped)
+  - 闭包内读 `cpu_keys<T>::CPU_EXCEPTION_CODE` (ch_uint<8> in CH_MEM mode) ← **wiring 段待 Phase B**
+  - 计算 `ch_bool mmufault_clear = (cpu_keys::CPU_EXCEPTION_CODE != 0)` (D3-A 最小) ← **wiring 段待 Phase B**
+  - 输出 `mmufault_clear` 到 `HazardPlugin::stall_ctrl_->halt_when(...)` ← **wiring 段待 Phase B; 须先解 CtrlLink toggle API gap (FP-4)**
 - [ ] **保持 API 兼容**:`setup`/`build`/`reset`/`mark_mmufault`/`clear_mmufault`/`mmufault_pending` API 不变 (TLM 版对齐)
-  - `mmufault_pending()` 改为返回 `mmufault_clear` 当前值 (组合逻辑直接读 ch_bool)
+  - `mmufault_pending()` 改为返回 `mmufault_clear` 当前值 (组合逻辑直接读 ch_bool) ← **wiring 段待 Phase B**
   - `mark_mmufault()` / `clear_mmufault()` 仍为 no-op (combinational network 不需 state)
 - [ ] **ADR-046 豁免不适用** — 本 Plugin 无状态机 (纯组合逻辑),**不加** `CF_PLUGIN_USE_FSM_EXEMPT`
 - [ ] **回归项**:C.5 HazardPlugin 同步;`[cpu]` 既有不退化
@@ -279,18 +282,24 @@
 
 ### C.4 [GREEN] 修复 `cpu_factory_chmem.h` owner 真空 (移除 "owner TBD" 注释)
 
-- [ ] **修改文件**:`ip/cpu/cpu_factory_chmem.h:80-85`
-- [ ] **删除注释** (现 6 行):
+- [x] **修改文件**:`ip/cpu/cpu_factory_chmem.h:80-85` (skeleton shipped, wiring pending)
+  - **2026-10-14 现状**: commit `8bb55a9` (C.4 owner attribution) 已落地
+  - **已落地**:`:80-85` owner claim 段从字面 "owner 尚未分配" 改写为 `v0.11.0 owner: change mmu-chmem-pipeline-integration; Phase B deferred to 2026-12-01 per proposal §11; plumbing-only no-op stub`
+  - **未落地 (wiring 段)**: 删除 `:117-126` 运行期 `fprintf` (仍写 "Real sv32 CH_MEM owner TBD") — 真真空活证, 与 mmufault_clear 接线同步 (Phase B post-merge)
+- [ ] **删除 :117-126 运行期 `fprintf`** (Phase B post-merge):
   ```
-  //   enable_mmu  (Phase 6d P1 placeholder, **CH_MEM plumbing-only no-op stub**)
-  //     — std::nullopt (默认): ...
-  //     — true:               emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."
-  //                            **不会** 注册任何 MMU plugin (mmu_chmem.h 不在本 change scope)。
-  //                            sv32 translation 实现 owner 尚未分配 — see change verilator-mmu-bare-plumbing-e2e
-  //                            (CLI plumbing only, also plumbing-only) + cpu-pipeline-mmufault-handler for downstream plan.
-  //     — false:              ...
+  // 现 9 行 (line 117-125):
+  //   if (enable_mmu.value_or(false)) {
+  //     const std::string mode = mmu_mode.value_or("bare");
+  //     std::fprintf(stderr,
+  //         "MMU hook enabled (mode=%s) — plumbing-only no-op stub; "
+  //         "mmu_chmem.h not implemented. NO translation occurs. "
+  //         "Real sv32 CH_MEM owner TBD; see change verilator-mmu-bare-plumbing-e2e "
+  //         "(CLI plumbing only) + cpu-pipeline-mmufault-handler.\n",
+  //         mode.c_str());
+  //   }
   ```
-- [ ] **替换为新注释** (实装后):
+- [ ] **替换为新逻辑** (实装后):
   ```
   //   enable_mmu  (v0.11.0 owner: mmu-chmem-pipeline-integration)
   //     — std::nullopt (默认): 与原 4 参数行为逐位等价 (无 MMU plugin 注册)
@@ -298,18 +307,21 @@
   //                            emit satp config from cfg.satp_value | cfg.satp_ppn
   //     — false:              显式禁用,无 plugin (与 nullopt 等价)
   ```
-- [ ] **实装 cfg.enable_mmu=true 路径** — 调用 `cpu_factory_chmem` 注册 `MMUPluginChmem` + `RiscvMMUPluginChmem` 到 `PipeBuilder`
+- [ ] **实装 cfg.enable_mmu=true 路径** — 调用 `cpu_factory_chmem` 注册 `MMUPluginChmem` + `RiscvMMUPluginChmem` 到 `PipeBuilder` ← **wiring 段待 Phase B**
 - [ ] **回归项**:`[chmem]` 既有 baseline 维持;`[mmu][chmem]` (B.4 新增) PASS
 - [ ] **运行命令**:同 C.2
 
 ### C.5 [GREEN] HazardPlugin CH_MEM 接 mmufault_clear (C1 配套)
 
-- [ ] **修改文件**:`ip/cpu/plugins/hazard_chmem.h:151-153` (现 stub 区域)
-- [ ] **替换 mark/clear mmufault stub**:
+- [x] **修改文件**:`ip/cpu/plugins/hazard_chmem.h:151-153` (现 stub 区域) (skeleton shipped, wiring pending)
+  - **2026-10-14 现状**: commit `06bb1d3` (C.5 hazard_chmem mmufault_pending state skeleton) 已落地
+  - **已落地**:`mark/clear/pending` 维护 instance state (`hazard_chmem.h:156-162` 现)
+  - **未落地 (wiring 段)**: 调 `stall_ctrl_->halt_when(...)` — `hazard_chmem.h:152-154` 自承 "未实际调 CtrlLink 是 CtrlLink API gap (无 toggle)"; 真 stall 接线须先解 API gap (FP-4)
+- [ ] **替换 mark/clear mmufault stub** (Phase B post-merge, 须先解 CtrlLink toggle API gap):
   - 现 `void mark_mmufault() noexcept {}` → 改为调 `stall_ctrl_->halt_when(ch_bool(true))` (实际触发 stall)
   - 现 `void clear_mmufault() noexcept {}` → 改为调 `stall_ctrl_->halt_when(ch_bool(false))` (实际取消 stall)
   - 现 `bool mmufault_pending() const noexcept { return false; }` → 改为返回当前 stall_ctrl_ 状态
-- [ ] **依赖 C.1** — MmuExceptionHandler combinational network 输出 `mmufault_clear` 到 `HazardPlugin::stall_ctrl_`
+- [ ] **依赖 C.1** — MmuExceptionHandler combinational network 输出 `mmufault_clear` 到 `HazardPlugin::stall_ctrl_` ← **wiring 段待 Phase B**
 - [ ] **回归项**:`[cpu] 19/19` 维持;`[cpu-integration] 81/81` 维持 (无 sv32 fault 测试 PASS)
 - [ ] **运行命令**:同 C.2
 
@@ -343,17 +355,17 @@
 
 ### D.1 [GREEN] `test_mmu_bare_plumbing_verilator.cpp` TEST_CASE 6 sv32 e2e flip
 
-- [ ] **修改文件**:`tests/mmu/test_mmu_bare_plumbing_verilator.cpp` (现 5/5 PASS)
-- [ ] **新增 TEST_CASE 6**:`mmu_sv32_translation_verilator_e2e_flipped`
+- [ ] **修改文件**:`tests/mmu/test_mmu_bare_plumbing_verilator.cpp` (现 3/3 PASS, 2026-10-14 修订: 实测 3 TEST_CASE, 历史 proposal "5/5" 是误录)
+- [ ] **新增 TEST_CASE 4**:`mmu_sv32_translation_verilator_e2e_flipped` (2026-10-14 修订: 编号应为 4, 第 4 个新 case; spec.md 已用此编号; 旧"TEST_CASE 6"是 typo)
 - [ ] **实现要点**:
   - `popen("cpu_verilator_sim --enable-mmu --mmu-mode sv32 --elf sv32_pte.elf --cycles 5000")`
-  - 读 `sv32_pte.elf` (D3 完成 vendor)
-  - 断言 `tohost == 1` (5/5 ELF)
+  - 读 `sv32_pte.elf` (D3 完成 vendor; 1 个新 ELF)
+  - 断言 `tohost == 1` (1/1 sv32_pte.elf; 2026-10-14 修订: 历史"5/5 ELF"是误录, 实测仅 vendor 1 个 sv32 ELF)
   - 断言 cycle ≤ `sv32-baseline-matrix.csv` × 1.5
-  - 断言 `EXCEPTION_CODE` 正确传播 (新 AC 替代原"trap PC 跳转断言")
-  - 断言 pipeline stall 在 PTW_ACTIVE=1 时正确生效
+  - 断言 `EXCEPTION_CODE` 正确传播 (新 AC 替代原"trap PC 跳转断言"; 须先扩 `sim_main.cpp` 输出 EXCEPTION_CODE, 否则物理不可观测)
+  - 断言 pipeline stall 在 PTW_ACTIVE=1 时正确生效 (同上: 须先扩 `sim_main.cpp` 输出 PTW_ACTIVE 计数)
 - [ ] **断言数**:8-12 assertions
-- [ ] **回归项**:`[mmu-verilator]` 既有 5/5 维持;`[verilator] 1/1` 维持
+- [ ] **回归项**:`[mmu-verilator]` 既有 3/3 维持;`[verilator] 1/1` 维持 (2026-10-14 修订: baseline 5/5 → 3/3)
 - [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[mmu-verilator]"`
 
 ### D.2 [GREEN] `test_cpu_l1_mmu_demo.cpp` TEST_CASE 7 真 sv32 翻转 (承接 mmufault Part a)
@@ -403,7 +415,7 @@
 - [ ] **预期 PASS**:
   - TLM binary (432 catch2 instances / 67026 assertions):`[framework] 89/89` + `[cache]` + `[cpu] 19/19` + `[cpu-integration] 81/81` + `[cpu-l1-mmu-demo] 7/7` + `[bundles]` + `[mmu] 53/53` + `[riscv-tests] 40/48` + `[soc]` + `[tlb-refill]`
   - CH_MEM binary:`[chmem] 9/9` + `[cpphdl] 6/6` + `[elaborate]` + `[verilator] 1/1` + `[mmu-verilator] 3/3` + `[mmu][chmem] 3/3` (B.4 新增) + `[cpu-integration][mmu-chmem] 1/1` (C.6 新增)
-  - Verilator smoke:`cpu_verilator_sim_add` 5/5 PASS
+  - Verilator smoke:`cpu_verilator_sim_add` 5/5 PASS (2026-10-14 修订: 历史 5/5 快照; 当前 cpu_verilator_sim 扩 48 ELF = 40 rv32ui + 8 rv32um, 96 assertions, 详见 AGENTS.md v0.10.4 实测; 此处 cpu_verilator_sim_add 走的是 ctest entry 单 ELF smoke, 数字与全量 48 ELF 不可互换)
 - [ ] **若失败**:
   - 是本 PR 引入 → 修复
   - 是已知 flake (如 `cpphdl_poc_chbool_contextual_conversion`) → 记录

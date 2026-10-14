@@ -212,6 +212,10 @@ TEST_CASE("PTWAdvanceFromStubIsNoOpWhenNotBusy", "[mmu][MMUPlugin][PTW]") {
 // mmu-chmem-pipeline-integration Phase A RED tests (HANDOFF §1 D4/D5)
 
 TEST_CASE("BareShortcut_Sv32ZeroPpnInitiatesPTW", "[mmu][bare-shortcut]") {
+  // 2026-10-14 修订: 与 D4-A (commit a3afcfa) 实际行为对齐。
+  // Sv32 + satp_ppn=0 **不可**走 Bare shortcut (sv_mode_ != Bare),
+  // 而是走 Sv32 TLB miss → 启动 PTW, PADDR_VALID 保持 false。
+  // 旧版 "期望 PADDR = vaddr (走 identity)" 是 D4-A 修复前的预期,已过时。
   std::vector<MMUPlugin::TLBConfig> levels = {{"L0", 8, 8, 1, 1, "LRU"}};
   cf::plugin::PipeBuilder pb;
   auto plugin = std::make_unique<MMUPlugin>(SvMode::Sv32, levels, MMUPlugin::PTWConfig{2});
@@ -231,6 +235,10 @@ TEST_CASE("BareShortcut_Sv32ZeroPpnInitiatesPTW", "[mmu][bare-shortcut]") {
 
   const bool paddr_valid = static_cast<bool>((*node)(Key::PADDR_VALID));
   CHECK_FALSE(paddr_valid);
+  // 2026-10-14 增强断言: 验证 Sv32+ppn=0 真的启动 PTW (而非什么都不做)。
+  // 旧版只断 PADDR_VALID, 名实不符 (FP-3 风险)。
+  const bool ptw_active = static_cast<bool>((*node)(Key::PTW_ACTIVE));
+  CHECK(ptw_active);
 }
 
 TEST_CASE("BareShortcut_Sv32NonZeroPpnTLBHitBypassesBare", "[mmu][bare-shortcut]") {

@@ -157,7 +157,7 @@ oracle_date: 2026-10-07
 ### 9. Regression Final Check
 
 - 跑 `bash tools/run_chipforge_tests.sh` 全部测试
-- `[mmu-verilator] 5/5` + `[mmu] 53/53` + `[cpu-integration] 81/81` + `[cpu-l1-mmu-demo] 7/7` + `[cpu] 19/19` + `[verilator] 1/1`
+- `[mmu-verilator] 3/3` + `[mmu] 59/59` + `[cpu-integration] 89/93 (4 已知 cpu_sim FAIL)` + `[cpu-l1-mmu-demo] 7/7` + `[cpu] 128/129 (1 已知 cpu_sim FAIL)` + `[verilator] 1/1 (48 ELF, 96 assertions)` (2026-10-14 修订: 与 AGENTS.md §已知测试状态 v0.10.4 实测数字对齐; 历史 `5/5 / 53/53 / 81/81` 是 v0.10.2 快照)
 
 ### 10. Archive Preparation
 

@@ -30,7 +30,7 @@ The change closes the CH_MEM MMU owner gap documented in `ip/cpu/cpu_factory_chm
 ### Requirement: MMUPlugin CH_MEM Plugin implemented (narrow scope, Oracle D1-B)
 
 A new CH_MEM-mode MMU plugin SHALL be implemented at `ip/mmu/tlm/MMUPlugin_chmem.h` (header-only, `#ifdef CF_PLUGIN_USE_CH_MEM` wrapped). The plugin SHALL:
-- Implement a single-level direct-mapped TLB (8 entries, configurable in PR) using `ch_mem`/`ch_reg` storage.
+- Implement a single-level direct-mapped TLB (8 entries, configurable in PR) using `std::vector<ch_reg<ch_uint<kVpnBits>>>` + `std::vector<ch_reg<ch_uint<kPaddrBits>>>` + `std::vector<ch_reg<ch_uint<1>>>` (valid bit) for storage (2026-10-14 修订: `ch_mem` 数组不可用, 因 `include/cf/plugin/storage.h:76` static_assert 要求 T trivially_copyable, `ch::core::ch_uint<N>` 非 trivially_copyable per Oracle 2026-10-09 Q1 compile-verified; `ch_mem::aread` 1-cycle latency 破坏单拍命中语义,须组合读。tasks.md B.3 §存储模式 一致)。
 - Reuse the existing `PtWalkFsmPlugin` from `ip/cpu/plugins/mmu_ptw_chmem.h` **without modification** for Page Table Walker FSM.
 - Emit payload keys `mmu_keys<T>::PADDR`, `PADDR_VALID`, `MMU_VADDR`, `PTW_ACTIVE` at the corresponding `at_stage` closures.
 - Configure `satp_value` and `satp_ppn` as elaboration-time `ch_reg` initial values (no runtime CSR write — Oracle R11 / D5-CH_MEM constraint).
