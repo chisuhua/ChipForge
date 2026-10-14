@@ -135,3 +135,49 @@
 | mmu-chmem-pipeline-integration Phase B mmu_chmem.h | ⏸ defer 2026-12-01 | trap 路径 mcause/mepc 写需 Phase B 落地 (但 A.4 FSM 状态机可独立测试 mcause=11) |
 | chipforge_tests_chmem 二进制 + Verilator 后端 | ✅ ready | 验证环境就绪 |
 | ch_state_machine DSL (mmu_ptw_chmem 已有先例) | ✅ available | FSM 模式参考 mmu_ptw_chmem.h |
+
+---
+
+## Phase D — 架构门禁 (E1 之后, archive 前必跑)
+
+- [ ] 跑 `bash tools/verify_adr.sh` — 必须 0 失败 (ADR 引用一致性)
+- [ ] 跑 `bash tools/verify_plugin_decision.sh` — 必须 0 失败 (D4 业务代码 8 项检查)
+- [ ] 跑 `bash tools/check_plugin_portability.sh` — 必须 0 失败 (ADR-040 v2.0 12 项检查)
+- [ ] 跑 `bash tools/doc_link_check.sh` — 必须 0 失败 (文档死链)
+- [ ] 若失败:
+  - 是本 PR 引入 → 修复
+  - 是历史问题 → 记录但不阻塞 archive
+- [ ] 运行命令: 上面 4 个 bash 命令, 顺序跑
+
+---
+
+## Phase E — Archive 准备 (D 之后)
+
+- [ ] **E.1 [GREEN] CHANGELOG.md 同步**
+  - [ ] 在 `CHANGELOG.md` v0.11.0 段 (如未建, 则新建) 加 entry: "csr-chmem-pipeline-integration: CH_MEM 模式 Zicsr 集成 (8 CSR + 8 指令 + 3 trap) (Oracle 2026-10-13 R1-R3 decisions)"
+  - [ ] 标注 scope-partial 风险 (R4: at_stage 内 if(ch_bool) 陷阱; R7: 假阴性 gate 风险)
+- [ ] **E.2 [GREEN] AGENTS.md §CH_MEM 模式 段更新**
+  - [ ] 7-plugin 流水线 → 8-plugin 流水线 文字修订
+  - [ ] `ip/cpu/STATUS.md` 移除 "🔴 RISC-V CSR P2 占位" 状态 (R1 落 → 占位消除)
+- [ ] **E.3 [GREEN] `openspec change validate csr-chmem-pipeline-integration` 0 error**
+  - [ ] 验证 `specs/csr-chmem-zicsr/spec.md` 4 个 ADDED Requirements + Scenarios 解析无错
+- [ ] **E.4 [GREEN] Archive 触发**
+  - [ ] 跑 `openspec archive csr-chmem-pipeline-integration -y` 触发 archive
+  - [ ] 验证目录移到 `openspec/changes/archive/2026-11-XX-csr-chmem-pipeline-integration/`
+  - [ ] 验证 `openspec/specs/csr-chmem-zicsr/spec.md` 升格
+  - [ ] 跑 `bash .rddf/sync_strategy_status.sh` 更新 strategy.md §7
+- [ ] **运行命令**:
+  - `bash tools/verify_adr.sh && bash tools/verify_plugin_decision.sh && bash tools/check_plugin_portability.sh && bash tools/doc_link_check.sh`
+  - `openspec change validate csr-chmem-pipeline-integration`
+  - `openspec archive csr-chmem-pipeline-integration -y`
+
+---
+
+## 接受目标 (2026-10-14 修订: 与 AGENTS.md v0.10.4 实测数字对齐)
+
+- [cpu][csr-chmem] 5/5 PASS
+- 8-plugin 流水线在 chipforge_tests_chmem 全套零退化
+  - TLM 端基线: `[mmu] 59/59 + [cpu] 128/129 (1 已知 cpu_sim FAIL) + [cpu-integration] 89/93 (4 已知 cpu_sim FAIL + 1 SIGTERM dhrystone)`
+  - CH_MEM 端基线: `[chmem] 9/9 + [cpphdl] 6/6 + [verilator] 1/1 (48 ELF, 96 assertions) + [mmu-verilator] 3/3`
+- Zicsr 8 指令 + trap 3 指令功能闭环 (CSRRW/CSRRS/CSRRC 写、CSRRWI/CSRRSI/CSRRCI 写立即数、ECALL/EBREAK/MRET 跳转)
+- bare path (rv32ui-p-* 无 Zicsr) byte-identical preserved
