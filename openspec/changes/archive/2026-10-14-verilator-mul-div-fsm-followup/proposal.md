@@ -75,7 +75,7 @@ test_32:
 
 ### 1.4 推迟路径
 
-`mul_div_fsm_chmem.h` 是 v0.11.0 启动期承接（`mfc-extract-fsm-restore`），本 change 与其并行启动。
+`mul_div_fsm_chmem.h` 是 v0.11.0 启动期承接（实质由 `archive/2026-10-10-mfc-extract-fsm-h/` 已落地的 ch_state_machine DSL 负责），本 change 与之并行启动诊断。
 
 ## What Changes
 
@@ -129,5 +129,5 @@ test_32:
 
 - 触发：`openspec/changes/chmem-verilator-rv32um-coverage/` 2026-10-13 实测
 - 现状：`tools/verilator_runner/sim_main.cpp:80`（runner 协议）+ `ip/cpu/plugins/mul_div_fsm_chmem.h`（CH_MEM 路径）
-- 上游：`mfc-extract-fsm-h`（df3bcea, 2026-10-10 archive）+ `mfc-extract-fsm-restore`（v0.11.0 启动期承接）
+- 上游：`mfc-extract-fsm-h`（commit `df3bcea`, archived 2026-10-10）—— advance_fsm 真 radix-2 iterative + fsm.h 抽取 + ch_state_machine DSL 全部落地, 本 change 诊断仅依赖此 baseline
 - 设计：`docs/architecture/adr/ADR-046`（ch_state_machine DSL）+ `docs/architecture/adr/ADR-040 v2.0`（双模同语义）

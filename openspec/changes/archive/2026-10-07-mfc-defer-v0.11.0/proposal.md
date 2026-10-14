@@ -52,7 +52,7 @@ mfc 在 v0.10.0 launch 期间保持 47/60 partial advance (含 A'+C'+B2 fix 等�
 ## v0.11.0 启动 checklist (mfc 重启 entry point)
 
 当 v0.11.0 启动时:
-1. 创建 follow-up change `mfc-extract-fsm-restore` 引用本文档
+1. ~~创建 follow-up change `mfc-extract-fsm-restore`~~ → **实际承接 = `mfc-extract-fsm-h` (commit `df3bcea`, archived 2026-10-10)**, advance_fsm 真 radix-2 iterative + fsm.h 抽取均已落地
 2. 实装 advance_fsm 真 radix-2 iterative (1-2 周)
 3. 跑 vendor rv32um 8/8 PASS (Phase E.5 实成)
 4. 实装 fetch stall framework 扩展 (1-2 周)

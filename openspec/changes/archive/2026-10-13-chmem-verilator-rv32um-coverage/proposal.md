@@ -15,7 +15,7 @@ precondition: |
 
 > **范围 (scope)**：纯测试覆盖扩展，不改业务代码。
 > **触发 (trigger)**：2026-10-13 radix-2 实装确认（commit `df3bcea` mfc-extract-fsm-h）后实测发现 CH_MEM + Verilator 路径下 rv32um 覆盖 = 0。
-> **目标版本**：v0.11.0（mfc-extract-fsm-restore 承接期）。
+> **目标版本**：v0.11.0（`mfc-extract-fsm-h` archived 兑现期，本 change 与之 sibling）。
 > **治理路径**：rdd-builder 轻量（4 artifacts 已就绪，P0 approve 后 P2 原地执行，6.x 文档修订独立 commit 兜底数字维护原则）。**非 rdd-quick 旁路**（scope 4 文件 + 27 tasks 超 ADR-0047 阈值）。
 
 ## Why

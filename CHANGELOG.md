@@ -258,7 +258,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 
 ### v0.11.0 推迟 scope (follow-up changes, v0.11.0 launch 期启动)
 
-1. **`mfc-extract-fsm-restore`** (新建 change): advance_fsm 真 radix-2 iterative, 32 cycle quotient bit-by-bit + 1 cycle write-back. 估时 1-2 周.
+1. **`mfc-extract-fsm-h`** (已 archive 2026-10-10, commit `df3bcea`): advance_fsm 真 radix-2 iterative, 32 cycle quotient bit-by-bit + 1 cycle write-back. **本项实质已落地**——不在 v0.11.0 重复创建 change.
 2. **fetch stall framework 扩展** (协同 wave5-bp): 类似 HazardPlugin RAW stall 模式, 阻止新指令进 EX 而非 stall EX 本身. 估时 1-2 周.
 3. **`wave5-bp-btb`** (新建 change): BTB 分支预测, 5-stage flush 减少 ~50%. 估时 2-4 周, 解锁 DMIPS/MHz ≥1.4 硬门禁.
 
@@ -268,7 +268,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 
 - **mfc-cpu-pipeline-multi-cycle-fsm 不 archive**: 维持 48/60 partial advance, 12 task 推迟 (D.4/F/G/H); proposal §Out of Scope 明确 "不修 advance_fsm / fetch stall / BTB"
 - **mfc-defer-v0.11.0 archive 时机**: 本 change 实施完成 (tasks 10/16) 后 archive, **不在 v0.10.0 期内启动 §3 v0.11.0 prep tasks** (有意的 unchecked)
-- **不重命名 mfc tasks.md phase**: 当前 D.4/F/G/H 保持 unchecked, 等 v0.11.0 重启后由 `mfc-extract-fsm-restore` 承接
+- **不重命名 mfc tasks.md phase**: 当前 D.4/F/G/H 保持 unchecked, 等 v0.11.0 重启后由 mfc 主线承接（D.4 refactor 实质已落入 `archive/2026-10-10-mfc-extract-fsm-h/`）
 
 ### Downstream (NOT in this change scope)
 

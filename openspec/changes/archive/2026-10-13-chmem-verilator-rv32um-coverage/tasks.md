@@ -2,7 +2,7 @@
 
 > **Path**: rdd-builder 轻量（**非 rdd-quick**，已修订 P0-1）  
 > **Est. total**: 1-1.5 天  
-> **Owner**: Plugin 测试 (mfc-extract-fsm-restore wave 启动期承接)  
+> **Owner**: Plugin 测试 (`mfc-extract-fsm-h` wave 已 archive, 本 change 与之 sibling)  
 > **Spec refs**: `specs/chmem-rv32um-coverage/spec.md`, `specs/verilator-rv32um-coverage/spec.md`  
 > **Design refs**: `design.md`
 

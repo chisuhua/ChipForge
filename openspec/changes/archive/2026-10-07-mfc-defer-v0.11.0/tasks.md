@@ -21,7 +21,7 @@ version_target: v0.11.0
 
 ## 3. v0.11.0 mfc 重启 prep (deferred, 仅在 v0.11.0 launch 时启动)
 
-- [ ] 3.1 创建 follow-up change `mfc-extract-fsm-restore` 引用本文档 (v0.11.0 launch 触发)
+- [x] 3.1 ~~创建 follow-up change `mfc-extract-fsm-restore`~~ **Superseded by `mfc-extract-fsm-h` (commit `df3bcea`, archived 2026-10-10)** —— v0.11.0 launch 前此承诺已提前兑现
 - [ ] 3.2 实装 advance_fsm 真 radix-2 iterative (1-2 周, 32 cycle quotient bit-by-bit)
 - [ ] 3.3 实装 fetch stall framework 扩展 (1-2 周, 类似 HazardPlugin RAW stall 模式)
 - [ ] 3.4 跑 vendor rv32um 8/8 PASS (Phase E.5 实成)

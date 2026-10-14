@@ -23,10 +23,10 @@ CH_MEM 路径下 `mul_div_fsm_chmem.h` 的 `ch_state_machine` DSL FSM 行为未�
 ### 1.3 约束
 
 - **不依赖** 任何 active change（precondition: mfc-extract-fsm-h 已 archive，2026-10-10，目录 `openspec/changes/archive/2026-10-10-mfc-extract-fsm-h/` 已确认）
-- **与 mfc-extract-fsm-restore 关系**：该 change 尚未在 `openspec/changes/` 创建（仅 AGENTS.md 文字预告），两者**实为 sibling**——本 change 不消费 mfc-extract-fsm-restore 的任何产物，`depends_on: []` 准确；仅版本窗口（v0.11.0）重合
+- **与 `mfc-extract-fsm-h` 关系**: 两者**实为 sibling**——本 change 不消费 mfc-extract-fsm-h 的任何产物（除 `archive/2026-10-10-mfc-extract-fsm-h/` 已存在的 rv32um 实装外），`depends_on: []` 准确；仅版本窗口（v0.11.0）重合。原 `AGENTS.md` 文字预告的 `mfc-extract-fsm-restore` 从未创建, 实质内容由 `mfc-extract-fsm-h` (commit `df3bcea`) 提前兑现
 - **不改** 业务代码、Plugin、Simulator、Verilator runner、toolchain
 - **仅扩展** Catch2 kCases 列表 + 文档数字刷新
-- **目标版本** v0.11.0（mfc-extract-fsm-restore 承接期）
+- **目标版本** v0.11.0（`mfc-extract-fsm-h` archived 兑现期，本 change 与之 sibling）
 
 ## Goals / Non-Goals
 
