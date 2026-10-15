@@ -58,10 +58,21 @@ class IBusPlugin : public cf::plugin::PluginBase {
     // plugin-framework-stall commit B: register fetch CtrlLink (PTW-busy halt)
     // halt when tlb_lookup_ifetch node has PTW_ACTIVE=1 (PTW walk in progress).
     // shared_ptr holds the lambda (no need for a member ctrl_link).
+    //
+    // cpu-pipeline-tick-fix F3b: Bare-mode guard via SATP_MODE key.
+    // When SATP_MODE == 0 (Bare mode per RISC-V Privileged Spec §4.3.1),
+    // MMUPlugin::do_lookup() returns identity translation directly without PTW;
+    // the fetch stage should NOT stall. This eliminates the v0.10.4 a3afcfa
+    // strict Bare-shortcut regression that caused 5 cpu_sim CLI tests to FAIL
+    // even with enable_mmu=true (satp CSR unwritten → CPU defaults to Sv39 →
+    // PTW tries to walk to PPN=0 → permanent stall).
     auto fetch_ctrl = std::make_shared<cf::plugin::CtrlLink>();
     fetch_ctrl->halt_when([&pb]() {
       auto* n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
       if (!n) return false;
+      const std::uint8_t satp_mode =
+          static_cast<std::uint8_t>((*n)(MmuKeys::SATP_MODE));
+      if (satp_mode == 0) return false;  // Bare = identity, no PTW stall
       return static_cast<bool>((*n)(MmuKeys::PTW_ACTIVE));
     });
     pb.register_ctrl_link("fetch", fetch_ctrl);

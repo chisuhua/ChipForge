@@ -110,6 +110,25 @@ cf::cpu::CPUConfig load_config(const std::string& path) {
     cfg.dcache_latency =
         p.value("dcache_latency", cfg.dcache_latency);
     cfg.n_threads = p.value("n_threads", cfg.n_threads);
+
+    // cpu-pipeline-tick-fix F1: parse 8 previously dropped JSON fields.
+    // Background: RCA cpu-pipeline-tick-rca (P2 实测 commit 47cd8b8, archive 23783a3)
+    // confirmed load_config() silently dropped enable_mmu/mmu_mode/etc., leading to
+    // F1 fix path. D4 决策: keep CPUConfig::enable_mmu default = true;
+    // these parses only change cfg.X when JSON explicitly provides the value.
+    cfg.enable_pmp = p.value("enable_pmp", cfg.enable_pmp);
+    cfg.enable_mmu = p.value("enable_mmu", cfg.enable_mmu);
+    cfg.clock_freq_mhz = p.value("clock_freq_mhz", cfg.clock_freq_mhz);
+    cfg.satp_ppn = p.value("satp_ppn", cfg.satp_ppn);
+    cfg.btb_entries = p.value("btb_entries", cfg.btb_entries);
+    {
+      const std::string mmode = p.value("mmu_mode", std::string{});
+      if (!mmode.empty()) cfg.mmu_mode = mmode;
+    }
+    {
+      const std::string bpredictor = p.value("branch_predictor", std::string{});
+      if (!bpredictor.empty()) cfg.branch_predictor = bpredictor;
+    }
   }
   return cfg;
 }
