@@ -73,20 +73,32 @@ build_l1cache_basic() {
   rm -f l1cache_basic.o
 }
 
+# csr-chmem-pipeline-integration C.1: Zicsr 最小测试程序 (CSRRW + tohost=1)
+#   注: scope-partial. cpu_sim CLI 路径 framework-level bug 阻塞 e2e (defer
+#   cpu-pipeline-tick-rca); 本函数仅提供 .elf 编译基础设施就位, 集成 e2e 测试
+#   推迟到后续 session (走 C++ API 路径, 类似 test_rv32ui_runner)
+build_zicsr_basic() {
+  echo "[build_zicsr_basic] 编译 zicsr_basic.S → zicsr_basic.elf (RV32I + Zicsr)"
+  riscv32-unknown-elf-as -march=rv32i_zicsr -mabi=ilp32 zicsr_basic.S -o zicsr_basic.o
+  riscv32-unknown-elf-ld -T link_add.ld zicsr_basic.o -o zicsr_basic.elf
+  rm -f zicsr_basic.o
+}
+
 case "$TEMPLATE" in
   all|"")
     build_add
     build_mul
     build_div
     ;;
-  add)       build_add ;;
-  mul)       build_mul ;;
-  div)       build_div ;;
-  mmu_bare)  build_mmu_bare ;;
+  add)          build_add ;;
+  mul)          build_mul ;;
+  div)          build_div ;;
+  mmu_bare)     build_mmu_bare ;;
   l1cache_basic) build_l1cache_basic ;;
+  zicsr_basic)  build_zicsr_basic ;;
   *)
     echo "FAIL: 未知模板 '$TEMPLATE'"
-    echo "      可用: all | add | mul | div | mmu_bare | l1cache_basic"
+    echo "      可用: all | add | mul | div | mmu_bare | l1cache_basic | zicsr_basic"
     exit 1
     ;;
 esac
