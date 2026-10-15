@@ -85,6 +85,11 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
   // R3.5 单元测试用
   ch_uint<32> last_csr_read_value_ch() const { return last_csr_read_value_; }
   ch_uint<1>  last_csr_read_valid_ch() const { return last_csr_read_valid_; }
+  // R2.4 单元测试用
+  ch_uint<1>  last_trap_pending_ch() const { return last_trap_pending_; }
+  ch_uint<32> last_trap_target_ch()  const { return last_trap_target_; }
+  // R2.5 单元测试用
+  ch_uint<32> last_mcycle_observed_ch() const { return last_mcycle_observed_; }
 #endif
 
   void reset() {
@@ -228,8 +233,103 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
         }
       }
     });
+
+    // ====================================================================
+    // R2.2 [GREEN]: branch-LATE 闭包 — 写 TRAP_PENDING / TRAP_TARGET
+    //   + ECALL/EBREAK 时写 mcause + mepc
+    //
+    // 设计要点 (per design.md §R2):
+    //   - trap 优先级 trap > branch > pc+4 (R2 优先级固化, 与 wave5-bp-btb 协调)
+    //   - ECALL (funct12=0x000) → mcause=11, mepc=PC+4, trap_target=mtvec
+    //   - EBREAK (funct12=0x001) → mcause=3, mepc=PC+4, trap_target=mtvec
+    //   - MRET (funct12=0x302) → trap_target=mepc (不写 mcause)
+    //   - 其他指令 → trap_pending=false, trap_target=0 (no-op)
+    //
+    // 时序: at_stage("branch", LATE) — elaboration 注册顺序晚于 IBus
+    //   (CSR plugin 在 cpu_factory 位置 5, 晚于 IBus 位置 3), 所以 CSR
+    //   branch-LATE 闭包执行时 last_funct12_/last_opcode_ 已被 execute-LATE
+    //   闭包写过 (execute stage 在 branch stage 之前)。
+    //
+    // 注: 本闭包不消费 PC node (PC+4 直接从 branch node KT::PC 读);
+    //   mcause/mepc 写不依赖 mmu Phase B 路径 (per R2.3 决策 + tasks.md R2)
+    // ====================================================================
+    pb.at_stage("branch", cfc::Phase::LATE, [this, &pb]() {
+      auto* n = pb.node_of_logic_stage("branch").get();
+      if (n) {
+        using KeyType = cf::cpu::core::payload::keys<T, 32>;
+        using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
+
+        // funct12 来自 execute-LATE 闭包重提取的 DAG signal (R1.2 决策:
+        //   execute-LATE 闭包内 bits<31,20> 自提取, instance ch_signal)
+        auto funct12_ch = last_funct12_;
+        auto funct12_eq_000 = (funct12_ch == ch_uint<32>(ch_literal<0x000, 32>{}));
+        auto funct12_eq_001 = (funct12_ch == ch_uint<32>(ch_literal<0x001, 32>{}));
+        auto funct12_eq_302 = (funct12_ch == ch_uint<32>(ch_literal<0x302, 32>{}));
+        // trap_pending = (funct12==0x000) | (funct12==0x001) | (funct12==0x302)
+        //   select 树 (R4 强制: 不用 if(ch_bool))
+        auto trap_pending = select(funct12_eq_000, ch_uint<1>(ch_literal<1, 1>{}),
+                            select(funct12_eq_001, ch_uint<1>(ch_literal<1, 1>{}),
+                            select(funct12_eq_302, ch_uint<1>(ch_literal<1, 1>{}),
+                                   ch_uint<1>(ch_literal<0, 1>{}))));
+
+        // trap_target select 树:
+        //   MRET (0x302) → mepc_; ECALL/EBREAK (0x000/0x001) → mtvec_; else 0
+        // 注: mepc_/mtvec_ 是 ch_reg<ch_uint<32>>, ch_reg 公有继承 ch_uint<32>,
+        //   select 返回类型由 true/false 决定 — 必须 ch_uint<32> 同类型
+        //   隐式上行 ch_reg<ch_uint<32>> → ch_uint<32> base slice
+        auto trap_target = select(funct12_eq_302, ch_uint<32>(mepc_),
+                           select(funct12_eq_000, ch_uint<32>(mtvec_),
+                           select(funct12_eq_001, ch_uint<32>(mtvec_),
+                                  ch_uint<32>(ch_literal<0, 32>{}))));
+
+        // 写 TRAP_PENDING / TRAP_TARGET 到 PayloadStore
+        n->payloads().put(CsrKT::TRAP_PENDING,
+                          static_cast<bool>(trap_pending));
+        n->payloads().put(CsrKT::TRAP_TARGET, trap_target);
+
+        // R2.4 单测观察口 (trap 路径 DAG signal 始终写, 不依赖 PC 驱动)
+        last_trap_pending_ = trap_pending;
+        last_trap_target_  = trap_target;
+
+        // ECALL/EBREAK 时写 mcause + mepc (mepc = PC+4)
+        // has() guard: PC 节点在单 stage 测试可能未驱动 (避免 SEGV)
+        if (n->payloads().has(KeyType::PC)) {
+          // PC 从 branch node 读 — branch stage 保留 PC pipeline 节点
+          auto pc_val = n->operator()(KeyType::PC);
+          auto pc_plus_4 = pc_val + ch_uint<32>(ch_literal<4, 32>{});
+          mcause_ <<= select(funct12_eq_000, ch_uint<32>(ch_literal<11, 32>{}),
+                      select(funct12_eq_001, ch_uint<32>(ch_literal<3, 32>{}),
+                              ch_uint<32>(mcause_)));
+          mepc_ <<= select(funct12_eq_000, ch_uint<32>(pc_plus_4),
+                    select(funct12_eq_001, ch_uint<32>(pc_plus_4),
+                            ch_uint<32>(mepc_)));
+        }
+      }
+    });
+
+    // ====================================================================
+    // R2.5 [GREEN]: fetch-NORMAL 闭包 — mcycle 自由计数
+    //   每 cycle mcycle_ <<= mcycle_ + 1 (carry 自增, free-running)
+    //   R2.5 决策 (per design.md Q1 收口): mcycle 必须 free-running, 与
+    //   CSR writeback 路径解耦, 5-stage 流水线每 cycle +1
+    //
+    // 时序: at_stage("fetch", NORMAL) — fetch stage NORMAL phase 每 cycle 跑
+    //   Phase enum 仅 EARLY/NORMAL/LATE (无 ALWAYS, per pipe_builder.h:57-60)
+    //   5-stage pipeline 默认每 cycle 触发 fetch NORMAL
+    //   has() guard: 单 stage 测试无 fetch node → no-op 零退化
+    // ====================================================================
+    pb.at_stage("fetch", cfc::Phase::NORMAL, [this, &pb]() {
+      auto* n = pb.node_of_logic_stage("fetch").get();
+      if (n) {
+        // mcycle_ 是 ch_reg<ch_uint<32>>, 公有继承 ch_uint<32>
+        // mcycle_ + 1 返回 ch_uint<32> (operator+ on ch_uint)
+        mcycle_ <<= mcycle_ + ch_uint<32>(ch_literal<1, 32>{});
+        // R2.5 单测观察口: 取 mcycle_ 当前值 (post-tick)
+        last_mcycle_observed_ = mcycle_;
+      }
+    });
 #else
-    // TLM 模式: 当前 R1+R3 决策仅针对 CH_MEM 通路, TLM 端 RiscvCsrPlugin 仍为 stub
+    // TLM 模式: 当前 R1+R3+R2 决策仅针对 CH_MEM 通路, TLM 端 RiscvCsrPlugin 仍为 stub
     (void)pb;
 #endif
   }
@@ -260,6 +360,13 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
   // R3.5 单测观察口: execute-LATE 闭包读 mux 输出
   ch_uint<32> last_csr_read_value_{ch::core::ch_literal<0, 32>{}};
   ch_uint<1>  last_csr_read_valid_{ch::core::ch_literal<0, 1>{}};
+
+  // R2.4 单测观察口: branch-LATE 闭包 trap 路径输出
+  ch_uint<1>  last_trap_pending_{ch::core::ch_literal<0, 1>{}};
+  ch_uint<32> last_trap_target_ {ch::core::ch_literal<0, 32>{}};
+
+  // R2.5 mcycle 自由计数观察口 (读 post-tick DAG value, 应近似 cycle 数)
+  ch_uint<32> last_mcycle_observed_{ch::core::ch_literal<0, 32>{}};
 #else
   // TLM 模式: 8 个 CSR POD (R3 CH_MEM 通路实装后, TLM 端 RiscvCsrPlugin 仍为 stub)
   std::uint32_t mstatus_ = 0;
