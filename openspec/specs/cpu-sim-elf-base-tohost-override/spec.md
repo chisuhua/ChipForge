@@ -105,3 +105,19 @@ The root-cause investigation and fix MUST be deferred to `openspec/changes/cpu-p
 - **WHEN** the same `rv32ui-p-add` ELF runs through `test_rv32ui_runner` (TLM C++ API, not cpu_sim CLI)
 - **THEN** it SHALL still pass 40/40 (this baseline is unaffected by the cpu_sim CLI bug; the workaround only affects the CLI path)
 
+
+### Requirement: cpu_sim CLI Bare-mode fetch MUST NOT stall (cpu-pipeline-tick-fix F3b)
+
+When MMUPlugin publishes `SATP_MODE=0` (Bare mode per RISC-V Privileged Spec §4.3.1 — e.g. satp CSR not yet programmed, or explicit Bare mode config), `ip/cpu/plugins/ibus.h` `fetch_ctrl->halt_when` MUST return `false` so the fetch stage proceeds with identity translation instead of stalling on `PTW_ACTIVE=1`.
+
+#### Scenario: Bare-mode fetch proceeds without PTW stall (cpu-pipeline-tick-fix F3b)
+- **GIVEN** CPUConfig with `enable_mmu=true` but `satp_value MODE=0` (Bare mode)
+- **WHEN** cpu_sim CLI runs any workload (e.g. add.elf)
+- **THEN** `pb->run()` cycles proceed normally with `(*tlb_node)(SATP_MODE)==0` triggering `halt_when` return `false`; `tohost` is writable within cycles<30
+- **AND** the Bare-mode byte-identical behavior with v0.10.4 (`a3afcfa`) is preserved
+
+#### Scenario: Real Sv32/Sv39/Sv48 translation stall preserved (cpu-pipeline-tick-fix F3b)
+- **GIVEN** CPUConfig with `enable_mmu=true` AND satp CSR programmed with non-zero MODE (e.g. sv_mode=Sv39, `satp_value >> 60 = 8`)
+- **WHEN** `fetch_ctrl->halt_when` lambda runs and PTW_ACTIVE=1
+- **THEN** returns `true` (preserves v0.10.4 hotfix `a3afcfa` strict Bare-shortcut judgment for real Sv modes)
+- **AND** `[mmu]` 59/59 + `[cache] EndToEndTranslationThroughBridge` PASS maintained
