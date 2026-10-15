@@ -1,6 +1,6 @@
 // ip/cpu/cpu_factory_chmem.h
 //
-// Phase 6d 6d.3: CpuFactory (CH_MEM) — 7-plugin 5-stage 流水线 CPU 集成
+// Phase 6d 6d.3: CpuFactory (CH_MEM) — 8-plugin 5-stage 流水线 CPU 集成
 //   IBus + Decoder + RegFile + Hazard + IntAlu + Branch + DMem
 //
 // License: ChipForge Project (see top-level LICENSE file)
@@ -36,6 +36,7 @@
 #include "ip/cpu/plugins/reg_file_chmem.h"
 #include "ip/cpu/plugins/decode_chmem.h"
 #include "ip/cpu/plugins/dmem_chmem.h"
+#include "ip/cpu/plugins/csr_chmem.h"  // csr-chmem-pipeline-integration B.1: 第 8 plugin
 #include "ip/cpu/arch/riscv/int_alu_chmem.h"
 #include "ip/cpu/arch/riscv/decoder_table.h"
 #include "ip/cpu/core/payload_common.h"
@@ -70,7 +71,7 @@ class CpuFactoryChmem {
   using DMem     = plugins::DMemPlugin<T>;
 
   // ==========================================================================
-  // build_cpu — 7-plugin 5-stage
+  // build_cpu — 8-plugin 5-stage
   //
   // 参数:
   //   memory — 保留向后兼容 (TLM 模式使用, CH_MEM 忽略)
@@ -79,7 +80,7 @@ class CpuFactoryChmem {
   //   elf_image — ELF 字节数组
   //   enable_mmu  (v0.11.0 owner: change mmu-chmem-pipeline-integration; Phase B
   //                deferred to 2026-12-01 per proposal §11; plumbing-only no-op stub)
-  //     — std::nullopt (默认): 与原 4 参数行为逐位等价（7-plugin 流水线无 MMU hook）
+  //     — std::nullopt (默认): 与原 4 参数行为逐位等价（8-plugin 流水线无 MMU hook）
   //     — true:               emit stderr/log "MMU hook enabled (mode=<mmu_mode>) — plumbing-only no-op stub; mmu_chmem.h not implemented. NO translation occurs."
   //                            **不会** 注册任何 MMU plugin (mmu_chmem.h 不在本 PR scope, 见 owner change)。
   //     — false:              显式禁用，无 log 无 plugin（与 nullopt 行为一致但显式）
@@ -106,7 +107,7 @@ class CpuFactoryChmem {
     (void)memory;
 
     // Phase 6d P2 fail-fast: L1Cache CH_MEM 实装 owner 未分配 (wave4 P2 placeholder).
-    // 早 throw 不污染 7-plugin 流水线 (per design.md §D2 fail-fast 决策, v0.10.4 hotfix 教训).
+    // 早 throw 不污染 8-plugin 流水线 (per design.md §D2 fail-fast 决策, v0.10.4 hotfix 教训).
     if (enable_cache.value_or(false)) {
       throw std::runtime_error(
           "L1Cache CH_MEM not implemented; refer to change verilator-l1cache-e2e-coverage "
@@ -305,6 +306,11 @@ class CpuFactoryChmem {
     pb->register_plugin(std::move(ibus));
     pb->register_plugin(std::make_unique<RegFile>());
     pb->register_plugin(std::make_unique<IntAlu>());
+    // csr-chmem-pipeline-integration B.1: 第 8 plugin (RegFile/IntAlu 之后,
+    //   Branch 之前), 实现 Zicsr 8 指令 + trap 3 指令 (ECALL/EBREAK/MRET)
+    //   ADR-048 canonical ordering 维持: CSR execute-LATE 在 IntAlu NORMAL
+    //   之后, writeback-NORMAL 在 Branch 之后
+    pb->register_plugin(std::make_unique<RiscvCsrPluginChmem<T>>());
     pb->register_plugin(std::make_unique<Branch>());
     pb->register_plugin(std::move(dmem));
 
