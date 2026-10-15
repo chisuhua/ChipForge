@@ -190,7 +190,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[cpu][csr-chmem]`: **16/16** PASS (116 assertions) — **基线 14/14 → 16/16**
 - `m3_poc_5stage_byte_equal` (8-plugin 5-stage 关键守门): **185/185** PASS — 0 退化
 - TLM `[mmu]`: **59/59** PASS (146 assertions) — 跨 binary baseline 维持
-- `[chmem]` family: **37/38** (1 known `cpphdl_poc_chbool_contextual_conversion` flake, 与本 change 无关)
+- `[chmem]` family: **37/38** (1 failed: `test_cpu_chmem_vendored_elf.cpp:170` `tohost==1` 未达到 cycle cap, vendored ELF pre-existing limitation, 与本 change 无关; `cpphdl_poc_chbool_contextual_conversion` context pollution flake 维持 baseline 已知状态)
 - `[verilator]` (48 ELF): **1/1** PASS (96 assertions) — bare path byte-identical preserved
 - `[mmu-verilator]`: **3/3** PASS (26 assertions) — bare path plumbing 0 退化
 - 架构门禁 `check_plugin_portability` **12/12** + `verify_plugin_decision` **8/8** + `verify_adr` **0 fail** 全 PASS

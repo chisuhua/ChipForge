@@ -1,7 +1,12 @@
 # csr-chmem-csr-write Specification
 
 ## Purpose
-TBD - created by archiving change csr-chmem-writeback-complete. Update Purpose after archive.
+定义 CH_MEM 模式 (`-DCF_PLUGIN_USE_CH_MEM`) 下 RISC-V Zicsr CSR 写通路的契约：7 个 M-mode CSR (`mstatus/mtvec/mepc/mcause/mie/mip/mscratch`) 经 CSRRW/CSRRS/CSRRC (含立即数变体 CSRRWI/CSRRSI/CSRRCI) 实际可写, mcycle 永不被 CSRR* 写 (R3 决策 + R2.5 自由计数 维持)。覆盖 execute-LATE 闭包写 `csr_keys::CSR_WRITE_ADDR/VALUE/EN` payload + cpu_factory_chmem.h §2b/§2c + populate_stage 跨 stage propagate + writeback-NORMAL 闭包 5 个无冲突 CSR 单 driver 写 + 2 个多 driver CSR (mcause/mepc) 仲裁 select。
+
+**来源**: archived change `csr-chmem-writeback-complete` (2026-10-15, commit `1d02531`, wave5 P1-4 csr-chmem 收官 R3.5 完整版)。
+
+**验证范围注记**: 单 plugin 测试路径 (`tests/cpu/test_csr_chmem.cpp` 16 cases) 验证 execute-LATE CSR_WRITE_* payload 写出 (DAG construction 验证) + 5 层 funct3/rs1/imm5 门控正确性; writeback-NORMAL 闭包 5 个无冲突 CSR 单 driver 写 + 2 个仲裁 CSR 实际 ch_reg 更新由 5-stage build_cpu 路径 (`m3_poc_5stage_byte_equal` 185/185 维持 + 后续 C.1 集成 e2e zicsr_basic) 端到端覆盖。Spec SHALL "actually update" 的端到端兑现需配合 `cpu-pipeline-tick-rca` 修复 (deferred, 与 csr-chmem-pipeline-integration archive 同源)。
+
 ## Requirements
 ### Requirement: CSR writeback 7 M-mode CSR registers actually update
 

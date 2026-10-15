@@ -66,14 +66,25 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
   RiscvCsrPluginChmem& operator=(const RiscvCsrPluginChmem&) = delete;
 
   // 公开访问器 (test 用): 当前 mstatus value
-  // A.3 落地后从 ch_reg<32> 读回; A.2 骨架阶段 return 0
+  // CH_MEM 模式: ch_reg 不能用 static_cast<uint64_t> 在 elab 期读回 (M6 教训,
+  //   触发 ch_uint<N>::operator uint64_t non-constant node 错误路径, 静默返回 0)。
+  //   改为返回 ch_uint<32> DAG signal reference, 调用方走 sim->get_signal_value() 取
+  //   post-tick 值 (与 last_csr_*_ch 模式一致, 见 line 80-88 既有访问器)。
+  // TLM 模式: 8 个 CSR POD (R3 CH_MEM 通路实装后, TLM 端 RiscvCsrPlugin 仍为 stub),
+  //   ch_reg 不存在, 直接返回 POD 成员值。
   std::uint32_t mstatus() const noexcept {
 #ifdef CF_PLUGIN_USE_CH_MEM
-    return static_cast<std::uint32_t>(static_cast<std::uint64_t>(mstatus_));
+    // mstatus_ 是 ch_reg<ch_uint<32>>, 公有继承 ch_uint<32> — 返回 DAG signal ref
+    //   调用方需用 sim->get_signal_value(mstatus()) 读 post-tick 值
+    return 0;  // placeholder, 见 mstatus_ch() 获取 DAG ref
 #else
     return mstatus_;
 #endif
   }
+#ifdef CF_PLUGIN_USE_CH_MEM
+  // R3.5 修 F1: 与 last_csr_*_ch 模式一致, 返回 ch_signal DAG reference
+  ch_uint<32> mstatus_ch() const { return mstatus_; }
+#endif
 
 #ifdef CF_PLUGIN_USE_CH_MEM
   // R1 测试访问器 (DAG signal references, sim->get_signal_value() 取 post-tick 值)
