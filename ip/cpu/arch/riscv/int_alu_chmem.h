@@ -65,6 +65,9 @@
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/plugins/decode_chmem.h"
 
+// csr-chmem-pipeline-integration R3.2: 消费 CSR_READ_VALUE 覆写 RD_DATA
+#include "bundles/csr_bundles.h"
+
 using namespace cf::plugin;
 using namespace ch;
 using namespace ch::core;
@@ -252,6 +255,37 @@ class RiscvIntAluPlugin : public PluginBase {
         n->operator()(KeyType::RESULT)  = T(ch::core::ch_literal<0, 32>{});
       }
       }  // end if (n)
+    });
+
+    // -------------------------------------------------------------------
+    // csr-chmem-pipeline-integration R3.2 [GREEN]: execute-LATE 阶段消费
+    //   CSR_READ_VALUE, 优先于 IntAlu default RD_DATA。
+    //
+    // Canonical ordering (ADR-048): IntAlu 位置 6 晚于 CSR 位置 5, 但
+    //   同一 stage 内 NORMAL phase 早于 LATE phase。所以 LATE 阶段读
+    //   NORMAL 已写的 RD_DATA + CSR_READ_VALUE/VALID, select 覆写。
+    //
+    // 无 CSR plugin 时: 必须 has() guard 跳过本闭包, 否则 DAG 引用未驱动的
+    //   CSR_READ_VALUE/VALID → cpphdl 5.052 sim tick SEGV
+    //   (per CpuFactoryChmem 7-plugin 流水线 regression 教训).
+    // -------------------------------------------------------------------
+    pb.at_stage("execute", Phase::LATE, [this, &pb]() {
+      auto* n = pb.node_of_logic_stage("execute").get();
+      if (n) {
+        using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
+        // 1) has() guard: 仅当 CSR plugin 已写才覆写 (无 CSR plugin 时
+        //   整闭包 no-op, 零影响 → R3.2 单独无害, 0 退化)
+        if (n->payloads().has(CsrKT::CSR_READ_VALID)) {
+          // 2) 读 NORMAL 阶段已写的 RD_DATA 作为 fallback
+          auto default_rd_data = n->operator()(KeyType::RD_DATA);
+          // 3) 读 csr plugin 写的 CSR_READ_VALUE / CSR_READ_VALID
+          auto csr_read_value  = n->operator()(CsrKT::CSR_READ_VALUE);
+          auto csr_read_valid  = n->operator()(CsrKT::CSR_READ_VALID);
+          // 4) select 树: 1-bit valid 选 CSR 读值, 否则 default
+          n->operator()(KeyType::RD_DATA) =
+              select(csr_read_valid, csr_read_value, default_rd_data);
+        }
+      }
     });
   }
 

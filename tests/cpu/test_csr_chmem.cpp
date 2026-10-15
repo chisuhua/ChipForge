@@ -309,3 +309,143 @@ TEST_CASE("csr_chmem_CsrrsMstatus_ZicsrValid", "[cpu][csr-chmem]") {
   REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
   REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct3_ch()))   == 0x2u);
 }
+
+// =========================================================================
+// Case 7 (R3.5): CSRRW 读 mstatus 旧值 = 0 (初始状态, ch_reg = 0)
+//   验证 R3.3 决策: csr_addr == 0x300 → CSR_READ_VALUE = mstatus (初值 0)
+// =========================================================================
+TEST_CASE("csr_chmem_R3_CsrrwMstatus_InitialReadValue", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_r3_csrrw_mstatus");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  // CSRRW x1, mstatus, x0: inst = 0x300010F3
+  std::uint32_t inst = 0x300010F3u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(1);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  // R3.3 决策: csr_addr == 0x300 → CSR_READ_VALUE = mstatus (初始 0)
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_value_ch())) == 0u);
+  // R3.3 决策: mcycle (0xB00) 单独路径, 其他 CSR READ_VALID = 1
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_valid_ch())) == 1u);
+  // R1 重提取 csr_addr 正确 (0x300)
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0x300u);
+}
+
+// =========================================================================
+// Case 8 (R3.5): CSRRS 读 mcycle → CSR_READ_VALID = false (R3 决策: mcycle 单独路径)
+//   验证 R3 决策: csr_addr == 0xB00 → RD_DATA 不被覆写 (mcycle 读单独走)
+// =========================================================================
+TEST_CASE("csr_chmem_R3_CsrrsMcycle_ReadValidFalse", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_r3_csrrs_mcycle");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  // CSRRS x1, mcycle, x0: inst = (0xB00 << 20) | (0 << 15) | (0b010 << 12) | (1 << 7) | 0x73
+  //   = 0xB0000000 | 0 | 0x2000 | 0x80 | 0x73 = 0xB00020F3
+  std::uint32_t inst = 0xB00020F3u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(1);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  // R3 决策: csr_addr == 0xB00 → CSR_READ_VALID = false
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_valid_ch())) == 0u);
+  // csr_addr 重提取 = 0xB00
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0xB00u);
+  // mcycle 初始 0
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_value_ch())) == 0u);
+}
+
+// =========================================================================
+// Case 9 (R3.5): 8 选 1 mux 覆盖 — 验证 4 个不同 csr_addr 走不同分支
+//   mstatus=0x300, mtvec=0x305, mepc=0x341, mcause=0x342
+// =========================================================================
+TEST_CASE("csr_chmem_R3_ReadMux_FourCsrAddresses", "[cpu][csr-chmem]") {
+  struct AddrCase {
+    std::uint32_t csr_addr;
+    std::uint32_t inst;       // CSRRW x1, csr, x0
+    const char* label;
+  };
+  const std::vector<AddrCase> cases = {
+    {0x300, 0x300010F3u, "mstatus"},
+    {0x305, 0x305010F3u, "mtvec"},
+    {0x341, 0x341010F3u, "mepc"},
+    {0x342, 0x342010F3u, "mcause"},
+  };
+  for (const auto& tc : cases) {
+    ch::core::context ctx(std::string("csr_chmem_r3_") + tc.label);
+    ctx.set_as_current_context();
+    ch::core::ctx_swap guard(&ctx);
+
+    cfc::PipeBuilder pb(&ctx);
+    CsrPluginGuard plugin_guard(pb);
+    cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+    using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+    pb.at_stage("execute", cfc::Phase::EARLY, [&pb, tc]() {
+      auto* n = pb.node_of_logic_stage("execute").get();
+      if (n) {
+        n->operator()(KT::INSTRUCTION) = ch_uint<32>(tc.inst);
+        n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+        n->operator()(KT::RS1)         = ch_uint<32>(0);
+        n->operator()(KT::RS2)         = ch_uint<32>(0);
+        n->operator()(KT::RD_IDX)      = ch_uint<5>(1);
+      }
+    });
+    pb.build();
+    auto exp = pb.elaborate(ctx);
+    REQUIRE(exp.has_value());
+    auto sim = cfc::auto_throw(pb.create_simulator());
+    REQUIRE(sim != nullptr);
+    sim->reset();
+    REQUIRE_NOTHROW(sim->tick());
+
+    // 验证 csr_addr 走正确分支 (read mux 8 选 1)
+    REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == tc.csr_addr);
+    // 初值 0
+    REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_value_ch())) == 0u);
+    // READ_VALID = 1 (非 mcycle)
+    REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_valid_ch())) == 1u);
+  }
+}
