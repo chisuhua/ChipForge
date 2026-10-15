@@ -65,9 +65,16 @@ static inline void dhry_strcpy(char *dst, const char *src, int max_len) {
   dst[j] = 0;
 }
 
-// ===== PicolibcHostMemory tohost_addr=0 PASS marker =====
-static void tohost_pass(void) {
-  volatile int *p = (volatile int *)0;
+// ===== PicolibcHostMemory tohost PASS marker (feat-dhrystone-dmips-gate B1 H1) =====
+/* link_dhrystone.ld 锚定 tohost symbol @ 0x80001000, 写窗口内 [0x80000000, 0x80010000).
+ * 旧: 写绝对地址 0 (window_base=0x710, 窗口外被 load_section 静默 drop, 永远 exited=false).
+ */
+extern char tohost;
+extern "C" {
+extern void tohost_pass(void);  /* 导出给 dhrystone_crt0.S tail 调 */
+}
+void tohost_pass(void) {
+  volatile int *p = (volatile int *) &tohost;  /* write to 0x80001000 (in-window) */
   *p = 1;
   while (1);
 }
@@ -215,8 +222,11 @@ Boolean Func_3(Enumeration Enum_Par_Val) {
   else return false;
 }
 
-// ===== Entry point (ChipForge cpu_sim 默认 _start symbol) =====
-extern "C" void _start(void) {
+// ===== Entry point (C++ 实现, _cstart 命名避免与 .S 文件 _start 冲突) =====
+// feat-dhrystone-dmips-gate B1 H3: _start 入口在 dhrystone_crt0.S (汇编),
+//   设 sp=0x8000F000 后 jal _cstart. 之前用 inline asm 失败, g++ 仍插 prologue
+//   `addi sp,sp,-112` (在 inline asm 之前), sp 下溢 0xFFFFFF90, 8 个 sw 写窗口外 drop.
+extern "C" void _cstart(void) {
   const int Number_Of_Runs = 2000;
 
   One_Fifty Int_1_Loc, Int_2_Loc, Int_3_Loc;

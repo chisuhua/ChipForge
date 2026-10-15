@@ -118,33 +118,56 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
   # (tests/CMakeLists.txt 定义) 引用 build/mmu_bare.elf.
   find_program(RISCV_AS riscv64-unknown-elf-as)
   find_program(RISCV_LD riscv64-unknown-elf-ld)
+  find_program(RISCV_GPP riscv32-unknown-elf-g++)  # feat-dhrystone-dmips-gate B3
   if(RISCV_AS AND RISCV_LD)
     # cpu-sim-add-elf-tohost-fix: add.elf uses link_add.ld (riscv-tests style),
     # other ELF (mmu_bare/l1cache_basic) keep link.ld (legacy base=0x0).
+    # feat-dhrystone-dmips-gate: dhrystone uses link_dhrystone.ld (base=0x80000000 + .tohost)
+    # + g++ -O2 -fno-inline 编译 (Dhrystone 规范要求开优化, 1.4 DMIPS/MHz 物理可达).
     foreach(ELF_PAIR IN ITEMS
         "add;add.S;link_add.ld"
+        "dhrystone;dhrystone/dhrystone_crt0.S;link_dhrystone.ld"  # B1: harness repair
         "mmu_bare;build_mmu_bare.S;link.ld"
         "l1cache_basic;build_l1cache_basic.S;link.ld")
       list(GET ELF_PAIR 0 ELF_NAME)
       list(GET ELF_PAIR 1 SRC_FILE)
       list(GET ELF_PAIR 2 LINK_SCRIPT)
       if(EXISTS ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE})
-        add_custom_command(
-          OUTPUT ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
-          COMMAND ${RISCV_AS} -march=rv32i -mabi=ilp32
-            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
-            -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
-          COMMAND ${RISCV_LD} -m elf32lriscv
-            -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
-            ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
-            -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
-          COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
-          DEPENDS
-            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
-            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
-          COMMENT "Building ${ELF_NAME}.elf from ${SRC_FILE} + ${LINK_SCRIPT}"
-          VERBATIM
-        )
+        if(ELF_NAME STREQUAL "dhrystone" AND RISCV_GPP)
+          # feat-dhrystone-dmips-gate B3: dhrystone C++ 源码 + crt0.S, g++ -O2 -fno-inline 编译
+          add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
+            COMMAND ${RISCV_GPP} -O2 -fno-inline -march=rv32im_zicsr -mabi=ilp32
+              -nostdlib -static
+              -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/dhrystone/dhrystone_crt0.S
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/dhrystone/dhrystone.c
+              -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
+            DEPENDS
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
+            COMMENT "Building ${ELF_NAME}.elf from ${SRC_FILE} + ${LINK_SCRIPT} (-O2 -fno-inline)"
+            VERBATIM
+          )
+        else()
+          # 既有 add/mmu_bare/l1cache_basic 路径: riscv-as/ld (无 -O)
+          add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
+            COMMAND ${RISCV_AS} -march=rv32i -mabi=ilp32
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
+              -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
+            COMMAND ${RISCV_LD} -m elf32lriscv
+              -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
+              ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
+              -o ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf
+            COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/${ELF_NAME}.o
+            DEPENDS
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${SRC_FILE}
+              ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/${LINK_SCRIPT}
+            COMMENT "Building ${ELF_NAME}.elf from ${SRC_FILE} + ${LINK_SCRIPT}"
+            VERBATIM
+          )
+        endif()
         add_custom_target(${ELF_NAME}_elf ALL
           DEPENDS ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf)
       endif()

@@ -1,9 +1,9 @@
 // tests/cpu/integration/test_dhrystone.cpp
 //
-// Dhrystone DMIPS/MHz 集成测试 (mfc-cpu-pipeline-multi-cycle-fsm Phase G)
+// Dhrystone DMIPS/MHz 集成测试 (feat-dhrystone-dmips-gate)
 // 跑 tests/cpu/manual_elf/dhrystone/dhrystone.elf (Number_Of_Runs=2000)
-// 计算 DMIPS/MHz = 1757 * N / cycle_count (VAX 11/780 reference).
-// mfc hard gate: DMIPS/MHz >= 1.4 → cycle_count <= 2,510,000.
+// 计算 DMIPS/MHz = N*1e6/(1757*cycles) (VAX 11/780 reference).
+// mfc hard gate: DMIPS/MHz >= 1.4 → cycle_count <= 813,043.
 //
 // Family tag: [cpu-integration][dhrystone]
 // SPDX-License-Identifier: BSD-3-Clause
@@ -21,11 +21,27 @@
 
 namespace {
 
-constexpr std::uint64_t kMaxCycles = 100000000;  // 100M cycle cap (mfc Phase G C': 验证 livelock vs performance vs 10M cap)
+/* feat-dhrystone-dmips-gate AC2: 降 cap 5M (从 100M).
+ *   旧 100M cap 永远 timeout → wall-clock 超 ctest timeout → SIGTERM.
+ *   5M cap 是真 gate 813,043 × 6 余量, 顺带治愈 AGENTS.md §known SIGTERM.
+ */
+constexpr std::uint64_t kMaxCycles = 5000000;  // 5M cycle cap
 
 constexpr int kDhrystoneRuns = 2000;
+
+/* feat-dhrystone-dmips-gate B2: 真 gate 813,043 cycles (= N*1e6/(1757*1.4)).
+ *   旧公式 1757*N/14*10 = 2,510,000 是错误 (3.087× 宽, 因 1757²/1e6).
+ *   公式修为 (N*1e6)/(1757*14)*10 = 813,043 (标准 DMIPS 公式).
+ */
 constexpr std::uint64_t kMaxCyclesForDmips14 =
-    (1757ULL * kDhrystoneRuns) / 14 * 10;  // = 2,510,000 (= 1757*2000*10/14)
+    (kDhrystoneRuns * 1'000'000ULL) / (1757 * 14) * 10;  // = 813,043
+
+/* feat-dhrystone-dmips-gate B1 part c: hardcode base=0x80000000.
+ *   旧 window_base = entry & ~0xFFFF; if(window_base==0 && entry!=0) window_base=entry
+ *   让 .text@0x0 (旧 link.ld base=0) 整段被 load_section 静默 drop (Oracle H2 升级).
+ *   修法: 与 link_dhrystone.ld 锁 base=0x80000000 一致.
+ */
+constexpr std::uint64_t kDhrystoneBase = 0x80000000;
 
 void runDhrystone(cf::cpu::CPUConfig::MulImpl mul_impl,
                  std::uint64_t& cycles_out, bool& exited_out, int& ec_out) {
@@ -35,15 +51,13 @@ void runDhrystone(cf::cpu::CPUConfig::MulImpl mul_impl,
     FAIL("dhrystone.elf not found: " + elf_path);
   }
   auto elf = cf::tools::load_elf_full(elf_path);
-  // manual_elf/dhrystone/ use direct sw to address 0 (no .tohost section)
-  std::uint64_t tohost_addr = (elf.tohost_addr != UINT64_MAX)
-                                 ? elf.tohost_addr
-                                 : 0;
-  std::uint64_t window_base = elf.entry_addr &
-                              ~static_cast<std::uint64_t>(0xFFFF);
-  if (window_base == 0 && elf.entry_addr != 0) window_base = elf.entry_addr;
+  /* feat-dhrystone-dmips-gate B1 H1: link_dhrystone.ld 锚定 tohost symbol @ 0x80001000.
+   *   旧 fallback tohost=0 (无 .tohost section) → picolibc_host_memory.h write_byte 静默 drop.
+   *   修法: tohost_addr=base+0x1000 (与 link_dhrystone.ld ALIGN 锁).
+   */
+  const std::uint64_t tohost_addr = kDhrystoneBase + 0x1000;
   cf::cpu::PicolibcHostMemory::Config mem_cfg{
-      .base_addr = window_base, .size = 64 * 1024,
+      .base_addr = kDhrystoneBase, .size = 64 * 1024,
       .tohost_addr = tohost_addr};
   cf::cpu::PicolibcHostMemory mem(mem_cfg);
   for (const auto& sec : elf.sections) {
@@ -73,29 +87,37 @@ void runDhrystone(cf::cpu::CPUConfig::MulImpl mul_impl,
 
 }  // namespace
 
-// LEGACY mode baseline: Phase A.7 实测 mul.elf LEGACY 5 cycles tohost=1 PASS.
-// Dhrystone LEGACY 应 tohost=1 (RiscvMulPlugin<U,1> 单周期).
+// LEGACY mode baseline: RiscvMulPlugin<U,1> 单周期.
+// feat-dhrystone-dmips-gate: Dhrystone LEGACY 应 tohost=1.
 TEST_CASE("dhrystone_legacy_tohost_pass", "[cpu-integration][dhrystone]") {
   std::uint64_t cycles;
   bool exited;
   int ec;
   runDhrystone(cf::cpu::CPUConfig::MulImpl::LEGACY, cycles, exited, ec);
-  INFO("cycles=" << cycles << " ec=" << ec);
+  /* feat-dhrystone-dmips-gate B2: 标准 DMIPS/MHz = N*1e6/(1757*cycles).
+   *   旧 1757*N/cycles 错 3.087× 宽 (1757²/1e6).
+   */
+  const double dmips_per_mhz =
+      (double)kDhrystoneRuns * 1e6 / (1757.0 * (double)cycles);
+  INFO("cycles=" << cycles << " ec=" << ec
+       << " dmips_per_mhz=" << dmips_per_mhz << " (mfc hard gate: >= 1.4)");
   REQUIRE(exited);
   REQUIRE(ec == 0);
 }
 
-// FSM mode DMIPS/MHz hard gate (mfc tasks G.2 v0.10.0):
-// DMIPS/MHz >= 1.4 (VAX 11/780 reference, Dhrystone cycles per iter <= 1255 @ 1MHz)
-// = 1757 * N / cycles_per_iter >= 1.4
-// = cycles_per_iter <= 1757 / 1.4 = 1255 cycles per iter
-// = total cycles >= 1757 * 2000 / 1.4 = 2,510,000
+// feat-dhrystone-dmips-gate B2: FSM mode DMIPS/MHz 1.4 硬门禁
+//   标准公式: cycles <= N*1e6/(1757*1.4) = 813,043
+//   真 gate (旧 2,510,000 是 3.087× 宽错误)
 TEST_CASE("dhrystone_fsm_dmips_mhz_minimum_1_4", "[cpu-integration][dhrystone]") {
   std::uint64_t cycles;
   bool exited;
   int ec;
   runDhrystone(cf::cpu::CPUConfig::MulImpl::FSM, cycles, exited, ec);
-  INFO("cycles=" << cycles << " ec=" << ec);
+  const double dmips_per_mhz =
+      (double)kDhrystoneRuns * 1e6 / (1757.0 * (double)cycles);
+  INFO("cycles=" << cycles << " ec=" << ec
+       << " dmips_per_mhz=" << dmips_per_mhz << " (mfc hard gate: >= 1.4)");
+  REQUIRE(exited);
   REQUIRE(ec == 0);
   REQUIRE(cycles <= kMaxCyclesForDmips14);
 }
@@ -106,11 +128,9 @@ TEST_CASE("dhrystone_fsm_dmips_mhz_metric", "[cpu-integration][dhrystone][perfor
   bool exited;
   int ec;
   runDhrystone(cf::cpu::CPUConfig::MulImpl::FSM, cycles, exited, ec);
-  // DMIPS/MHz = 1757 * N / cycles (VAX 11/780 reference, 1 MHz = 1e6 cycles/sec)
-  // 简化公式: VAX 1 Dhrystone iteration = 1757 cycles @ 1MHz
-  // DMIPS/MHz = cycles_per_iter / VAX_ref = 1757 * N / cycles
+  // feat-dhrystone-dmips-gate B2: 标准 DMIPS/MHz 公式
   const double dmips_per_mhz =
-      (1757.0 * kDhrystoneRuns) / static_cast<double>(cycles);
+      (double)kDhrystoneRuns * 1e6 / (1757.0 * (double)cycles);
   INFO("cycles=" << cycles << " dmips_per_mhz=" << dmips_per_mhz
        << " (mfc hard gate: >= 1.4)");
   REQUIRE(exited);
