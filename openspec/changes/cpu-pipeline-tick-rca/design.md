@@ -48,23 +48,40 @@
 
 ### L4 (Config Divergence) — 新加最高优先
 
-**假设**:
-- `tools/cpu_sim/main.cpp:load_config()` **不解析 `enable_mmu` 字段** (只解析 7 字段: `isa`/`pipeline_stages`/`mul_latency`/`mul_impl`/`dispatch_width`/`n_lanes`/`icache_latency`/`dcache_latency`/`n_threads`)
-- `cfg.enable_mmu` 保留 `CPUConfig` struct 默认值 = `true` (cpu_factory.h:136)
+**假设 (P0 重做扩为复合根因 F1+F2+F3 三层, 不再是单因子 L4)**:
+- `tools/cpu_sim/main.cpp:load_config()` **静默忽略** `enable_mmu` / `mmu_mode` / `satp_ppn` / `enable_pmp` / `branch_predictor` / `btb_entries` / `clock_freq_mhz` / OoO 宽度 / `ghr_bits` / `ext_*` 等字段 (只解析 10 字段: `name`/`isa`/`pipeline_stages`/`mul_latency`/`mul_impl`/`dispatch_width`/`n_lanes`/`icache_latency`/`dcache_latency`/`n_threads`, 数字 P0 重做修正自原 "7 字段")
+- `cfg.enable_mmu` 保留 `CPUConfig` struct 默认值 = `true` (cpu_factory.h:136) — **D4 决策: 保持 true, 不动**
 - 启用 MMU → `RiscvMMUPlugin` 注册 → `tlb_lookup_ifetch` 节点存在 → fetch CtrlLink `halt_when` 评估 `PTW_ACTIVE`
 - 而 `test_rv32ui_runner.cpp:109` 显式 `cfg.enable_mmu = false`, 不注册 MMU plugin
-- **真差异** 在 config 而非 build 路径
+- **真差异** 在 config 保真度 (F1) + 测试 config 意图 (F2) + MMU 瞬态语义 (F3), 非单因子 L4
 
-**control experiment** (必前置):
-1. 临时加 `tools/cpu_sim/main.cpp` 接受 `--no-mmu` flag (不允许 commit)
-2. 跑 `cpu_sim --no-mmu --elf build/add.elf --base-addr 0x80000000 --tohost-addr 0x80001000 --cycles 1000`
-3. **若 tohost=1**: L4 confirmed, 根因即 config 分歧, L2/L3/L1 全部排除
-4. **若 tohost=0**: L4 excluded, 进入 L2/L3/L1 调查
+**control experiment** (必前置, **P0 重做扩为 2×2 矩阵 + F4 反向**):
+
+**2×2 实验矩阵**:
+
+| 维度 | enable_mmu=false | enable_mmu=true |
+|---|---|---|
+| **CLI (cpu_sim)** | (A) 4 次 `--no-mmu` × 4 config (3/5/7/10-stage) | (B) 默认路径 (5 FAIL 已知) |
+| **C++ API (runner)** | (C) `test_rv32ui_runner.cpp:109` 当前 (PASS 48/48) | (D) **[F4] 同 ELF + enable_mmu=true** |
+
+实验步骤:
+1. 临时加 `tools/cpu_sim/main.cpp` 接受 `--no-mmu` flag (patch 文件管理, 不允许 commit)
+2. 跑 (A) 列 4 次: `cpu_sim --no-mmu --elf build/add.elf --base-addr 0x80000000 --tohost-addr 0x80001000 --cycles 1000` × 4 config
+3. 跑 (B) 列 5 测试 baseline (`[cpu]` + `[cpu-integration]` 已知)
+4. 跑 (D) 反向对照: 临时 patch `test_rv32ui_runner.cpp` 置 enable_mmu=true, 跑 1 个 ELF
+5. (C) 列已知数据, 不重跑
+6. **判定**:
+   - **(A) 5/5 tohost=1 + (D) FAIL (或 terminate with exception, 算 F4 confirmed)**: **F1+F2+F3 复合根因 confirmed**, L2/L3/L1 全部排除
+   - **(A) 部分 tohost=1 (如 7-stage 仍 FAIL)**: F1+F2+F3 部分 confirmed, 7-stage lane dispatch 独立 bug, fix 需分支
+   - **(A) 全部 tohost=0**: L4 excluded (但 F2/F3 仍可能是 partial), pivot 到 L2 深查
+   - **(D) tohost=1 (PASS)**: F4 不成立, 需追加第 4 层 CLI/API 路径差异 × enable_mmu 交互, L2 升主要嫌疑
 
 **静态证据** (无需 runtime):
-- `tools/cpu_sim/main.cpp:88-111` `load_config()` 不读 `enable_mmu`
+- `tools/cpu_sim/main.cpp:88-113` `load_config()` 不读 `enable_mmu/mmu_mode/satp_ppn/enable_pmp/branch_predictor/btb_entries/clock_freq_mhz/...` (10 字段解析 + 静默丢其余)
 - `ip/cpu/cpu_factory.h:136` `enable_mmu` 默认 `true`
 - `test_rv32ui_runner.cpp:109` runner 显式 `false`
+- `ip/mmu/tlm/MMUPlugin.cpp:109` Bare shortcut 严格判定 (MODE≠0 不走 identity translation)
+- `ip/cpu/plugins/ibus.h:62-67` fetch CtrlLink `halt_when` lambda
 
 **fallback** (如 control experiment 不可执行):
 - 跑 `cpu_sim --elf <riscv-tests-elf>` 看是否复现 FAIL (riscv-tests-rv32ui-p-add 在 cpu_sim CLI 下应 FAIL, 因为 CLI enable_mmu=true)
@@ -162,22 +179,32 @@
 - 阶段 5: L1 静态排除 (5 分钟, 任何时候)
 - 阶段 6: 综合诊断 + 验证 + 文档同步
 
-## Open Questions (继承并扩展)
+## Open Questions (继承并扩展, **P0 重做 D4-aligned**)
 
-**OQ1** (从 cpu-sim-add-elf-tohost-fix 转移): pipeline 不 tick 真根因 → 本 change L4/L2/L3/L1 调查输出
+**OQ1** (从 cpu-sim-add-elf-tohost-fix 转移): fetch 永 stall 真根因 (复合 F1+F2+F3 还是含 F4 第 4 层) → 本 change L4/L2/L3/L1 调查 + §1 control experiment 2×2+F4 反向 5 测试台账输出
 
-**OQ2** (新): `cfg.enable_mmu` 默认值是否应改?
-- 如果 L4 confirmed: `cpu-pipeline-tick-fix` 改 `CPUConfig::enable_mmu` 默认 `false` (Bare-friendly default) + `load_config()` 解析 enable_mmu 字段
-- 如果 L4 excluded: 改 cpu_sim CLI 显式 pin `cfg.enable_mmu = false` 作为 work-around
-- 需与 `mmu-chmem-pipeline-integration` 协调 (mmu tests 期望 enable_mmu=true)
+**OQ2** (P0 重做 D4 决策): `cfg.enable_mmu` 默认值是否保持 true?
+- **D4 决策 (2026-10-15)**: **保持 true, 不动**. 理由: v0.10.4 hotfix Bare shortcut 严格化 + `cpu_factory.h:444` Sv39 自动编码 + `[mmu] 59/59` / `[mmu-verilator] 3/3` / `[cpu-l1-mmu-demo] 6/6` 全 PASS 强依赖.
+- **修复方向 (D4-compliant)**: (a) `load_config()` 解析 `enable_mmu` 等被静默丢字段 + (b) 4 个测试 config 改 `enable_mmu:false` (F2 配套) + (c) cpu_sim CLI 加 `--no-mmu` override flag (替代 work-around).
+- 需与 `mmu-chmem-pipeline-integration` owner 协调 config 传播路径 (不改默认, 只让 CLI 忠实消费 JSON).
 
-**OQ3** (新): L2 fetch CtrlLink `halt_when` lambda 是否需 Bare-mode guard?
-- 候选: `if (!tlb_n || tlb_n is bare) return false;` (避免在 Bare mode 误读 PTW_ACTIVE)
-- 需 L2 调查结论定
+**OQ3** (新, F4 反向对照): 同 ELF + `enable_mmu=true` 在 C++ API 路径 (`test_rv32ui_runner.cpp`) PASS 还是 FAIL?
+- **前置验证**: §1 control experiment [D] 必须先答.
+- **可接受结局集合**: `{tohost=1, F4 confirmed, L2 demoted}` / `{tohost=0 cycles exhausted, F4 confirmed}` / `{terminate with exception (PTW fault throw path), F4 confirmed as compound evidence per Oracle 风险记录 design.md:207 (即原版 design.md:207, P0 未删)}` / `{PASS 但 cycles 异常高, F4 partial, L2 升主要嫌疑}`.
+- **MUST** 在 §2 启动前回答, 否则 §2 调查方向未定.
 
-**OQ4** (新): L3 StageLink 是否需重新审视?
-- 仅在 L1/L2/L4 全部 excluded 后启动
-- 需 deep-dive 设计, 不在本 change scope
+**OQ4** (新, L2 备用): fetch CtrlLink `halt_when` lambda 是否需 Bare-mode guard?
+- 仅在 F4 显式失败 (CLI/API 路径差异 × enable_mmu 交互) 时启动.
+- 候选修复: `if (!tlb_n || satp_mode_is_bare) return false;` (避免 Bare mode 误读 PTW_ACTIVE).
+- 需 L2 调查结论定.
+
+**OQ5** (新, L3 备用): StageLink 是否需重新审视?
+- 仅在 L1/L2/L4/F4 全部 excluded 后启动.
+- 需 deep-dive 设计, **不在本 change scope**, 留给后续独立 change.
+
+**OQ6** (新, 7-stage 同因, D3 决策): `cpu_superscalar.json` (dispatch_width=2 + n_lanes=2 触发 `cpu_factory.h:367` lane dispatch 路径) 走 cpu_sim 是否与其余 4 个测试同因?
+- **前置验证**: §1 §1.2b 7-stage superscalar control run 必答.
+- **预期**: 若 (dispatch_width=1 + --no-mmu) 7-stage tohost=1 → 同因 (F1+F2+F3 已覆盖); 若仍 FAIL → lane dispatch 路径独立 bug.
 
 ## 附录: Metis + Oracle 复审意见整合
 
@@ -218,3 +245,22 @@
 - **采纳** 3 个 runtime log 点 (Oracle 详细) + revert gate
 - **拒绝** 修复建议含 patch (本 change 是纯诊断, 修复留给 `cpu-pipeline-tick-fix`)
 - **拒绝** L3 StageLink 重写 (HIGH 风险, 留给后续 change)
+
+### P0 重做补充 (2026-10-15, 三方复审: Oracle + Metis + Critic)
+
+**触发原因**: 2026-10-12 整合决策**遗漏 4 项**, Metis 2026-10-15 重新审查指出:
+
+1. **复合根因三层缺失**: 原 L4 是单因子 "config divergence"; Metis 用 3 code facts (F1+F2+F3) 证明根因是 config 保真度 + 测试 config 意图 + MMU 瞬态语义三层. **采纳**: L4 扩为 F1+F2+F3 复合叙事 (见 proposal §Why).
+2. **修复建议含 D4 违规候选**: 原 OQ2 列 "改 `CPUConfig::enable_mmu` 默认 false"; 实际决策 D4 = 保持默认 true (与 v0.10.4 hotfix + `[mmu] 59/59` + `[mmu-verilator] 3/3` 强依赖). **采纳**: 修复方向改为 (a)+(b)+(c) 三段 (load_config 解析 + 测试 config 改 false + cpu_sim --no-mmu override).
+3. **5-测试独立基线台账缺失**: 原 tasks.md 仅跑 1 次 control experiment (5-stage 默认); D3 决策要求 4 config × `--no-mmu` 数据填表 + F4 反向对照. **采纳**: tasks.md §0.8 + §1.2 + §1.2b + §1.4.
+4. **白名单不一致 (spec vs tasks)**: tasks.md 排除清单写 `ip/mmu/**`, spec.md:33 写 `ip/mmu/lib/** + ip/mmu/chmem/**`; 原意是 mmu TLM 可读 (Bare shortcut 必读). **采纳**: 对齐统一纳入 `ip/mmu/tlm/MMUPlugin.{h,cpp}` + `ip/mmu/tlm/mmu_keys.h`.
+
+**Critic 复审补漏 (2026-10-15)**:
+- **B1**: D4 违规有 5 处 (proposal §OQ3 + tasks.md §5.3 候选 1 + spec.md §5.3 Scenario + design.md OQ2 + tasks.md Out of scope 段); 已全替换.
+- **B5**: `diag(` commit prefix 在 git log 无先例 (grep -c 返回 0); 已有 precedent `chore(openspec):` commit `5403718`. **采纳**: commit message prefix 改为 `chore(openspec):`.
+- **B6**: "framework-level bug" 提法被 C++ API 48/48 PASS 证伪; 原 `AGENTS.md:61` 表述延迟到 §6.4 archive 时同步更新 (引用 proposal ⚠️ Naming Caveat).
+- **数字修正**: L4 "只解析 7 字段" → 实际 10 字段 (依 `main.cpp:83-113` 静态读).
+
+**未采纳** (sentinel, 备查):
+- rename 目录到 `cpu-sim-config-fidelity-rca`: 需改 ≥8 处外部引用 (CHANGELOG / AGENTS.md / `csr-chmem-writeback-complete` / `mmu-chmem-pipeline-integration` tasks / spec deferral notice 等), 改动面 > 收益, 保留目录名 + ⚠️ Naming Caveat.
+- 改 `enable_mmu` 默认 false (D4 反复强调 HARD-EXCLUDED).
