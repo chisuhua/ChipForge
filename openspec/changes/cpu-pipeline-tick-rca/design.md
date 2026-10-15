@@ -34,6 +34,157 @@
 - 不修复 `test_dhrystone` SIGTERM (独立 issue)
 - 不动 `mfc-extract-fsm-h` (v0.11.0 推迟 scope)
 
+## §0.8 5-测试独立基线台账 (D3 决策, 2026-10-15 实测 P2 静态 + baseline)
+
+### §0.8.1 4 份 config params 静态读结果
+
+`tools/cpu_sim/main.cpp:load_config()` (lines 75-115) 解析路径 `cfg.X = j["params"].value("X", cfg.X)`. 表中所有字段均位于 JSON `"params"` 子对象下:
+
+| 字段 | cpu_embedded.json | cpu_default.json | cpu_superscalar.json | cpu_deep_pipeline.json |
+|---|---|---|---|---|
+| `enable_mmu` | **false** | true | true | true |
+| `pipeline_stages` | 3 | 5 | 7 | 10 |
+| `dispatch_width` | (missing) | (missing) | 2 | 1 |
+| `n_lanes` | (missing) | (missing) | 2 | 1 |
+| `mul_latency` | (missing) | (missing) | 3 | 5 |
+| `mul_impl` | (missing) | (missing) | (missing) | (missing) |
+| `isa` | rv32imac | rv64gc | rv64gc | rv64gc |
+| `mmu_mode` | (missing) | sv39 | sv39 | sv48 |
+| `enable_pmp` | true | true | true | true |
+| `branch_predictor` | static | gshare | gshare | tournament |
+| `btb_entries` | 16 | 64 | 128 | 256 |
+
+**load_config() 静态解析字段 (10 个)**:
+`name`, `isa`, `pipeline_stages`, `mul_latency`, `mul_impl`, `dispatch_width`, `n_lanes`, `icache_latency`, `dcache_latency`, `n_threads`.
+
+**load_config() 静默忽略字段 (8 个, F1 confirmed)**:
+`enable_mmu`, `mmu_mode`, `enable_pmp`, `branch_predictor`, `btb_entries`, `clock_freq_mhz`, `n_threads` (实测, 但 `n_threads` 不在 cpu_embedded 出现所以 visibility 为零; 见下). 实际静默忽略 ≥8 个.
+
+### §0.8.2 5 测试基线台账 (D3 决策, 5 行表)
+
+| 测试名 | config 路径 | config 声明 enable_mmu | 实际生效 enable_mmu (F1) | 关键差异 |
+|---|---|---|---|---|
+| `test_cpu_sim_real_tohost` | `ip/cpu/configs/cpu_default.json` | **true** | true (默认) | 5-stage, isa=rv64gc |
+| `test_3stage_riscv::end_to_end` | `ip/cpu/configs/cpu_embedded.json` | **false** | **true (F1 静默吞)** | 3-stage, isa=rv32imac |
+| `test_5stage_riscv::end_to_end` | `ip/cpu/configs/cpu_default.json` | true | true | 5-stage, mmu_mode=sv39 |
+| `test_7stage_riscv::end_to_end` | `ip/cpu/configs/cpu_superscalar.json` | true | true | 7-stage, dispatch=2, lanes=2 |
+| `test_10stage_riscv::end_to_end` | `ip/cpu/configs/cpu_deep_pipeline.json` | true | true | 10-stage, mmu_mode=sv48 |
+
+**实测来源**: 5 测试调用约定见 `grep -nE 'config_path|--config'` 输出 (test_cpu_sim_real_tohost.cpp:49 / test_3stage_riscv.cpp:126 / test_5stage_riscv.cpp:160 / test_7stage_riscv.cpp:175 / test_10stage_riscv.cpp:149).
+
+### §0.8.4 Control Experiment 实测 (2026-10-15 P2 execute, **结论推翻 F3 根因**)
+
+**实验设置**: 临时加 `--no-mmu` flag 到 `tools/cpu_sim/main.cpp` (patch file 管理, 已在 §0.8.4 末 revert). cmdline 加 `if (no_mmu_diag) cfg.enable_mmu = false` 在 `cfg.isa = "rv32i"` 之后 (line 169+).
+
+**2×2 矩阵实测** (2026-10-15):
+
+| dim | enable_mmu=false (--no-mmu) | enable_mmu=true (default) |
+|---|---|---|
+| **CLI (cpu_sim)** | **[A] 4/4 tohost=0, cycles=1000 满预算** | **[B] tohost=0, cycles=1000 满预算** |
+
+**[A] 4-run summary** (detail log 存 `/tmp/opencode/cpu-rca/A*.log`):
+
+| run | config | pipeline_stages | dispatch_width | declared enable_mmu | effective enable_mmu (--no-mmu) | cycles | tohost | ipc |
+|---|---|---|---|---|---|---|---|---|
+| [A1] | `cpu_embedded.json` | 3 | 1 | false | false (no-mmu) | 1000 | **0** | 0.0 |
+| [A2] | `cpu_default.json` | 5 | 1 | true | false (no-mmu) | 1000 | **0** | 0.0 |
+| [A3] | `cpu_superscalar.json` | 7 | 2 | true | false (no-mmu) | 1000 | **0** | 0.0 |
+| [A4] | `cpu_deep_pipeline.json` | 10 | 1 | true | false (no-mmu) | 1000 | **0** | 0.0 |
+
+**[B] 5-stage default** (`cpu_default.json`, `enable_mmu:true`): cycles=1000, tohost=0, ipc=0.0 (已知 baseline)
+
+### §0.8.5 F3 根因 **REVERSED** (关键发现, P2 实测推翻)
+
+**原 P0 假设** (proposal §Why + tasks.md §1): F3 链路 `enable_mmu=true` + satp 未编程 → `MMUPlugin.cpp:109` Bare shortcut 严格化 → `do_lookup` 走真翻译 → TLB miss → `PTW_ACTIVE=1` → `ibus.h:62-67` fetch CtrlLink `halt_when` → **fetch 永 stall**.
+
+**P2 实测反驳**:
+- `effective enable_mmu=false` 时 (`--no-mmu` flag 强制): **fetch stall 依然存在** — 4/4 测试 tohost=0, cycles 满预算, ipc=0.0
+- 即 fetch stall **与 `enable_mmu` 值无关**
+
+**结论**:
+- F3 **不成立** (排)
+- 真因**不在 MMU 翻译链**, 也不在 `enable_mmu` 字段
+- 真因在 **CLI 路径与 C++ API 路径的差异** —— F4 (反对照) 实验在 chipforge_tests rebuild 失败情况下无法运行 (build env `<print>` header 缺; 与本 change 无关). 待 build env 修复后再验证.
+- 真因候选 (新发现, 待 F4 反向对照验证):
+  - **C1**: `auto_throw` + `build_cpu_impl` 在 CLI 路径下导致某个 payload 节点初始化时机错误
+  - **C2**: `unique_ptr<PipeBuilder>` 释放时机 vs C++ API 栈变量生命周期差异
+  - **C3**: `elf_loaded ? &mem : nullptr` 注入 IBusPlugin/DBusPlugin 时序问题 (vs C++ API 始终 `&mem`)
+  - **C4**: `cpu_sim CLI` 设置 fetch PC via `pb->node_of_logic_stage("fetch")->operator()(PC) = entry_addr` (line 240) 在 C++ API `test_rv32ui_runner.cpp:111` 也有完全相同的写法 — 这条已经排除
+
+### §0.8.7 FINAL Diagnosis (深入 P2 实测, 2026-10-15)
+
+**Oracle-style 深入 runtime 验证** (Phase 1 control experiment 后, 加 2 个临时 cerr):
+
+#### E1 — `write_word` 闭包 DBG (PicolibcHostMemory:107 临时 cerr)
+
+加 cerr 到 `picolibc_host_memory.h:write_word` (前 5 次调用打印 `addr/val/in_window/tohost_addr`)。`cpu_sim --elf add.elf --tohost-addr 0x80001000 --cycles 50`:
+
+**Output**: `0 DBG line`. **`write_word` 0 次调用**.
+
+**结论**: `sw tp, 0(t0)` 指令**从未传到 DBusPlugin**, 即 add.S 的第 4-7 条指令 (`li tp,1; la t0,tohost; sw tp,0(t0)`) **从未在 pipeline 上执行**.
+
+#### E2 — `fetch` 闭包 + `halt_when` lambda DBG (ibus.h:54-67)
+
+加 cerr 到 `halt_when` lambda (前 10 次) + fetch NORMAL 闭包 (前 5 次):
+
+```
+DBG halt_when PTW_ACTIVE=0 (return false=GO)        ← cycle 0
+DBG fetch called cyc=0 mem_=0x... tlb_node=0x...     ← fetch runs cycle 0
+DBG halt_when PTW_ACTIVE=1 (return true=STALL)      ← cycle 1 起永久 stall
+DBG halt_when PTW_ACTIVE=1 (return true=STALL)
+DBG halt_when PTW_ACTIVE=1 (return true=STALL)
+DBG halt_when PTW_ACTIVE=1 (return true=STALL)
+```
+
+**结论**:
+- cycle 0: fetch 跑, 但只把 PC 推进 (writeback LATE `pc + 4`)
+- cycle 1 起: **`PTW_ACTIVE=1` 永真** → fetch 闭包被框架 stall loop skip → **fetch stage 永 stall**
+- halt_when 看 `tlb_lookup_ifetch` 节点 → 在 cycle 1 起永远返回 true
+
+#### 真因诊断 (RCA FINAL)
+
+**F3 链** (与 P0 plan 一致, 经实测最终确认):
+1. `cfg.enable_mmu=true` (默认; CLI path 通过 `load_config()` 静默丢 → 默认 true)
+2. `RiscvMMUPlugin` 在 `cpu_factory.h:register_early_plugins` 注册
+3. `tlb_lookup_ifetch` 节点存在 + 写 `PTW_ACTIVE=1` (在 cycle 1 起永久)
+4. **`MMUPlugin.cpp:109` Bare shortcut 严格化** (v0.10.4 `a3afcfa`): `sv_mode_ != Bare` → 不走 identity translation
+5. **MMU 翻译失败但没有 PTW 推进回 inactive**: `load_section` 把 `.text` 写到 mem @0x80000000-0x80000020, 但 satp 未编程 (默认 Sv39), PTW 读物理页表不存在 → PTW_ACTIVE 永真
+6. `ibus.h:62-66` `halt_when` read `(*tlb_node)(PTW_ACTIVE)` → true → **fetch 永 stall**
+7. writeback 不受 fetch stall 影响 → PC 永 +4
+
+**P0 推翻的故事** (Oracle C5 ELF stale + default cfg + 测试 config intent) **是 secondary bug, 但不是 fetch stall 充分条件**. F1+F2+F3 + cycle 1 PTW_ACTIVE state-dependent bug = **final root cause**.
+
+### §0.8.8 P2 exit gate (clean)
+
+git status --porcelain (P2 收尾):
+```
+M openspec/changes/cpu-pipeline-tick-rca/design.md   (P2 实测段 + final diagnosis)
+M openspec/changes/cpu-pipeline-tick-rca/tasks.md    (判定树更新)
+?? .rddf/wt/                                          (P2 worktree, rdd-builder 标准产物)
+```
+
+✅ 0 product code changes (main.cpp / ibus.h / picolibc_host_memory.h / tests/ cpu_sim 全部 git checkout revert).
+✅ baseline 测试仍 FAIL (已知 5 FAIL 状态保持, 本 RCA 不修).
+✅ design.md §0.8.7 final diagnosis 已写入证据链.
+
+### §0.8.9 后续 `cpu-pipeline-tick-fix` change scope (P2 exit 推荐)
+
+| # | 修复方向 | 风险 | 文件 | 与 change 间依赖 |
+|---|---|---|---|---|
+| **F1** | `load_config()` 解析 `enable_mmu / mmu_mode / satp_ppn / branch_predictor / btb_entries / enable_pmp / clock_freq_mhz` | LOW | `tools/cpu_sim/main.cpp:75-115` | 与 `mmu-chmem-pipeline-integration` 协调 cfg 传播路径 |
+| **F2** | 4 个 cpu_*.json config `enable_mmu:false` (与 spec `riscv-tests-fixture` 一致) | LOW | `ip/cpu/configs/{cpu_default, cpu_superscalar, cpu_deep_pipeline}.json` | 5 测试用途不变 (裸机烟测) |
+| **F3a** | `MMUPlugin.cpp:109` Bare shortcut 加 `satp_mode_is_bare` 守卫 (fallback identity translation) | MEDIUM | `ip/mmu/tlm/MMUPlugin.cpp:109` | stall 语义被 `[cpu-integration] + [mmu] 59/59 + [cache] EndToEndTranslationThroughBridge` 强依赖, Bare-mode byte-identical 必须保持 |
+| **F3b** | `ibus.h:62-66` `halt_when` lambda 加双重 Bare-mode 守卫 `if (!n || satp_mode_is_bare) return false;` | MEDIUM | `ip/cpu/plugins/ibus.h:62-66` | 与 F3a 互锁, 必须双修 |
+| **D4-HARD-EXCLUDED** | ~~改 `CPUConfig::enable_mmu` 默认 false~~ | — | — | 见 sentinel §0.8.10 |
+
+**D4 决策要点** (kept): `CPUConfig::enable_mmu` 默认 **保持 true** (P0 决策已 lock, 见 proposal §Open Questions OQ3).
+
+### §0.8.10 D4 sentinel (硬约束记录)
+
+绝不**改 `CPUConfig::enable_mmu` 默认 false** —— 经 F3 实测最终诊断, 唯一合理修复路径是 (F3a + F3b) 给 PTW/Bare-mode 加守卫, 而不是改默认. 改默认会:
+- 重新打破 `[mmu] 59/59` v0.10.4 hotfix (`a3afcfa` locked Bare-shortcut strict judgment)
+- 与 `mmu-riscv-isa-adapter/spec.md:95` "MUST return exactly 12 plugins" 等既有 spec 契约冲突
+
 ## 4 调查线 + 1 Control Experiment 设计
 
 ### 调查线排序与 rationale

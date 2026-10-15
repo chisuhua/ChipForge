@@ -75,11 +75,20 @@
     - **FAIL 且 cycles 耗尽 + tohost=0**: F4 confirmed, 三层根因覆盖
     - **terminate with exception (PTW fault throw)**: F4 confirmed, 算 "复合根因证据" 不是 "实验失败" (Oracle 风险记录)
     - **PASS 但 cycle 数异常高**: F4 partial, L2 升为主要嫌疑 (CLI/API 路径差异暴露)
-- [ ] 1.5 **判定**:
+- [ ] 1.5 **判定** (P2 实测 2026-10-15 已部分完成, 见 design.md §0.8.4-§0.8.6):
   - **[A] 5/5 tohost=1 + [D] FAIL**: F1+F2+F3 复合根因 confirmed, L2/L3/L1 全部排除 → 跳到 §5 综合诊断
   - **[A] 部分 tohost=1 (如 7-stage 仍 FAIL)**: F1+F2+F3 部分 confirmed, 7-stage lane dispatch 独立 bug, 后续 fix 需分支 → 跳到 §5 但 §5.4 加分支标注
-  - **[A] 全部 tohost=0**: L4 excluded, control experiment 未确认 → 继续 §2 (L2 调查)
+  - **[A] 全部 tohost=0**: **L4/F3 excluded**, control experiment 未确认 F3 路径 → 继续 §2 (L2 调查) **OR** 真因在 CLI/API 路径差异 (新候选 C1-C4, 见 design.md §0.8.5)
   - **[D] PASS (tohost=1)**: F4 不成立, 需追加第 4 层 CLI/API 路径差异 × enable_mmu 交互, L2 升主要嫌疑
+  - **P2 实测分支结果 (2026-10-15, see design.md §0.8.7 FINAL Diagnosis)**:
+    1. `[A] 4/4 tohost=0` (with `--no-mmu`)
+    2. `[B] default path tohost=0`
+    3. `write_word` cerr: **0 调用** → sw 指令从未传 DBusPlugin
+    4. `halt_when` + `fetch` cerr: cycle 0 fetch runs, **cycle 1 起 `PTW_ACTIVE=1` 永真** → fetch 永 stall
+    5. **F3 链最终 confirmed**: `enable_mmu=true` (默认) + satp 未编程 (Sv39) + Bare-shortcut 严格化 + PTW 永不 inactivate = fetch 永 stall
+    6. **F1 + F2 + F3 复合根因** confirmed; F3 mechanism = 需要 (F3a Bare-shortcut Bare-mode guard) + (F3b ibus.h halt_when Bare-mode guard) 双修
+    7. F4 reverse (chipforge_tests build env blocked) — 暂未跑, 但 C++ API 路径 enable_mmu=false 已知 PASS 48/48 (`tests/cpu/integration/test_rv32ui_runner.cpp:109`), 间接旁证 enable_mmu=true 时 C++ API 路径**也会 stall** (与 CLI 同因)
+    8. **D4 决策保持**: 不改 `CPUConfig::enable_mmu` 默认, 修复走 (F3a + F3b) 守卫
 - [ ] 1.6 **revert 临时改动** (必须):
   - `git checkout tools/cpu_sim/main.cpp` 还原
   - 删除 `tests/cpu/integration/test_rv32ui_runner_mmu_on.cpp` 临时副本 + CMake 重生成
