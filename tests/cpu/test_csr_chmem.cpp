@@ -1,0 +1,311 @@
+// tests/cpu/test_csr_chmem.cpp
+//
+// [cpu][csr-chmem] 单元测试 — csr-chmem-pipeline-integration R1.2/R1.3/R1.4
+//
+// 覆盖:
+//   - Case 1 (csr_chmem_CsrrwMstatus_AddressReextract):    CSRRW x1, mstatus
+//   - Case 2 (csr_chmem_CsrrwiMtvec_ImmediateReextract):  CSRRWI x4, mtvec, imm5=5
+//   - Case 3 (csr_chmem_Ecall_NotZicsrButFunct12_0_000):   ECALL -> trap 路径
+//   - Case 4 (csr_chmem_Ebreak_NotZicsrButFunct12_0_001):  EBREAK -> trap 路径
+//   - Case 5 (csr_chmem_Mret_NotZicsrButFunct12_0_302):    MRET -> mepc PC 重定向
+//   - Case 6 (csr_chmem_CsrrsMstatus_ZicsrValid):          CSRRS x4, mstatus, x10
+//
+// R1 验证目标: sim->get_signal_value() 读 execute-LATE 闭包重提取 DAG 信号
+// (csr_addr / funct12 / imm5 / opcode / funct3 / zicsr_valid), 与 INSTRUCTION
+// 预期一致。注: R1 段不写 payload, 仅验证重提取层正确。
+//
+// 设计遵循:
+//   - tests/cpu/test_cpu_decoded_inst_migration.cpp POC stage-tick 模式
+//   - ch::core::context 单 case, RAII ctx_swap guard 防 thread_local pollution
+//   - at_stage("execute", Phase::EARLY) 灌 INSTRUCTION (ch 字面值)
+//   - sim->tick() 走 1 cycle
+//   - sim->get_signal_value() 验证 last_*_ch DAG signal post-tick 值
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+#include "catch_amalgamated.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <ch.hpp>
+#include <core/context.h>
+#include <simulator.h>
+
+#include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/result_macros.h"
+#include "cf/plugin/uint_t.h"
+
+#include "ip/cpu/core/payload_common.h"
+
+#include "ip/cpu/plugins/csr_chmem.h"
+
+using namespace ch;
+using namespace ch::core;
+namespace cfc = cf::plugin;
+namespace cfcpu = cf::cpu;
+
+namespace {
+
+struct CsrPluginGuard {
+  std::unique_ptr<cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>> holder;
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* raw;
+
+  explicit CsrPluginGuard(cfc::PipeBuilder& pb)
+      : holder(std::make_unique<cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>>()),
+        raw(holder.get()) {
+    pb.register_plugin(std::move(holder));
+  }
+};
+
+}  // namespace
+
+// =========================================================================
+// Case 1: CSRRW x1, mstatus (csr_addr=0x300) — R1 重提取基础
+//
+// 指令编码 (CSRRW x1, mstatus, x0):
+//   bits[31:20]=0x300, bits[19:15]=x0=0, bits[14:12]=funct3=001, bits[11:7]=rd=1,
+//   bits[6:0]=opcode=0x73 (SYSTEM)
+//   inst = 0x300010F3
+// =========================================================================
+TEST_CASE("csr_chmem_CsrrwMstatus_AddressReextract", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_csrrw_mstatus");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_csrrw_mstatus = 0x300010F3u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_csrrw_mstatus]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst_csrrw_mstatus);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(1);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  // 取 DAG signal post-tick 值
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0x300u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct12_ch()))  == 0x300u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_imm5_ch()))     == 0u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct3_ch()))   == 0x1u);
+}
+
+// =========================================================================
+// Case 2: CSRRWI x4, mtvec(0x305), imm5=5 — R1 重提取 imm5
+//
+//   bits[31:20]=0x305, bits[19:15]=imm5=5, bits[14:12]=funct3=101,
+//   bits[11:7]=rd=4, bits[6:0]=0x73
+//   inst = 0x305A5273
+// =========================================================================
+TEST_CASE("csr_chmem_CsrrwiMtvec_ImmediateReextract", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_csrrwi_mtvec");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  // CSRRWI x4, mtvec, imm5=5:
+  //   inst = (0x305 << 20) | (5 << 15) | (0b101 << 12) | (4 << 7) | 0x73
+  //        = 0x30500000 | 0x28000  | 0x5000       | 0x200   | 0x73
+  //        = 0x3052D273
+  std::uint32_t inst_csrrwi_mtvec_5 = 0x3052D273u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_csrrwi_mtvec_5]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst_csrrwi_mtvec_5);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(4);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0x305u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct12_ch()))  == 0x305u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_imm5_ch()))     == 5u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct3_ch()))   == 0x5u);
+}
+
+// =========================================================================
+// Case 3: ECALL (funct12=0x000) — trap 路径触发, Zicsr_VALID=false
+// =========================================================================
+TEST_CASE("csr_chmem_Ecall_NotZicsrButFunct12_0_000", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_ecall");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_ecall = 0x00000073u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_ecall]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst_ecall);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(0);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct12_ch()))  == 0x000u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0x000u);
+}
+
+// =========================================================================
+// Case 4: EBREAK (funct12=0x001)
+// =========================================================================
+TEST_CASE("csr_chmem_Ebreak_NotZicsrButFunct12_0_001", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_ebreak");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_ebreak = 0x00100073u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_ebreak]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst_ebreak);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(0);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct12_ch()))  == 0x001u);
+}
+
+// =========================================================================
+// Case 5: MRET (funct12=0x302)
+// =========================================================================
+TEST_CASE("csr_chmem_Mret_NotZicsrButFunct12_0_302", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_mret");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_mret = 0x30200073u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_mret]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst_mret);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(0);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(0);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct12_ch()))  == 0x302u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0x302u);
+}
+
+// =========================================================================
+// Case 6: CSRRS x4, mstatus(0x300), x10 — csr_addr=0x300, Zicsr_VALID=true
+//   inst = 0x30052073
+// =========================================================================
+TEST_CASE("csr_chmem_CsrrsMstatus_ZicsrValid", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_csrrs_mstatus");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_csrrs_mstatus = 0x30052073u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_csrrs_mstatus]() {
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT::INSTRUCTION) = ch_uint<32>(inst_csrrs_mstatus);
+      n->operator()(KT::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT::RS1)         = ch_uint<32>(10);
+      n->operator()(KT::RS2)         = ch_uint<32>(0);
+      n->operator()(KT::RD_IDX)      = ch_uint<5>(4);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_addr_ch())) == 0x300u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct12_ch()))  == 0x300u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_imm5_ch()))     == 10u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_opcode_ch()))   == 0x73u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_funct3_ch()))   == 0x2u);
+}
