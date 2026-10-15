@@ -113,21 +113,22 @@ graph TD
 | `2026-10-08-cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-08-verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 52 0 |
 | `cpu-pipeline-tick-rca` | wave5-isa-coverage-and-bp | P2 | TODO | 41 0 |
-| `cpu-sim-add-elf-tohost-fix` | wave5-isa-coverage-and-bp | P2 | DONE | 0 30 |
-| `csr-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | TODO | 47 0 |
 | `mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (50/60) | 10 50 |
-| `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (12/165) | 153 12 |
+| `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (15/165) | 150 15 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
 | `2026-10-05-verilator-cpu-factory-extensible-params` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 5 42 |
 | `2026-10-05-verilator-mmu-bare-plumbing-e2e` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 0 42 |
 | `2026-10-06-cpu-pipeline-mmufault-handler` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 7 |
-| `2026-10-07-mfc-defer-v0.11.0` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 6 10 |
+| `2026-10-07-mfc-defer-v0.11.0` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 5 11 |
 | `2026-10-08-mmufault-verilator-sv32-e2e-flip` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 36 0 |
 | `2026-10-10-mfc-extract-fsm-h` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 15 0 |
 | `2026-10-13-chmem-verilator-rv32um-coverage` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 25 4 |
+| `2026-10-14-cpu-sim-add-elf-tohost-fix` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 0 30 |
 | `2026-10-14-verilator-mul-div-fsm-followup` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 8 29 |
+| `2026-10-15-csr-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 131 0 |
+| `2026-10-15-csr-chmem-writeback-complete` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 42 0 |
 | `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
 
 > **Status 解读**:
