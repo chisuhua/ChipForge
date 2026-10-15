@@ -1,7 +1,7 @@
 # Phase 6c plugin-elaboration-substrate 教训与模式 (CH_MEM 模式)
 
 > **沉淀自 Phase 6c W0-M6 实施期间 (10 commits: `25e2672` → `5fe72fe`, 2026-09-16 → 2026-09-20, v0.3.0 + v0.3.1 发布)**
-> **目的**: 收集 `cf::plugin` 从"每周期仿真器"翻转"elaboration DSL"过程中的 15 类行级陷阱 + 7 个可复用模式, 供 Phase 6d+ 新 Plugin 作者参考。
+> **目的**: 收集 `cf::plugin` 从"每周期仿真器"翻转"elaboration DSL"过程中的 **17 类**行级陷阱 + 7 个可复用模式, 供 Phase 6d+ 新 Plugin 作者参考。
 > **关联文档**:
 > - **方法学评估**: [`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md) (Phase 1.4 v1, 6 维度 × 3 边界, **superseded by v2.0 (Phase 6c W9)** + Phase 6c elaboration chapter)
 > - **审计报告**: [`docs/audit/cppHDL-maturity-audit.md`](../audit/cppHDL-maturity-audit.md) (W0 报告)
@@ -359,6 +359,79 @@ TEST_CASE("cpphdl_poc_chbool_contextual_conversion") {
 
 ---
 
+## 六半、跨 stage 传播 + ch_reg 读回 (R3.5 新增 2 类, F5 2026-10-15 收编)
+
+> **来源**: `csr-chmem-writeback-complete` change (2026-10-15 archived, commit `1d02531`) 实装 R3.5 CSR 写通路时**实测踩中两类新陷阱**, 收编为**第 16/17 类** (本文档扩展 SSOT).
+
+### 6.3 ✅ 跨 stage payload 必须显式 propagate (第 16 类陷阱)
+
+**陷阱**: 每个 `PipeNode` 是**独立 KV store** (per `openspec/specs/cpu-stage-link-propagation/spec.md:8`), CH_MEM 流水线跨 stage 拷贝依赖 `cpu_factory_chmem.h` §2b (execute→memory) + §2c (memory→writeback) + `populate_stage` (decode EARLY 预填默认值) **三个硬编码白名单**. 漏配 → 下一 stage 节点访问 key 时 `PayloadStore::cells_[&key]` 触发 `emplace-on-miss`, 对 `ch_uint<N>`/`ch_bool` 产生 **null impl** → 后续 `select`/`operator==` 比较触发 SEGV (M6 模式, CHANGELOG:839).
+
+**触发条件**:
+- 新增 payload key (e.g. `csr_keys::CSR_WRITE_*` 3 keys)
+- writeback 节点需消费 execute 节点写的 key
+- 单 plugin 测试不调 `cpu_factory_chmem.h::build_cpu()`, 需 plugin 自身 provide 兜底 (e.g. `csr_chmem.h` writeback 闭包保留 `has(CsrKT::CSR_WRITE_EN)` guard)
+
+**正确实装** (3 处必须):
+```cpp
+// (1) populate_stage lambda (cpu_factory_chmem.h:145-191) 灌默认值
+n->operator()(CsrKT::CSR_WRITE_ADDR)  = T(ch::core::ch_literal<0, 32>{});
+n->operator()(CsrKT::CSR_WRITE_VALUE) = T(ch::core::ch_literal<0, 32>{});
+n->payloads().put(CsrKT::CSR_WRITE_EN, false);  // Payload<bool> put 用 ch_bool literal
+
+// (2) §2b execute→memory 阶段链接加 propagate
+mem->operator()(CsrKT::CSR_WRITE_ADDR)  = exe->operator()(CsrKT::CSR_WRITE_ADDR);
+mem->operator()(CsrKT::CSR_WRITE_VALUE) = exe->operator()(CsrKT::CSR_WRITE_VALUE);
+mem->payloads().put(CsrKT::CSR_WRITE_EN, exe->payloads().get(CsrKT::CSR_WRITE_EN));
+
+// (3) §2c memory→writeback 阶段链接加 propagate (同上模式)
+```
+
+**反例** (R3.5 实装前): 仅有 `n->operator()(CsrKT::CSR_READ_VALUE/VALID)` 在 execute-LATE 闭包内 `put`, 写通路 CSR_WRITE_* key 定义在 `bundles/csr_bundles.h:45-47` **但从未 propagate**, writeback 节点访问必 SEGV.
+
+**检测手段**:
+- 跑全量 `bash tools/run_chipforge_tests.sh --all` → `[chmem] 37/38 (1 known flake)` 若突然 `38/38` 是好, 突然 `0/38` 必有 propagate 漏配
+- 单 plugin 测试发现 `SIGSEGV` 在 `n->operator()(CsrKT::CSR_WRITE_EN)` 行 → propagate 漏
+
+**关联变更**: `csr-chmem-writeback-complete` Task 1.0 完整实装 + Task 1.2 决定保留 `has()` guard 兜底单 plugin 路径 (plan 偏差, 已记录在 `tasks.md` 实装偏差段).
+
+### 6.4 ✅ ch_reg 不能用 `static_cast<uint64_t>` 同步读回 (第 17 类陷阱)
+
+**陷阱**: `ch_reg<T>` 公有继承 `T` (如 `ch_reg<ch_uint<32>>` 公有继承 `ch_uint<32>`), 但 `ch_uint<N>::operator uint64_t` 对**非常量 DAG 节点**触发错误路径 (`[ERROR] Attempting to convert non-constant node to uint64_t`), 静默返回 0. 因此:
+
+```cpp
+// ❌ 反例 (csr_chmem.h:70-76 R3.5 旧实装, F1 修复前):
+std::uint32_t mstatus() const noexcept {
+#ifdef CF_PLUGIN_USE_CH_MEM
+  return static_cast<std::uint32_t>(static_cast<std::uint64_t>(mstatus_));
+  //  ↑ ch_reg 上 operator uint64_t 走错误路径, 静默返回 0
+#else
+  return mstatus_;
+#endif
+}
+```
+
+**正确实装** (返回 DAG signal ref, 让调用方走 `sim->get_signal_value()` 取 post-tick 值):
+```cpp
+// ✅ 正确: ch_uint<32> signal ref (与 last_csr_*_ch 模式一致)
+ch_uint<32> mstatus_ch() const { return mstatus_; }
+// 调用方:
+sim->get_signal_value(plugin->mstatus_ch());
+```
+
+**触发条件**:
+- CH_MEM 模式 plugin 需暴露 ch_reg 当前值给测试
+- 调试时想 print ch_reg 实际值
+- 任何 `static_cast<uint64_t>(ch_reg_instance)` / `static_cast<bool>(ch_reg_instance)` 模式
+
+**检测手段**:
+- 编译期 grep `static_cast.*>(.*_)` + `_$` 模式 (R3.5 旧 mstatus() 命中)
+- 运行期 `[ERROR] Attempting to convert non-constant node to uint64_t` stderr → 必为该陷阱
+
+**TBD** (Phase 6d follow-up): 提供 `safe_read_reg<T>(sim, ch_reg<T>)` helper 一站式封装 `sim->get_signal_value(ch_reg)` 模式, 减少 F1 类重复.
+
+---
+
 ## 七、可复用模式 (7 个)
 
 ### 模式 #1: RegFilePlugin 实例成员 + 延迟初始化
@@ -549,7 +622,8 @@ CH_MEM 模式运行时输出大量 `[INFO] Created node ID X (top.<name>) of top
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0 | 2026-09-20 | 初版: Phase 6c W0-M6 实施期间 15 类行级陷阱 + 7 个可复用模式 + 8 项编译期检查清单 |
+| 1.1 | 2026-10-15 | F5 (csr-chmem-writeback-complete post-archive): 收编**第 16 类 (跨 stage payload propagate)** + **第 17 类 (ch_reg 不能用 static_cast<uint64_t> 读回)** — R3.5 CSR 写通路实装实测踩中两类新陷阱. 全文 15 → 17 类陷阱. |
 
 ---
 
-*本文档是 Phase 6c CH_MEM 模式实施教训的系统沉淀。Phase 6d+ 新 Plugin 作者**先读本文档了解 15 类陷阱 + 7 个模式 + 8 项检查清单**, 再参考 [`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md) (Phase 1.4 v1 方法学评估 + Phase 6c elaboration chapter 待补充) + [`docs/research/phase6c-elaboration-pattern-study.md`](../research/phase6c-elaboration-pattern-study.md) (Phase 6c 立项前研究)。*
+*本文档是 Phase 6c CH_MEM 模式实施教训的系统沉淀。Phase 6d+ 新 Plugin 作者**先读本文档了解 17 类陷阱 + 7 个模式 + 8 项检查清单**, 再参考 [`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md) (Phase 1.4 v1 方法学评估 + Phase 6c elaboration chapter 待补充) + [`docs/research/phase6c-elaboration-pattern-study.md`](../research/phase6c-elaboration-pattern-study.md) (Phase 6c 立项前研究)。*

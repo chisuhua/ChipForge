@@ -342,6 +342,19 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
         //     is_trap_branch = funct12 == 0x000 (ECALL) || funct12 == 0x001 (EBREAK)
         //   注: writeback 不读 branch node PC (跨 stage), 用 last_funct12_ instance
         //     判定 (execute-LATE 重提取, branch-LATE 也读同一 instance)
+        //
+        //   ⚠️ F6 (2026-10-15, post-archive debt): 未来 MmuExceptionHandler CH_MEM 实装
+        //     (mmu-chmem-pipeline-integration Phase D, owner change) 会成为 **第三 driver** —
+        //     MmuExceptionHandlerPlugin::handle_page_fault() 写 mcause_/mepc_/mtval_ 处理
+        //     page fault / access fault, 与 branch-LATE trap 写 (ECALL/EBREAK) +
+        //     writeback-NORMAL CSR 写 (CSRRW mcause/mepc) 三方竞争同 cycle.
+        //     届时仲裁需扩展为 3 路:
+        //       is_trap_branch || mmufault_active → mcause = trap 或 mmufault 值
+        //     实装 owner: mmu-chmem-pipeline-integration Phase D (mmu_exception_handler_chmem.h)
+        //     本 change 仅登记扩展点, 不实装 (per mmu-chmem spec v0.11.0 owner 决策).
+        //   触发条件: 当 mmu-chmem-pipeline-integration 实装 MmuExceptionHandlerPlugin CH_MEM 时
+        //     必须先 re-evaluate 此 select 树, 否则 mmu fault 写 mcause=exception code 会
+        //     被 CSRRW mcause 写 (last-wins 选 writeback) 覆盖.
         auto funct12_eq_000 = (last_funct12_ == ch_uint<32>(ch_literal<0x000, 32>{}));
         auto funct12_eq_001 = (last_funct12_ == ch_uint<32>(ch_literal<0x001, 32>{}));
         auto is_trap_branch = funct12_eq_000 || funct12_eq_001;

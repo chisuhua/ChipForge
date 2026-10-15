@@ -513,6 +513,44 @@
 
 ---
 
+## F7 re-evaluate 任务 (2026-10-15, csr-chmem-writeback-complete post-archive)
+
+> **触发条件**: `csr-chmem-writeback-complete` (commit `1d02531`, 2026-10-15 archived) 已**实装 `RiscvCsrPluginChmem<T>` 第 8 plugin** (注册位置 `ip/cpu/cpu_factory_chmem.h:321`), R3.5 写通路完整版就绪 (7 个 M-mode CSR 经 CSRRW 实际可写, mcause/mepc/mtvec trap 路径实装, TRAP_PENDING/TRAP_TARGET payload 已 propagate). **R11 假设"CH_MEM 流水线无 CSR plugin → trap PC 跳转物理不可能"已事实失效**.
+
+### 待 re-evaluate 项 (mmu-chmem 推进 Phase B/C 启动前必做)
+
+- [ ] **R11.1** trap PC 跳转可行性重新评估
+  - 旧决策 (proposal.md:88 + HANDOFF.md:24): D3-A 锁定仅 stall, 无 trap PC 跳转, defer v0.11.1+
+  - 新事实: TRAP_PENDING/TRAP_TARGET payload + mepc/mtvec/mcause 7 个 CSR 可写已就绪 (`openspec/changes/csr-chmem-writeback-complete/` archived)
+  - 行动: Phase C.1 (Pipeline 集成) 启动时重审 D3-A 决策, 评估是否能在本 change 内实装 trap PC 跳转 (ibus_chmem.h NORMAL select 覆写 PC 节点). 若可, 提前 R2.3 实现 (独立 change `csr-chmem-trap-pc-jump` 候选)
+  - owner: mmu-chmem owner 启动 Phase C 时执行
+  - **不阻塞** mmu-chmem Phase A/B (根因 bug 修复 + MMUPlugin CH_MEM 实装), 仅影响 Phase C 决策
+
+- [ ] **R11.2** 批量更新 R11 表述 (7 处)
+  - `HANDOFF.md:24` (D3 行)
+  - `HANDOFF.md:133` (R11 索引行)
+  - `proposal.md:69` (§4 末尾 AC 矛盾)
+  - `proposal.md:88` (D3-A 物理不可能)
+  - `proposal.md:125` (AC 修订 R14)
+  - `proposal.md:191` (v0.11.1+ 候选)
+  - `research-v0.11.0-prep.md:250,412,447,460` (R11 索引 4 处)
+  - 修订模式: "(CH_MEM 无 CSR plugin, 物理不可能) → (CH_MEM CSR plugin 已实装 per csr-chmem-writeback-complete, R3.5 写通路完整; trap PC 跳转待 R11.1 re-evaluate 决策)"
+  - 优先度: 中 (不影响功能, 影响读者对当前架构状态的认知)
+
+- [ ] **R11.3** D3-A 多 driver 仲裁扩展点 (与 csr-chmem-writeback-complete F6 注释登记联动)
+  - 旧实装: csr_chmem.h writeback 闭包 mcause/mepc 仲裁仅 2 driver (writeback-NORMAL vs branch-LATE)
+  - 待实装: mmu_exception_handler_chmem.h (mmu-chmem Phase D) 写 mcause=exception_code, mepc=faulting_pc → 3 driver 仲裁
+  - 扩展模式: `is_trap_branch || mmufault_active → mcause = trap 或 mmufault 值`
+  - owner: mmu-chmem Phase D 实装时同步改 csr_chmem.h 仲裁 select
+  - **触发前置条件**: mmu-chmem Phase D 启动时
+
+### 跨 change 同步
+
+- **已落地 (本 change)**: `ip/cpu/plugins/csr_chmem.h:337-360` writeback 闭包注释显式登记 F6 扩展点
+- **待落地 (mmu-chmem owner)**: R11.1/R11.2/R11.3 任一启动时
+
+---
+
 ## 总进度追踪
 
 | Phase | Tasks | 估时(人天) | 状态 |

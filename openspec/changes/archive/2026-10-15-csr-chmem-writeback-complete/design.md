@@ -2,6 +2,27 @@
 
 > **承载 R3.5 完整版决策依据 + 实装机制**。与 csr-chmem-pipeline-integration/design.md §R3 (方法 X) 互补: 本 change 关闭 §R3.5 writeback 完整版 deferred, 不重写 §R3。
 
+## 锚定 ADR / Lessons / Spec (F4 2026-10-15 修订)
+
+本 change 实装严格遵守以下架构约束 + 教训沉淀:
+
+### 架构 ADR (锚定)
+- **ADR-040 v2.0** (`docs/architecture/adr/ADR-040-plugin-style-tlm-to-hdl.md`): TLM→HDL 移植性约束。本 change 双文件分离 (`csr_chmem.h` 仅 CH_MEM 编译), `at_stage` 闭包不引入 `if(ch_bool)` 早返, 严守约束 #4 + #8.
+- **ADR-046 v2.0** (`docs/architecture/adr/ADR-046-fsm-exemption.md`): 多周期协议引擎豁免 D4 无状态机禁令。本 change CSR plugin 不属多周期协议引擎, 不启用 `CF_PLUGIN_USE_FSM_EXEMPT`, 走 ADR-046 §2.1 组合逻辑 + ch_reg 模式.
+- **ADR-048** (`docs/architecture/adr/ADR-048-canonical-plugin-order.md`): Plugin canonical ordering。本 change CSR plugin 在 `cpu_factory_chmem.h:321` 注册位置 (IntAlu 之后, Branch 之前) 满足 ADR-048, 注释 line 311-313 显式声明.
+- **ADR-083** (`docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md`): Plugin-style SSOT。本 change 单一 source-of-truth plugin `ip/cpu/plugins/csr_chmem.h`, 不再分别维护 TLM/RTL 副本.
+- **ADR-082**: 文档存在性约束 (架构 gate 验证). 本 change design/proposal/tasks/specs 4 个 artifacts 完整.
+
+### Phase 6c 教训 (`docs/lessons/phase-6c-elaboration-substrate.md`)
+本 change 落地过程中**实测踩中两类新陷阱**, 已登记为 **第 16/17 类** (F5 修订):
+- **第 16 类: 跨 stage payload 传播** — 每个 PipeNode 是独立 KV store, 跨 stage 需 `cpu_factory_chmem.h` §2b/§2c 硬编码白名单传播. 漏配 → writeback 节点 emplace-on-miss null-impl SEGV (M6 模式, CHANGELOG:839).
+- **第 17 类: ch_reg 不能用 `static_cast<uint64_t>` 读回** — `ch_uint<N>::operator uint64_t` 对非常量 DAG 节点触发错误路径, 静默返回 0. 应统一走 ch_uint signal ref + `sim->get_signal_value()`.
+
+### 跨 change Spec 引用
+- `openspec/changes/archive/2026-10-15-csr-chmem-pipeline-integration/` (本 change 上游): R3.4 writeback 8 个 ch_reg 写 + has() guard 兜底, R3.5 显式 deferred 留给本 change.
+- `openspec/specs/cpu-stage-link-propagation/spec.md`: per-stage PipeNode KV store 语义依据 (本 change §2b/§2c propagate 实现锚定).
+- `openspec/changes/mmu-chmem-pipeline-integration/` (本 change 下游, ACTIVE): 多 driver 仲裁扩展点 (F6 登记) + R11 假设 re-evaluate 任务 (F7 登记).
+
 ## Context
 
 `csr-chmem-pipeline-integration` (commit `c150b2e`, archived 2026-10-15) 完成 R1+R2(部分)+R3+B.1+C.1(scope-partial)。R3.5 writeback 完整版**显式 deferred**: execute-LATE 闭包**未**写 CSR_WRITE_ADDR/VALUE/EN payload, writeback-NORMAL 闭包**有** 8 个 `ch_reg <<=` 代码但**被** `if (n->payloads().has(CsrKT::CSR_WRITE_EN)) return;` 兜底阻止。
