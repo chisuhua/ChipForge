@@ -27,6 +27,9 @@ venv/
 .idea/
 .vscode/
 *.swp
+
+# rdd-workflow worktree (per .rddf/wt/<name>/ via git worktree)
+.rddf/wt/
 *.swo
 
 # Build artifacts
