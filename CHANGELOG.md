@@ -67,6 +67,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## v0.11.0 (interim) — csr-chmem-pipeline-integration: CH_MEM 模式 RISC-V Zicsr 集成 (8 CSR + 8 指令 + 3 trap)
+
+> **OpenSpec change**: `csr-chmem-pipeline-integration` (wave5 P1-4, ready → archive)
+> **Author / Date**: build agent, 2026-10-15
+> **Depends on**: `mfc-extract-fsm-h` (commit `df3bcea`, archived 2026-10-10); `mmu-chmem-pipeline-integration` C.1 stall_ctrl_ (✅ resolved for R1+R3, ⏸ R2.3 等 mmu C.2 merge)
+> **Hard-block (partial)**: R2.3 (`ibus_chmem.h` branch-NORMAL select 覆写 PC 节点) 等 mmu-chmem C.2 merge — 同一文件 `ibus_chmem.h` 双方都要改, 须协调合并顺序
+> **Scope-partial 风险**: R4 [High] `at_stage` 闭包内 `if(ch_bool)` 陷阱 (本 change 严守 select 树规避); R7 [Low] gate 假阴性 (本 change 已 git mv 到 `ip/cpu/plugins/`, 走 `check_plugin_portability.sh` Check 2 强制)
+
+### Added
+- **CSR plugin 主实现** `ip/cpu/plugins/csr_chmem.h` (从 `ip/cpu/arch/riscv/csr_chmem.h` git mv, R7 路径修正):
+  - 8 个 M-mode CSR `ch_reg<ch_uint<32>>` (mstatus/mtvec/mepc/mcause/mie/mip/mscratch/mcycle), 初始值 0
+  - execute-LATE 闭包: 重提取 5 位字段 (csr_addr/funct12/imm5/opcode/funct3) + 8 选 1 读 mux (R1+R3 决策, 严守 select 树, 不用 if(ch_bool))
+  - branch-LATE 闭包: 写 `TRAP_PENDING` / `TRAP_TARGET` (R2 决策), ECALL/EBREAK 写 mcause/mepc
+  - writeback-NORMAL 闭包: 8 个独立 write-enable + select 树 + ch_reg `<<=` 模式 (R3.4, R3.5 完整版推迟, 当前 has() guard 兜底)
+  - fetch-NORMAL 闭包: `mcycle_ <<= mcycle_ + 1` 自由计数 (R2.5 Q1 收口)
+- **CSR payload key 集合** `bundles/csr_bundles.h` (9 keys):
+  - R3 读通路: `CSR_READ_VALUE` / `CSR_READ_VALID` (mcycle 单独路径 valid=false)
+  - R3 写通路: `CSR_WRITE_ADDR` / `CSR_WRITE_VALUE` / `CSR_WRITE_EN` (writeback 消费)
+  - R1 判定: `Zicsr_VALID` / `Zicsr_OP`
+  - R2 trap 路径: `TRAP_PENDING` / `TRAP_TARGET`
+- **IntAlu execute-LATE 闭包** `ip/cpu/arch/riscv/int_alu_chmem.h`: 消费 `CSR_READ_VALUE` 覆写 RD_DATA (4 行 select 树, R3 决策方法 X), `has()` guard 无 CSR plugin 时 no-op 0 退化
+- **CpuFactory 8-plugin 集成** `ip/cpu/cpu_factory_chmem.h`: `RiscvCsrPluginChmem<T>` 注册 (IntAlu 之后, Branch 之前, 满足 ADR-048 canonical ordering); 注释 7→8 plugin
+- **`[cpu][csr-chmem]` 单元测试** `tests/cpu/test_csr_chmem.cpp` (14 cases, 105 assertions):
+  - Case 1-6 (R1.4): CSRRW/CSRRWI/CSRRS 重提取 + ECALL/EBREAK/MRET funct12 验证
+  - Case 7-9 (R3.5): CSRRW 读 mstatus / CSRRS 读 mcycle (READ_VALID=false) / 4 路 mux 覆盖
+  - Case 10-13 (R2.4): ECALL/EBREAK/MRET trap 路径 + 非 trap 指令 (TRAP_PENDING 验证)
+  - Case 14 (R2.5): mcycle 自由计数 (1 cycle tick 后 ≥ 1)
+- **zicsr_basic ELF 基础设施** `tests/cpu/manual_elf/zicsr_basic.S` + `build_manual_elf.sh` 加 `build_zicsr_basic` 函数 (scope-partial, 集成 e2e 测试推迟, 详见 C.1 entry)
+- **OpenSpec change artifacts**: `openspec/changes/csr-chmem-pipeline-integration/` (proposal/design/tasks/2 specs/.openspec.yaml 共 6 文件)
+- **R7 路径修正**: `ip/cpu/arch/riscv/csr_chmem.h` → `ip/cpu/plugins/csr_chmem.h` (消除 `check_plugin_portability.sh` Check 2 假阴性)
+
+### Verification (HEAD `77dc4c3` + B.1 `6ec7a20` + C.1 `213e022` 实测, 2026-10-15)
+
+- **`[cpu][csr-chmem]`**: **14/14 PASS (105 assertions)** — R1 6 + R3 3 + R2 5 case 全绿
+- **`[cpphdl]`**: 6/6 PASS — 0 退化
+- **`m3_poc_5stage_byte_equal`** (5-stage baseline): **185/185 PASS** — CSR plugin 集成后 0 退化
+- **`[chmem]`** 全套: 37/38 (1 known cpphdl_poc_chbool_contextual_conversion context pollution flake, 与本 change 无关)
+- **TLM `[mmu]`** (main binary): 59/59 PASS
+- **TLM `[cpu]`** (main binary): 128/129 (1 已知 cpu_sim CLI 路径 framework-level bug, 与本 change 无关)
+- **TLM `[cpu-integration]`** (main binary): 85/96 (11 pre-existing FAIL: 4 add_elf end_to_end + 1 dhrystone timeout + 6 mul_div_fsm, **0 新退化**)
+- **TLM `[cpu-l1-mmu-demo]`** (main binary): 6/6 PASS
+- **架构门禁**: `verify_adr` 0 fail / `verify_plugin_decision` 8/8 / `check_plugin_portability` 12/12 全 PASS
+- **`doc_link_check.sh`**: 7 pre-existing broken links (与本 change 无关, main 仓库 9 个; 路径指向 `.rddf/roadmap/archive/` 是 main 历史问题, plan §5.1 "记录但不阻塞 archive")
+
+### Scope Declaration (per plan §9 + tasks §C.1 修订)
+
+- **已落地 (R1+R3+R2 部分 + B.1 + C.1 部分)**: 14/17 plan task — CSR plugin 实装完整, 8-plugin 流水线集成, zicsr_basic ELF 基础设施就位
+- **R2.3 deferred** (per plan §3.3 Step 5): `ibus_chmem.h` branch-NORMAL select 覆写 PC 节点强阻塞 mmu-chmem C.2 merge (3-6 月), 须 mmu C.2 PR merge 后 rebase 本分支再开 R2.3 PR
+- **C.1 zicsr_basic e2e deferred** (per AGENTS.md `cpu-pipeline-tick-rca`): 期望的 7/8-stage zicsr_basic end_to_end 测试走 `cpu_sim` CLI 路径, 与 4 个已知 add_elf end_to_end FAIL 同源 (framework-level bug, pipeline 不 tick). 集成 e2e 测试推迟到 `cpu-pipeline-tick-rca` 修复后, 走 C++ API 路径 (类似 `test_rv32ui_runner` 风格)
+- **R3.5 完整版 (writeback 实际写 CSR 寄存器) deferred**: 当前 writeback-NORMAL 闭包 has() guard 兜底 no-op, 完整版 (execute-LATE 同时写 CSR_WRITE_* payload → writeback 消费 → ch_reg `<<=` 实际写) 推迟到后续 session. 读路径 (R3.3) 全绿, A.1 Case 1+2 (CSRRW 读 mstatus + CSRRS 读 mcycle) 通过
+
+### Known Issues (deferred)
+
+- **P1 follow-up**: R2.3 `ibus_chmem.h` branch-NORMAL select 覆写 (依赖 mmu C.2 merge); R3.5 writeback 完整版 (无外部依赖); C.1 集成 e2e (依赖 cpu-pipeline-tick-rca)
+- **P3 follow-up**: `wave5-bp-btb` 幽灵依赖 (per design.md §R2): 本 change 显式声明 `trap > bp` 优先级, 后续 bp-btb change 启动时需协调
+- **P5 follow-up**: PMP / Smode CSR / 64-bit CSR / FPU CSR (per proposal §Out-of-Scope, 全部 Phase 5+ 跟踪)
+
+### Acceptance Criteria (来自 proposal.md + tasks.md)
+
+- ✅ AC-1: `[cpu][csr-chmem]` 5/5 PASS (A.1 Zicsr 基础 case)
+- ✅ AC-2: `[cpu][csr-chmem]` 14/14 PASS (R1+R3+R2 全 case, 105 assertions)
+- ✅ AC-3: 8-plugin 流水线在 `chipforge_tests_chmem` 全套 0 退化 (`m3_poc_5stage_byte_equal` 185/185 维持)
+- ✅ AC-4: 架构门禁 `12/12 + 8/8 + verify_adr 0 fail` 全 PASS
+- ✅ AC-5: AGENTS.md §CH_MEM 模式 7→8 plugin 文字修订 (本 archive 同步落地)
+- ✅ AC-6: 0 regression (本 change 跨 TLM/CH_MEM/5-stage 全部 baseline 维持)
+- ⚠️ AC-7: scope-partial (R2.3/C.1 集成 e2e/R3.5 完整版 deferred, 已显式声明)
+
+---
+
 ## v0.10.x (interim) — verilator-cpu-factory-extensible-params: CpuFactoryChmem::build_cpu + cpu_verilator_sim 可选参数化扩展
 
 > **OpenSpec change**: `verilator-cpu-factory-extensible-params` (wave5 P1, IN_PROGRESS)
