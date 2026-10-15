@@ -41,6 +41,7 @@
 #include "ip/cpu/arch/riscv/decoder_table.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/arch/riscv/payload_riscv.h"
+#include "bundles/csr_bundles.h"  // R3.5 propagate CSR_WRITE_* (csr-chmem-writeback-complete Task 1.0)
 
 using namespace cf::plugin;
 using namespace ch;
@@ -164,6 +165,13 @@ class CpuFactoryChmem {
       n->payloads().put(KT::DECODE, default_decode);
       cf::cpu::arch::riscv::RiscvDecodeDetail default_detail{};
       n->payloads().put(RK::RISCV_DETAIL, default_detail);
+      // R3.5 [GREEN]: CSR_WRITE_* 默认值预填 (csr-chmem-writeback-complete Task 1.0)
+      //   避免 writeback 节点 emplace-on-miss null-impl ch_uint SEGV (M6 模式, CHANGELOG:839)
+      using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
+      n->operator()(CsrKT::CSR_WRITE_ADDR)  = T(ch::core::ch_literal<0, 32>{});
+      n->operator()(CsrKT::CSR_WRITE_VALUE) = T(ch::core::ch_literal<0, 32>{});
+      // CSR_WRITE_EN 是 Payload<bool>, 用 put(false) 避开 contextual conversion 歧义
+      n->payloads().put(CsrKT::CSR_WRITE_EN, false);
       // DECODED_INST: 用真实 ch_literal 零值初始化 (v0.3.1 M6: 默认构造
       // DecodedInst{} 的 ch_uint 成员是 null impl → Hazard 比较 SEGV)
       cf::cpu::plugins::DecodedInst zero_decoded;
@@ -371,6 +379,11 @@ class CpuFactoryChmem {
         mem->operator()(KT::INSTRUCTION) = exe->operator()(KT::INSTRUCTION);
         mem->operator()(KT::RS2)         = exe->operator()(KT::RS2);
         mem->operator()(DecodePlugin::DECODED_INST) = exe->operator()(DecodePlugin::DECODED_INST);
+        // R3.5 [GREEN]: propagate CSR_WRITE_* execute → memory (csr-chmem-writeback-complete Task 1.0)
+        using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
+        mem->operator()(CsrKT::CSR_WRITE_ADDR)  = exe->operator()(CsrKT::CSR_WRITE_ADDR);
+        mem->operator()(CsrKT::CSR_WRITE_VALUE) = exe->operator()(CsrKT::CSR_WRITE_VALUE);
+        mem->payloads().put(CsrKT::CSR_WRITE_EN, exe->payloads().get(CsrKT::CSR_WRITE_EN));
         // Phase 6d.4: JAL/JALR link — rd = pc+4 (return address). The ALU
         // does not match these opcodes, so RD_DATA defaults to 0; override
         // here using the execute stage's PC.
@@ -397,6 +410,11 @@ class CpuFactoryChmem {
         wb->operator()(KT::RD_DATA)  = mem_st->operator()(KT::RD_DATA);
         wb->operator()(KT::DECODE)   = mem_st->operator()(KT::DECODE);
         wb->operator()(DecodePlugin::DECODED_INST) = mem_st->operator()(DecodePlugin::DECODED_INST);
+        // R3.5 [GREEN]: propagate CSR_WRITE_* memory → writeback (csr-chmem-writeback-complete Task 1.0)
+        using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
+        wb->operator()(CsrKT::CSR_WRITE_ADDR)  = mem_st->operator()(CsrKT::CSR_WRITE_ADDR);
+        wb->operator()(CsrKT::CSR_WRITE_VALUE) = mem_st->operator()(CsrKT::CSR_WRITE_VALUE);
+        wb->payloads().put(CsrKT::CSR_WRITE_EN, mem_st->payloads().get(CsrKT::CSR_WRITE_EN));
       }
     });
 

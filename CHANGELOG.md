@@ -136,6 +136,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## v0.11.0 (interim) — csr-chmem-writeback-complete: R3.5 写通路完整版 (7 CSR 实际可写 + 4 层 funct3/rs1/imm5 门控)
+
+> **OpenSpec change**: `csr-chmem-writeback-complete` (wave5 P1-4, ready → archive)
+> **Author / Date**: build agent, 2026-10-15
+> **Depends on**: `csr-chmem-pipeline-integration` (commit `c150b2e`, archived 2026-10-15, R3.5 显式 deferred)
+> **Hard-block**: 无 (本 change 自包含, 不依赖 mmu C.2 / cpu-pipeline-tick-rca)
+> **Oracle/Metis 复审**: 2026-10-15 8 项发现全部处置 (1 critical + 3 high + 2 medium + 2 low)
+
+### Added
+- **R3.5 写通路完整版** `ip/cpu/plugins/csr_chmem.h` (execute-LATE 闭包):
+  - 4 层 select 树门控 `write_en`:
+    - L1: `zicsr_valid` (opcode==0x73)
+    - L2: `!ecall_ebreak_mret` (funct3 != 000, 排除 trap 指令)
+    - L3: `!csrr_read` (funct3 ∈ {010,011} && rs1_idx == 0, 维持 csrr 读惯例)
+    - L4: `!csrwi_read` (funct3 ∈ {110,111} && imm5 == 0, 维持 csrwi/csrri 读惯例)
+    - L5: `csr_addr != 0xB00` (mcycle 永不被 CSRR* 写)
+  - `write_value` select: 立即数变体 (CSRRWI/CSRRSI/CSRRCI, funct3[2]=1) 走 uimm (零扩展); 寄存器变体 (CSRRW/CSRRS/CSRRC, funct3[2]=0) 走 rs1
+  - 写出 `csr_keys::CSR_WRITE_ADDR/VALUE/EN` payload 到 execute 节点
+  - 新增单测观察口 `last_csr_write_value_ch()` / `last_csr_write_en_ch()` (ch_uint<32> + ch_uint<1>)
+  - 新增 instance 成员 `last_rs1_idx_` (R1.2 重提取模式, `bits<19,15>(instr)`)
+- **R3.5 propagate** `ip/cpu/cpu_factory_chmem.h` (Oracle [Critical] 修复):
+  - `populate_stage` lambda 灌 `CSR_WRITE_ADDR=0` / `CSR_WRITE_VALUE=0` / `CSR_WRITE_EN=false` 默认值 (避免 writeback 节点 emplace-on-miss null-impl SEGV, M6 模式)
+  - §2b `execute→memory` 阶段链接加 `CSR_WRITE_ADDR/VALUE/EN` 传播
+  - §2c `memory→writeback` 阶段链接加 `CSR_WRITE_ADDR/VALUE/EN` 传播
+  - `#include "bundles/csr_bundles.h"` (template 解析 `csr_keys<T>` 用)
+- **R3.5 writeback-NORMAL 闭包** `ip/cpu/plugins/csr_chmem.h` (Task 1.2 实装):
+  - 5 个无冲突 CSR (`mstatus/mtvec/mscratch/mip/mie`) 单 driver 写 (R3.4 既有路径)
+  - 2 个多 driver CSR (`mcause/mepc`) 仲裁 select:
+    - `is_trap_branch = funct12==0x000 || funct12==0x001` (ECALL/EBREAK)
+    - `mcause_ <<= select(is_trap, branch_mcause (11/3), wb_mcause)` — branch trap 优先
+    - `mepc_ <<= select(is_trap, mepc_branch (preserved), wb_mepc)` — branch 优先
+  - 保留 `has(CsrKT::CSR_WRITE_EN)` guard 兜底 (单 plugin 测试路径无 cpu_factory propagate 兼容)
+- **`[cpu][csr-chmem]` 单元测试** `tests/cpu/test_csr_chmem.cpp` 14→16 cases (105→116 assertions):
+  - Case 15 `csr_chmem_R3_5_CsrrwWriteEnableAndValue`: CSRRW x1, mstatus, x10 (`0x300510F3`), 验证 `last_csr_write_en_ch() == 1` + value=0xCAFEBABE
+  - Case 16 `csr_chmem_R3_5_McycleWriteEnableFalse`: CSRRS x1, mcycle, x10 (`0xB00520F3` — Oracle 修正, 原 `0xB0005073` 误为 `CSRRSI x0`), 验证 `last_csr_write_en_ch() == 0` + read_valid=0
+- **OpenSpec change artifacts**: `openspec/changes/csr-chmem-writeback-complete/` (proposal/design/tasks/specs/csr-chmem-csr-write/spec.md 共 5 文件, 135+697+105+137 lines)
+- **Smoke test 证据** `/tmp/opencode/smoke_multidriver.cpp` (Phase 0 Task 0.2, 现已清理, 实测保留):
+  - CppHDL 5.052 接受双 `<<=` (elaborate OK + sim OK)
+  - **Behavior: A (last-wins)** — writeback-NORMAL 注册晚于 branch-LATE 胜出
+  - 决策: 必加仲裁 select (本 change Task 1.2 Step 3 实装)
+
+### Modified
+- `ip/cpu/plugins/csr_chmem.h` writeback-NORMAL 闭包:
+  - 保持 `has(CsrKT::CSR_WRITE_EN)` guard 兜底 (与 plan "删 guard" 偏差, 见 Scope-partial)
+  - 8 个 `ch_reg <<=` 改为 5 个单 driver + 2 个仲裁 select (mcause/mepc)
+  - 1 个 mcycle_ 不写 (R3 决策 + R2.5 自由计数)
+- `ip/cpu/cpu_factory_chmem.h`:
+  - populate_stage lambda 加 3 行 CSR_WRITE_* 默认值
+  - §2b execute→memory + §2c memory→writeback 各加 3 行 propagate
+
+### Verification (HEAD 实测, 2026-10-15)
+- `[cpu][csr-chmem]`: **16/16** PASS (116 assertions) — **基线 14/14 → 16/16**
+- `m3_poc_5stage_byte_equal` (8-plugin 5-stage 关键守门): **185/185** PASS — 0 退化
+- TLM `[mmu]`: **59/59** PASS (146 assertions) — 跨 binary baseline 维持
+- `[chmem]` family: **37/38** (1 known `cpphdl_poc_chbool_contextual_conversion` flake, 与本 change 无关)
+- `[verilator]` (48 ELF): **1/1** PASS (96 assertions) — bare path byte-identical preserved
+- `[mmu-verilator]`: **3/3** PASS (26 assertions) — bare path plumbing 0 退化
+- 架构门禁 `check_plugin_portability` **12/12** + `verify_plugin_decision` **8/8** + `verify_adr` **0 fail** 全 PASS
+- `doc_link_check`: 7 pre-existing broken (与本 change 无关, plan 已知记录)
+- `openspec change validate csr-chmem-writeback-complete`: ✅ **valid**
+
+### Scope-partial 残留 (与 csr-chmem-pipeline-integration archive 同源)
+- **R2.3** (`ibus_chmem.h` branch-NORMAL select 覆写 PC 节点) — 等 mmu C.2 merge, 独立 change
+- **C.1 集成 e2e** (zicsr_basic 7/8-stage tohost=1 跑 cpu_sim C++ API) — 等 cpu-pipeline-tick-rca fix, 独立 change
+- **CSRRS/CSRRC set/clear mask 完整展开** (`csr |= mask` / `csr &= ~mask`) — 本 change 简化直写 RS1/uimm 退化为 CSRRW 语义, 未来 change 补 spec 严格性
+- **单 plugin 测试路径 writeback 写 ch_reg 验证** — 受 has() guard 兜底保留限制, 单 plugin 测试仅验证 execute-LATE CSR_WRITE_* 写出 (DAG construction 验证), 不验证 ch_reg 实际更新; ch_reg 实际更新依赖 build_cpu 路径 (R3.5 完整版完整生效)
+
+### 实装偏差 (vs plan Task 1.2 Step 2 "删 has() guard")
+- **偏差**: 计划"删 has() guard" → **实装保留** has() guard
+- **真因**: 单 plugin 测试路径 (`test_csr_chmem.cpp` 14+2 cases) 不调 `cpu_factory_chmem.h::build_cpu()`, 因此 `populate_stage` + §2c propagate 不生效, writeback 节点缺 CSR_WRITE_* keys
+- **验证**: 实装中尝试删 guard → Case 1 (`csr_chmem_CsrrwMstatus_AddressReextract`) SIGSEGV (R3.4 兜底本就是为此设计); 加 has() guard 后 16/16 PASS
+- **影响**:
+  - build_cpu 路径 (8-plugin `m3_poc_5stage_byte_equal`): populate_stage 灌默认值 + §2c propagate → writeback 节点 has CSR_WRITE_* keys → has=true → R3.5 完整版完整生效
+  - 单 plugin 测试路径: writeback 节点无 key → has=false → no-op 零退化 (R3.3 读通路仍正常)
+- **文档同步**: spec.md §Scenario 1 已降级为"DAG construction 验证"; tasks.md 实装偏差段已记录; plan 接受目标维持
+
+---
+
 ## v0.10.x (interim) — verilator-cpu-factory-extensible-params: CpuFactoryChmem::build_cpu + cpu_verilator_sim 可选参数化扩展
 
 > **OpenSpec change**: `verilator-cpu-factory-extensible-params` (wave5 P1, IN_PROGRESS)

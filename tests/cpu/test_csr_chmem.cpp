@@ -664,3 +664,113 @@ TEST_CASE("csr_chmem_R2_McycleFreeRunning_AfterOneTick", "[cpu][csr-chmem]") {
   REQUIRE(mcycle_val >= 1u);  // R2.5: ≥ 1
   REQUIRE(mcycle_val <= 2u);  // 防止过度计数 (1 cycle → mcycle ≤ 2)
 }
+
+// =========================================================================
+// Case 15 (R3.5): CSRRW x1, mstatus, x10 — 验证 write enable + write value 写出
+//
+// Inst encoding (csr-chmem-writeback-complete 2026-10-15 Oracle 修正):
+//   CSRRW x1, mstatus, x10:
+//     bits[31:20]=0x300 (mstatus csr_addr)
+//     bits[19:15]=01010 (rs1=x10)
+//     bits[14:12]=001 (funct3=CSRRW)
+//     bits[11:7]=00001 (rd=x1)
+//     bits[6:0]=0x73 (SYSTEM opcode)
+//     inst = 0x30000000 | 0x00050000 | 0x00001000 | 0x00000080 | 0x00000073
+//          = 0x300510F3 ✓
+//
+// 验证 (单 cycle 观察口):
+//   - write enable = 1 (zicsr_valid && funct3=001 != 000 && !(funct3 in {010,011} && rs1==0)
+//                    && !(funct3 in {110,111} && imm5==0) && csr_addr != 0xB00)
+//   - write value = rs1_val = 0xCAFEBABE (funct3[2]=0 走 RS1 路径)
+// =========================================================================
+TEST_CASE("csr_chmem_R3_5_CsrrwWriteEnableAndValue", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_r3_5_csrrw");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_csrrw = 0x300510F3u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_csrrw]() {
+    using KT_in = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT_in::INSTRUCTION) = ch_uint<32>(inst_csrrw);
+      n->operator()(KT_in::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT_in::RS1)         = ch_uint<32>(0xCAFEBABEu);  // 写 mstatus = 0xCAFEBABE
+      n->operator()(KT_in::RS2)         = ch_uint<32>(0);
+      n->operator()(KT_in::RD_IDX)      = ch_uint<5>(1);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  // R3.5 验证 (单 cycle 观察口)
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_write_en_ch())) == 1u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_write_value_ch())) == 0xCAFEBABEu);
+}
+
+// =========================================================================
+// Case 16 (R3.5): CSRRS x1, mcycle, x10 — 验证 mcycle 永不被 CSRR* 写
+//
+// Inst encoding (csr-chmem-writeback-complete 2026-10-15 Oracle 修正):
+//   原 plan 0xB0005073 实为 CSRRSI x0, mcycle, 0 (funct3=101, rd=x0)
+//   修正为 CSRRS x1, mcycle, x10:
+//     bits[31:20]=0xB00 (mcycle csr_addr)
+//     bits[19:15]=01010 (rs1=x10)
+//     bits[14:12]=010 (funct3=CSRRS)
+//     bits[11:7]=00001 (rd=x1)
+//     bits[6:0]=0x73
+//     inst = 0xB0000000 | 0x00050000 | 0x00002000 | 0x00000080 | 0x00000073
+//          = 0xB00520F3 ✓
+//
+// 验证:
+//   - write enable = 0 (mcycle csr_addr=0xB00 强制 false)
+//   - write value = 0xCAFEBABE (funct3[2]=0 走 RS1 路径, 写出但无效果)
+//   - read valid = 0 (mcycle 单独路径, R3 决策)
+// =========================================================================
+TEST_CASE("csr_chmem_R3_5_McycleWriteEnableFalse", "[cpu][csr-chmem]") {
+  ch::core::context ctx("csr_chmem_r3_5_mcycle_we");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+  CsrPluginGuard plugin_guard(pb);
+  cf::cpu::arch::riscv::RiscvCsrPluginChmem<ch_uint<32>>* plugin_raw = plugin_guard.raw;
+
+  using KT = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+  std::uint32_t inst_csrrs_mcycle = 0xB00520F3u;
+
+  pb.at_stage("execute", cfc::Phase::EARLY, [&pb, inst_csrrs_mcycle]() {
+    using KT_in = cf::cpu::core::payload::keys<ch_uint<32>, 32>;
+    auto* n = pb.node_of_logic_stage("execute").get();
+    if (n) {
+      n->operator()(KT_in::INSTRUCTION) = ch_uint<32>(inst_csrrs_mcycle);
+      n->operator()(KT_in::PC)          = ch_uint<32>(0x80000000u);
+      n->operator()(KT_in::RS1)         = ch_uint<32>(0xCAFEBABEu);
+      n->operator()(KT_in::RS2)         = ch_uint<32>(0);
+      n->operator()(KT_in::RD_IDX)      = ch_uint<5>(1);
+    }
+  });
+  pb.build();
+  auto exp = pb.elaborate(ctx);
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  REQUIRE_NOTHROW(sim->tick());
+
+  // R3.5 验证: mcycle 永不被 CSRR* 写
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_write_en_ch())) == 0u);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_write_value_ch())) == 0xCAFEBABEu);
+  REQUIRE(static_cast<std::uint64_t>(sim->get_signal_value(plugin_raw->last_csr_read_valid_ch())) == 0u);
+}
