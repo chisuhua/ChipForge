@@ -91,7 +91,7 @@ target_include_directories(cf_plugin
 
 ## 5. 退出标准(Phase 0 完成条件)
 
-详见 [`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md` §2](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md):
+详见 `.rddf/roadmap/archive/phase-0-plugin-scaffolding.md` §2（2026-10-09 路线迁移时整合进 AGENTS.md §架构核心约束 + ADR-040/046, 文件已删除, 不链接）:
 
 ### 5.1 功能标准
 
@@ -152,4 +152,4 @@ target_include_directories(cf_plugin
 
 ---
 
-*本目录为 Phase 0 实施的工作区。Phase 0 启动后,按 [`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md` §1.1-1.5](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md) 顺序添加 5 个 P0 组件。*
+*本目录为 Phase 0 实施的工作区。Phase 0 启动后,按 `.rddf/roadmap/archive/phase-0-plugin-scaffolding.md` §1.1-1.5（2026-10-09 路线迁移时整合进 AGENTS.md §架构核心约束 + ADR-040/046, 文件已删除, 不链接）顺序添加 5 个 P0 组件。*

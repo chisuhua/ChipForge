@@ -1154,9 +1154,9 @@ CppTLM AGENTS.md 明确：
 > - **Phase 0**：Plugin 最小**脚手架**（5 个 P0 组件，~2-3 周）—— 让 Plugin-style 业务逻辑能跑起来
 > - **Phase 6**：完整 **PipeBuilder 框架** + RTL 生成（~12-20 周）—— 完整调度算法、JSON 解析、验证基础设施、RTL 集成
 >
-> 详细任务清单：见 [`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md)
-> 详细 Phase 6 任务：见 [`.rddf/roadmap/archive/phase-6-declarative.md`](../../.rddf/roadmap/archive/phase-6-declarative.md)（v2.0.2 暂未创建，预留）
-> 决策依据：见 `.omo/drafts/decision-plugin-framework-2026-06-08.md`（已归档为 gitignored 草稿，不链接）
+> 详细任务清单：`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`（2026-10-09 路线迁移时整合进 AGENTS.md + ADR-037/040/046/083, 文件已删除, 不链接）
+> 详细 Phase 6 任务：`.rddf/roadmap/archive/phase-6-declarative.md`（同上, 整合进 AGENTS.md + roadmap-evolution.md, 文件已删除, 不链接）
+> 决策依据：`.omo/drafts/decision-plugin-framework-2026-06-08.md`（已归档为 gitignored 草稿，不链接）
 
 #### 12.2.1 Phase 0 范围（5 个 P0 交付物）
 

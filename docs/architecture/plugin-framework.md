@@ -757,13 +757,13 @@ D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业�
 | Phase 6 | 🚧 待开发 | 完整 PipeBuilder 框架 + RTL 生成（12-20 周）；推迟的 Phase 1a/1b/1c 内容合并到此阶段 |
 
 > **详细阶段定义**：
-> - Phase 0：[`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md)（实施记录 + 退出标准）
+> - Phase 0：`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`（实施记录 + 退出标准；2026-10-09 路线迁移时整合进 AGENTS.md + ADR-037/040/046/083, 文件已删除, 不链接）
 > - Phase 1：[`.rddf/roadmap/archive/phase-1-tlm-foundation.md`](../../.rddf/roadmap/archive/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
-> - Phase 6：[`.rddf/roadmap/archive/phase-6-declarative.md`](../../.rddf/roadmap/archive/phase-6-declarative.md)（v2.0.2 暂未创建，路线图 README 已预留位置）
+> - Phase 6：`.rddf/roadmap/archive/phase-6-declarative.md`（同上, 整合进 AGENTS.md + roadmap-evolution.md, 文件已删除, 不链接）
 
 ### 5.2 Phase 0 接口稳定性承诺
 
-> **引用**：[`phase-0-plugin-scaffolding.md` §6.1](../../.rddf/roadmap/archive/phase-0-plugin-scaffolding.md) + [`declarative-hybrid-framework.md` §12.2.3](declarative-hybrid-framework.md)
+> **引用**：`phase-0-plugin-scaffolding.md` §6.1（2026-10-09 路线迁移时整合进 AGENTS.md §架构核心约束 + ADR-040/046, 文件已删除, 不链接） + [`declarative-hybrid-framework.md` §12.2.3](declarative-hybrid-framework.md)
 
 Phase 0 完成后，以下 **5 个接口**在 Phase 1-5 期间**保持稳定**（仅 Phase 6 才升级）：
 
