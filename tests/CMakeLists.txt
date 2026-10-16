@@ -135,6 +135,8 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_csr_chmem.cpp
     # mmu-chmem-pipeline-integration / Phase 2 Task 2.1 (C2): ibus_chmem sv32 消费
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_ibus_chmem_sv32.cpp
+    # mmu-chmem-pipeline-integration / Phase 2 Task 2.2 (C3): dmem_chmem sv32 消费
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_dmem_chmem_sv32.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

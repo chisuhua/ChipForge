@@ -21,6 +21,7 @@
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/plugins/ibus_chmem.h"
+#include "ip/mmu/tlm/mmu_keys.h"  // mmu-chmem-pipeline-integration Phase 2 Task 2.2 (C3): sv32 消费
 
 using namespace cf::plugin;
 using namespace ch;
@@ -128,7 +129,24 @@ class DMemPlugin : public PluginBase {
     auto flush = fch ? fch->operator()(IBusPlugin<T>::FLUSH)
                      : ch::core::ch_bool(false);
 
-    auto byte_addr = n->operator()(KT::RESULT);
+    // mmu-chmem-pipeline-integration Phase 2 Task 2.2 (C3): sv32 消费
+    //   byte_addr = select(PADDR_VALID, PADDR, RESULT)
+    //   RESULT 是 ALU 输出的 vaddr (reg + imm); PADDR 由 tlb_lookup_loadstore 节点同步写
+    //   Bare 路径 (PADDR_VALID=false, 当前): sel 回退到 RESULT → 与未改前 byte-identical
+    //   Sv32 路径 (Phase B Sprint 6-7 后): PADDR_VALID=true 时 sel 选 PADDR → vaddr→paddr 真翻译
+    //   byte_off / half_off 用 byte_addr 低位, sv32 不改变低 12-bit, 不影响 RMW mask 路径
+    //   ADR-040 v2.0 §4 D4 主逻辑包裹: 用 select 表达式而非运行期 if(ch_bool), 保持 elaboration DAG 完整
+    auto vaddr_byte_addr = n->operator()(KT::RESULT);
+    auto byte_addr = vaddr_byte_addr;  // Bare default: 直接 vaddr
+    {
+      using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+      if (auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_loadstore").get();
+          tlb_n && tlb_n->payloads().has(MmuKeys::PADDR_VALID)) {
+        auto paddr_valid = ch::core::ch_bool(tlb_n->operator()(MmuKeys::PADDR_VALID));
+        auto paddr = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::PADDR));
+        byte_addr = ch::core::select(paddr_valid, paddr, vaddr_byte_addr);
+      }
+    }
     auto word_addr = bits<15, 2>(byte_addr);
     auto byte_off = bits<1, 0>(byte_addr);  // 0..3 within word (little-endian)
     auto half_off = bits<1, 1>(byte_addr);  // 0 or 2 (bit1 selects half-word slot)
