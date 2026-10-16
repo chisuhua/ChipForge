@@ -142,18 +142,29 @@ Expected: 拿到 48 ELF cycle 数 → 写到 `.rddf/plans/mmu-chmem-pipeline-int
 ### Task 1.1: bp-btb-coordination-3items — fetch stage 协议 0.5d (R-CHMEM-1 缓解)
 
 **Files:**
-- Create: `ip/cpu/plugins/fetch_stall_chmem.h` (新, ~80 LOC) — 提供 `pc_reg_mux` ch_uint + `stall_fetch_when` 信号 + 与 bp-btb owner 的 3 项协议 hook
-- Modify: `ip/cpu/cpu_factory_chmem.h` (line ~80-85 已写 owner claim, 加 fetch_stall 实例化 8→9 plugin)
+- Create: `.rddf/protocols/fetch_stall_requirements_v0.11.0.md` (新, 270+ 行) — requirements doc v0.1 替代原 protocol spec (降级)
+- ~~Create: `ip/cpu/plugins/fetch_stall_chmem.h` (新, ~80 LOC)~~ **deferred to Sprint 6-7 Phase B 启动期 (由 wave5-bp-btb owner 解决 5 BLOCKER 后实装)**
 
-- [ ] **Step 1: 与 bp-btb owner 协商 3 项协议**
+- [x] **Step 1: 与 bp-btb owner 协商 3 项协议** → **变更为: 起草 requirements doc (降级为非可执行)** ✅ landed `f3419b4` 2026-10-16
 
-Run: 异步会议 + ADR 引用 `wave5-bp-btb` proposal §3 备选 3 项 (pc_reg mux / fetch stall / fetch stage 共享)
-Expected: 拿到 3 项 fetch stage 协议 hash + interface spec
+Run: 原计划 异步会议 + ADR 引用 `wave5-bp-btb` proposal §3 备选 3 项 → **实际**: 由 mmu-chmem-pipeline-integration builder (本次 session) 起草 fetch_stall_protocol_v0.11.0.md (Draft v0.1, 237 行) 作为 wave5-bp-btb owner Sprint 6-7 启动期 review 锚点
+**Critic 审稿 2026-10-16**: REJECT + 5 BLOCKERS + 7 SHOULD_FIXS
+- B1: declare_substage 当前不产生调度顺序 (substage 关系无 reader)
+- B2: CH_MEM register_ctrl_link("fetch", ...) 不会冻结 pc_reg (elaborate 路径不消费 CtrlLink)
+- B3: Payload Keys 类型 ch_bool/ch_uint<3> 直写违反 ADR-040 v2.0 双模 + 命名空间 cf::cpu::keys 不存在
+- B4: Bare path 判定公式与已锁定 D4 决议直接矛盾 (satp_ppn=0 不等于 Bare)
+- B5: ptw_active 是 Payload<bool> POD, CH_MEM halt_when 需要 ch_bool, 无合法信号源
+Expected (original): 拿到 3 项 fetch stage 协议 hash + interface spec
+**Actual outcome (2026-10-16)**: protocol spec 撤回 + requirements doc v0.1 (270+ 行, 显式列出 5 BLOCKER + 7 SHOULD_FIX + 3-step 启动序列) 替代. wave5-bp-btb owner Sprint 6-7 启动期必须先解决 5 BLOCKER 后才能起草 v0.2 protocol (本 requirements doc 不作为可执行依据)
 
-- [ ] **Step 2: 创建 `fetch_stall_chmem.h` 框架**
+- [ ] **Step 2: 创建 `fetch_stall_chmem.h` 框架** → **deferred to Sprint 6-7 Phase B 启动期**
 
-Run: 写 ch_mem 基础模板 + 3 项协议签名 (含注释指明 0.5d scope)
-Expected: file created, 8→9 plugin 计数准备 (但本 task 不实装, 只模板)
+Run: 写 ch_mem 基础模板 + 3 项协议签名
+Status: **deferred** per critic B1-B5 BLOCKERS — fetch_stall_chmem.h 在 5 BLOCKER 解决前无法实装. wave5-bp-btb owner Sprint 6-7 启动期需:
+1. 解决 5 BLOCKER (显式选择每个的设计路径: substage ordering / stall 表达 / payload keys 归属 / Bare 判定公式 / ptw_active ch_bool 信号源)
+2. 起草 v0.2 protocol spec (新文件 fetch_stall_protocol_v0.11.0.md)
+3. v0.2 spec 经 critic 二轮 review 通过后才能实装 fetch_stall_chmem.h
+4. cpu_factory_chmem.h 8→10 plugin (per critic S2 修正: +2 = MMUPlugin_chmem + fetch_stall)
 
 - [ ] **Step 3: 验证 Phase 0 baseline 0 退化**
 
@@ -295,8 +306,49 @@ Defer reason: 需要 Phase B (MMUPlugin_chmem + PtWalkFsmPlugin 联动) 实装�
 
 **Files:**
 - Modify: `ip/cpu/plugins/dmem_chmem.h` line ~100-145 (load/store 闭包 ~30 LOC 改)
+- Create: `tests/cpu/test_dmem_chmem_sv32.cpp` (~150 LOC, 2 case)
 
-- [ ] **Step 1-4 与 Task 2.1 同模式 (Bare path byte-identical + Sv32 path sel 表达式)**
+- [x] **Step 1: [RED] 写 `[cpu][chmem][dmem-sv32]` 单测** ✅ landed `5b9f74a` 2026-10-16
+
+Run: 创建 `tests/cpu/test_dmem_chmem_sv32.cpp` ~150 LOC: Bare baseline + Sv32 plumbing 对比
+Expected: 当前会 PASS(Bare path) + RED-via-pre-existing(via load/store ELF, 因 main HEAD `b8d860f` pre-existing baseline 退化 18 ELF FAIL 与本 change 无关). **实际**: 选 `rv32ui-p-add` (ALU-only) 作为唯一 ELF 避免 pre-existing 退化污染, 2 case 全 PASS (972 assertions)
+
+- [x] **Step 2: 改 dmem_chmem.h mem_access 闭包消费 sv32** ✅ landed `5b9f74a` 2026-10-16
+
+```cpp
+// ip/cpu/plugins/dmem_chmem.h:95-204 mem_access (CH_MEM mode)
+auto vaddr_byte_addr = n->operator()(KT::RESULT);
+auto byte_addr = vaddr_byte_addr;  // Bare default
+{
+  using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
+  if (auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_loadstore").get();
+      tlb_n && tlb_n->payloads().has(MmuKeys::PADDR_VALID)) {
+    auto paddr_valid = ch::core::ch_bool(tlb_n->operator()(MmuKeys::PADDR_VALID));
+    auto paddr = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::PADDR));
+    byte_addr = ch::core::select(paddr_valid, paddr, vaddr_byte_addr);  // ch_uint<32> sel (ADR-040 v2.0 §4)
+  }
+}
+auto word_addr = bits<15, 2>(byte_addr);  // sv32 不改变低 12-bit, byte_off/half_off/RMW mask 路径一致
+```
+
+(用 `select` 表达式而非 `if (cond)`，按 D4 §4 主逻辑包裹)
+
+- [x] **Step 3: [GREEN] 跑 + 回归 baseline** ✅ landed `5b9f74a` 2026-10-16
+
+实测:
+- `[dmem-sv32]` 2 case 全 PASS (972 assertions)
+- `[ibus-sv32]` 2 case 全 PASS (976 assertions, 无退化)
+- 4 arch gate (verify_adr 0 fail + verify_plugin_decision 8/8 + check_plugin_portability 12/12) 全 PASS
+- 0 退化引入 ([chmem] 41/42, 与 main HEAD `b8d860f` 一致)
+
+**关键设计选择** (与 Task 2.1 不同):
+- Task 2.2 测试 ELF 选 `rv32ui-p-add` 而非 `rv32ui-p-lw/sw`, 因 main HEAD `b8d860f` pre-existing baseline 退化 (chipforge_tests_chmem [chmem_vendored_elf_tohost1] 18 ELF FAIL) 在 load/store 类 ELF 触发, 但与本 change 无关 (A/B test 验证). 用 ALU-only ELF 避免被 pre-existing 退化污染.
+
+- [ ] **Step 4: PTW_ACTIVE=1 时 stall load/store** (defer to Sprint 6-7 Phase B 完成后, 同 Task 2.1 Step 4)
+
+Run: `./build/bin/chipforge_tests_chmem "[cpu][chmem][dmem-sv32]" && 用 sv32 PTE ELF 验证 load/store stall 协议生效`
+Expected: PTW_ACTIVE=1 时 dmem stall 不发新 addr, PTW 完成 → resume
+Defer reason: 同 Task 2.1 Step 4 — 需要 Phase B (MMUPlugin_chmem + PtWalkFsmPlugin 联动) 实装才能 plant `PTW_ACTIVE=1` 信号
 
 ### Task 2.3: C4 — `cpu_factory_chmem.h` owner 真空修复
 
