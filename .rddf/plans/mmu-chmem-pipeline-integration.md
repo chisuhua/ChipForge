@@ -287,12 +287,16 @@ Expected: bare path cycle 数 == Phase 0 baseline byte-identical (零额外 late
 - 0 退化引入 (新测试与现有 CHMEM family 共存)
 - sv32 plumbing path (enable_mmu=true, mmu_mode=sv32) 行为 === Bare, 因 Phase B 未实装 mmu_chmem.h, PADDR_VALID 永远 false → sel 走 vaddr 分支
 
-**Pre-existing baseline 退化发现** (与本 commit 无关, Phase 2 follow-up 跟踪):
+**Pre-existing baseline 退化 ROOT CAUSE 确认** (与本 commit 无关, **不是代码回归**):
 - `chipforge_tests_chmem [chmem_vendored_elf_tohost1]`: 18 ELF FAIL (lb/lbu/ld_st/lh/lhu/lw/sb/sh/sw/st_ld + 8 rv32um)
 - A/B test 验证: HEAD `992dbf5` 完全干净 (revert ibus_chmem.h + cpu_factory_chmem.h + tests/CMakeLists.txt) 同样 18 fail → 与本 Task 2.1 改动无关
-- 推测根因: Phase 2.4 commit `992dbf5` C5 wiring 注释更新后, 或其他近期 commit 引入 CH_MEM elaboration 退化 (与 bare path 无关)
-- 影响: Phase D 验证 (`tools/run_chipforge_tests.sh --all`) baseline 对比需要先 fix 此退化, 否则 D6 baseline cycle 比对失败
-- 跟进: `feat-mmu-chmem-integration` Sprint 6-7 启动 Phase B 时同步深查此退化 root cause
+- 进一步深查 (explore subagent 2026-10-16): **不是代码回归**,是 **pre-existing 架构限制**, 已 Oracle 确认记录在 [`docs/lessons/phase-6d7-load-store-replay-stall.md`](docs/lessons/phase-6d7-load-store-replay-stall.md) (2026-10-10, **早于** Phase 2.4 C5 wiring commit):
+  - 根因: CppHDL Simulator (`pb->create_simulator()`) 把 **所有** `type_mem_read_port` (async `aread` + sync `sread`) 都归类为 `sequential_instr_list_` → 1-cycle read latency regardless of port type (`CppHDL/src/simulator_init.cpp:116-121` + `CppHDL/docs/simulation/ARCHITECTURE.md:362-377`)
+  - 上游 `openspec/changes/archive/2026-10-11-2026-10-12-followup-mem-read-drift-hardening/proposal.md` 刻意保留此行为 (Verilog backend = combinational, Simulator = sequential, 上游决定两者行为不同)
+  - ChipForge CH_MEM 5-stage datapath 是 **fully combinational** (`cpu_factory_chmem.h:395-400` 声明无 stage register); **只有 IBus 用 `pc_lag` (ch_reg 延迟) 补偿 1-cycle latency** (`ibus_chmem.h:80`); **DMem 没有等效补偿**
+  - 后果: MEM stage 的 `mem.aread(word_addr)` 读的是 **上一 cycle 的 byte_addr** 对应的 dmem 值 → wrong load value → ELF self-check fail → `tohost = (test#)|1` (3, 33, 65, ...)
+- 影响: Phase D 验证 (`tools/run_chipforge_tests.sh --all`) baseline 对比不需要 fix 此退化 — 因为这是 pre-existing 架构限制, 不在 mmu-chmem-pipeline-integration scope. Phase D 应当用 **Verilator backend** (`[verilator]`) 而非 CppHDL Simulator 做 baseline 对比, 或在 TLM binary 上做 baseline
+- **状态**: 此退化从 commit `5e82970` (Phase 6d.7 B', 2026-10-10) kCases 5→38 扩展时就被发现并记录. mmu-chmem-pipeline-integration 不需要修复它. 修复由 feat-phase-6d-rtl-verification (Phase 6d.7 owner) 负责 (lesson doc `phase-6d7-load-store-replay-stall.md` 列出 3 候选方案: A/B/C/D, 都需要 sprint 级工作量)
 
 - [ ] **Step 4: PTW_ACTIVE=1 时 stall fetch** (defer to Sprint 6-7 Phase B 完成后)
 
