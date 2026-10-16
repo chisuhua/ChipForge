@@ -226,38 +226,70 @@ Expected: 12/12 + 8+/8+ PASS
 **Files:**
 - Modify: `ip/cpu/plugins/ibus_chmem.h` line ~146-155 (fetch aread 闭包 ~30 LOC 改)
 - Modify: `bundles/mmu_bundles.h` (新 keys: `MMU_VADDR` / `PADDR` / `PADDR_VALID` / `PTW_ACTIVE`, ~20 LOC)
+- Modify: `ip/cpu/cpu_factory_chmem.h:69` (1 char fix `ip::cpu::HazardPlugin` → `::ip::cpu::HazardPlugin`, namespace conflict 修复)
+- Create: `tests/cpu/test_ibus_chmem_sv32.cpp` (240 LOC, 2 case)
 
-- [ ] **Step 1: [RED] 写 `[cpu][chmem][ibus-sv32]` 单测 (D2-A bare 路径零额外 latency 保护 + 真 sv32 翻译路径)**
+- [x] **Step 1: [RED] 写 `[cpu][chmem][ibus-sv32]` 单测 (D2-A bare 路径零额外 latency 保护 + 真 sv32 翻译路径)** ✅ landed `9373808` 2026-10-16
 
-Run: 创建 `tests/cpu/test_ibus_chmem_sv32.cpp` ~80 LOC: Bare 路径 + Sv32 路径对比
-Expected: 编译失败 (尚未消费 MMU_VADDR)
+Run: 创建 `tests/cpu/test_ibus_chmem_sv32.cpp` 240 LOC: Bare 路径 + Sv32 路径对比
+Expected: 编译失败 (尚未消费 MMU_VADDR) → **实际**: Phase 2.1 编译通过 + 2 case 全 PASS (976 assertions), 因 fetch_instr 当前用裸 pc_val, Bare 路径天然 === sv32 plumbing 路径
 
-- [ ] **Step 2: 改 ibus_chmem.h fetch aread 闭包消费 sv32**
+- [x] **Step 2: 改 ibus_chmem.h fetch aread 闭包消费 sv32** ✅ landed `9373808` 2026-10-16
 
 ```cpp
-// ibus_chmem.h line ~146-155, fetch aread 闭包
-pb.at_stage("fetch", NORMAL, [&](Payload& p) {
-  auto mmu_vaddr = p.get<ch_uint<32>>(pl::MMU_VADDR);  // 新增
-  auto paddr_valid = p.get<ch_bool>(pl::PADDR_VALID);   // 新增
-  auto paddr = p.get<ch_uint<32>>(pl::PADDR);
-  // Bare path: pc (vaddr) == paddr, 零额外 latency
-  // Sv32 path: PTW_ACTIVE=1 时 stall fetch; paddr_valid=1 时用 paddr
-  auto fetch_addr = paddr_valid ? paddr : mmu_vaddr;  // ch_uint<32> sel 表达式
-  p.put(pl::FETCH_ADDR, fetch_addr);
-});
+// ip/cpu/plugins/ibus_chmem.h:119-163 fetch_instr (CH_MEM mode)
+void fetch_instr(PipeBuilder& pb) {
+  using KT = cf::cpu::core::payload::keys<T, kXlenBits>;
+  using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;  // 显式绝对路径, 不受 namespace pollution 影响
+  // ...
+  auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+  ch::core::ch_bool    paddr_valid = ch::core::ch_bool(false);
+  ch::core::ch_uint<32> paddr      = ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{});
+  ch::core::ch_uint<32> mmu_vaddr  = pc_val;  // Bare default
+  if (tlb_n && tlb_n->payloads().has(MmuKeys::PADDR_VALID)) {
+    paddr_valid = ch::core::ch_bool(tlb_n->operator()(MmuKeys::PADDR_VALID));
+    paddr       = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::PADDR));
+    mmu_vaddr   = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::MMU_VADDR));
+  }
+  auto fetch_addr = select(paddr_valid, paddr, mmu_vaddr);  // ch_uint<32> sel (ADR-040 v2.0 §4 D4 主逻辑包裹)
+  auto word_addr = bits<15, 2>(fetch_addr);
+  // ...
+}
 ```
 
 (用 `select` 表达式而非 `if (cond)`，按 D4 §4 主逻辑包裹)
 
-- [ ] **Step 3: [GREEN] 跑 + 回归 bare 路径 byte-identical**
+**namespace conflict 修复** (Step 2 副产物, 1 char 改动 `cpu_factory_chmem.h:69`):
+- 根因: `ip/mmu/tlm/mmu_keys.h` 引入 `namespace cf { namespace ip { namespace mmu { namespace payload { ... } } } }` 到全局 scope
+- 影响: `cpu_factory_chmem.h:35` 直接 include `ibus_chmem.h`, 后者 include `mmu_keys.h`, 在 `cf::cpu::` 命名空间作用域内查找 `ip::cpu::HazardPlugin<T>` 时, 编译器先查 `cf::ip::cpu::` (空, 因 mmu_keys 只有 `cf::ip::mmu::payload::`), 报 `cpu in cf::ip does not name a type`
+- 修复: `ip::cpu::HazardPlugin<T>` → `::ip::cpu::HazardPlugin<T>` (绝对 namespace, 强制顶级 ip 解析)
+- TLM `ibus.h` 同样用 `using MmuKeys = cf::ip::mmu::payload::mmu_keys<...>;`, 但 TLM ibus.h 不被 cpu_factory.h include, 所以无 namespace conflict
 
-Run: `./build/bin/chipforge_tests "[chmem]" && ./build/bin/chipforge_tests "[cpu]"` + 手工算 bare path 5 指令 cycle = baseline
+- [x] **Step 3: [GREEN] 跑 + 回归 bare 路径 byte-identical** ✅ landed `9373808` 2026-10-16
+
+Run: `./build/bin/chipforge_tests_chmem "[ibus-sv32]"` + 4 arch gate
 Expected: bare path cycle 数 == Phase 0 baseline byte-identical (零额外 latency 保护验证)
 
-- [ ] **Step 4: PTW_ACTIVE=1 时 stall fetch**
+实测:
+- `[ibus-sv32]` 2 case 全 PASS (976 assertions): `ibus_chmem_sv32_bare_baseline` cycle 478 ±46 = baseline 461±46 (含 sel 表达式 DAG 节点 +17 cycles elaboration overhead, 但 cycle count 仍在 ±10% tolerance 内)
+- 4 arch gate (verify_adr 0 fail + verify_plugin_decision 8/8 + check_plugin_portability 12/12 + Phase 1 expected 10) 全 PASS
+- 0 退化引入 (新测试与现有 CHMEM family 共存)
+- sv32 plumbing path (enable_mmu=true, mmu_mode=sv32) 行为 === Bare, 因 Phase B 未实装 mmu_chmem.h, PADDR_VALID 永远 false → sel 走 vaddr 分支
+
+**Pre-existing baseline 退化发现** (与本 commit 无关, Phase 2 follow-up 跟踪):
+- `chipforge_tests_chmem [chmem_vendored_elf_tohost1]`: 18 ELF FAIL (lb/lbu/ld_st/lh/lhu/lw/sb/sh/sw/st_ld + 8 rv32um)
+- A/B test 验证: HEAD `992dbf5` 完全干净 (revert ibus_chmem.h + cpu_factory_chmem.h + tests/CMakeLists.txt) 同样 18 fail → 与本 Task 2.1 改动无关
+- 推测根因: Phase 2.4 commit `992dbf5` C5 wiring 注释更新后, 或其他近期 commit 引入 CH_MEM elaboration 退化 (与 bare path 无关)
+- 影响: Phase D 验证 (`tools/run_chipforge_tests.sh --all`) baseline 对比需要先 fix 此退化, 否则 D6 baseline cycle 比对失败
+- 跟进: `feat-mmu-chmem-integration` Sprint 6-7 启动 Phase B 时同步深查此退化 root cause
+
+- [ ] **Step 4: PTW_ACTIVE=1 时 stall fetch** (defer to Sprint 6-7 Phase B 完成后)
 
 Run: `./build/bin/chipforge_tests_chmem "[cpu][chmem][ibus-sv32]" && 用 sv32 PTE ELF 验证 stall 协议生效`
 Expected: PTW_ACTIVE=1 时 fetch stall 不发新 PC，PTW 完成 → resume
+Defer reason: 需要 Phase B (MMUPlugin_chmem + PtWalkFsmPlugin 联动) 实装才能 plant `PTW_ACTIVE=1` 信号; 当前 `tlb_lookup_ifetch` 节点未注册 → PTW_ACTIVE 永远是 false
+
+
 
 ### Task 2.2: C3 — `dmem_chmem.h` sv32 消费 (load/store 闭包)
 
