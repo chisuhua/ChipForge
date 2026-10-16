@@ -23,6 +23,7 @@
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/plugins/branch_chmem.h"
+#include "ip/mmu/tlm/mmu_keys.h"  // mmu-chmem-pipeline-integration Phase 2 Task 2.1 (C2): sv32 消费
 
 using namespace cf::plugin;
 using namespace ch;
@@ -117,6 +118,7 @@ class IBusPlugin : public PluginBase {
 
   void fetch_instr(PipeBuilder& pb) {
     using KT = cf::cpu::core::payload::keys<T, kXlenBits>;
+    using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
     auto* n = pb.node_of_logic_stage("fetch").get();
     if (!n) return;
     auto& pc_reg = get_pc();
@@ -125,7 +127,27 @@ class IBusPlugin : public PluginBase {
     ch::core::ch_uint<32> pc_val(pc_reg);
     ch::core::ch_uint<32> pc_lag_val(pc_lag);
     auto br_taken_buf = ch::core::ch_bool(get_br_taken_buf());
-    auto word_addr = bits<15, 2>(pc_val);
+
+    // mmu-chmem-pipeline-integration Phase 2 Task 2.1 (C2): sv32 消费
+    //   统一 sel 表达式 (ADR-040 v2.0 §4 D4 主逻辑包裹, Phase C 决策):
+    //     word_addr = select(PADDR_VALID, PADDR, MMU_VADDR)
+    //   Bare 路径 0 额外 latency (D2-A 保护): PADDR_VALID=false (MMU 未注册) 时
+    //     sel 回退到 MMU_VADDR (由 tlb_lookup_ifetch 节点 NORMAL phase 写 vaddr;
+    //     当前 phase B 未注册 → 默认构造 ch_uint<32>(0) cell = 无害 placeholder)
+    //   Sv32 路径 (Phase B 落地后, Sprint 6-7): PADDR_VALID=true 时 sel 选 PADDR,
+    //     实现 vaddr → paddr 真翻译
+    //   闭包外层 "tlb_lookup_ifetch" 节点不存在时 (Bare) → PADDR_VALID=false → 走 vaddr
+    auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
+    ch::core::ch_bool    paddr_valid = ch::core::ch_bool(false);
+    ch::core::ch_uint<32> paddr      = ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{});
+    ch::core::ch_uint<32> mmu_vaddr  = pc_val;  // Bare default = pc_val
+    if (tlb_n && tlb_n->payloads().has(MmuKeys::PADDR_VALID)) {
+      paddr_valid = ch::core::ch_bool(tlb_n->operator()(MmuKeys::PADDR_VALID));
+      paddr       = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::PADDR));
+      mmu_vaddr   = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::MMU_VADDR));
+    }
+    auto fetch_addr = select(paddr_valid, paddr, mmu_vaddr);
+    auto word_addr = bits<15, 2>(fetch_addr);
     // Phase 6d.7 B' follow-up: use sread (not aread) here so imem keeps
     // its 1-cycle read latency. CppHDL commit 250198a made aread emit a
     // combinational `assign` in Verilog, which would break pc_lag

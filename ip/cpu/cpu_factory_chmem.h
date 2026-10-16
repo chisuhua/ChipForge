@@ -66,7 +66,7 @@ class CpuFactoryChmem {
   using RegFile  = plugins::RegFilePlugin<T>;
   using IntAlu   = arch::riscv::RiscvIntAluPlugin<T>;
   using Branch   = plugins::BranchPlugin<T>;
-  using Hazard   = ip::cpu::HazardPlugin<T>;
+  using Hazard   = ::ip::cpu::HazardPlugin<T>;  // mmu-chmem-pipeline-integration Phase 2 Task 2.1 (C2): 绝对 namespace 路径, 避免 ibus_chmem.h 引入 cf::ip::mmu::payload namespace 后污染 cf::cpu:: 作用域内的 `ip` 查找
   using IBus     = plugins::IBusPlugin<T>;
   using Decoder  = plugins::RiscvDecodePluginChmem<T>;
   using DMem     = plugins::DMemPlugin<T>;
