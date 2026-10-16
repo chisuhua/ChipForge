@@ -153,6 +153,24 @@ class HazardPlugin : public cf::plugin::PluginBase {
   // 只接 ch::core::ch_bool 句柄, 反复调会累积到 OR 网无法 toggle, 是
   // CtrlLink API gap (解决路径 = 扩展接受 ch_reg/bit 句柄, 独立 change).
   // bare path 维持 byte-identical: state 默认 false, 不影响 HazardPlugin RAW stall.
+  //
+  // mmu-chmem-pipeline-integration (2026-10-16, Phase 2 Task 2.4 / C5 接线更新):
+  //   - intent: build() 闭包 OR-merge "raw_hazard + mmufault_pending" → halt_when()
+  //   - blocker 1: ch::core::ch_bool mmufault signal 来源 — cross-type operator() 在
+  //                CppHDL 0.x 未验证,需要 Phase B (mmu_chmem.h) 落地后统一 key 类型
+  //                为 ch_uint<8>,然后 MmuExceptionHandlerPlugin 写
+  //                pl::CPU_EXCEPTION_CODE → mmufault_clear, HazardPlugin 这里读
+  //   - blocker 2: CtrlLink API gap — halt_when() 接收 ch_bool 信号句柄,但 mark/clear
+  //                toggle 不对应 elaboration period;需要 CtrlLink 扩展接受 ch_reg<ch_bool>
+  //                句柄 (instance state 在 elaboration 期 form persistent signal).
+  //                解决路径 = 独立 change (per c5 commit comment),建议 PR 命名
+  //                "ctrl-link-chmem-reg-handle"
+  //   - bare path 维持: 上面 mmufault_pending_ 默认 false,即使 build() 闭包 OR-merge,
+  //                HazardPlugin RAW stall 路径不受影响
+  //   - 解锁条件: Phase B (12-01 起) + CtrlLink API gap 解决后,在 build() 闭包内加
+  //                auto mmufault_signal = ch_bool(mmufault_pending_);
+  //                stall_ctrl_->halt_when(raw_hazard || mmufault_signal);
+  //                (此 1 行 OR-merge, 不破坏 CtrlLink 现状 API, 仅 toggle via build-time)
   void mark_mmufault() noexcept {
     mmufault_pending_ = true;
   }
