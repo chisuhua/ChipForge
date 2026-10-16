@@ -524,6 +524,7 @@ Expected: `openspec/changes/mmu-chmem-pipeline-integration/` 移到 `openspec/ch
 |--------|------|------|---------------|------|
 | plan-2026-10-16 | plan-gen | plan 起草 (P0 approved 后由 rdd-builder P1 落位) | 6 phase 聚合 165 tasks.md 子任务 + bp-btb-coordination 提前到 Sprint 2 早期纳入 Phase 1 | rdd-builder P1 输出 + R-CHMEM-1 缓解整合 |
 | Phase 0 (2026-10-16) | baseline-verified | 4 architecture gates + 5 test families | baseline state: [mmu] 59/59, [cpu-l1-mmu-demo] 6/6 (workaround active), [cpu] 129/129, [cpu-integration] 95/96 + 1 known infra drift, [riscv-tests] 48/48, [verilator] 1 SIGTERM known flaky | HEAD 230bd36 (docs P0+P1 闭环), 6 files / +563 LOC, 进入 worktree openspec/mmu-chmem-pipeline-integration |
+| Phase 1.1 (2026-10-16) | protocol-spec-draft | `fetch_stall_protocol_v0.11.0.md` 290 行 in worktree `.rddf/protocols/` (untracked, owner handoff draft) | 不创建 `fetch_stall_chmem.h` 实际文件避免提前 dead code,Sprint 6-7 wave5-bp-btb owner 启动期 review + accept 后再入仓实装 | 替代 "本会话实装 fetch_stall_chmem.h" 选项,避免 8→9 plugin 注册跨 phase 干扰 + CppHDL substage API 未验证风险 |
 
 ## §7. 验证自检（execute 完成后跑）
 
