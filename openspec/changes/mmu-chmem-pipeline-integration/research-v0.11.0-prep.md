@@ -19,7 +19,7 @@
 | 上游 precedent | `mfc-cpu-pipeline-multi-cycle-fsm` Phase D.1 (MulDivFsmPlugin CH_MEM 占位) |
 | 风险等级 | 🔴 **High** — Oracle 已锁定 5 项决议 + 发现 shadow 双 bug + 1 个 proposal AC 矛盾 |
 | Oracle session | `bg_13cd7890` (2026-10-07),详见 §12 |
-| 估时(Oracle 调整) | **6.0-6.2 人周** (vs 原 5.6 估时;v0.10.0 期估 1-3 周失败教训) |
+| 估时(Oracle 调整 + 2026-10-16 user 决策追加) | **6.0-6.2 人周** (vs 原 5.6 估时;v0.10.0 期估 1-3 周失败教训;2026-10-16 bp-btb-coordination-3items 0.5d 提前对冲 R-CHMEM-1,净时不增但交付置信度 ↑) |
 
 ---
 
@@ -225,9 +225,12 @@
 | C Pipeline 集成 | 11 | 2.2 | +2d (byte-identical baseline 保护有真实成本) |
 | D 验证 | 5 | 1.0 | +0.5d (新增 D0 proposal 文本修订) |
 | E 文档 | 3 | 0.6 | 0 |
-| **合计** | **34** | **~6.0-6.2 人周** | +6d (vs 5.6 原始估时) |
+| **bp-btb-coordination-3items** (新增, 2026-10-16) | 0.5 | 0.1 | +0.5d (Sprint 2 早期 0.5d 提前启) |
+| **合计** | **34.5** | **~6.0-6.2 人周** | +6.5d (vs 5.6 原始估时) |
 
 > **对比 v0.10.0 估算 (Oracle 2026-10-07)**: 1-3 周。本研究两次上调: 原始 5.6 → Oracle 调整 6.0-6.2 人周,因 v0.10.0 估时仅含 Part a/b flip,未含 MMUPlugin CH_MEM + csr_write_satp shadow 修复 + 文档/回归/归档。
+>
+> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: 估时 +0.5d 在 Sprint 2 早期同步启。但抵消 R-CHMEM-1 (objective-v0110-launch.md §5) 1 周 buffer 暴露——Phase C 启动期不需要"先试探 fetch stall 边界再实装 ibus_chmem.h",C2/C3 可直接消费已 stable 的 fetch stall framework 锚点。**净时不变 (≈6.0-6.2 人周)**,但交付置信度从 ~70% 提升到 ~85%。
 >
 > **降级路径** (若 v0.11.0 窗口硬性 < 5 周): D1 收窄版再砍为"TLB-less"(每 access 走 PTW FSM) → 省 ~1.5d,但 5-指令 ELF 可接受,**必须在 proposal 显式标 PoC 限制**。
 

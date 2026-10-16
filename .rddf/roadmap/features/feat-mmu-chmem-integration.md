@@ -13,9 +13,10 @@ v0.11.0 launch owner：MMUPlugin CH_MEM 模式完整实装（ibus/dmem/mmu_excep
 
 ### phase-4 (v0.10.0-v0.11.0)
 - mmu-chmem-pipeline-integration Phase A 已 commit (`a3afcfa`, 2026-10-08): Bare shortcut + shadow 双 bug 修复 → [mmu] 59/59 PASS
+- **R-CHMEM-1 缓解（2026-10-16 user 决策）**: `bp-btb-coordination-3items` (0.5d fetch stall framework) 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启——为 Phase C (ibus_chmem.h) 入口准备稳定锚点，避免 R-CHMEM-1 暴露（详见 `objective-v0110-launch.md` §5 R-CHMEM-1 + §8 Sprint 6-7 时间盒）
 - Phase B-E 实装（依赖 bp-btb 协调 3 项协议达成）：
   - B1-B5: mmu_chmem.h 单级 ch_mem TLB + 复用 PtWalkFsmPlugin
-  - C1-C6: ibus_chmem.h + dmem_chmem.h sv32 消费
+  - C1-C6: ibus_chmem.h + dmem_chmem.h sv32 消费（依赖 bp-btb-coordination-3items 提前完成）
   - D1-D6: mmu_exception_handler_chmem.h combinational network
   - E1-E6: hazard_chmem.h mark/clear mmufault 实装
 

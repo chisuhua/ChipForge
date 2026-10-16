@@ -58,7 +58,7 @@ Phase B-E 全绿 (HANDOFF §10 退出标准):
 
 ### 9.2 Go / No-Go Decision Gate
 - **Phase B Go**: [mmu] 59/59 维持 + A5 PPN 验证结论已记录
-- **Phase C Go**: bp-btb 协调 3 项协议达成 (HANDOFF §3 备选: C2 推迟到协议达成)
+- **Phase C Go**: bp-btb 协调 3 项协议达成 (HANDOFF §3) — **2026-10-16 决策把 bp-btb-coordination-3items 0.5d 提前到 Sprint 2 早期完成**,确保 Phase C 启动期已有 fetch stall framework 锚点(R-CHMEM-1 缓解)
 - **Phase D Go**: B/C 全绿 + 4 architecture gates
 - **No-Go 触发**:
   - bp-btb 协调未达成 → Phase C 阻塞
@@ -66,13 +66,14 @@ Phase B-E 全绿 (HANDOFF §10 退出标准):
   - CH_MEM elaborate 0 error 无法达成
 
 ## 10. next_sprint_candidates
-- `phase-b-mmu-chmem-sv32` — MMUPlugin CH_MEM 实装 (10d)
-- `phase-c-ibus-dmem-sv32-consume` — IBus/DBus sv32 消费 (11d)
-- `bp-btb-coordination-3items` — fetch stage 协议 (0.5d, 先决)
+- `phase-b-mmu-chmem-sv32` — MMUPlugin CH_MEM 实装 (10d, **Sprint 6+ defer 维持**)
+- `phase-c-ibus-dmem-sv32-consume` — IBus/DBus sv32 消费 (11d, **依赖** bp-btb-coordination-3items 提前完成)
+- `bp-btb-coordination-3items` — fetch stage 协议 (0.5d, **先决**——Sprint 2 早期 10-23 ~ 10-30 启动,Phase C 入口对齐)
 
 ## 11. 跟踪台账（append-only）
 | Sprint | kind | 内容 | Decision/调整 | 原因 |
 |--------|------|------|---------------|------|
 | sprint-2026-10 | sprint-review | objective 创建 (Phase A 已 commit) | — | initial |
 | sprint-2026-10-2 | deferral-rationale | **Phase B (B.2-B.5 mmu_chmem.h) 推迟到 Sprint 6+** | Defer Phase B (B.2-B.5) 到 Sprint 6 起头 (12-01) 或 Sprint 7 (12-23),与 Phase D/E 同步推进 | 3 次 deep agent 派发累计 1.5h+ 探查 CppHDL API (ch_uint / ch_reg / ch_mem / ch_state_machine / pipe_node) 均未产出代码 (`ip/mmu/plugins/mmu_chmem.h` 不存在);Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A 真 radix-2 实装 (mfc-extract-fsm-h);Track B 推迟期不阻塞 Track A |
+| sprint-2026-10-3 | sprint-replan | **`bp-btb-coordination-3items` 0.5d 由 Sprint 6 提前到 Sprint 2 早期** | 0.5d (10-23 ~ 10-30) 同步启作为 Phase C (ibus_chmem.h) 入口对齐;原 Sprint 6 (12-01) 同步窗口收口改作 fallback | R-CHMEM-1 暴露 (`objective-v0110-launch.md` §5 风险表) 在 Phase C 启动期无 fetch stall framework 锚点;提前 bp-btb-coordination = 消解 1 周 buffer 暴露;代价 = Sprint 2 占用 0.5d 给 fetch stall 协议(不影响 Sprint 2-5 总 5.5 周窗口净时);user 决策 2026-10-16 |
 

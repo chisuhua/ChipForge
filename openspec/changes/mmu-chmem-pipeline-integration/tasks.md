@@ -9,12 +9,13 @@
 > **D0 已完成**: proposal 文本修订 (本 PR 落地)
 > **Phase B 已 defer (2026-10-10)**: 3 次 deep agent 派发累计 1.5h+ 均未产出 mmu_chmem.h 代码 (Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力)。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A (mfc-extract-fsm-h 真 radix-2 实装);Phase B (B2-B5) + C (C1-C6) 推迟到 Sprint 6+ (12-01 起) 与 D/E 同步推进。详见 `objective-mmu-chmem-phase-b-e.md` §11 跟踪台账
 > **Sprint 2-5 window (Phase C only, 10-23 ~ 11-30)**: C1-C6 (per objective-mmu-chmem-phase-b-e.md, B 已 defer)
+> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: `bp-btb-coordination-3items` 0.5d 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启——为 Phase C (C2/C3 ibus_chmem.h / dmem_chmem.h sv32 消费) 入口准备稳定 fetch stall framework 锚点,缓解 R-CHMEM-1 暴露 (objective-v0110-launch.md §5)。Sprint 2 占用 0.5d,但净时不变(消解 R-CHMEM-1 1 周 buffer 暴露换得)。原 Sprint 6 同步窗口收口改作 fallback(若 Sprint 2 提前未达成则 Sprint 6 补救)。
 > **Owner**: mfc-chmem team (per ADRs in proposal)
 >
 > **执行顺序** (硬性,不可并行的有依赖标记):
 > 1. PR1-A (A1 → A3.1 → A4 → A5 → A6) — 根因修复,**必须前置**
 > 2. PR1-B (B2 → B3 → B4 → B5) — MMUPlugin CH_MEM 实装
-> 3. PR1-C (C1 → C4 → C2/C3 并行 → C5 → C6) — Pipeline 集成
+> 3. PR1-C (C1 → C4 → C2/C3 并行 → C5 → C6) — Pipeline 集成(**C2/C3 启动前 bp-btb-coordination-3items 必须完成**)
 > 4. PR1-D (D1 → D2 → D3/D4 并行 → D5 → D6) — 验证与回归
 > 5. PR1-E (E1 → E2/E3 并行 → E4 → E5 → E6) — 文档与归档
 
@@ -25,8 +26,9 @@
 | Sprint | Window | Phase | Tasks | Owner |
 |--------|--------|-------|-------|-------|
 | Sprint 1 | 10-09 ~ 10-22 | Phase A (verified ✅) | A1-A6 | mfc-chmem |
-| Sprint 2-5 | 10-23 ~ 11-30 | Phase B + C | B2-B5 + C1-C6 | mfc-chmem |
-| Sprint 6-7 | 12-01 ~ 12-22 | Phase D | D1-D6 | mfc-chmem |
+| Sprint 2 (early, 10-23 ~ 10-30) | **bp-btb-coordination-3items** (0.5d, **Sprint 2 早期**——R-CHMEM-1 缓解) | mfc-chmem + bp-btb owner |
+| Sprint 2-5 | 10-23 ~ 11-30 | Phase C (B defer 维持到 Sprint 6+) | C1-C6(其中 C2/C3 依赖 bp-btb-coordination 完成) | mfc-chmem |
+| Sprint 6-7 | 12-01 ~ 12-22 | Phase B + D (B2-B5 解锁并入; bp-btb-coordination fallback 收口) | B2-B5 + D1-D6 | mfc-chmem |
 | Sprint 7-8 | 12-23 ~ 01-13 | Phase E | E1-E6 | mfc-chmem |
 
 ---
