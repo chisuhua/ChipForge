@@ -1,6 +1,6 @@
 # ADR-082: Plugin::negotiate() capability 协商（v0.10.0）
 
-> **Status**: 🚧 Drafting (2026-09-27, for v0.10.0)
+> **Status**: ✅ Accepted (2026-10-16, mfc-cpu-pipeline-multi-cycle-fsm archive 触发)
 > **类别**: Plugin / 框架扩展
 > **关联 ADR**: ADR-037 v2.0 (Plugin 范式) · ADR-046 (FSM 豁免) · ADR-047 (Result 范式) · ADR-048 (注册规范序) · ADR-070 (RVC) · ADR-082 (LaneArbiter)
 > **关联变更**: `openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/`（首个消费方）

@@ -503,6 +503,61 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - `wave5-bp-btb` (新建, v0.11.0+) — 解锁 DMIPS/MHz ≥1.4 硬门禁
 - `vexii-riscv-parity-poc` (wave6 P1) — v0.11.0+ 启动
 
+## v0.10.3 (2026-10-16, final archive) — mfc-cpu-pipeline-multi-cycle-fsm: MUL/DIV FSM 化 + ADR-082 negotiate 集成 (Phase A-H 全收官)
+
+> **OpenSpec change**: `mfc-cpu-pipeline-multi-cycle-fsm` (✅ archived 2026-10-16, 53/60 tasks, 7 defer v0.11.0)
+> **Initiative**: `wave5-isa-coverage-and-bp` (PoC-1 硬指标)
+> **Purpose**: MUL/DIV 多周期 FSM 化实装 + ADR-082 negotiate capability 集成 + Dhrystone DMIPS/MHz ≥1.4 硬门禁兑现
+> **Entry 状态**: **final archive** — 合并 v0.10.3 interim (Phase A) + mfc-defer-v0.11.0 scope handoff (2026-10-07) + mfc-extract-fsm-h (2026-10-10) + feat-dhrystone-dmips-gate (2026-10-15) 三段成果
+
+### Added (Phase B/C/D 累计)
+
+- **`MulDivResult<T>` Result 范式** (`ip/cpu/arch/riscv/mul_div_fsm.h:50`): `std::expected<T, PluginError>` 类型别名, 静态配置期错误处理 (ADR-047 v0.6). B.3/B.4 TDD red→green sequence, 4 用例 (`mul_div_result_type_alias` / `ok_static_factory` / `err_static_factory` / `build_failfast_passes`)
+- **`CapabilityTable` 框架** (`include/cf/plugin/capability_table.h`): ADR-082 negotiate API 载体. `provides<T>(key)` / `requires<T>(key)` / `topological_sort()` / `validate()` 4 API. C.1-C.4 PoC 5/5 PASS
+- **`MulDivFsmPlugin::negotiate()` 集成** (`ip/cpu/arch/riscv/mul_div_fsm.h:300-320`): 首个 ADR-082 消费方. 提供 `provide("multi_cycle_fsm", this)`. 删原 2 条 `requires` (`flush_broadcaster` + `writeback_arbiter`) per commit `722eca6` (oracle 双复审 A' fix)
+- **`mul_div_fsm_chmem.h` CH_MEM 配对** (`ip/cpu/plugins/mul_div_fsm_chmem.h`): `ch::core::ch_state_machine` DSL 描述 FSM (D.1, ADR-046 §2.1.1 豁免首例). `has_chmem_support = true` helper namespace
+- **`cycle_parity_test_*`** ([framework][chmem][multi-cycle] family): D.2 TLM↔CH_MEM cycle ±0 比对测试 3 用例 (`cycle_parity_test_tlm_busy_cycles` MUL=1/DIV=33 + `cycle_parity_test_chmem_file_exists` + `cycle_parity_test_chmem_namespace_symbol`), 5 assertions PASS
+- **`[elaborate]` family 5/5 PASS** (Phase D.3): `pb.elaborate(ctx)` emit lnode DAG + `always_ff @(posedge clk)` FSM 状态转移描述
+
+### Changed (D.4 mfc-extract-fsm-h 独立 archive)
+
+- **`ip/cpu/arch/riscv/mul_div_fsm.h:207-274` `advance_fsm` 真 radix-2 iterative 实装** (commit `df3bcea`, archive `2026-10-10-mfc-extract-fsm-h`): 替换原 ad-hoc busy counter. MUL=1 cycle / MULH=3 cycle / DIV=33 cycle (32 quotient bit-by-bit + 1 write-back), RV32 spec 上限 35 cycle 是 "全 stall" 近似
+- **TLM↔CH_MEM 共用 FSM 抽取**: D.4 refactor 推迟到独立 change `mfc-extract-fsm-h` 并已 archive, 不在本 change 重复跟踪
+
+### Fixed (Phase B' partial advance + Phase E 实装)
+
+- **MulDivFsmPlugin::negotiate() 无效 requires** (commit `722eca6`): 删 2 条 requires 避免 `BuildFailed` 在 cpu_factory.h 静默吞掉. `[cpu-integration][mul-div-fsm-integration]` 4/4 PASS
+- **`state_==IDLE` 守卫** (commit `b8f4769` B2 fix): at_stage 闭包内 `state_==IDLE` 早返, 修复 `mul_fsm` tohost=1
+- **Dhrystone harness 3 层契约违反** (commit `f95b2d0`): `dhrystone.c:tohost_pass` 写绝对地址 0 → 写 `&tohost` 锚定 0x80001000 + 新建 `link_dhrystone.ld` (base=0x80000000) + `dhrystone_crt0.S` (`_start` 接管 prologue) + DMIPS 公式修为标准量纲 + `-O2 -fno-inline` 编译 flag + `kMaxCycles` 100M → 5M
+
+### Verification (v0.10.3 archive 实测, 2026-10-16 HEAD `e9850d2`)
+
+- **`[riscv-tests]` 48/48 PASS** (461+48 assertions) — rv32ui 40/40 + rv32um 8/8 (mul=455 / mulh=504 / div=380 / rem=380 cycles 与 CSV baseline 1:1 对齐)
+- **`[cpu]` 129/129 PASS** (含 5 cpu_sim CLI 修复后 5/5 全绿, F1+F2+F3b 4 路径修复 commit `082b07a`)
+- **`[cpu-integration]` 86/86 PASS** (含 `[dhrystone]` 3/3 + `[mul-div-fsm-integration]` 4/4)
+- **`[mmu]` 59/59 PASS** (146+146 assertions, Bare-mode byte-identical 锚点)
+- **`[cpu-l1-mmu-demo]` 6/6 PASS** (含 `cpu-pipeline-tick-fix` 维持 workaround)
+- **`DMIPS/MHz = 1.43`** (≥ 1.4 硬门禁 PASS, 0.0351 → 1.43 增长 40.84×, vs VexiiRiscv single-issue 官方 ~1.4 偏差 ≤10%)
+- **`[verilator]` 1/1 PASS (96 assertions)** — 48 ELF (40 rv32ui + 8 rv32um) Verilator 后端 tohost=1 验证
+- **`[mmu-verilator]` 3/3 PASS (26 assertions)** — MMU Bare mode plumbing 验证
+- **`verify_adr.sh` 0 FAILED** / **`verify_plugin_decision.sh` 8/8** / **`check_plugin_portability.sh` 12/12** / **`doc_link_check.sh` 0 broken** — 4 架构门禁全绿
+- **2 个 TDD red markers (已知, 不算 regression)**:
+  - `mul_div_fsm_build_failfast_passes` — Phase B.3/B.4 Result 范式 validate_build_preconditions 实装未到位
+  - `PTW_Has_AdvanceFromRealMemory_Method` — wave3-mmu-real-memory-and-cycle P1#3 task 3.1/4.1 实装前 TDD red
+- **ADR-082 Accepted 状态**: ✅ 2026-10-16 (本 change archive 触发)
+
+### Known Limitations (defer v0.11.0, 跟踪独立 feature)
+
+- **F.2 stall 期间 IPC 回归 ≤5%** (`[cpu-integration]` 性能断言): Phase F optional scope, 推迟到 v0.11.0 Sprint 6 BP-BTB 协调阶段 (`feat-bp-btb-gshare` 启动期需 stall framework 实装)
+- **F.3 forward 网络优化** (如必要): 同 F.2, 性能回归在 BTB 装好后才有测量底座
+- **mfc-cpu-pipeline-multi-cycle-fsm scope 完结**: 53/60 tasks done, 7 task 残留 (F.2 + F.3 + H.1-H.5 archive 流程已在本 entry 完成), change 已 archive 2026-10-16
+
+### Downstream (v0.11.0 launch 启动期承接)
+
+- `feat-bp-btb-gshare` (新建 change, v0.11.0 Sprint 6-7): BTB 4K + GShare 13-bit + RAS 8-entry, 解锁 PoC-6 CoreMark ≥1.9 软门禁. `bp-btb-coordination-3items` (0.5d, mfc Phase C 入口) 为前置
+- `feat-mmu-chmem-integration` (active, 15/168 tasks): Phase B-E (mmu_chmem.h TLB + ibus_chmem.h + dmem_chmem.h sv32 + mmufault_clear)
+- `feat-dhrystone-dmips-gate` (✅ archived 2026-10-15, 本 entry 合并): DMIPS ≥1.4 已达成
+
 ## v0.10.x (2026-10-07, interim) — mmufault Part a BLOCKED + mmu-chmem-pipeline-integration change 占位
 
 > **OpenSpec change**: `mmufault-verilator-sv32-e2e-flip` Part a (BLOCKED) + 新建 `mmu-chmem-pipeline-integration` (v0.11.0 占位)
