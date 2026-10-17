@@ -80,6 +80,7 @@ DEFAULT_SKIP_PATTERNS: List[str] = [
     "sail-riscv-Linux-x86_64/",
     "cpp-tlm/",
     "CppHDL/",
+    ".rddf/",  # rdd-workflow transient state (gitignored, see .gitignore:57 state/)
 ]
 
 # ip_structure_check 豁免：IP 名 -> 豁免理由注释

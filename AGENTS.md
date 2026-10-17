@@ -411,7 +411,7 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 
 ## Phase 6d 启动前必知 (2026-09-20 新增, Oracle/Metis 审查修正)
 
-> Phase 6c 已完成 (`plugin-elaboration-substrate` 归档, v0.3.0 + v0.3.1 发布)。Phase 6d 待启动, 见 [`docs/architecture/roadmap-evolution.md §1`](docs/architecture/roadmap-evolution.md §1)。
+> Phase 6c 已完成 (`plugin-elaboration-substrate` 归档, v0.3.0 + v0.3.1 发布)。Phase 6d 待启动, 见 [`docs/architecture/roadmap-evolution.md` §1](docs/architecture/roadmap-evolution.md#1)。
 
 **Phase 6d 范围**: 5-stage Pipeline CH_MEM 端到端 + Verilator + MMU/PTW FSM (11-13 周, Oracle 估时上调 0.5 周因 6d.1 从零建)
 
