@@ -443,6 +443,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ch_uint<32>` 算术语义异常** (B.2.1 PoC): `ch_uint<32>(14) / ch_uint<32>(4) = 1` (非 3), `ch_uint<32>(3) * ch_uint<32>(4) = 16` (非 12). CppHDL `bv_div_truncate` / `bv_mul_truncate` 位截断语义与 C++ 整数算术不一致. PoC 用 `ch_literal<12,3,33>` 占位, 真 fix 跟踪 Phase B.4 + Phase C.2.
 - **`ch_reg` lock 顺序 race** (B.2.1 PoC): `busy_cycles_reg` ↔ `state_reg` ↔ `counter_reg` select tree 嵌套 lock 顺序与 `in_wb` 评估时机 race. PoC 用 `ch_literal<33>` 占位, 失去 MUL=1 / DIV=counter-1 cycle 计数语义. 跟踪 Phase C.2.
 
+## v0.11.0 (2026-10-17, interim) — mmu-chmem-pipeline-integration: Phase 2 done 收档 + follow-up Sprint 2-5 占位
+
+> **OpenSpec change**: `mmu-chmem-pipeline-integration` (wave5 P1, IN_PROGRESS 29/168 tasks) + follow-up `mmu-chmem-phase-b-c-launch` (placeholder 0/27 tasks)
+> **Author / Date**: build agent, 2026-10-17
+> **Commit**: `271c379 docs(openspec): mmu-chmem Phase 2 done 收档 + Sprint 2-5 follow-up 占位`
+> **Hard-block**: 4 项 prerequisite (R11.1 重审 / fetch-stall-protocol-v0.2 / bp-btb-coordination-3items / CtrlLink API gap FP-4) 由 follow-up change 承接,Sprint 2-5 启动期必做
+
+### Added
+- **mmu-chmem Phase 2 done 收档**: 根因 Bug 修复 (Bare shortcut + shadow 双 bug, commit `a3afcfa`) + C.2/C.3 sv32 消费 sel 表达式 (commit `9373808`/`5b9f74a`) + C.1/C.4/C.5 skeleton shipped (mmu_exception_handler_chmem + cpu_factory_chmem owner claim + hazard_chmem mmufault_pending state). tasks.md 同步 15 → 29 [x], TEST_CASE 6 → 4 编号统一 (7 处).
+- **follow-up change `mmu-chmem-phase-b-c-launch` 占位** (status=placeholder, 锚 Sprint 2-5 2026-10-23 ~ 2026-11-30 + Sprint 6-7 12-01 ~ 12-22): spec.md 2 Requirements + 7 Scenarios (sv32 TLB hit / PTW FSM 5 状态 / PTW fault / Bare byte-identical / mmufault exception propagation test tohost=1 / Verilator sv32 e2e flip TEST_CASE 4); yaml depends_on 仅列已 archive (mmu-chmem-pipeline-integration + csr-chmem-writeback-complete), prose 标注 4 项 prerequisite.
+- **strategy.md §3 line 38 文字与 §7 sync 派生一致 (29/168)**, 标注 follow-up; **events.jsonl 补 evt_20261017** 跨会话广播 (Phase 2 done + follow-up opened).
+
+### Verified
+- `openspec validate --strict` 4/4 PASS
+- 3 architecture gate: `verify_adr 0/0` + `verify_plugin_decision 8/8` + `check_plugin_portability 12/12` all PASS
+- 0 code change; 0 test change; 0 doc link broken; commit risk score 0.00
+- **H1 决策 (deferral)**: 本 change 不 archive, B–E 移交 follow-up, Sprint 2-5 启动期再处置双计
+
 ## v0.10.x (2026-10-07, interim) — mfc-defer-v0.11.0: mfc partial advance + scope handoff (Metis D' defer 决策)
 
 > **OpenSpec change**: `mfc-defer-v0.11.0` (IN_PROGRESS, 10/16 tasks)

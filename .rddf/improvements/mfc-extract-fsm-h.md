@@ -33,7 +33,7 @@ v0.11.0 是 Wave 5 ISA 覆盖 + 分支预测收官版本。`objective-v0110-laun
 2. **复用难**：业务 Plugin（L1Cache refill FSM / Hazard detection / Branch prediction）想复用 ch_state_machine DSL 模板需 include 整个 `mul_div_fsm.h`，不是干净 reusable header。
 3. **真 radix-2 落点被堵**：`advance_fsm` 重写为真 radix-2 iterative 需要干净的 FSM 边界；不先提取 `multi_cycle_fsm.h` 框架，真 radix-2 与 DSL 内联代码纠缠，无法独立验证。
 
-> 本段只给缺口摘要与项目上下文，完整设计/任务明细见 [`openspec/changes/mfc-extract-fsm-h/proposal.md`](../openspec/changes/mfc-extract-fsm-h/proposal.md) + [`tasks.md`](../openspec/changes/mfc-extract-fsm-h/tasks.md)（Phase A/B/C），本文件不重复。
+> 本段只给缺口摘要与项目上下文，完整设计/任务明细见 [`openspec/changes/archive/2026-10-10-mfc-extract-fsm-h/proposal.md`](../openspec/changes/archive/2026-10-10-mfc-extract-fsm-h/proposal.md) + [`tasks.md`](../openspec/changes/archive/2026-10-10-mfc-extract-fsm-h/tasks.md)（Phase A/B/C，archived 2026-10-10），本文件不重复。
 
 ## 2. What Changes
 
