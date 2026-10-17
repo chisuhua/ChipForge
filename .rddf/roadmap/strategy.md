@@ -35,7 +35,7 @@
 | `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | ✅ 已收官（archived, commit cba5e53 + 8909165 + d98a9dd） |
 | `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | ✅ **已收官（2026-10-08 全量 archive）**：P1#3 已 archive（commit 8a14402）；P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede（原 change 已 archive 2026-10-05）；**P1#4 ✅ archive (2026-10-08, Phase F optional 降级落地)**；P1#6 ✅ DONE (archived, 2026-10-08) |
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
-| **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm ✅ archived (2026-10-16, 53/60 done, 7 defer v0.11.0) + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare + P3#14 soc-freertos-demo + ADR-070~082 ✅ Accepted + ADR-084（14 条新规划，含 084=write-back FSM（重编号，原 083 冲突）净新增）| **v0.10.0 ✅ mfc 收官 → v0.11.0 → v1.0.0** | IN_PROGRESS（mfc ✅ archived, mmu-chmem 15/168, BP-BTB 待启动）；详见 [`docs/architecture/roadmap-evolution.md` §4-§4.5](../../docs/architecture/roadmap-evolution.md) |
+| **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm ✅ archived (2026-10-16, 53/60 done, 7 defer v0.11.0) + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare + P3#14 soc-freertos-demo + ADR-070~082 ✅ Accepted + ADR-084（14 条新规划，含 084=write-back FSM（重编号，原 083 冲突）净新增）| **v0.10.0 ✅ mfc 收官 → v0.11.0 → v1.0.0** | IN_PROGRESS（mfc ✅ archived, mmu-chmem **29/168 (Phase 2 done 2026-10-17, follow-up `mmu-chmem-phase-b-c-launch` 已开占位 Sprint 2-5)**, BP-BTB 待启动）；详见 [`docs/architecture/roadmap-evolution.md` §4-§4.5](../../docs/architecture/roadmap-evolution.md) |
 | **`wave6-linux-and-productization`**（**2026-10-09 标记, v1.0.0+ 远期**）| Wave 6 Linux + chip-selector 商业化 | P4#15 vexii-riscv-parity-poc (远期 placeholder, v1.0.0+ 启动期启用) | **v1.0.0 → v1.3.0** | deferred (wave6 启动期启用); 详见 [`docs/architecture/roadmap-evolution.md` §5-§7](../../docs/architecture/roadmap-evolution.md) |
 
 ## 4. 依赖图
@@ -112,7 +112,8 @@ graph TD
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
 | `2026-10-08-cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-08-verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 52 0 |
-| `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (15/168) | 153 15 |
+| `mmu-chmem-phase-b-c-launch` | wave5-isa-coverage-and-bp | P1 | TODO | 27 0 |
+| `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (29/168) | 139 29 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |

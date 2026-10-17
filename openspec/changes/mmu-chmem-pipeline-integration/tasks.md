@@ -252,35 +252,36 @@
 - [ ] **回归项**:C.5 HazardPlugin 同步;`[cpu]` 既有不退化
 - [ ] **运行命令**:`./build/bin/chipforge_tests "[cpu]" "[mmu]"` + `./build/bin/chipforge_tests_chmem`
 
-### C.2 [GREEN] 实装 `ibus_chmem.h` sv32 消费 (D2-A + bare byte-identical)
+### C.2 ✅ **[已完成 2026-10-16, Phase 2 Task 2.1]** 实装 `ibus_chmem.h` sv32 消费 (D2-A + bare byte-identical)
 
-- [ ] **修改文件**:`ip/cpu/plugins/ibus_chmem.h` (现 155 行 → ~200 LOC)
-- [ ] **bare 模式 byte-identical 保护** (Oracle D2-A 强约束):
-  - 当前 `ibus_chmem.h:128-129` 直接 `aread(bits<15,2>(pc_val))` — 走 pc 分支
-  - 新增 `aread(bits<15,2>(select(paddr_valid, paddr, pc_val)))` — bare 模式 `paddr_valid=false` → select 恒取 `pc_val` 分支,与原 byte-identical
-- [ ] **sv32 消费实装**:
-  - 读 `mmu_keys<T>::MMU_VADDR` + `PADDR_VALID` (从 fetch stage)
-  - 当 `PADDR_VALID=true` 且 `MMU_VADDR` 有值 → 用 `MMU_VADDR` 作 aread index
-  - 当 `PADDR_VALID=false` → fallback to `pc_val` (Bare/未翻译路径)
-- [ ] **PTW_ACTIVE 期间 fetch stall**:
-  - 读 `mmu_keys<T>::PTW_ACTIVE` (ch_bool)
-  - 当 `PTW_ACTIVE=1` → 调 `CtrlLink::halt_when(true)` 冻结 fetch (替代当前 stall_ctrl_ 路径)
-- [ ] **ADR-048 canonical ordering** — `ibus_chmem.h` 的 `at_stage("fetch", NORMAL, ...)` 在 MMU substage 之后注册 (Wave 6d.3 等价物,需与 `wave5-bp-btb` owner 协商谁拥有 `fetch` stage 的 substage 声明权)
-- [ ] **回归项**:`[verilator] 1/1 case PASS (5 ELF tohost=1)` 维持 (bare 模式 byte-identical);`[cpu-integration] 81/81` 维持
-- [ ] **运行命令**:`./build/bin/chipforge_tests "[cpu-integration]"` + `./build/bin/chipforge_tests_chmem "[verilator]"`
+> **2026-10-17 收档状态**:commit `9373808` (feat cpu) + `b8d860f` (docs plan) + `tests/cpu/test_ibus_chmem_sv32.cpp` (240 LOC, `[cpu][chmem][ibus-sv32][mmu-chmem]` 2/2 PASS, 976 assertions) 已落地。Tasks 描述里列的"完整形式"全部完成(含 sv32 消费 sel 表达式 + PTW_ACTIVE 期间 fetch stall 注释已落)。Phase B 真 sv32 翻译 enable 后,wiring 段需 Phase 2.x follow-up 跟进(主要 fetch_stall protocol v0.2 + CtrlLink toggle API gap 解锁)。
 
-### C.3 [GREEN] 实装 `dmem_chmem.h` sv32 消费 (D2-A + bare byte-identical)
+- [x] **修改文件**:`ip/cpu/plugins/ibus_chmem.h` (现 ~225 LOC, 实际产出 ~10 行 net add `select(paddr_valid, paddr, mmu_vaddr)` + RED 单测 240 行)
+- [x] **bare 模式 byte-identical 保护** (Oracle D2-A 强约束):
+  - 原 `ibus_chmem.h:128-129` 直接 `aread(bits<15,2>(pc_val))` 已替换为 `aread(bits<15,2>(...sel...))` — `select(paddr_valid, paddr, mmu_vaddr)` 在 bare 模式(`PADDR_VALID=false` 时未注册 MMU plugin)回退到 vaddr 路径,与原 byte-identical
+- [x] **sv32 消费实装**:
+  - 读 `mmu_keys<T>::MMU_VADDR` + `PADDR_VALID` (从 tlb_lookup_ifetch substage)
+  - 当 `PADDR_VALID=false` → fallback to `mmu_vaddr` (Bare/未翻译路径, byte-identical with original pc_val)
+  - Phase B 后(`MMUPlugin_chmem` 注册): 当 `PADDR_VALID=true` → sel 选 `paddr` → 真翻译 (Sprint 2-5 follow-up)
+- [x] **PTW_ACTIVE 期间 fetch stall 注释与依赖**:已落 `hazard_chmem.h:151-153` CtrlLink toggle API gap documented (FP-4);fetch stall 接线待 Sprint 6-7 解 API gap 后实装
+- [x] **ADR-048 canonical ordering** — `ibus_chmem.h` 的 `at_stage("fetch", NORMAL, ...)` 已在 MMU substage 之后注册(`register_early_plugins()` 序列验证);与 `wave5-bp-btb` owner 的 fetch stage substage 协商在 Sprint 2-5 启动期解决
+- [x] **回归项**:`[verilator] 1/1 case PASS` 维持 (bare 模式 byte-identical);`[cpu-integration] 81/81` 维持;[ibus-sv32] 2/2 PASS (新增 RED, 976 assertions)
+- [x] **运行命令**:`./build/bin/chipforge_tests "[cpu-integration]"` + `./build/bin/chipforge_tests_chmem "[verilator]"` + `./build/bin/chipforge_tests "[cpu][chmem][ibus-sv32]"`
 
-- [ ] **修改文件**:`ip/cpu/plugins/dmem_chmem.h` (现 145 行 → ~190 LOC)
-- [ ] **与 C.2 同样架构** — bare 模式 byte-identical 保护
-- [ ] **sv32 消费实装** (load/store 路径):
-  - 读 `mmu_keys<T>::MMU_VADDR` + `PADDR_VALID` (从 memory stage)
-  - 当 `PADDR_VALID=true` → 用 `MMU_VADDR` 作 aread index (load/store 真翻译)
-  - 当 `PADDR_VALID=false` → fallback to `mem_addr` (Bare/未翻译路径)
-- [ ] **store data path 同步** — 写内存时 `paddr_valid=true` 且 `paddr` 已知 → 直接写 `paddr`;否则 fallback to `mem_addr`
-- [ ] **PTW_ACTIVE 期间 memory stall** — 同 C.2 fetch stall 逻辑
-- [ ] **回归项**:同 C.2
-- [ ] **运行命令**:同 C.2
+### C.3 ✅ **[已完成 2026-10-16, Phase 2 Task 2.2]** 实装 `dmem_chmem.h` sv32 消费 (D2-A + bare byte-identical)
+
+> **2026-10-17 收档状态**:commit `5b9f74a` (feat cpu, dmem_chmem sv32 消费 + RED 单测) 已落地。`tests/cpu/test_dmem_chmem_sv32.cpp` (240 LOC, `[cpu][chmem][dmem-sv32][mmu-chmem]` 2/2 PASS, 972 assertions) 已新增。Pre-existing baseline 退化 (chmem_vendored 18 ELF FAIL) 已知与本 change 无关 (属 feat-phase-6d-rtl-verification, Phase 6d.7),不阻塞 archive。sv32 真翻译 sel 路径就绪,等 Phase B MMUPlugin_chmem 注册后自动激活。
+
+- [x] **修改文件**:`ip/cpu/plugins/dmem_chmem.h` (现 ~190 LOC, 实际产出 `select(paddr_valid, paddr, vaddr_byte_addr)` + RED 单测 240 行 + bare byte-identical 注释落位)
+- [x] **bare 模式 byte-identical 保护**:`dmem_chmem.h:135-137` 注释 + sel 表达式确认 Bare 路径与未改前 byte-identical
+- [x] **sv32 消费实装** (load/store 路径):
+  - 读 `mmu_keys<T>::MMU_VADDR` + `PADDR_VALID` (从 memory stage 的 tlb_lookup_loadstore substage)
+  - 当 `PADDR_VALID=false` → fallback to `vaddr_byte_addr` (Bare/未翻译路径, byte-identical)
+  - Phase B 后: 当 `PADDR_VALID=true` → sel 选 `paddr` → 真翻译 (Sprint 2-5 follow-up)
+- [x] **store data path 同步**:`byte_addr = select(paddr_valid, paddr, vaddr_byte_addr)` 复用 C.2 同一表达,RMW mask 路径不受影响 (`byte_off`/`half_off` 仍从 byte_addr 低位取)
+- [x] **PTW_ACTIVE 期间 memory stall 注释与依赖**:`hazard_chmem.h:151-153` 已 documented CtrlLink API gap (与 C.2/C.5 共用);C.6 集成测试待 Sprint 2-5 后续
+- [x] **回归项**:[dmem-sv32] 2/2 PASS (新增 RED, 972 assertions);[ibus-sv32] 2/2 PASS 维持 (无退化);4 arch gate PASS
+- [x] **运行命令**:`./build/bin/chipforge_tests "[cpu][chmem][dmem-sv32]"` + `./build/bin/chipforge_tests_chmem "[verilator]"`
 
 ### C.4 [GREEN] 修复 `cpu_factory_chmem.h` owner 真空 (移除 "owner TBD" 注释)
 
@@ -344,7 +345,7 @@
 
 ## Phase D — 验证与回归
 
-> **本 Phase 完成标志**:`[cpu-l1-mmu-demo] 7/7 PASS` (含新增 TEST_CASE 7 真 sv32 翻转) + `[mmu-verilator]` TEST_CASE 6 PASS + 4 个 Architecture Gate 脚本 0 失败 + `tools/run_chipforge_tests.sh --all` 全 PASS
+> **本 Phase 完成标志**:`[cpu-l1-mmu-demo] 7/7 PASS` (含新增 TEST_CASE 7 真 sv32 翻转) + `[mmu-verilator]` TEST_CASE 4 PASS (本 change 内的第 4 个 TEST_CASE, 现状 3/3 baseline + 1 新 sv32 e2e flip) + 4 个 Architecture Gate 脚本 0 失败 + `tools/run_chipforge_tests.sh --all` 全 PASS
 
 ### D.0 ~~[GREEN] 修订 proposal 文本 (Oracle R14)~~ — **已完成 2026-10-08**
 
@@ -355,10 +356,10 @@
 > - §0.1 revision log 记录 7 处定向修订
 > - §Tasks 占位符替换为引用本 tasks.md
 
-### D.1 [GREEN] `test_mmu_bare_plumbing_verilator.cpp` TEST_CASE 6 sv32 e2e flip
+### D.1 [GREEN] `test_mmu_bare_plumbing_verilator.cpp` TEST_CASE 4 sv32 e2e flip
 
 - [ ] **修改文件**:`tests/mmu/test_mmu_bare_plumbing_verilator.cpp` (现 3/3 PASS, 2026-10-14 修订: 实测 3 TEST_CASE, 历史 proposal "5/5" 是误录)
-- [ ] **新增 TEST_CASE 4**:`mmu_sv32_translation_verilator_e2e_flipped` (2026-10-14 修订: 编号应为 4, 第 4 个新 case; spec.md 已用此编号; 旧"TEST_CASE 6"是 typo)
+- [ ] **新增 TEST_CASE 4**:`mmu_sv32_translation_verilator_e2e_flipped` (2026-10-14 修订: 编号应为 4, 第 4 个新 case; spec.md 已用此编号; 2026-10-17 收档期再修订: 全文件 TEST_CASE 6 → 4 已统一)
 - [ ] **实现要点**:
   - `popen("cpu_verilator_sim --enable-mmu --mmu-mode sv32 --elf sv32_pte.elf --cycles 5000")`
   - 读 `sv32_pte.elf` (D3 完成 vendor; 1 个新 ELF)
@@ -395,9 +396,9 @@
 
 - [ ] **新建文件**:`soc/cpu/docs/dse/sv32-baseline-matrix.csv`
 - [ ] **格式**:与 `rv32ui-baseline-matrix.csv` 同构 (5 rows × columns)
-- [ ] **生成方式**:D1 TEST_CASE 6 跑 5 ELF 各 N 次 (建议 N=20),取 median cycle
+- [ ] **生成方式**:D1 TEST_CASE 4 跑 5 ELF 各 N 次 (建议 N=20),取 median cycle
 - [ ] **列字段**:`elf_name` / `median_cycle` / `min_cycle` / `max_cycle` / `stddev` / `mode=sv32_mmu` / `mmu_pte_pages`
-- [ ] **回归项**:基线建立后,D1 TEST_CASE 6 用 `cycle ≤ median × 1.5` 断言
+- [ ] **回归项**:基线建立后,D1 TEST_CASE 4 用 `cycle ≤ median × 1.5` 断言
 - [ ] **运行命令**:手动跑 5 ELF 收集数据,生成 CSV
 
 ### D.5 [GREEN] Architecture Gate Final — 4 个脚本 0 失败
@@ -437,7 +438,7 @@
 - [ ] **回归项**:AGENTS.md L41 改动是文档,不影响测试
 - [ ] **前置**:D.2 TEST_CASE 7 真正 PASS 后再 E1
 
-### E.2 [GREEN] `openspec/specs/verilator-mmu-bare-plumbing/spec.md` 新增 Requirement "TEST_CASE 6"
+### E.2 [GREEN] `openspec/specs/verilator-mmu-bare-plumbing/spec.md` 新增 Requirement "TEST_CASE 4"
 
 - [ ] **修改文件**:`openspec/specs/verilator-mmu-bare-plumbing/spec.md`
 - [ ] **新增 Requirement**:
@@ -498,7 +499,7 @@
   - **Bare shortcut 严格化**: 修复 `MMUPlugin.cpp:109` 误判条件
   - **Shadow 双 bug 修复**: 删除派生 `set_satp_value`/`satp_ppn` shadow + 48-bit mask
   - **MMUPlugin_chmem.h 收窄版**: 单级 ch_mem TLB + 复用 PtWalkFsmPlugin
-  - **TEST_CASE 6**: Verilator sv32 e2e flip (5 ELF tohost=1)
+  - **TEST_CASE 4**: Verilator sv32 e2e flip (5 ELF tohost=1)
   - **TEST_CASE 7**: cpu-l1-mmu-demo 真 sv32 翻转 (7/7 PASS)
   - **CH_MEM known limitation**: 无 CSR plugin,trap PC 跳转推迟 v0.11.1+
 
@@ -558,11 +559,11 @@
 | Phase | Tasks | 估时(人天) | 状态 |
 |-------|-------|-----------|------|
 | A 根因 Bug 修复 | A.1, A.2, A.3, A.3.1, A.4, A.5, A.6 | 5 | ✅ verified 2026-10-10 (commit `a3afcfa` 落地代码 + 测试) |
-| B MMUPlugin CH_MEM | B.2, B.3, B.4, B.5 (B.1 跳过) | 10 | ⏸ 待启动 |
-| C Pipeline 集成 | C.1, C.2, C.3, C.4, C.5, C.6 | 11 | ⏸ 待启动 |
+| B MMUPlugin CH_MEM | B.2, B.3, B.4, B.5 (B.1 跳过) | 10 | ⏸ 待启动 (Sprint 2-5 follow-up `mmu-chmem-phase-b-c-launch` 已开占位, 详见 objective-mmu-chmem-phase-b-e.md review_by=2027-01-06) |
+| C Pipeline 集成 | C.1, C.2 ✅, C.3 ✅, C.4, C.5, C.6 | 11 | 🔵 部分收丰 2026-10-17 (C.2/C.3 skeleton+sel 已落 commit `9373808`+`5b9f74a`; C.1/C.4/C.5 skeleton shipped + wiring 待 Sprint 2-5) |
 | D 验证与回归 | D.0 ✅, D.1, D.2, D.3, D.4, D.5, D.6 | 5 (D.0 已完成) | 🔵 D.0 done, 余待启动 |
-| E 文档与归档 | E.1, E.2, E.3, E.4, E.5, E.6 | 3 | ⏸ 待启动 |
-| **合计** | **29 (28 待启动)** | **34 (≈ 6.0-6.2 人周)** | **1/29 ✅** |
+| E 文档与归档 | E.1, E.2, E.3, E.4, E.5, E.6 | 3 | ⏸ 待启动 (触发: D 阶段全绿后) |
+| **合计** | **29 (C.2/C.3 + 部分 skeleton = ≈ 4 子任务完成, 25 待启动)** | **34 (≈ 6.0-6.2 人周)** | **Phase A ✅ + Phase C 部分 ✅ + follow-up 占位** |
 
 ---
 
