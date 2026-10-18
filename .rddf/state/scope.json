@@ -1,0 +1,20 @@
+{
+  "schema_version": "scope-v1",
+  "current_scope": {
+    "category": "governance",
+    "target": "governance",
+    "sub_target": null
+  },
+  "updated_at": "2026-10-18T16:23:59Z",
+  "updated_by": "user",
+  "session_id": "unknown",
+  "history": [
+    {
+      "from": null,
+      "to": "governance/governance",
+      "at": "2026-10-18T16:23:59Z",
+      "by": "user",
+      "trigger": "scope-matrix-proposal initial (2026-10-19)"
+    }
+  ]
+}

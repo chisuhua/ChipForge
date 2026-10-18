@@ -388,6 +388,163 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 
 ---
 
+
+---
+
+## Build Agent Work Scope Matrix (POC)
+
+> **生效范围：仅 build agent。** 其他 agent (explore / oracle / metis / critic / librarian / general) 不受本矩阵约束。
+>
+> **本段是 build agent 的运行时工作焦点约束**。build agent 在每个回合开始时，必须先识别自己当前的工作 scope，再决定建议焦点 / grep 范围 / 反向引用优先级。
+>
+> **与 `~/.config/opencode/AGENTS.md` Build Agent 角色矩阵的关系（正交独立）**:
+>
+> | 维度 | opencode Role Matrix | 本 Project Scope Matrix |
+> |------|---------------------|------------------------|
+> | 目的 | agent 行为约束 (who I am) | agent 工作焦点 (what I am working on) |
+> | 状态位置 | `~/.config/opencode/AGENTS.md` (用户全局) + `<cwd>/.rddf/state/role.json` (项目级) | `<cwd>/.rddf/state/scope.json` (项目级, git tracked) |
+> | 取值 | arch / planner / builder / verifier / no-role / general | framework / ip/<name> / soc/<name> / governance / tools/<name> |
+> | 副作用 | enforcement（允许/禁止动作: commit/edit/branch) | **advisory**（建议焦点 / grep 范围 / 反向引用优先级） |
+> | UI | `【角色: builder | change: <名或无>】` | `【角色: <X> | scope: <Y>】` |
+>
+> 两个正交独立: `role=builder + scope=ip/cpu` 叠加完全有效, 无冲突。
+
+### 1. 状态来源
+
+- **状态文件**: `<cwd>/.rddf/state/scope.json` (项目级, parallel to `role.json`).
+- **fallback**: 项目级缺失时视为 `governance/governance` 默认值 (与本 session 入口一致).
+- **字段**:
+  - `current_scope.category`: framework | ip | soc | governance | tools
+  - `current_scope.target`: 具体 ip/soc/工具 name (e.g. "cpu", "cache", "soc/cpu_l1_mmu_demo", "cpu_sim")
+  - `current_scope.sub_target`: optional, 当前 work 落入的子目录 (e.g. "plugins", "docs", "configs")
+  - `history`: scope 切换历史 (array of {from, to, at, by, trigger})
+- **读取时机**: 每个 build agent 回合开始时 (含本回合响应前) 必须读 `scope.json` 当 prompt context.
+- **写入**: scope 切换时 build agent 写入 `.rddf/state/scope.json` (项目级, 与 `role.json` 同层).
+- **gitignore 冲突解析**: `.gitignore:57` 有 `state/` rule, 但 scope.json 是手维护 SSoT (同 role.json 角色), 使用 `git add -f .rddf/state/scope.json` 强制加入 git (force-add despite gitignore).
+- **初始化**: 用本 section §6 schema v1 模板在项目根创建 `.rddf/state/scope.json` (幂等; 已有则覆盖为当前 scope).
+
+### 2. 5 Categories × Targets 矩阵
+
+| Category | Targets (示例) | 默认 grep 范围 | 主要反向引用 | 关联 4 架构 gate 重点 |
+|----------|------|----------|----------|------|
+| `framework` | framework | `include/cf/plugin/` + `src/cf_plugin/` + `bundles/` | ADR-037/040/046/082/083 (Plugin 框架) | check_portability + verify_decision |
+| `ip` | cpu + cache + mmu + memory + peripheral + interconnect + tilecopy + tilecore | `ip/<target>/` + `tests/<target>/` | docs/architecture/adr + openspec/specs/<target> | check_portability + verify_decision + verify_adr |
+| `soc` | soc/cpu_l1_mmu_demo + soc/mmu_minimal + soc/l1_cache_minimal | `soc/<target>.json` + `tests/soc/<target>/` + `tools/{cpu_sim,verilator_runner}/` | docs/architecture + soc-level DSE CSV | check_portability + verify_decision + verify_adr + E2E smoke |
+| `governance` | governance | `.rddf/` + `openspec/` + `AGENTS.md` + `docs/` | rdd-workflow + sync scripts | doc_link_check + verify_adr |
+| `tools` | cpu_sim + verilator_runner | `tools/<target>/` | tools-related docs | tool-specific smoke |
+
+> **命名约定**: targets 镜像物理目录真实名字 (`soc/cpu_l1_mmu_demo.json` 用下划线, 不是 `soc/cpu-l1-mmu-demo`). `/` separator 仅用于 category namespace 分割, 实际文件系统路径用 `_` (下划线) 在 JSON filenames 中, `/` 在目录中.
+
+### 3. 切换触发 & 写入
+
+- **显式 trigger**: user 说 "切换到 ip/cpu" / "scout framework" / "回到 soc" / "scope=cache".
+- **隐式 trigger (可选)**: build agent 可基于最近 git diff 路径推荐 scope 设置 (`git diff --name-only HEAD~N | grep -E "^ip/|^tests/|^soc/"` 自动 suggest, user 确认).
+- **写入**: 触发时 build agent 写 `.rddf/state/scope.json` 项目级 (同 `role.json` 模式).
+- **查看**: build agent 每个回合开始读 `current_scope` 作 prompt context.
+- **不冲突**: scope 切换不影响 role; `role=builder + scope=ip/cpu` 完全有效.
+
+### 4. 开场报告格式
+
+build agent 每个回合输出 (类似 role 矩阵开场报告):
+
+```
+【角色: <X> | scope: <Y>】
+  <human-readable line>
+```
+
+示例:
+
+- `【角色: builder | scope: ip/cpu】当前会话在 ip/cpu 工作, 包括 plugins/docs/configs 子目录 + 关联 ADR-048/084/085 反向引用.`
+- `【角色: builder | scope: soc/cpu_l1_mmu_demo】已切换到 SoC 集成层; grep 范围 = soc/cpu_l1_mmu_demo.json + tests/soc/soc-cpu-l1-mmu-demo/ + cpu_sim + verilator_runner.`
+- `【角色: builder | scope: governance】检测最近 N 次 commit 含 openspec/ + .rddf/ 改动, 推断 governance 模式; 切换? (y/n)`
+
+> **格式差异**: 全局 `~/.config/opencode/AGENTS.md` 的 builder 行使用 `change: <名或无>` tail (e.g. `【角色: builder | change: my-change】`); 本项目使用 `scope: <Y>` tail. 两个 open report 格式按 host file 区隔 (project-level vs global), 各有独立语义. 同时显示也不会冲突, 因为只有 build agent + project-level AGENTS.md 时才会同时读两者.
+
+### 5. 默认行为
+
+- **不自动切换**: scope 不跨 tool 自动切换 (避免 cognitive drift).
+- **不限制操作**: agent 在任一 scope 下都可读/写所有文件, scope 仅影响:
+  - 推荐优先级 (scope = cpu 时 cpu 相关 grep 优先)
+  - 反向引用范围提示 (scope = cache 时 cache 相关的 ADR/docs/specs 优先)
+  - 4 架构 gate 重点 (scope = ip/cache 时 check_portability + verify_decision 优先; scope = soc 时 soc E2E smoke test 优先)
+- **可手动 override**: user 任何时候说 "scope 切换" 即生效.
+
+### 6. scope.json Schema v1 初始模板
+
+```json
+{
+  "schema_version": "scope-v1",
+  "current_scope": {
+    "category": "<framework|ip|soc|governance|tools>",
+    "target": "<target name, e.g. cpu, cache, soc/cpu_l1_mmu_demo, cpu_sim, governance>",
+    "sub_target": "<optional, e.g. plugins, docs, configs>"
+  },
+  "updated_at": "<ISO8601 timestamp>",
+  "updated_by": "user",
+  "session_id": "<OpenCode session ID>",
+  "history": [
+    {
+      "from": null,
+      "to": "<category>/<target>",
+      "at": "<ISO8601>",
+      "by": "user",
+      "trigger": "scope-matrix-proposal initial | user requested | agent inferred"
+    }
+  ]
+}
+```
+
+### 7. Mermaid 关系图
+
+```mermaid
+graph TD
+    Framework[framework] --> Ipcpu[ip/cpu]
+    Framework --> Ipcache[ip/cache]
+    Framework --> Ipmmu[ip/mmu]
+    Framework --> Ipmem[ip/memory]
+    Framework --> Ipperipheral[ip/peripheral]
+    Framework --> Ipinterconnect[ip/interconnect]
+    Ipcpu --> SocDemo[soc/cpu_l1_mmu_demo]
+    Ipcache --> SocDemo
+    Ipmmu --> SocDemo
+    Ipcpu --> SocMmu[soc/mmu_minimal]
+    Ipmmu --> SocMmu
+    Ipcache --> SocCache[soc/l1_cache_minimal]
+    Framework --> ToolsCpuSim[tools/cpu_sim]
+    Framework --> ToolsVerilator[tools/verilator_runner]
+    ToolsCpuSim --> SocDemo
+    ToolsVerilator --> SocDemo
+    Governance[governance] -.-> Framework
+    Governance -.-> Ipcpu
+    Governance -.-> SocDemo
+```
+
+> **实线** = scope 从属关系 (e.g. scope=ip/cache 时 grep 自动覆盖 ip/cache + tests/cache); **虚线** = governance 跨 scope 影响 (governance 改动影响 framework + ip + soc 全栈).
+
+### 8. 与现有 governance 对齐 (per code-test-ownership-report.md §D 归属划分)
+
+| 物理目录 | Scope category | 默认 target | rationale |
+|---------|-------------|------------|------|
+| `include/cf/plugin/` | framework | framework | cf::plugin namespace API |
+| `src/cf_plugin/bridge/` | framework | framework | bridge 适配层 (D4 ADR-041 例外) |
+| `bundles/` | framework | framework | 共享 payload key (mem_bundles 等) |
+| `ip/cpu/` | ip | cpu | IP 业务代码, ADR-083 v2.0 plugins/ 双文件分离 |
+| `ip/cache/` | ip | cache | IP 业务代码, plugins/ (本次治理后命名一致) |
+| `ip/mmu/` | ip | mmu | IP 业务代码, lib+tlm 拆分 |
+| `ip/{memory,peripheral,interconnect,tilecopy,tilecore}/` | ip | (placeholder) | 0 代码, 仅 README+STATUS 占位 |
+| `soc/*.json` | soc | (per JSON) | SoC 拓扑声明 |
+| `tests/soc/<soc-name>/` | soc | (per JSON) | SoC 测试 (本次治理后 3 子目录) |
+| `tools/{cpu_sim,verilator_runner}/` | tools | (per tool) | SoC E2E 工具链 |
+| `.rddf/` + `openspec/` + `AGENTS.md` | governance | governance | workflow + 元文件 |
+
+### 9. 后续 follow-up (governance 治理窗口)
+
+- **AGENTS.md 全局层面**: 本 section 写在 repo `AGENTS.md` (项目级), 与 `~/.config/opencode/AGENTS.md` (用户全局 Role Matrix) 独立. 用户在两个 AGENTS.md 中分别维护各自 scope matrix + role matrix, 形成两层 runtime context.
+- **cache-tlm-to-plugins-rename + tests-soc-topology-restructure + tests-cpu-configs-to-schema-rename 三个 governance predecessor 已 DONE (archived, strategy.md §7 DONE)**: 本 change 紧随其后, 补齐 "agent 知道自己在哪里" 的元数据层.
+- **5 项 code-test-ownership-report.md §F 不一致点治理收官**: 本 session 完成 4/5 (§F.1 缓存 tlm→plugins, §F.2 chmem 混在 tlm, §F.5 tests-cpu/configs→schema). 剩 §F.3 placeholder IP + §F.4 tests/bundles/ 补全, 留 future work (独立 change).
+
+---
+
 ## 不显而易见的约定
 
 - **`ip/cpu/` 是最老的 IP**，当前不完全遵守标准文档结构（无 `ip/cpu/docs/` 等）；新增 IP 必须对齐
