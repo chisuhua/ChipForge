@@ -393,6 +393,72 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 
 ## Build Agent Work Scope Matrix (POC)
 
+### 0.5. Per-turn read+output 硬性规范
+
+> **本节是 build agent 的 runtime 行为约束, 让 scope matrix 从"docs 规范"升级为"硬规范"**。本节生效后, 任何 build agent 回合响应 (不论 session / tool / scope) 必做 read + output 两阶段.
+
+#### Read 必做清单 (3 步)
+
+每个 build agent 回合响应前 (含本回合响应前) 必读:
+
+1. **角色** (从 opencode Role Matrix 继承):
+   - 主: `<cwd>/.rddf/state/role.json` (项目级, 当前 `current_role=builder`)
+   - Fallback: `~/.config/opencode/AGENTS.md` §1 (项目级缺失时读全局规则)
+   - Fallback: 都没有则视为 `general` (默认 build agent 行为)
+
+2. **Scope** (本 project Scope Matrix 维护):
+   - 主: `<cwd>/.rddf/state/scope.json` (项目级, 当前 `current_scope=governance/governance`)
+   - Fallback: `governance/governance` (本 session 入口默认)
+
+3. **隐式 trigger 检测** (optional):
+   - `git log -1 --oneline` 读最近 1 个 commit message
+   - 如果 commit message 含 `Scope-Context: <X>` 标记, 隐式 restore scope=<X> (前提: 未来 hooks 实施后)
+
+#### Output 必做清单 (2 步)
+
+每个 build agent 回合响应**最顶部** (其他内容之前) 必出:
+
+1. **开场报告** 1 行 (机读 + 人话):
+   ```
+   【角色: <X> | scope: <Y>】
+   ```
+   示例:
+   - `【角色: builder | scope: ip/cpu】当前会话在 ip/cpu 工作, 包括 plugins/docs/configs 子目录 + 关联 ADR-048/084/085 反向引用.`
+   - `【角色: builder | scope: governance/governance】当前会话在 governance 治理层, 关注 AGENTS.md + openspec/ + rdd-workflow.`
+
+2. **切换 mark** (if scope changed from previous turn):
+   - 显式: "已切换 scope: <X> (原 <Y>)"
+   - 让用户能从对话表层看到 scope 变化
+
+#### Before vs After 对照表
+
+| 维度 | Before (scope-matrix-proposal 2026-10-19) | After (本 change §0.5 升级) |
+|------|----|----|
+| 角色 read | 靠 LLM 自觉 | **硬规范, §0.5 第 1 步必做** |
+| Scope read | 靠 LLM 自觉 | **硬规范, §0.5 第 2 步必做** |
+| 开场报告输出 | 靠 LLM 自觉 | **硬规范, §0.5 第 1 步必出** |
+| 切换 mark 显式 | 不强制 | **硬规范, §0.5 第 2 步必出** |
+| 用户认知成本 | 中 (LLM 可能忘) | 低 (每次响应都看得到) |
+| 实施成本 | 0 (Phase 0 纯 docs) | 0 (本 change 也纯 docs) |
+| 跨 session 行为 | session-bootstrap 默认 `general` + `governance` | **同, 但有硬规范 ensure** |
+| runtime patch | 无 (opencode runtime 不能 patch LLM 行为) | **无 (同, 仍靠 LLM 读 §0.5)** |
+
+#### 与 `~/.config/opencode/AGENTS.md` §3 角色切换的对比
+
+| 触发 | opencode Role Matrix §3 | 本 §0.5 Per-turn 硬规范 |
+|------|------|------|
+| 触发频率 | 仅当 user 说"切换到 X" (低频) | **每回合** (高频) |
+| 触发方 | user (显式) | LLM (每回合自动) |
+| 副作用 | 写 `role.json` + 输出新角色开场报告 | 读 `role.json` + `scope.json` + 输出当前角色+scope 开场报告 |
+| 角色 vs scope | 仅角色 | 角色 + scope (双 read) |
+
+#### 用户验证方法
+
+每次本会话 (或任何后续 session) 看 LLM 响应, 最顶部应该出现 `【角色: <X> | scope: <Y>】` 格式. 如果没出现 = LLM 没遵守 §0.5 硬规范, 用户可提醒"请遵守 AGENTS.md §0.5".
+
+---
+
+
 > **生效范围：仅 build agent。** 其他 agent (explore / oracle / metis / critic / librarian / general) 不受本矩阵约束。
 >
 > **本段是 build agent 的运行时工作焦点约束**。build agent 在每个回合开始时，必须先识别自己当前的工作 scope，再决定建议焦点 / grep 范围 / 反向引用优先级。
@@ -544,6 +610,99 @@ graph TD
 - **5 项 code-test-ownership-report.md §F 不一致点治理收官**: 本 session 完成 4/5 (§F.1 缓存 tlm→plugins, §F.2 chmem 混在 tlm, §F.5 tests-cpu/configs→schema). 剩 §F.3 placeholder IP + §F.4 tests/bundles/ 补全, 留 future work (独立 change).
 
 ---
+
+
+### 10. /scope-show
+
+> **User-facing trigger** (口语口令, 非 opencode runtime slash command): 用户说 `scope?` / `scope status` / `/scope-show` / `我现在在哪?` 之一即触发.
+
+#### LLM 动作 (3 步)
+
+1. `cat .rddf/state/scope.json`
+2. 解析 `current_scope` (category + target + sub_target) + `history` 倒序取最近 5 条
+3. 输出格式化 (见示例)
+
+#### 期望输出示例 (governance 状态)
+
+```
+【scope-show】
+  current: governance/governance
+  updated_at: 2026-10-19T00:23:59Z
+  updated_by: user
+  history (last 5):
+    [2026-10-19T00:23:59Z] from=null to=governance/governance by=user trigger="scope-matrix-proposal initial"
+```
+
+#### 与 opencode `/role-show` 命名对比
+
+| 命令 | 来源 | 触发 |
+|------|------|------|
+| `/role-show` | `~/.config/opencode/AGENTS.md` §1 | user 口语 (opencode runtime 不解析) |
+| `/scope-show` | 本项目 AGENTS.md §10 | user 口语 (opencode runtime 不解析) |
+
+> **明确说明**: opencode runtime **不解析真 slash command** (e.g. `/scope-show` 不会自动 trigger 任何 tool). 这些都是 user → LLM 触发的口语口令, 靠 LLM 读到 AGENTS.md §10 后理解执行. 命名风格对齐 opencode 已有约定 (e.g. `/role-show`).
+
+---
+
+### 11. /scope-history
+
+> **User-facing trigger**: `scope history` / `scope 切换了什么` / `/scope-history` 之一.
+
+#### LLM 动作 (2 步)
+
+1. `cat .rddf/state/scope.json`, 提取 `history` array
+2. 倒序打印 (最近在上), 每条带 `from/to/at/by/trigger` 5 字段表格化
+
+#### 期望输出示例
+
+```
+【scope-history】(2 entries, reverse-chronological)
+  1. 2026-10-19T01:10:00Z | user | governance/governance → ip/cpu | trigger: "user 切到 ip/cpu 看 mul_div_fsm"
+  2. 2026-10-19T00:23:59Z | user | (init) → governance/governance | trigger: "scope-matrix-proposal initial"
+```
+
+> **如果 history 为空 (e.g. fresh clone)**: 输出 `【scope-history】history empty (fresh state, current_scope=governance/governance default)`.
+
+---
+
+### 12. /scope-reset
+
+> **User-facing trigger**: `scope reset` / `回到 governance` / `/scope-reset` 之一.
+
+#### LLM 动作 (4 步)
+
+1. 读 current scope.json, 备份 `from: <old_current_scope>` 给 history
+2. 写新 state: `current_scope = {category: governance, target: governance, sub_target: null}`
+3. 追加 history entry: `{from: <old>, to: "governance/governance", at: <now>, by: "user", trigger: "user reset"}`
+4. 输出确认 (见示例) + git commit scope.json (force-add 模式, 因 `.gitignore:57 state/`)
+
+#### 期望输出示例
+
+```
+【scope-reset】已重置回 governance/governance (原: ip/cpu)
+  state file: .rddf/state/scope.json
+  history: 1 new entry appended
+  git: committed (force-add)
+```
+
+> **Note**: 与 scope-matrix-proposal §6 schema 一致 — 5 categories 中 `governance/governance` 是 reset 默认值.
+
+---
+
+### 13. Slash command 触发对照表 (速查)
+
+| 用户说 | 触发 LLM 动作 | 输出 section |
+|--------|----|----|
+| `scope?` / `scope status` | /scope-show | §10 |
+| `scope history` / `scope 切换了什么` | /scope-history | §11 |
+| `scope reset` / `回到 governance` | /scope-reset | §12 |
+| `切换到 <X>` / `scope=<X>` | 修改 current_scope + append history + 输出新开场报告 | §3 + §4 |
+| `auto-pick` / `推荐 scope` | git diff 推断 + propose | (per §3 隐式 trigger) |
+
+> **生效范围**: 全部触发, 不论 scope 状态 (governance / ip / soc / tools / framework 都可).
+
+---
+
 
 ## 不显而易见的约定
 
