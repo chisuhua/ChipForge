@@ -132,6 +132,7 @@ graph TD
 | `2026-10-16-mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 60 |
 | `2026-10-18-cache-tlm-to-plugins-rename` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 80 0 |
 | `2026-10-18-scope-matrix-proposal` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 31 0 |
+| `2026-10-18-scope-state-show-and-read-hint` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-18-tests-cpu-configs-to-schema-rename` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 37 0 |
 | `2026-10-18-tests-soc-topology-restructure` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 47 0 |
 | `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
