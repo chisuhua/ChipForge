@@ -2,7 +2,12 @@
 initiative: wave5-isa-coverage-and-bp
 priority: P1
 version_target: v0.11.0
-status: placeholder
+status: ready
+# Status 修订 (2026-10-18, F2 P0 入口):
+#   从 placeholder -> ready. 由 build agent 2026-10-18 在 mmu-chmem-pipeline-integration
+#   Phase 2 done 收档 + 跨 owner 协商预约 (events.jsonl evt_20261018_120000) 之后,
+#   走 ADR-0049-auto-decision P0 入口 (complex case). Sprint 2-5 启动期 (2026-10-23 ~)
+#   进入 P1 plan gen + P1.5 deps check.
 depends_on:
   - mmu-chmem-pipeline-integration  # ✅ Phase 2 done 2026-10-17 (Phase A + C.2/C.3 sel 已落 commit 9373808+5b9f74a+1429f5a+8bb55a9+06bb1d3+992dbf5+c71c9e7)
   - csr-chmem-writeback-complete    # ✅ archived 2026-10-15 (R3.5 写通路完整, R11.1 重审入口就绪)
@@ -17,6 +22,7 @@ related_to:
   - ADR-046 (多周期协议引擎 FSM 豁免 — PtWalkFsmPlugin 复用入口)
   - ADR-049 (MMU paddr 消费契约)
   - ADR-083 (Plugin-style 单一 source of truth — mmu.h + mmu_chmem.h 双文件分离)
+  - ADR-0049 (LLM auto-decision P0 入口, 4-option 决议)
   - objective-mmu-chmem-phase-b-e.md  (review_by=2027-01-06)
   - tasks.md mmu-chmem-pipeline-integration Phase B-E deferral comments
   - .rddf/protocols/fetch_stall_requirements_v0.11.0.md (5 BLOCKERS, v0.2 起草 baseline)
