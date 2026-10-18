@@ -1,4 +1,4 @@
-// tests/soc/page_table_helpers.h
+// tests/soc/soc-cpu-l1-mmu-demo/page_table_helpers.h
 //
 // cpu-factory-satp-mapping (v0.10.2): Plant identity-mapping Sv32 PTE into
 // PicolibcHostMemory window for [cpu-l1-mmu-demo] e2e test.

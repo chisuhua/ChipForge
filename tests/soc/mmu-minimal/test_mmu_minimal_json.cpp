@@ -1,4 +1,4 @@
-// tests/soc/test_mmu_minimal_json.cpp (mmu-cache-integration commit 5/9)
+// tests/soc/mmu-minimal/test_mmu_minimal_json.cpp (mmu-cache-integration commit 5/9)
 //
 // 功能描述: soc/mmu_minimal.json 结构验证
 // 作者: ChipForge Plugin Team

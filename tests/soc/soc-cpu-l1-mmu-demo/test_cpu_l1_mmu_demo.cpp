@@ -1,4 +1,4 @@
-// tests/soc/test_cpu_l1_mmu_demo.cpp
+// tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp
 //
 // Phase 1.5 Wave 2 (soc-cpu-l1-mmu-demo): CPU + MMU + Memory structural demo.
 // - JSON structure validation (soc/cpu_l1_mmu_demo.json, memory_map + components)
