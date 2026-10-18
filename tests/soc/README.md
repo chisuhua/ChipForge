@@ -1,31 +1,30 @@
-# SoC 集成层测试
+# tests/soc/ — SoC Topology Integration Tests
 
-> **家族**: SoC 集成 (JSON 拓扑 + JSON Schema 验证)
-> **数量**: 2 个测试
-> **增长**: M4-M5 联调阶段可能加 1-2 个 (soc/cpu_l1_picolibc/demo.json)
+Catch2 test suite that structurally validates + simulates each SoC topology
+declared as JSON config under `soc/`. One subdirectory per SoC topology, each
+with `test_<soc>.cpp` + `README.md`.
 
-## 1. 测试列表
+## Subdirectories (mirror `soc/*.json` 1:1)
 
-| 文件 | 测什么 | Phase | 备注 |
-|------|--------|-------|------|
-| `test_soc_l1_cache_minimal_json.cpp` | `soc/l1_cache_minimal.json` 结构验证 (v2 决策 §4 拓扑) | 1.3b | |
-| `test_cache_params_schema_json.cpp` | `ip/cache/configs/params_schema.json` Schema 验证 (v2 §3) | 1.3c | |
+| Subdirectory | SoC JSON | Family tag | Contents |
+|--------------|----------|-----------|----------|
+| [`soc-cpu-l1-mmu-demo/`](soc-cpu-l1-mmu-demo/) | [`soc/cpu_l1_mmu_demo.json`](../../soc/cpu_l1_mmu_demo.json) | `[soc][cpu-l1-mmu-demo]` | CPU + MMU + Memory e2e + helper |
+| [`mmu-minimal/`](mmu-minimal/) | [`soc/mmu_minimal.json`](../../soc/mmu_minimal.json) | `[soc]` | MMU standalone |
+| [`l1-cache-minimal/`](l1-cache-minimal/) | [`soc/l1_cache_minimal.json`](../../soc/l1_cache_minimal.json), [`soc/l1_cache_adapter_e2e.json`](../../soc/l1_cache_adapter_e2e.json) | `[soc]` | L1Cache schema + minimal + bridge adapter |
 
-## 2. SoC 测试的边界
+## Adding a new SoC topology
 
-- **SoC 配置** 在 `soc/` 目录
-- **IP 参数 Schema** 在各 IP 的 `configs/` 目录
-- **集成测试** 测"JSON 是否符合 v2 决策", 不测具体行为
-- **行为测试** 在 `tests/cpu/` `tests/cache/` (单元) 或 e2e (Phase 5+)
+1. Add `soc/<name>.json` under `soc/`
+2. Add a new subdirectory `tests/soc/<soc-name>/` containing:
+   - `test_<soc-name>.cpp` (Catch2 TEST_CASE with `[soc]` family tag)
+   - `README.md` (cross-reference the SoC JSON + family tag + upstream spec)
+3. **No CMake changes required**: `tests/CMakeLists.txt` uses `file(GLOB_RECURSE)`
+   that auto-discovers `test_*.cpp` in all subdirectories.
 
-## 3. M5 联调预测
+## Backward compatibility
 
-M5 阶段会新增 `soc/cpu_l1_picolibc/demo.json`, 测试可能加:
-- `test_demo_soc_json.cpp` - 验证 demo.json 结构
-- `test_demo_soc_e2e.cpp` - 完整 tohost=1 e2e (本期可能 1 测试 = 6 ELF 全跑通)
-
-## 相关文档
-
-- **SoC 配置**: `soc/l1_cache_minimal.json` `soc/l1_cache_adapter_e2e.json`
-- **IP Schema**: `ip/cache/configs/params_schema.json`
-- **M5 联调路径**: `ip/cpu/docs/implementation-plan/README.md` §7
+> **Archive note (2026-10-18)**: This restructure moved 6 `.cpp`/`.h` files
+> from this flat layout into 3 subdirectories. Active openspec changes that
+> referenced `tests/soc/<soc-name>/test_<soc-name>.cpp` paths have been updated in the same
+> PR (see commit history). The `README.md.old` is kept for historical diff
+> reference and can be removed in v0.12.0 cleanup.

@@ -585,7 +585,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 
 ### Context
 
-`mmufault-verilator-sv32-e2e-flip` Part a 计划 1-4h 实装 (`tests/soc/test_cpu_l1_mmu_demo.cpp:113` flip `cfg.enable_mmu=false → true`, 移除 workaround, 走真 sv32 translation 路径)。2026-10-07 Sisyphus bootstrap session 实装 3 次尝试均 FAIL:
+`mmufault-verilator-sv32-e2e-flip` Part a 计划 1-4h 实装 (`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp:113` flip `cfg.enable_mmu=false → true`, 移除 workaround, 走真 sv32 translation 路径)。2026-10-07 Sisyphus bootstrap session 实装 3 次尝试均 FAIL:
 
 - **尝试 1**: `cfg.enable_mmu=true` + `plant_identity_page_table(mem, window_base+60*1024, elf.entry_addr)` — 5 个 ELF (add/addi/auipc/jal/beq) 10000 cycles 卡住, `exit_code=-1`
 - **尝试 2**: 加 `cfg.satp_ppn = (window_base+60*1024)>>12 = 0x80000` 修复 PPN 路径 — 仍然 5/5 FAIL
@@ -646,7 +646,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 ### Tests
 
 - **`CpuFactory_MMUCfg_PassesSatpValue` TEST_CASE** (`tests/cpu/test_cpu_factory.cpp`): 5 SECTIONs (Sv32/Sv39/Sv48/Bare/Negative-PPN-masked), **9 assertions PASS** (TDD Red→Green)
-- **`[cpu-l1-mmu-demo]` 保持 workaround** (`tests/soc/test_cpu_l1_mmu_demo.cpp`): `cfg.enable_mmu = false` 维持 (v0.10.1 workaround), 6/6 PASS 不退化. **真 sv32 e2e 翻转推迟** (CPU pipeline hazard on vaddr=0 PTW fault).
+- **`[cpu-l1-mmu-demo]` 保持 workaround** (`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp`): `cfg.enable_mmu = false` 维持 (v0.10.1 workaround), 6/6 PASS 不退化. **真 sv32 e2e 翻转推迟** (CPU pipeline hazard on vaddr=0 PTW fault).
 
 ### Verification (v0.10.2 实测)
 
@@ -672,8 +672,8 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 
 ### Fixed
 
-- **`[cpu-l1-mmu-demo]` 5/6 FAIL → 6/6 PASS** (`tests/soc/test_cpu_l1_mmu_demo.cpp`): 测试 `cfg.enable_mmu` 从 `true` 改为 `false`。与 `test_rv32ui_runner.cpp:109` (40/40 PASS same ELFs) 对齐
-- **测试 header comment** (`tests/soc/test_cpu_l1_mmu_demo.cpp`): 新增"Note (debug-cpu-l1-mmu-demo-deep-rca, v0.9.0)"段, 指向 `ip/cpu/cpu_factory.h:390` 硬写 `/*satp_value=*/0` (Bare mode) 让 `mmu_mode` config inert。Tripwire 防后续开发者误改回 `enable_mmu=true`
+- **`[cpu-l1-mmu-demo]` 5/6 FAIL → 6/6 PASS** (`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp`): 测试 `cfg.enable_mmu` 从 `true` 改为 `false`。与 `test_rv32ui_runner.cpp:109` (40/40 PASS same ELFs) 对齐
+- **测试 header comment** (`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp`): 新增"Note (debug-cpu-l1-mmu-demo-deep-rca, v0.9.0)"段, 指向 `ip/cpu/cpu_factory.h:390` 硬写 `/*satp_value=*/0` (Bare mode) 让 `mmu_mode` config inert。Tripwire 防后续开发者误改回 `enable_mmu=true`
 
 ### Known Limitation (NOT fixed, out of scope)
 
@@ -1340,7 +1340,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 
 ### Added (SoC — demo)
 - `soc/cpu_l1_mmu_demo.json` (NEW): 结构拓扑声明 (CPU+MMU+L1+Memory, L1 仅声明)
-- `tests/soc/test_cpu_l1_mmu_demo.cpp` (NEW, 6 case): JSON 结构验证 + 5 ELF tohost=1 (enable_mmu=true, sv32)
+- `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` (NEW, 6 case): JSON 结构验证 + 5 ELF tohost=1 (enable_mmu=true, sv32)
 
 ### Docs
 - `CHANGELOG.md`: v0.2.3 条目
@@ -1484,7 +1484,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - **`tests/mmu/test_ptw_unit.cpp`** (commit 6): 3 边界 case — MMU_VADDR 一致性 (success + 2 fault paths)
 - **`tests/mmu/test_mmu_plugin.cpp`** (commit 6): 4 RISC-V test — SFENCE.VMA (单 vaddr + 全清) + csr_write_satp + ASID switch + 多 ASID 失效
 - **`tests/cache/test_mmu_cache_integration.cpp`** (commit 3): 3 integration test — VIPT 命中 + PIPT fallback + has() 对称性
-- **`tests/soc/test_mmu_minimal_json.cpp`** (commit 5): 4 结构验证 — top-level + modules + connections + params
+- **`tests/soc/mmu-minimal/test_mmu_minimal_json.cpp` [legacy: `tests/soc/test_mmu_minimal_json.cpp` pre-restructure]** (commit 5): 4 结构验证 — top-level + modules + connections + params
 - **`ip/mmu/STATUS.md`**: `IMPLEMENTED` → `INTEGRATED (mmu-cache-integration + L1Cache VIPT + SoC 全链)`
 - **`openspec/changes/mmu-cache-integration/`**: 完整 OpenSpec lifecycle artifacts (proposal + design + tasks + 6 ADDED + 2 MODIFIED specs)
 

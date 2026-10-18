@@ -373,7 +373,7 @@
 
 ### D.2 [GREEN] `test_cpu_l1_mmu_demo.cpp` TEST_CASE 7 真 sv32 翻转 (承接 mmufault Part a)
 
-- [ ] **修改文件**:`tests/soc/test_cpu_l1_mmu_demo.cpp` (现 6/6 PASS)
+- [ ] **修改文件**:`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` (现 6/6 PASS)
 - [ ] **新增 TEST_CASE 7**:`cpu_l1_mmu_demo_sv32_translation_flipped`
 - [ ] **实现要点**:
   - `cfg.enable_mmu = true` (现 6/6 用例均 false)

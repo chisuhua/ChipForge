@@ -5,7 +5,7 @@ TBD - created by archiving change debug-cpu-l1-mmu-demo-paddr-regression. Update
 ## Requirements
 ### Requirement: [cpu-l1-mmu-demo] SHALL pass 6/6 after PADDR regression fix
 
-`tests/soc/test_cpu_l1_mmu_demo.cpp` `[cpu-l1-mmu-demo]` family SHALL 6/6 PASS (`add`, `addi`, `auipc`, `jal`, `beq` + `cpu_l1_mmu_demo_json_structure`). Each riscv-tests ELF (`rv32ui-p-{add,addi,auipc,jal,beq}`) SHALL reach `tohost=1` within 10000 cycles, triggering `PicolibcHostMemory::exited() == true` and `exit_code() == 0`.
+`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` `[cpu-l1-mmu-demo]` family SHALL 6/6 PASS (`add`, `addi`, `auipc`, `jal`, `beq` + `cpu_l1_mmu_demo_json_structure`). Each riscv-tests ELF (`rv32ui-p-{add,addi,auipc,jal,beq}`) SHALL reach `tohost=1` within 10000 cycles, triggering `PicolibcHostMemory::exited() == true` and `exit_code() == 0`.
 
 #### Scenario: 5 ELF tests PASS
 - **WHEN** ctest `[cpu-l1-mmu-demo]` invoked

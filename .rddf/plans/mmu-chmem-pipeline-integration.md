@@ -69,7 +69,7 @@ deps_status:
 | `tests/mmu/test_mmu_chmem_basic.cpp` (新, ~180 LOC) | `[mmu][chmem][basic]` TLB hit 走 lookup + miss 走 PTW walk 5 case (D1-B 范围验证) |
 | `tests/cpu/test_cpu_chmem_mmu_pipeline.cpp` (新, ~200 LOC) | `[cpu][chmem][mmu-pipeline]` 真 sv32 PTE ELF + plant_identity_page_table + tohost=1 (Phase C 集成验证) |
 | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` (现有 3 case) | TEST_CASE 6 新增 sv32 e2e flip — cycle ≤ baseline × 1.5 + EXCEPTION_CODE 正确传播 + pipeline stall 生效 |
-| `tests/soc/test_cpu_l1_mmu_demo.cpp` (现有 6 case) | TEST_CASE 7 新增 `cpu_l1_mmu_demo_sv32_translation_flipped` — flip `cfg.enable_mmu=true` 真 sv32 翻译 7/7 PASS（workaround `cfg.enable_mmu=false` 移除） |
+| `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` (现有 6 case) | TEST_CASE 7 新增 `cpu_l1_mmu_demo_sv32_translation_flipped` — flip `cfg.enable_mmu=true` 真 sv32 翻译 7/7 PASS（workaround `cfg.enable_mmu=false` 移除） |
 | `tests/cpu/manual_elf/build_sv32_pte.S` (新, ~30 LOC) | sv32 PTE ELF vendor — vendor 1 个 sv32 翻译 PTE 程序 |
 | `tests/cpu/manual_elf/build_manual_elf.sh` (改) | 加 `build_sv32_pte` 入口 |
 | `soc/cpu/docs/dse/sv32-baseline-matrix.csv` (新) | 5 ELF × median cycle × mode=sv32_mmu (用于 Phase D1 1.5× 阈值) |
@@ -526,7 +526,7 @@ Expected: `[mmu-verilator]` 5/5 PASS（真 sv32 翻译通过 Verilator 后端）
 ### Task 4.2: D2 — `[cpu-l1-mmu-demo]` TEST_CASE 7 真 sv32 翻转
 
 **Files:**
-- Modify: `tests/soc/test_cpu_l1_mmu_demo.cpp` (现有 6 → 7 case)
+- Modify: `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` (现有 6 → 7 case)
 
 - [ ] **Step 1-3: 移除 workaround `cfg.enable_mmu=false` + 加 TEST_CASE 7**
 

@@ -77,7 +77,7 @@ CpuFactory SHALL compute `satp_value` passed to `RiscvMMUPlugin` constructor fro
 
 ### Requirement: v0.10.1 workaround preservation (本 change NOT removing workaround)
 
-`tests/soc/test_cpu_l1_mmu_demo.cpp` MUST preserve v0.10.1 `cfg.enable_mmu = false` workaround. True sv32 translation e2e (Phase D.2) is **deferred** to follow-up `cpu-pipeline-mmufault-handler` due to CPU pipeline lacking MMU exception handler.
+`tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` [legacy: `tests/soc/test_cpu_l1_mmu_demo.cpp` pre-restructure] MUST preserve v0.10.1 `cfg.enable_mmu = false` workaround. True sv32 translation e2e (Phase D.2) is **deferred** to follow-up `cpu-pipeline-mmufault-handler` due to CPU pipeline lacking MMU exception handler.
 
 #### Scenario: workaround retained (current state)
 

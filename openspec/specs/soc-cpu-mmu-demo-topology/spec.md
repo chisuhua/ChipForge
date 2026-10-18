@@ -5,7 +5,7 @@ TBD - created by archiving change soc-cpu-l1-mmu-demo. Update Purpose after arch
 ## Requirements
 ### Requirement: demo runner SHALL construct topology in C++ (no JSON instantiator)
 
-The `tests/soc/test_cpu_l1_mmu_demo.cpp` runner SHALL construct the CPU+MMU+Memory topology manually in C++, following the `test_rv32ui_runner.cpp` pattern:
+The `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` runner SHALL construct the CPU+MMU+Memory topology manually in C++, following the `test_rv32ui_runner.cpp` pattern:
 1. Load ELF via `cf::tools::load_elf_full` → `entry_addr`, `tohost_addr`, sections
 2. Construct `PicolibcHostMemory` (window=0x80000000, tohost_addr=elf.tohost_addr)
 3. Build CPU via `CpuFactory` (config=`cpu_default`, `enable_mmu=true`)
@@ -16,7 +16,7 @@ The `tests/soc/test_cpu_l1_mmu_demo.cpp` runner SHALL construct the CPU+MMU+Memo
 The runner SHALL **NOT** call any `cf::soc::Topology::from_json` API (which does not exist).
 
 #### Scenario: runner builds CPU+MMU+Memory manually
-- **WHEN** `tests/soc/test_cpu_l1_mmu_demo.cpp` executes
+- **WHEN** `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` executes
 - **THEN** it SHALL instantiate CpuFactory + MMUPlugin + PicolibcHostMemory directly in C++ (no JSON parsing)
 
 #### Scenario: structural JSON is validated separately

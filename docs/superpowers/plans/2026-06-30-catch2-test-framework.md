@@ -1321,8 +1321,8 @@ You are migrating 2 test files in tests/soc/ from "纯 main()+assert" to Catch2.
 SCOPE:
 - Working directory: /workspace/project/ChipForge/.worktrees/testing-catch2
 - 2 files:
-  - tests/soc/test_cache_params_schema_json.cpp
-  - tests/soc/test_soc_l1_cache_minimal_json.cpp
+  - tests/soc/l1-cache-minimal/test_cache_params_schema_json.cpp
+  - tests/soc/l1-cache-minimal/test_soc_l1_cache_minimal_json.cpp
 - Family tag for Catch2: [soc]
 
 TOOL:
@@ -1335,9 +1335,9 @@ POST-PROCESS (manual):
 4. Verify file still compiles
 
 VERIFICATION:
-    grep -c "int main" tests/soc/test_*.cpp | grep -v ":0" && echo "FAIL" || echo "OK: no main"
-    grep -c "^assert" tests/soc/test_*.cpp | grep -v ":0" && echo "FAIL" || echo "OK: no assert"
-    grep -c "TEST_CASE" tests/soc/test_*.cpp   # 至少 1 per file
+    grep -c "int main" tests/soc/soc-*/test_*.cpp  # post-restructure 2026-10-18 | grep -v ":0" && echo "FAIL" || echo "OK: no main"
+    grep -c "^assert" tests/soc/soc-*/test_*.cpp  # post-restructure | grep -v ":0" && echo "FAIL" || echo "OK: no assert"
+    grep -c "TEST_CASE" tests/soc/soc-*/test_*.cpp  # post-restructure   # 至少 1 per file
 
 DO NOT MODIFY:
 - src/cf_plugin/CMakeLists.txt, tests/CMakeLists.txt, tests/catch2/

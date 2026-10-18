@@ -78,7 +78,7 @@
 **`soc-cpu-l1-mmu-demo` 范围**：
 - 新建 `soc/cpu_l1_mmu_demo.json`：CPU(`cf::cpu::plugins`)+ MMU(`cf::ip::mmu::MMUPlugin` + `cf::ip::mmu::RiscvMMUPlugin`) + L1(`cf::ip::cache::L1CachePlugin`) + Memory(PicolibcHostMemory 64KB)
 - **PTW 真实内存接线**（兑现 `ip/mmu/STATUS.md:38` 的 deferred 承诺）：`MMUPlugin::ptw_->read_pte(vaddr)` 从 PicolibcHostMemory 而非 `pte_stub_memory_` 读 PTE — 不做此步，demo 里的 MMU 仍在跑测试 stub，"端到端真跑"名不副实
-- `tests/soc/test_cpu_l1_mmu_demo.cpp`：catch2 集成测试，跑 `add.elf`（已有）+ 选 3-5 个 riscv-tests 用例通过子集 → 端到端 tohost=1
+- `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp`：catch2 集成测试，跑 `add.elf`（已有）+ 选 3-5 个 riscv-tests 用例通过子集 → 端到端 tohost=1
 - 删除 `riscv_virt.json` 删除警告（v0.0.2 删除记录）→ 重建
 - 文档：`soc/README.md` 更新、Phase 1.5 → 1 推进状态
 

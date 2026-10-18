@@ -80,7 +80,7 @@
 | 2 | MMUPlugin Bare shortcut 严格化 | `ip/mmu/tlm/MMUPlugin.cpp:109` (修) + `ip/mmu/tlm/MMUPlugin_chmem.h` (新增) | **Bug 修复** |
 | 3 | RiscvMMUPlugin::csr_write_satp 注入时机审查 | `ip/cpu/plugins/mmu.cpp:34` | **Bug 修复** |
 | 4 | Verilator TEST_CASE 6 mmu_sv32_translation_verilator_e2e_flipped | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` | **验证** |
-| 5 | [cpu-l1-mmu-demo] 真 sv32 翻转 TEST_CASE 7 | `tests/soc/test_cpu_l1_mmu_demo.cpp` | **验证** |
+| 5 | [cpu-l1-mmu-demo] 真 sv32 翻转 TEST_CASE 7 | `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` | **验证** |
 | 6 | AGENTS.md workaround 行更新 | `AGENTS.md` L41 | **文档** |
 | 7 | Spec Delta 编辑 | `openspec/specs/verilator-mmu-bare-plumbing/spec.md` + `openspec/specs/cpu-l1-mmu-demo/spec.md` | **文档** |
 | 8 | Architecture Gate Final | `tools/{verify_adr,verify_plugin_decision,check_plugin_portability,doc_link_check}.sh` | **门禁** |
@@ -195,7 +195,7 @@
 |----|------|------|------|
 | D0 | **proposal 文本修订** — 删 §4 最后一行 "trap PC 跳转断言" AC (与 D3-A 矛盾),降级为 "EXCEPTION_CODE 正确传播 + pipeline stall";声明 D1 收窄 scope (显式 out-of-scope 列表) | `openspec/changes/mmu-chmem-pipeline-integration/proposal.md` | 0.5d |
 | D1 | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` TEST_CASE 6 新增 sv32 e2e flip | 同 | 1.5d |
-| D2 | `tests/soc/test_cpu_l1_mmu_demo.cpp` TEST_CASE 7 新增真 sv32 翻转 (7/7 PASS) | 同 | 1d |
+| D2 | `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` TEST_CASE 7 新增真 sv32 翻转 (7/7 PASS) | 同 | 1d |
 | D3 | sv32 PTE ELF vendor — build_sv32_pte.S + register build_sv32_pte in build_manual_elf.sh | `tests/cpu/manual_elf/` | 0.5d |
 | D4 | sv32 baseline CSV — 5 ELF × median cycle × mode=sv32_mmu | `soc/cpu/docs/dse/sv32-baseline-matrix.csv` | 0.5d |
 | D5 | Architecture Gate — `verify_adr` + `verify_plugin_decision` + `check_plugin_portability` + `doc_link_check` | — | 0.5d |

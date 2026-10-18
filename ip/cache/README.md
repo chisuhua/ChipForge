@@ -196,7 +196,7 @@ JSON Schema draft-07，4 核心 param 字段 required:
 | `idx_bits` | 8 | idx 位宽 (= log2(num_sets)) |
 | `line_data_bits` | 512 | cache line 数据位宽 (典型 64B) |
 
-forward-compat: `replacement_policy` (LRU/PLRU/Random/FIFO) + `write_policy` (WriteBack/WriteThrough)。详见 [`tests/soc/test_cache_params_schema_json.cpp`](../../tests/soc/test_cache_params_schema_json.cpp) (6 tests: top-level / type const / impl_mode enum / 4-required / strict / defaults)。
+forward-compat: `replacement_policy` (LRU/PLRU/Random/FIFO) + `write_policy` (WriteBack/WriteThrough)。详见 [`tests/soc/l1-cache-minimal/test_cache_params_schema_json.cpp`](../../tests/soc/l1-cache-minimal/test_cache_params_schema_json.cpp) (6 tests: top-level / type const / impl_mode enum / 4-required / strict / defaults)。
 
 ### 9.5 测试套件汇总 (13 tests PASS in 4.11s)
 

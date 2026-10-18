@@ -35,14 +35,14 @@ The system SHALL 在 `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` 实装 TES
 
 ### Requirement: TEST_CASE 7 cpu_l1_mmu_demo_sv32_translation_flipped
 
-The system SHALL 在 `tests/soc/test_cpu_l1_mmu_demo.cpp` 实装 TEST_CASE 7 `cpu_l1_mmu_demo_sv32_translation_flipped`，family tags `[soc][cpu-l1-mmu-demo][sv32]`。
+The system SHALL 在 `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` 实装 TEST_CASE 7 `cpu_l1_mmu_demo_sv32_translation_flipped`，family tags `[soc][cpu-l1-mmu-demo][sv32]`。
 
 **body 实现要求**:
 - flip `cfg.enable_mmu = true` (移除 v0.10.2 workaround)
 - 用 `sv32_pte.elf` 替换 `rv32ui-p-add` ELF
 - REQUIRE tohost=1 (CPU pipeline MMU exception handler 正常卸载 fault)
 
-**Where**: `tests/soc/test_cpu_l1_mmu_demo.cpp` 现有 6 TEST_CASE 后追加
+**Where**: `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` 现有 6 TEST_CASE 后追加
 
 **Rationale**: `[cpu-l1-mmu-demo]` 6/6 PASS 当前依赖 `enable_mmu=false` workaround (per AGENTS.md line 40)；本 change archive 后移除 workaround，真 sv32 translation 翻转。
 

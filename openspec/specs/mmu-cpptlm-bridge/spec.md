@@ -68,7 +68,7 @@ The change MUST include a sample SoC JSON topology demonstrating MMUTLMBridge in
 - **THEN** exactly one file MUST match at `soc/mmu_minimal.json`; the path `soc/cpu/configs/mmu_minimal.json` MUST NOT exist (that directory does not exist in the repo)
 
 #### Scenario: Sample SoC JSON structural validation
-- **WHEN** `tests/soc/test_mmu_minimal_json.cpp` runs structural validation (4 cases: top-level fields, module count + required params, connection count + src/dst, params schema strict validation)
+- **WHEN** `tests/soc/mmu-minimal/test_mmu_minimal_json.cpp` runs structural validation (4 cases: top-level fields, module count + required params, connection count + src/dst, params schema strict validation)
 - **THEN** all 4 test cases SHALL PASS; full instantiation-time simulation (MMUPlugin dual-write → L1CachePlugin VIPT path end-to-end) is **deferred** to a follow-up change requiring traffic_gen with retry support — this change verifies only structural correctness and compile-time invariants
 
 ### Requirement: HDL-friendly constraint enforced via existing CI gates

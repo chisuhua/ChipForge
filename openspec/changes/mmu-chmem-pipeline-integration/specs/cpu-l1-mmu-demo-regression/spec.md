@@ -12,7 +12,7 @@ This delta MODIFIES the `cpu-l1-mmu-demo-regression` capability to add a 7th TES
 
 ### Requirement: [cpu-l1-mmu-demo] SHALL pass 7/7 after sv32 translation flip
 
-The file `tests/soc/test_cpu_l1_mmu_demo.cpp` `[cpu-l1-mmu-demo]` family SHALL achieve 7/7 PASS. Each riscv-tests ELF (`rv32ui-p-{add,addi,auipc,jal,beq}`) SHALL reach `tohost=1` within 10000 cycles, triggering `PicolibcHostMemory::exited() == true` and `exit_code() == 0`.
+The file `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` `[cpu-l1-mmu-demo]` family SHALL achieve 7/7 PASS. Each riscv-tests ELF (`rv32ui-p-{add,addi,auipc,jal,beq}`) SHALL reach `tohost=1` within 10000 cycles, triggering `PicolibcHostMemory::exited() == true` and `exit_code() == 0`.
 
 > **MODIFIED 修订 (2026-10-08)**: 由 mmu-chmem-pipeline-integration change 扩展,从 6/6 扩展为 7/7 PASS。新增 TEST_CASE 7 `cpu_l1_mmu_demo_sv32_translation_flipped` 验证 cfg.enable_mmu=true 真 sv32 翻译路径。
 

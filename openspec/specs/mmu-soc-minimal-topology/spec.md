@@ -31,7 +31,7 @@ The `mmu` module's `params` in `soc/mmu_minimal.json` MUST include `sv_mode: "sv
 - **WHEN** `cpptlm::validateAll(soc/mmu_minimal.json)` is called
 - **THEN** validation SHALL succeed for both MMU params schema (`ip/mmu/configs/params_schema.json`) and L1Cache params schema (`ip/cache/configs/params_schema.json`)
 
-### Requirement: `tests/soc/test_mmu_minimal_json.cpp` SHALL mirror `tests/soc/test_soc_l1_cache_minimal_json.cpp`
+### Requirement: `tests/soc/mmu-minimal/test_mmu_minimal_json.cpp` SHALL mirror `tests/soc/l1-cache-minimal/test_soc_l1_cache_minimal_json.cpp`
 
 The test file MUST contain exactly 4 test cases mirroring the l1_cache_minimal_json test: top-level fields (name, modules, connections), module count and required params, connection count and src/dst fields, params schema strict validation. No full `instantiateAll()` simulation (deferred — would require cpptlm::run() loop wiring not in this change).
 

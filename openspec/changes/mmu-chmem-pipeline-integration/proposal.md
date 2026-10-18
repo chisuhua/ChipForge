@@ -128,7 +128,7 @@ oracle_date: 2026-10-07
 
 ### 5. [cpu-l1-mmu-demo] 真 sv32 翻转 (从 mmufault Part a 拆分)
 
-**位置**: `tests/soc/test_cpu_l1_mmu_demo.cpp` (修改)
+**位置**: `tests/soc/soc-cpu-l1-mmu-demo/test_cpu_l1_mmu_demo.cpp` (修改)
 
 承接 `mmufault-verilator-sv32-e2e-flip` Part a (原 tasks.md §5):
 - flip `cfg.enable_mmu=true` + `cfg.satp_ppn` + plant_identity_page_table
