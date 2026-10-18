@@ -25,7 +25,7 @@
 | cache | `tests/cache/` | 5 | 纯 main+assert | L1Cache IP 业务 |
 | cpu | `tests/cpu/` | 20 | 纯 main+assert | CPU 业务（含 4 个 integration/ + 1 个 configs/） |
 | cpu/integration | `tests/cpu/integration/` | 4 | 纯 main+assert | RISC-V 5/7/10-stage 集成 |
-| cpu/configs | `tests/cpu/configs/` | 1 | 纯 main+assert | M5.19 schema |
+| cpu/configs | `tests/cpu/schema/` | 1 | 纯 main+assert | M5.19 schema |
 | soc | `tests/soc/` | 2 | 纯 main+assert | SoC JSON 集成 |
 | bundles | `tests/bundles/` | 1 | 纯 main+assert | 共享 Bundle |
 | mmu | `tests/mmu/` | 5 | **GTest**（配置破碎） | 无 `find_package(GTest)` |
@@ -563,7 +563,7 @@ FAMILY_BY_DIR = {
     'tests/cache': 'cache',
     'tests/cpu': 'cpu',
     'tests/cpu/integration': 'cpu-integration',
-    'tests/cpu/configs': 'cpu-configs',
+    'tests/cpu/schema': 'cpu-configs',
     'tests/soc': 'soc',
     'tests/bundles': 'bundles',
     'tests/mmu': 'mmu',
@@ -1237,7 +1237,7 @@ REPORT:
 **agent prompt 完整内容**:
 
 ```
-You are migrating 25 test files in tests/cpu/ (含 tests/cpu/integration/ 和 tests/cpu/configs/ 子目录) from "纯 main()+assert" to Catch2.
+You are migrating 25 test files in tests/cpu/ (含 tests/cpu/integration/ 和 tests/cpu/schema/ 子目录) from "纯 main()+assert" to Catch2.
 
 SCOPE:
 - Working directory: /workspace/project/ChipForge/.worktrees/testing-catch2
@@ -1266,11 +1266,11 @@ SCOPE:
   - tests/cpu/integration/test_5stage_riscv.cpp
   - tests/cpu/integration/test_7stage_riscv.cpp
   - tests/cpu/integration/test_demo_soc.cpp
-  - tests/cpu/configs/test_schema_m5_19.cpp
+  - tests/cpu/schema/test_schema_m5_19.cpp
 - Family tags:
   - tests/cpu/*.cpp → [cpu]
   - tests/cpu/integration/*.cpp → [cpu-integration]
-  - tests/cpu/configs/*.cpp → [cpu-configs]
+  - tests/cpu/schema/*.cpp → [cpu-configs]
 
 TOOL:
   python3 tools/migrate_to_catch2/migrate.py <file>
@@ -1292,9 +1292,9 @@ POST-PROCESS (manual, you must do after running the tool):
 5. For integration/* tests: preserve any include paths to ../../manual_elf/ if present
 
 VERIFICATION:
-    grep -c "int main" tests/cpu/test_*.cpp tests/cpu/integration/test_*.cpp tests/cpu/configs/test_*.cpp | grep -v ":0" && echo "FAIL" || echo "OK: no main"
-    grep -c "^assert" tests/cpu/test_*.cpp tests/cpu/integration/test_*.cpp tests/cpu/configs/test_*.cpp | grep -v ":0" && echo "FAIL" || echo "OK: no assert"
-    grep -c "TEST_CASE" tests/cpu/test_*.cpp tests/cpu/integration/test_*.cpp tests/cpu/configs/test_*.cpp   # 至少 1 per file
+    grep -c "int main" tests/cpu/test_*.cpp tests/cpu/integration/test_*.cpp tests/cpu/schema/test_*.cpp | grep -v ":0" && echo "FAIL" || echo "OK: no main"
+    grep -c "^assert" tests/cpu/test_*.cpp tests/cpu/integration/test_*.cpp tests/cpu/schema/test_*.cpp | grep -v ":0" && echo "FAIL" || echo "OK: no assert"
+    grep -c "TEST_CASE" tests/cpu/test_*.cpp tests/cpu/integration/test_*.cpp tests/cpu/schema/test_*.cpp   # 至少 1 per file
 
 DO NOT MODIFY:
 - src/cf_plugin/CMakeLists.txt, tests/CMakeLists.txt, tests/catch2/

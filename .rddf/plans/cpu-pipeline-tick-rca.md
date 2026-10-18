@@ -33,7 +33,7 @@
 | `ip/cpu/plugins/ibus.h` | Read L2 halt_when lambda |
 | `ip/cpu/plugins/mmu.h` + `ip/mmu/tlm/MMUPlugin.{h,cpp}` + `ip/mmu/tlm/mmu_keys.h` | Read Bare shortcut + PTW_ACTIVE key |
 | `include/cf/plugin/pipe_builder.h` | Read stall dispatch + halt_when evaluation |
-| `tests/cpu/configs/{cpu_embedded,cpu_default,cpu_superscalar,cpu_deep_pipeline}.json` | Read F1/F2 evidence (declared enable_mmu value) |
+| `tests/cpu/schema/{cpu_embedded,cpu_default,cpu_superscalar,cpu_deep_pipeline}.json` | Read F1/F2 evidence (declared enable_mmu value) |
 | `tests/cpu/test_cpu_sim_real_tohost.cpp` + `tests/cpu/integration/test_{3,5,7,10}stage_riscv.cpp` | Read exec_cmd CLI invocation + base-addr/tohost-addr args |
 | `tests/cpu/riscv_tests/elf/rv32ui-p-add` | Used in F4 reverse counter-factual |
 
@@ -104,7 +104,7 @@ Use: `edit` tool to inject `## §0.8 5-测试独立基线台账 (D3 决策)` bet
 
 Run:
 ```bash
-for f in tests/cpu/configs/cpu_embedded.json tests/cpu/configs/cpu_default.json tests/cpu/configs/cpu_superscalar.json tests/cpu/configs/cpu_deep_pipeline.json; do
+for f in tests/cpu/schema/cpu_embedded.json tests/cpu/schema/cpu_default.json tests/cpu/schema/cpu_superscalar.json tests/cpu/schema/cpu_deep_pipeline.json; do
   echo "=== $f ==="
   grep -E '"enable_mmu"|"pipeline_stages"|"dispatch_width"|"n_lanes"' "$f" || echo "(no match)"
 done
@@ -241,7 +241,7 @@ Run:
 ```bash
 ./build/src/cf_plugin/cpu_sim --no-mmu \
   --elf tests/cpu/manual_elf/add.elf --base-addr 0x80000000 --tohost-addr 0x80001000 \
-  --cycles 1000 --config tests/cpu/configs/cpu_embedded.json 2>&1 | tee /tmp/opencode/cpu-rca-A1.log | tail -5
+  --cycles 1000 --config tests/cpu/schema/cpu_embedded.json 2>&1 | tee /tmp/opencode/cpu-rca-A1.log | tail -5
 ```
 Expected: 记录 `TOHOST=X CYCLES=Y` 输出
 
@@ -305,7 +305,7 @@ Format: `[B1-B5] 5 测试 baseline enable_mmu=true (默认, F1 静默吞) TOHOST
 ### Task 8: Control experiment [A2 variant] — 7-stage `dispatch_width=2` 是否真因 (D3 决策)
 
 **Files:**
-- Modify: `tests/cpu/configs/cpu_superscalar.json` (临时改 `dispatch_width: 1`, 必 revert)
+- Modify: `tests/cpu/schema/cpu_superscalar.json` (临时改 `dispatch_width: 1`, 必 revert)
 - Use binary: `./build/src/cf_plugin/cpu_sim` (含 --no-mmu patch)
 
 - [ ] **Step 1: 重加 `--no-mmu` patch (若 Phase 3 已 revert)**
@@ -315,12 +315,12 @@ Expected: 显示 `--no-mmu` patch 内容. 若空 → 重复 Task 5
 
 - [ ] **Step 2: 临时改 cpu_superscalar.json `dispatch_width: 1`**
 
-Use: `edit` tool on `tests/cpu/configs/cpu_superscalar.json`
+Use: `edit` tool on `tests/cpu/schema/cpu_superscalar.json`
 Change: `"dispatch_width": 2` → `"dispatch_width": 1`
 
 - [ ] **Step 3: 跑 [A3 variant] dispatch_width=1 + --no-mmu**
 
-Run: `./build/src/cf_plugin/cpu_sim --no-mmu --elf ... --config tests/cpu/configs/cpu_superscalar.json --cycles 1000 2>&1 | tail -5`
+Run: `./build/src/cf_plugin/cpu_sim --no-mmu --elf ... --config tests/cpu/schema/cpu_superscalar.json --cycles 1000 2>&1 | tail -5`
 Expected: 记录 TOHOST/CYCLES
 
 - [ ] **Step 4: 判定 — 7-stage 是否同因**
@@ -330,7 +330,7 @@ Expected: 记录 TOHOST/CYCLES
 
 - [ ] **Step 5: Revert cpu_superscalar.json dispatch_width 改回 2**
 
-Run: `git checkout tests/cpu/configs/cpu_superscalar.json`
+Run: `git checkout tests/cpu/schema/cpu_superscalar.json`
 Expected: `dispatch_width: 2` 恢复
 
 ### Task 9: Control experiment [D] — F4 反向对照 (C++ API 路径 enable_mmu=true)
@@ -391,7 +391,7 @@ Decision tree:
 
 ```bash
 git checkout tools/cpu_sim/main.cpp
-git checkout tests/cpu/configs/cpu_superscalar.json
+git checkout tests/cpu/schema/cpu_superscalar.json
 cmake --build build --target cpu_sim -j4  # 重 build
 ```
 Expected: baseline 0 diff, 128/129 保持
@@ -559,13 +559,13 @@ Expected: 仅含:
 - `openspec/changes/cpu-pipeline-tick-rca/{proposal,design,tasks,specs/cpu-pipeline-tick-rca/spec,README}.md` 5 个文件 (P0 重做)
 - `.rddf/plans/cpu-pipeline-tick-rca.md` (本 plan 文件)
 - `openspec/specs/cpu-pipeline-tick-rca/spec.md` (D3 auto-derived)
-- **不允许**: `tools/cpu_sim/main.cpp` / `tests/cpu/configs/*` / `tests/cpu/integration/test_rv32ui_runner_mmu_on.cpp` 等临时改动
+- **不允许**: `tools/cpu_sim/main.cpp` / `tests/cpu/schema/*` / `tests/cpu/integration/test_rv32ui_runner_mmu_on.cpp` 等临时改动
 
 - [ ] **Step 4: revert 全部临时改动 (兜底)**
 
 ```bash
 git checkout tools/cpu_sim/main.cpp 2>/dev/null || true
-git checkout tests/cpu/configs/cpu_superscalar.json 2>/dev/null || true
+git checkout tests/cpu/schema/cpu_superscalar.json 2>/dev/null || true
 rm -f tests/cpu/integration/test_rv32ui_runner_mmu_on.cpp
 cmake --build build --target cpu_sim -j4 2>&1 | tail -3
 ```

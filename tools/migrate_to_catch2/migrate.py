@@ -27,7 +27,7 @@ FAMILY_BY_DIR = {
     'tests/cache': 'cache',
     'tests/cpu': 'cpu',
     'tests/cpu/integration': 'cpu-integration',
-    'tests/cpu/configs': 'cpu-configs',
+    'tests/cpu/schema': 'cpu-configs',
     'tests/soc': 'soc',
     'tests/bundles': 'bundles',
     'tests/mmu': 'mmu',

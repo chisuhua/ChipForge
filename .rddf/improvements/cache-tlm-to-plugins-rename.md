@@ -156,4 +156,4 @@ review_by: 2026-12-31
 - `ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md` → 独立 ADR 治理 change（如需）。
 - `tests/bundles/` 补 csr/tlb bundle 测试 → 独立测试补全 change。
 - 占位 IP (interconnect/memory/peripheral/tilecopy/tilecore) 治理 → 独立 cleanup change。
-- `tests/cpu/configs/` 命名 → 独立 rename change。
+- `tests/cpu/schema/` 命名 → 独立 rename change。

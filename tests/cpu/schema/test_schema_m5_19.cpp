@@ -1,4 +1,4 @@
-// tests/cpu/configs/test_schema_m5_19.cpp
+// tests/cpu/schema/test_schema_m5_19.cpp
 //
 // 功能描述: cpu_params_schema.json 扩展验证 (M5.19, Section 5)
 // 作者: ChipForge Plugin Team
