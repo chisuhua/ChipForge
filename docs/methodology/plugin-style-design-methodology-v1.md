@@ -20,7 +20,7 @@
 | 项目 | 值 |
 |------|-----|
 | 文档版本 | v1 (单例子深复盘) |
-| 复盘对象 | `L1CachePlugin` (`ip/cache/tlm/L1CachePlugin.{h,cpp}`) + Bridge 层 (`src/cf_plugin/bridge/l1_cache_bridge*`) + 测试 (`src/cf_plugin/tests/test_l1_cache*`) |
+| 复盘对象 | `L1CachePlugin` (`ip/cache/plugins/L1CachePlugin.{h,cpp}`) + Bridge 层 (`src/cf_plugin/bridge/l1_cache_bridge*`) + 测试 (`src/cf_plugin/tests/test_l1_cache*`) |
 | 评估维度 | D1 可读性 / D2 范式合规 / D3 TLM↔RTL / D4 阶段调度 / D5 Payload 通信 / D6 测试便利 (6 维度) |
 | 边界类型 | **B1 接受** (范式自然, 无需妥协) / **B2 摩擦** (范式能表达但需 helper/包装) / **B3 局限** (范式硬限制, 需外部机制补充) |
 | 评估基线 | D4 + ADR-040 静态检查 **3+4/3 全部 PASS** (`.omo/evidence/phase-1.4-task-1-d4-static-check.txt`) |

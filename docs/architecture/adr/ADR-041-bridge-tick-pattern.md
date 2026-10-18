@@ -13,7 +13,7 @@
 
 ### 1.1 Phase 1.3 L1CachePlugin 桥接方案的实施经验
 
-Phase 1.3（`ip/cache/tlm/L1CachePlugin.{h,cpp}` + `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + `L1CacheTLMBridgeAdapter.{h,cpp}`）的桥接方案（详见 `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`）实现了如下架构：
+Phase 1.3（`ip/cache/plugins/L1CachePlugin.{h,cpp}` + `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + `L1CacheTLMBridgeAdapter.{h,cpp}`）的桥接方案（详见 `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`）实现了如下架构：
 
 ```
 +-- Business Logic: L1CachePlugin (cf::plugin::PluginBase)
@@ -135,7 +135,7 @@ void L1CacheTLMBridge::tick() override {
 
 - `docs/architecture/adr.md` §2.1 决策表 ADR-041
 - `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`（Phase 1.3 桥接决策记录）
-- `ip/cache/tlm/L1CachePlugin.h`（业务 Plugin 示例）
+- `ip/cache/plugins/L1CachePlugin.h`（业务 Plugin 示例）
 - `src/cf_plugin/bridge/L1CacheTLMBridge.h`（Bridge 适配示例）
 - `src/cf_plugin/bridge/L1CacheTLMBridgeAdapter.h`（Bridge StreamAdapter 适配示例）
 - ADR-025, ADR-037, ADR-040（关联 ADR）

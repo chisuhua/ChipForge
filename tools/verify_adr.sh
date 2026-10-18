@@ -772,7 +772,7 @@ verify_adr_036() {
 verify_adr_037() {
   should_run ADR-037 || return
   # 预期失败：当前仍是 tlm/rtl 分离
-  if [[ -d "$CHIPFORGE_ROOT/ip/cache/tlm" ]] && [[ -d "$CHIPFORGE_ROOT/ip/cache/rtl" ]]; then
+  if [[ -d "$CHIPFORGE_ROOT/ip/cache/plugins" ]] && [[ -d "$CHIPFORGE_ROOT/ip/cache/rtl" ]]; then
     log_expected_missing "ADR-037" "统一目录结构" "ip/cache/{tlm,rtl} 仍分离"
   else
     log_stale "ADR-037" "统一目录结构" "目录已合并但 ADR 仍 🚧"

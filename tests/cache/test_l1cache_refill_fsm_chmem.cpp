@@ -33,7 +33,7 @@
 #include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 
-#include "ip/cache/tlm/l1_cache_refill_fsm_chmem.h"
+#include "ip/cache/plugins/l1_cache_refill_fsm_chmem.h"
 
 using namespace ch;
 using namespace ch::core;

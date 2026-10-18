@@ -1,4 +1,4 @@
-// ip/cache/tlm/L1CachePlugin.cpp
+// ip/cache/plugins/L1CachePlugin.cpp
 //
 // 功能描述: L1CachePlugin 实现 (Phase 1.2) —— lookup + refill 两阶段
 // 作者: ChipForge Plugin Team
@@ -23,7 +23,7 @@
 //   - L1CachePlugin.h
 //   - .rddf/roadmap/archive/phase-1-tlm-foundation.md §1.2
 
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 
 #include <cassert>
 #include <cstddef>

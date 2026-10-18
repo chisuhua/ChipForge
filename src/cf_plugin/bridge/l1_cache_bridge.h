@@ -24,7 +24,7 @@
 
 #include "bundles/mem_bundles.h"
 #include "cf/plugin/pipe_builder.h"
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 
 // 前向声明: cpptlm 类型, 避免在头文件中拉入 CppTLM 依赖
 // EventQueue 是全局类 (CppTLM/include/core/event_queue.hh:31, 无 namespace 前缀)

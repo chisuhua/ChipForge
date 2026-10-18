@@ -40,7 +40,7 @@ The L1CachePlugin side of the VIPT data-flow contract (reading `pl::MMU_VADDR` f
 The L1CachePlugin MUST consume `pl::MMU_VADDR` (declared in `cf::ip::mmu::payload::mmu_keys<T>`) for VIPT index extraction when present, falling back to `pl::g_addr` (current issue_request path) for PIPT mode when MMU is absent. ADR-044 §3.2 data-flow contract is now FULLY enforced on both producer (MMUPlugin) and consumer (L1CachePlugin) sides.
 
 #### Scenario: L1CachePlugin modified in this change (replaces prior "unchanged" scenario)
-- **WHEN** `git diff --stat <mmu-cache-integration-base>..HEAD -- ip/cache/tlm/L1CachePlugin.cpp` is run after this change merges
+- **WHEN** `git diff --stat <mmu-cache-integration-base>..HEAD -- ip/cache/plugins/L1CachePlugin.cpp` is run after this change merges
 - **THEN** diff MUST show modifications to L1CachePlugin.cpp `at_stage("lookup")` closure (adding MMU_VADDR has() ternary + idx_src/tag_src selection); L1CachePlugin.h MUST be unchanged
 
 #### Scenario: L1CachePlugin consumes MMU_VADDR for VIPT index
@@ -64,7 +64,7 @@ The L1CachePlugin MUST consume `pl::MMU_VADDR` (declared in `cf::ip::mmu::payloa
 The ADR-044 §2.2 safety condition (`idx_bits + offset_bits ≤ 12`) MUST remain statically asserted in `L1CachePlugin.h` (already landed in commit baa3757).
 
 #### Scenario: Compile-time safety in L1CachePlugin (unchanged)
-- **WHEN** `ip/cache/tlm/L1CachePlugin.h` is compiled
+- **WHEN** `ip/cache/plugins/L1CachePlugin.h` is compiled
 - **THEN** `static_assert(kIdxBits + kOffsetBits <= 12, "VIPT safety...")` MUST be present and pass (8+4=12)
 
 #### Scenario: TLBFactory rejects unsafe configuration (mmu-side enforcement)

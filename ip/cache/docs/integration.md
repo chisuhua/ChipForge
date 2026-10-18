@@ -100,10 +100,10 @@ Bridge 不感知 VIPT/PIPT 差异 — 索引逻辑全部在 Plugin 内部 at_sta
 grep -q "MMU_VADDR" ip/mmu/tlm/mmu_keys.h
 
 # 验证 L1CachePlugin 用 vaddr 索引
-grep -q "extract_idx_from_vaddr" ip/cache/tlm/L1CachePlugin.cpp
+grep -q "extract_idx_from_vaddr" ip/cache/plugins/L1CachePlugin.cpp
 
 # 验证 L1CachePlugin 编译期 VIPT 安全
-grep -q "static_assert.*kIdxBits.*kOffsetBits.*12" ip/cache/tlm/L1CachePlugin.h
+grep -q "static_assert.*kIdxBits.*kOffsetBits.*12" ip/cache/plugins/L1CachePlugin.h
 
 # 验证既有测试 PASS
 bash tools/run_chipforge_tests.sh -L cache

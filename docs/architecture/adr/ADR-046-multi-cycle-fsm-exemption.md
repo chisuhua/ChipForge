@@ -262,7 +262,7 @@ ADR-040 Tier-1 #5 翻转：**CH_MEM 是新正道**——ch 渗透禁令变成"�
 
 ### 6.3 长期验证（Phase 6d+ Cache refill 实装）
 
-- [x] `ip/cache/tlm/l1_cache_refill_fsm_chmem.h` 使用 `ch_state_machine`（2026-09-22, Phase 6d.7 PoC）
+- [x] `ip/cache/plugins/l1_cache_refill_fsm_chmem.h` 使用 `ch_state_machine`（2026-09-22, Phase 6d.7 PoC）
 - [ ] L1Cache 端到端 Verilator sim 跑 l1_cache_minimal.json
 
 ---

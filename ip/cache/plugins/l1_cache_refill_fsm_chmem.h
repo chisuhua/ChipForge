@@ -1,4 +1,4 @@
-// ip/cache/tlm/l1_cache_refill_fsm_chmem.h
+// ip/cache/plugins/l1_cache_refill_fsm_chmem.h
 //
 // Phase 6d.7: L1Cache refill FSM — 4 状态 (IDLE/LOOKUP/MISS/REFILL_WAIT)
 //

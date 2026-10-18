@@ -43,7 +43,7 @@ struct CacheReq {
 
 **Phase 5/6 (待实施) Bundle 升级路径** (草案, 见 `.omo/drafts/bundle-mapper-phase-5-6-decision.md`):
 - `BundleMapper<cf::bundles::CacheReq, bundles::CacheReqBundle>` 模板将 POD 字段映射为 `ch_uint<N>` + `CH_BUNDLE_FIELDS_T(...)` 派生
-- Phase 1 业务代码 (`ip/cache/tlm/L1CachePlugin` 等) **无需修改**, 只需切换 Bundle 头文件包含
+- Phase 1 业务代码 (`ip/cache/plugins/L1CachePlugin` 等) **无需修改**, 只需切换 Bundle 头文件包含
 - 推迟依据: `plugin-framework.md` §1 + `adr.md` ADR-024 ⚠️ 状态 + `bundles/README.md` §8 表格
 
 **为什么 Phase 1 用 POD 而非 bundle_base?**

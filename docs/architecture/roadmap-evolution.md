@@ -85,7 +85,7 @@
 | E7 | Verilator 编译 `cpu.v` 无 error | `verilator --lint-only cpu.v` |
 | E8 | Verilator sim 跑 riscv-tests add.elf `tohost=1` 与 CppHDL sim byte-equal | TLM↔Verilog 对比 trace |
 | E9 | MMU PTW 5 状态 FSM (`chlib::ch_state_machine`) 实装 + `CF_PLUGIN_USE_FSM_EXEMPT` 标记 | `ip/cpu/plugins/mmu_ptw_chmem.h` |
-| E10 | L1Cache refill FSM (4 状态) 实装 | `ip/cache/tlm/l1_cache_refill_fsm_chmem.h` |
+| E10 | L1Cache refill FSM (4 状态) 实装 | `ip/cache/plugins/l1_cache_refill_fsm_chmem.h` |
 | E11 | Harness 切换 (`tools/cpu_sim/main.cpp` → CppHDL sim runner) + 保留 CLI 兼容 | `build/src/cf_plugin/cpu_sim --elf add.elf` 跑 CppHDL sim |
 | E12 | `chipforge_tests` TLM baseline 0 回归（数字维护原则：以 archive 时 AGENTS.md 已知测试状态为准，禁止快照引用硬编码数字；当前 v0.10.4 实测 432/432 PASS, 67026 assertions）| `ctest -R chipforge_tests` |
 | E13 | `chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS | `ctest -R chipforge_tests_chmem` |

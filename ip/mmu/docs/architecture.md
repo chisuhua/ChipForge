@@ -171,7 +171,7 @@ lib/*.h       ──不 include──> cf::plugin/{plugin_base, pipe_builder, pa
 | `ip/cpu/plugins/` | ISA 无关 Plugin 层（与 `ip/mmu/tlm/` 同层） |
 | `ip/cpu/arch/riscv/` | ISA 特定 adapter（与 `ip/cpu/plugins/mmu.h::RiscvMMUPlugin` 同层） |
 | `ip/cache/policies/` | 替换策略抽象（与 `ip/mmu/policies/` 同构） |
-| `ip/cache/tlm/L1CachePlugin.h` | Plugin-style 业务 IP 先例（同构） |
+| `ip/cache/plugins/L1CachePlugin.h` | Plugin-style 业务 IP 先例（同构） |
 
 ## 8. 实施里程碑
 

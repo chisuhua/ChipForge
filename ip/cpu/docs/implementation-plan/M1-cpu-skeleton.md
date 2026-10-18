@@ -14,7 +14,7 @@
 本节记录 M1 启动前的代码状态调查, 用于校准 v2.0 文档中的 M1 任务清单。 调查范围:
 
 - `include/cf/plugin/*.h` (8 个头文件, cf_plugin Phase 0 全部)
-- `ip/cache/tlm/L1CachePlugin.{h,cpp}` (1st 完整 Plugin 范例)
+- `ip/cache/plugins/L1CachePlugin.{h,cpp}` (1st 完整 Plugin 范例)
 - `src/cf_plugin/tests/` (15 个测试, 用 assert + main() 模式, 不是 gtest)
 - `ip/cpu/tlm/`, `ip/cpu/test/`, `ip/cpu/configs/` (cpu IP 当前状态)
 

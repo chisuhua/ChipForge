@@ -7,7 +7,7 @@
 #include "catch_amalgamated.hpp"
 
 #include "cf/plugin/pipe_builder.h"
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 #include "ip/mmu/tlm/MMUPlugin.h"
 #include "ip/mmu/tlm/mmu_keys.h"
 #include "bundles/tlb_bundles_tlm.hh"

@@ -21,7 +21,7 @@
 // 详见:
 //   - .rddf/roadmap/archive/phase-1-tlm-foundation.md §1.2
 //   - bundles/mem_bundles.h (CacheReq / CacheResp / MemResp)
-//   - ip/cache/tlm/L1CachePlugin.h (Phase 1.2 主实现)
+//   - ip/cache/plugins/L1CachePlugin.h (Phase 1.2 主实现)
 
 #include "catch_amalgamated.hpp"
 #include <cstddef>
@@ -31,7 +31,7 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
 #include "bundles/mem_bundles.h"
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 
 using cf::plugin::Phase;
 using cf::plugin::PipeBuilder;

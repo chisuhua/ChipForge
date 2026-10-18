@@ -23,7 +23,7 @@
 #include "cf_plugin/bridge/l1_cache_bridge.h"
 
 #include "core/stream_adapter_base.hh"
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 
 namespace cf {
 namespace plugin {

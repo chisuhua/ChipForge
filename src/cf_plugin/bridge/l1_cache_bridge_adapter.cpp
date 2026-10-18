@@ -20,7 +20,7 @@
 #include "core/event_queue.hh"
 #include "core/stream_adapter_base.hh"
 #include "framework/chstream_adapter_factory.hh"
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 
 #include "cf_plugin/bridge/l1_cache_bridge.h"
 

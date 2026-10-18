@@ -17,7 +17,7 @@ list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_csr_chmem.cp
 # 单二进制模式下, 必须显式列出以确保链接找到符号
 # (cf_plugin 是 INTERFACE 库, 不包含 .cpp 实现)
 set(CACHE_IMPL_SOURCES
-    ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp
+    ${CMAKE_SOURCE_DIR}/ip/cache/plugins/L1CachePlugin.cpp
     ${CMAKE_SOURCE_DIR}/ip/cache/policies/replacement_policy.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge.cpp
     ${CMAKE_SOURCE_DIR}/src/cf_plugin/bridge/l1_cache_bridge_adapter.cpp

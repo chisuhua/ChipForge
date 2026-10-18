@@ -75,7 +75,7 @@
 
 #### 3.2.1 议题 3 注释: "B 和 C 是一个东西"
 
-用户指出: **选项 B (引用 L1CachePlugin 的 array_store) 和 选项 C (复用 cf_plugin storage.h)** 是同一物。 这是 Phase 1.4 1.4 §2.4 决策: cf_plugin Phase 0 已有 `include/cf/plugin/storage.h` 提供 `array_store<T,N>`, L1CachePlugin `ip/cache/tlm/L1CachePlugin.h:147-149` 引用 cf_plugin storage.h, 这是 L1CachePlugin 6 维度方法学 D1 + D2 共同支持的"复用现有抽象"。
+用户指出: **选项 B (引用 L1CachePlugin 的 array_store) 和 选项 C (复用 cf_plugin storage.h)** 是同一物。 这是 Phase 1.4 1.4 §2.4 决策: cf_plugin Phase 0 已有 `include/cf/plugin/storage.h` 提供 `array_store<T,N>`, L1CachePlugin `ip/cache/plugins/L1CachePlugin.h:147-149` 引用 cf_plugin storage.h, 这是 L1CachePlugin 6 维度方法学 D1 + D2 共同支持的"复用现有抽象"。
 
 #### 3.2.2 RegFilePlugin 物理实现 (摘要)
 

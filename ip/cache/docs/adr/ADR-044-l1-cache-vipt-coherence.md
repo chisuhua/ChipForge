@@ -13,7 +13,7 @@
 
 ### 1.1 MMU 集成暴露的空白决策
 
-`ip/mmu/` IP 骨架已于 2026-06-29 落地（`mmu-ip-skeleton`）。MMU 是 vaddr→paddr 翻译的核心，但当前 `ip/cache/tlm/L1CachePlugin.h:17-23` 注释注明 "64-bit 物理" —— Cache 假定接收的是**物理地址**。MMU 与 L1 Cache 之间的耦合策略（Cache 索引使用 vaddr 还是 paddr）**全仓库无明文决策**。
+`ip/mmu/` IP 骨架已于 2026-06-29 落地（`mmu-ip-skeleton`）。MMU 是 vaddr→paddr 翻译的核心，但当前 `ip/cache/plugins/L1CachePlugin.h:17-23` 注释注明 "64-bit 物理" —— Cache 假定接收的是**物理地址**。MMU 与 L1 Cache 之间的耦合策略（Cache 索引使用 vaddr 还是 paddr）**全仓库无明文决策**。
 
 `openspec/changes/archive/2026-06-29-mmu-ip-skeleton/design.md:47` 将 VIVT/VIPT/PIPT 推迟到 `mmu-tlb-ptw-impl`。本 ADR 在启动 `mmu-tlb-ptw-impl` 之前锁定此决策。
 
@@ -29,7 +29,7 @@
 
 ### 1.3 当前 L1CachePlugin 参数
 
-来自 `ip/cache/tlm/L1CachePlugin.h:72-76`：
+来自 `ip/cache/plugins/L1CachePlugin.h:72-76`：
 
 | 参数 | 值 | 说明 |
 |------|:---:|------|
@@ -248,10 +248,10 @@ MMUPlugin 在 TLB lookup 命中时**同时写 paddr 和保留 vaddr**，L1CacheP
 
 ```bash
 # 验证 L1CachePlugin 编译期 VIPT 安全条件
-grep -q "static_assert.*kIdxBits.*kOffsetBits.*12" ip/cache/tlm/L1CachePlugin.h
+grep -q "static_assert.*kIdxBits.*kOffsetBits.*12" ip/cache/plugins/L1CachePlugin.h
 
 # 验证 associativity ≥ 4
-grep -q "kWays\|associativity.*4" ip/cache/tlm/L1CachePlugin.h
+grep -q "kWays\|associativity.*4" ip/cache/plugins/L1CachePlugin.h
 
 # 验证既有 13 个测试 PASS（Phase 1.3 baseline）
 bash tools/run_chipforge_tests.sh -L cache | grep "100% tests passed"
@@ -271,7 +271,7 @@ grep -q "ADR-044" docs/architecture/adr.md
 ## 8. 参考
 
 - **RISC-V 核比较**: Rocket Chip (VIPT), BOOM (VIPT), XiangShan kunminghu-v3 (VIPT), CVA6 HPDCache (VIPT), Xuantie C910 (PIPT)
-- **L1CachePlugin 当前参数**: `ip/cache/tlm/L1CachePlugin.h:72-76`
+- **L1CachePlugin 当前参数**: `ip/cache/plugins/L1CachePlugin.h:72-76`
 - **VIPT 安全条件**: [Hennessy & Patterson, Computer Architecture: A Quantitative Approach, 6th Ed., §2.3]
 - **CVA6 HPDCache 反别名方案**: CVA6 HPDCache docs, see [openhwgroup/cva6](https://github.com/openhwgroup/cva6/blob/master/core/cache_subsystem/hpdcache_doc.rst)
 - **mmu-ip-skeleton 推迟声明**: `openspec/changes/archive/2026-06-29-mmu-ip-skeleton/design.md §Non-Goals Line 47`

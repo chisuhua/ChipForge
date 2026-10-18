@@ -214,7 +214,7 @@ OoO's wakeup is **per-event, asynchronous**: a producer's "tag broadcast" must t
 
 ### C.6 [MEDIUM] No commit / retire stage in the framework
 
-**Where**: `multi_isa_architecture.md §2.4` lists stages as `IF, ID, EX, MEM, WB` only. The top-level directory at `ip/cpu/arch/riscv/` has no `commit.h` / `retire.h`. The `commit_hooks_` mechanism exists in `pipe_builder.h:128-138` but **no plugin uses it** (the only registered user in the entire codebase is L1CachePlugin in `ip/cache/tlm/L1CachePlugin.cpp:107` per `dse_architecture.md §1.5`).
+**Where**: `multi_isa_architecture.md §2.4` lists stages as `IF, ID, EX, MEM, WB` only. The top-level directory at `ip/cpu/arch/riscv/` has no `commit.h` / `retire.h`. The `commit_hooks_` mechanism exists in `pipe_builder.h:128-138` but **no plugin uses it** (the only registered user in the entire codebase is L1CachePlugin in `ip/cache/plugins/L1CachePlugin.cpp:107` per `dse_architecture.md §1.5`).
 
 **Problem**: OoO commit needs an explicit stage that (1) walks the ROB head, (2) writes the speculative PRF value into the architectural reg file, (3) frees the old PRF entry, (4) updates the architectural PC. In-order "writeback" does this implicitly because the instruction reaches WB in program order. OoO must do it out-of-order arrivals, in-order commits — **the entire reason ROB exists**.
 

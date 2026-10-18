@@ -28,7 +28,7 @@ TBD - created by archiving change mmu-cache-integration. Update Purpose after ar
 `L1CachePlugin::at_stage("lookup")` MUST express VIPT vs PIPT fallback using `if/else` full branches (D4 §2.3 — HDL 1:1 friendly, no early return). The `bool has_mmu` ternary SHALL be the sole decision point. No `enum class State` + `switch (state_)` pattern permitted.
 
 #### Scenario: D4 early-return absence verified
-- **WHEN** `tools/verify_plugin_decision.sh` runs against `ip/cache/tlm/L1CachePlugin.cpp`
+- **WHEN** `tools/verify_plugin_decision.sh` runs against `ip/cache/plugins/L1CachePlugin.cpp`
 - **THEN** script SHALL report no `if (cond) return;` early-return pattern in any `at_stage()` closure
 
 ### Requirement: L1Cache MUST NOT silently consume `pl::MMU_VADDR` from a stale prior transaction

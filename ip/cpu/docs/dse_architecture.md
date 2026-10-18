@@ -107,7 +107,7 @@ static void register_early_plugins(cf::plugin::PipeBuilder& pb,
 | `build()` | 94-97 | 按顺序调所有 plugin 的 `setup()` → `build()` |
 | `run()` | 99-102 | 执行所有 `at_stage` 回调 |
 
-**生产级调用者**: L1CachePlugin (`ip/cache/tlm/L1CachePlugin.cpp:107`) — 是目前唯一调用 `declare_substage` 的生产代码。
+**生产级调用者**: L1CachePlugin (`ip/cache/plugins/L1CachePlugin.cpp:107`) — 是目前唯一调用 `declare_substage` 的生产代码。
 
 ### 1.6 一句话现状
 

@@ -56,7 +56,7 @@
 
 ### 1.1 L1CachePlugin Phase 1.2 暴露的可移植性问题
 
-Phase 1.2 在 `ip/cache/tlm/L1CachePlugin.{h,cpp}` 实现了第一个 Plugin-style IP（256 sets × 64B line，lookup + refill 两阶段，4/4 单元测试 PASS）。然而 Oracle 报告 §2-§5-§6 指出，若 L1CachePlugin 的业务代码**直接**沿用到 Phase 5/6 升级到 CppHDL `ch_mem` 后端，将出现以下三类不匹配点：
+Phase 1.2 在 `ip/cache/plugins/L1CachePlugin.{h,cpp}` 实现了第一个 Plugin-style IP（256 sets × 64B line，lookup + refill 两阶段，4/4 单元测试 PASS）。然而 Oracle 报告 §2-§5-§6 指出，若 L1CachePlugin 的业务代码**直接**沿用到 Phase 5/6 升级到 CppHDL `ch_mem` 后端，将出现以下三类不匹配点：
 
 | 不匹配维度 | TLM 模式现状 | CppHDL 目标 | 风险 |
 |------------|-------------|------------|------|

@@ -1,6 +1,6 @@
 # Cache IP 设计文档
 
-> ✅ **Status: TLM model + Bridge + Adapter + JSON spec + ch_stream 注册 (Phase 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f, 2026-06-13)** — `ip/cache/tlm/L1CachePlugin.{h,cpp}` (Plugin-style, 4/4 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (L1CacheTLMBridge, 2/2 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (cpptlm ModuleFactory 兼容层 + ch_stream 4 字段窄桥注册, 5/5 e2e + 5/5 instantiateAll) + `soc/l1_cache_minimal.json` (静态验证 spec) + `soc/l1_cache_adapter_e2e.json` (full JSON instantiateAll e2e) + `ip/cache/configs/params_schema.json` (JSON Schema)。**Phase 1.3 全部子任务完成 (含 1.3d-extras ch_stream 注册 + full JSON e2e, PA-6 闭环)**。下一里程碑: PA-7 cpptlm::CacheTLM baseline 对比。详见 `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md` F1-F5 + `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md` §3-4（均 gitignored 草稿，不链接）。
+> ✅ **Status: TLM model + Bridge + Adapter + JSON spec + ch_stream 注册 (Phase 1.2 + 1.3a + 1.3b + 1.3c + 1.3d + 1.3d-extras + 1.3e + 1.3f, 2026-06-13)** — `ip/cache/plugins/L1CachePlugin.{h,cpp}` (Plugin-style, 4/4 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge.{h,cpp}` (L1CacheTLMBridge, 2/2 unit tests) + `src/cf_plugin/bridge/l1_cache_bridge_adapter.{h,cpp}` (cpptlm ModuleFactory 兼容层 + ch_stream 4 字段窄桥注册, 5/5 e2e + 5/5 instantiateAll) + `soc/l1_cache_minimal.json` (静态验证 spec) + `soc/l1_cache_adapter_e2e.json` (full JSON instantiateAll e2e) + `ip/cache/configs/params_schema.json` (JSON Schema)。**Phase 1.3 全部子任务完成 (含 1.3d-extras ch_stream 注册 + full JSON e2e, PA-6 闭环)**。下一里程碑: PA-7 cpptlm::CacheTLM baseline 对比。详见 `.omo/drafts/decision-phase-1.3d-extras-bridge-2026-06-13.md` F1-F5 + `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md` §3-4（均 gitignored 草稿，不链接）。
 
 ## 1. 功能概述
 
@@ -121,9 +121,9 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 
 ```cpp
 #include "cf/plugin/pipe_builder.h"
-#include "ip/cache/tlm/L1CachePlugin.h"
+#include "ip/cache/plugins/L1CachePlugin.h"
 
-auto plugin = std::make_unique<cf::ip::cache::tlm::L1CachePlugin>();
+auto plugin = std::make_unique<cf::ip::cache::plugins::L1CachePlugin>();
 L1CachePlugin* helper = plugin.get();
 
 cf::plugin::PipeBuilder pb;

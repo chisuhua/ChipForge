@@ -1192,17 +1192,19 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 | 来源 | `declarative-hybrid-framework.md` ADR-6 |
 | 决策 | 取消 `ip/<x>/tlm/` 与 `ip/<x>/rtl/` 分离，按职责组织（`bundles/` / `plugins/` / `tlm/` / `rtl/` / `configs/` / `tests/`）|
 | 理由 | 双模式由编译期 / 运行期开关切换，不应反映在顶层目录上 |
-| 后果 | 🚧 **未执行**：当前 ChipForge 仍是 `ip/cache/{tlm,rtl,configs,test}/` 分离 |
+| 后果 | 🚧 **未执行**：当前 ChipForge 仍是 `ip/cache/{plugins→[legacy: tlm],rtl,configs,test}/` 分离 |
 
-**验证命令**（当前预期失败）：
+**验证命令**（当前预期失败）:
 ```bash
 # 当前 tlm/rtl 仍分离（说明 ADR-6 未执行）
-[[ -d /workspace/project/ChipForge/ip/cache/tlm ]] && \
+[[ -d /workspace/project/ChipForge/ip/cache/plugins ]] && \
 [[ -d /workspace/project/ChipForge/ip/cache/rtl ]] && \
   echo "DRIFT: 目录仍分离 — ADR-039 仍为 🚧 状态"
 ```
 
-**代码锚点（当前）**：`ip/cache/{tlm,rtl,configs,test}/`, `ip/cpu/{tlm,rtl,configs,test}/`, `ip/interconnect/...`, `ip/memory/...`, `ip/peripheral/...`
+**代码锚点(当前)**：`ip/cache/{plugins→[legacy: tlm],rtl,configs,test}/`, `ip/cpu/{plugins,arch,rtl,configs,docs,tlm}/`, `ip/interconnect/...`, `ip/memory/...`, `ip/peripheral/...`
+
+> **annotation 2026-10-18 (cache-tlm-to-plugins-rename change)**: 验证命令中 `ip/cache/tlm` 字符串是历史 ADR 描述 baseline 状态，不动；新增 `[legacy: tlm]` 标记 + 路径只读指向 `plugins/`。未来 ADR-038 真要执行目录合并，是另一类 ADR-038 execution change。
 
 ---
 

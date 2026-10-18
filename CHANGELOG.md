@@ -874,7 +874,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
   - sv32 2-level walk (RISC-V Privileged Spec v1.12 §5.3)：root = satp.ppn << 12, pte1/pte0 via VPN[1]/VPN[0] 索引
   - PTE 类型判定 {R,W,X}：{0,0,0} 非叶, {1,0,0} reserved encoding → FAULT, 含 R/X (megapage 叶) → DONE
   - `transition_when(ch_bool, target)` select-tree（sibling CppHDL 5af3e40 cycle-accurate）
-- **6d.7 L1Cache refill 4 状态 FSM** (`ip/cache/tlm/l1_cache_refill_fsm_chmem.h`, 228 行, commit 09c9d23)
+- **6d.7 L1Cache refill 4 状态 FSM** (`ip/cache/plugins/l1_cache_refill_fsm_chmem.h` [legacy: `ip/cache/tlm/` pre-rename], 228 行, commit 09c9d23)
   - 顶部 `#define CF_PLUGIN_USE_FSM_EXEMPT`
   - `chlib::ch_state_machine<CacheState, 4>` DSL：IDLE → LOOKUP → MISS → REFILL_WAIT
   - lookup hit → IDLE；miss → 发 refill 请求 → REFILL_WAIT；mem_rdata_valid 写回 cache → IDLE
@@ -1477,8 +1477,8 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - **`ip/cpu/plugins/mmu.cpp`** (commit 6): `RiscvMMUPlugin::csr_write_satp` + `sfence_vma` 实装 (mmu-tlb-ptw-impl 遗留 defer)
 - **`ip/mmu/lib/tlb_base.h` / `tlb.h` / `multi_level_tlb.{h,cpp}`** (commit 6): `invalidate_vaddr_any_asid` 新 API (RISC-V SFENCE.VMA rs1!=x0, rs2=x0 跨 ASID 失效语义)
 - **`ip/mmu/tlm/MMUPlugin.h`** (commit 6): `multi_tlb()` public getter + `invalidate_vaddr_any_asid` facade
-- **`ip/cache/tlm/cache_keys.h`** (commit 1): 新增 `g_vaddr` VIPT Key + `vipt_fallback` Knob (Auto/PaddrOnly/Panic)
-- **`ip/cache/tlm/L1CachePlugin.cpp`** (commit 2): lookup 闭包用 `n->has(MMU_VADDR)` 三元选择 idx_src/tag_src (VIPT 索引 + PIPT fallback 兼容 baseline)
+- **`ip/cache/plugins/cache_keys.h` [legacy: `ip/cache/tlm/` pre-rename]** (commit 1): 新增 `g_vaddr` VIPT Key + `vipt_fallback` Knob (Auto/PaddrOnly/Panic)
+- **`ip/cache/plugins/L1CachePlugin.cpp` [legacy: `ip/cache/tlm/` pre-rename]** (commit 2): lookup 闭包用 `n->has(MMU_VADDR)` 三元选择 idx_src/tag_src (VIPT 索引 + PIPT fallback 兼容 baseline)
 - **`src/cf_plugin/bridge/mmu_bridge_adapter.{h,cpp}`** (commit 4): `MMUTLMBridgeAdapter` 独立 cpptlm `ChStreamModuleBase` 子类 + `ChStreamAdapterFactory` 注册
 - **`soc/mmu_minimal.json`** (commit 5): 4 modules + 3 connections 全链 (`tg → mmu → l1 → mem`)
 - **`tests/mmu/test_ptw_unit.cpp`** (commit 6): 3 边界 case — MMU_VADDR 一致性 (success + 2 fault paths)
@@ -1551,7 +1551,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - `ip/cache/docs/architecture.md` (L1Cache 微架构: 地址映射 + VIPT 安全 + DSE 边界)
 - `ip/cache/docs/integration.md` (L1Cache 集成契约: CPU/MMU 接口 + SoC JSON 样例)
 - `ip/cache/configs/params_schema.json` 加 `associativity` 字段 (enum [1,2,4,8], default 4)
-- `ip/cache/tlm/L1CachePlugin.h` 加 VIPT 编译期 `static_assert(kIdxBits + kOffsetBits <= 12)`
+- `ip/cache/plugins/L1CachePlugin.h` [legacy: `ip/cache/tlm/` pre-rename] 加 VIPT 编译期 `static_assert(kIdxBits + kOffsetBits <= 12)`
 
 ### Cross-document sync
 - `ip/cache/README.md` §6 DSE 表加 VIPT 安全约束警告 + §8 引用新 docs
@@ -1599,7 +1599,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 > **目的**: 落地 A7 架构债务（`ip/cache/policies/` 子目录缺失 + L1CachePlugin 不可插拔替换策略）+ 修正 L1Cache 容量注释错误（32KB→16KB）
 
 ### Changed（L1Cache 容量注释修正）
-- `ip/cache/tlm/L1CachePlugin.h` L18 注释：`256 sets × 64-byte = 32KB L1` → `256 × 1 way × 64B = 16KB L1 (direct-mapped)`（原 32KB 是 8-way 误算；实际 RAM = 16384 字节 = 16KB）
+- `ip/cache/plugins/L1CachePlugin.h` [legacy: `ip/cache/tlm/` pre-rename] L18 注释：`256 sets × 64-byte = 32KB L1` → `256 × 1 way × 64B = 16KB L1 (direct-mapped)`（原 32KB 是 8-way 误算；实际 RAM = 16384 字节 = 16KB）
 
 ### Added（落地可插拔替换策略接口）
 - `ip/cache/policies/replacement_policy.h` — `cf::ip::cache::policies::ReplacementPolicy` 抽象基类（4 虚方法 + 1 工厂方法）
@@ -1608,7 +1608,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - `tests/cache/test_replacement_policy.cpp` — 5 单元测试（factory-create-LRU / factory-create-None / factory-unknown-throws / LRU-on-access-increments / NoReplacement-victim-returns-zero）
 
 ### Changed（L1CachePlugin 集成注入点）
-- `ip/cache/tlm/L1CachePlugin.h/.cpp` — 构造函数签名扩展：`explicit L1CachePlugin(std::unique_ptr<ReplacementPolicy> policy = nullptr)`；`lookup` 阶段 `at_stage` 回调内调用 `policy_->on_access(set, way)`
+- `ip/cache/plugins/L1CachePlugin.h/.cpp` [legacy: `ip/cache/tlm/` pre-rename] — 构造函数签名扩展：`explicit L1CachePlugin(std::unique_ptr<ReplacementPolicy> policy = nullptr)`；`lookup` 阶段 `at_stage` 回调内调用 `policy_->on_access(set, way)`
 
 ### Impact
 - **向后兼容**: 默认 `nullptr` policy → `NoReplacementPolicy` 行为等价于 hard-coded
@@ -1755,7 +1755,7 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
   - 11/11 ChipForge ctest PASS in 3.56s; D4 verify_plugin_decision 3+4/3 PASS
   - Phase 1.3d 范围预留: `set_stream_adapter()` + ch_stream<CacheReqBundle> 协议转换 (cpptlm::StreamAdapterBase 已前向声明)
 - Phase 1.2: `L1CachePlugin` (Plugin-style first IP, lookup + refill two-stage pipeline)
-  - `ip/cache/tlm/L1CachePlugin.h/.cpp` (256 sets, 64B line, direct-mapped)
+  - `ip/cache/plugins/L1CachePlugin.h/.cpp` [legacy: `ip/cache/tlm/` pre-rename] (256 sets, 64B line, direct-mapped)
   - `src/cf_plugin/tests/test_l1_cache_plugin_unit.cpp` (4 tests: miss / refill / hit-after-refill / D4 runtime)
   - 10/10 ChipForge ctest PASS in 2.30s; D4 verify_plugin_decision 3/3 PASS
   - All Bundle fields `cf::plugin::uint_t<N>`; no `tick()`, no state machine; at_stage-driven

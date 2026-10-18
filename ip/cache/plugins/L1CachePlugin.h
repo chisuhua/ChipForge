@@ -1,4 +1,4 @@
-// ip/cache/tlm/L1CachePlugin.h
+// ip/cache/plugins/L1CachePlugin.h
 //
 // 功能描述: L1 Cache Plugin (Phase 1.2) —— 第一个 Plugin-style IP
 // 作者: ChipForge Plugin Team

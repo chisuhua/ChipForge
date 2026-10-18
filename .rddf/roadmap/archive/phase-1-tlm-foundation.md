@@ -10,7 +10,7 @@
 >
 > **实施历史** (2026-06-10):
 > - 1.1 Bundle 定义完成 (`073402c`): `bundles/mem_bundles.h` 6 个 Bundle (MemReq/MemResp/CacheReq/CacheResp/L1CachePluginBundle/IntBundle), D4 合规
-> - 1.2 L1CachePlugin 完成 (`e8deacc`): `ip/cache/tlm/L1CachePlugin.{h,cpp}` lookup + refill 两阶段, 256 sets × 64B direct-mapped, 4/4 单元测试 PASS
+> - 1.2 L1CachePlugin 完成 (`e8deacc`): `ip/cache/plugins/L1CachePlugin.{h,cpp}` lookup + refill 两阶段, 256 sets × 64B direct-mapped, 4/4 单元测试 PASS
 > - 1.3 全部子任务完成 (`26fe7d2`..`387b8ca`): 1.3a Bridge / 1.3b SoC JSON / 1.3c Schema / 1.3d Adapter / 1.3d-extras ch_stream注册 / 1.3e drift 防护 / 1.3f README
 > - Phase 1 进度: 0% → 10% (1.1) → 30% (1.2) → 65% (1.3) → 75% (1.3d-extras)
 > - 14/14 ctest PASS in ~4.5s
@@ -126,13 +126,13 @@ private:
 - [ ] 业务代码**无 `tick()`**（grep 静态检查）
   ```bash
   # 必须通过
-  ! grep -r "void tick()" ip/cache/tlm/
+  ! grep -r "void tick()" ip/cache/plugins/
   ```
 - [ ] 业务代码**无状态机**（switch/case state 不允许）
 - [ ] Bundle 字段使用 `uint_t<N>`（编译期验证 + grep 检查）
   ```bash
   # 必须通过
-  ! grep -rE "uint(32|64)_t addr|ch_uint<\d+> addr" ip/cache/tlm/
+  ! grep -rE "uint(32|64)_t addr|ch_uint<\d+> addr" ip/cache/plugins/
   ```
 - [ ] 所有阶段用 `at_stage()` 注册（无 `if (state_ == ...)` 模式）
 - [ ] 阶段间通信通过 `Payload<T>` Key（无显式成员变量做 IPC）
@@ -184,19 +184,19 @@ set -e
 echo "Checking for forbidden patterns..."
 
 # 禁止 void tick() 业务重写
-if grep -rn "void tick()" ip/cache/tlm/ 2>/dev/null; then
+if grep -rn "void tick()" ip/cache/plugins/ 2>/dev/null; then
     echo "ERROR: void tick() forbidden in Plugin-style code"
     exit 1
 fi
 
 # 禁止直接用 ch_uint<N> 或 uintN_t 做 Bundle 字段
-if grep -rnE "(ch_uint<\d+>|uint(32|64)_t) +addr" ip/cache/tlm/ 2>/dev/null; then
+if grep -rnE "(ch_uint<\d+>|uint(32|64)_t) +addr" ip/cache/plugins/ 2>/dev/null; then
     echo "ERROR: Bundle fields must use uint_t<N> (compile-time switch)"
     exit 1
 fi
 
 # 禁止状态机
-if grep -rnE "enum class.*State|switch \(state_" ip/cache/tlm/ 2>/dev/null; then
+if grep -rnE "enum class.*State|switch \(state_" ip/cache/plugins/ 2>/dev/null; then
     echo "ERROR: State machines forbidden in Plugin-style code"
     exit 1
 fi

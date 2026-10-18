@@ -911,7 +911,7 @@ REGISTER_CHSTREAM;
 
 > **本章为 Phase 1 设计提案**。所有示例文件路径均**不存在**于 ChipForge 仓库：
 > - `ip/cache/bundles/cache_bundles.h` ❌（`ChipForge/bundles/` 仅含 `.gitkeep`）
-> - `ip/cache/tlm/l1_cache_tlm.h` ❌（`ip/cache/tlm/` 目录为空）
+> - `ip/cache/plugins/l1_cache_tlm.h` ❌（`ip/cache/plugins/` 目录为空）
 > - `ip/cache/rtl/l1_cache_rtl.h` ❌（`ip/cache/rtl/` 目录为空）
 > - `ip/cache/plugins/*` ❌（`ip/cache/plugins/` 目录不存在）
 >

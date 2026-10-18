@@ -322,7 +322,7 @@ Phase 1.2 的 L1CachePlugin 只有 1 个 .cpp，不需要独立的 library targe
 ```cmake
 add_executable(test_l1_cache_plugin_unit
   tests/test_l1_cache_plugin_unit.cpp
-  ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.cpp  # 直接编译
+  ${CMAKE_SOURCE_DIR}/ip/cache/plugins/L1CachePlugin.cpp  # 直接编译
 )
 target_include_directories(test_l1_cache_plugin_unit PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(test_l1_cache_plugin_unit PRIVATE cf_plugin)
@@ -332,7 +332,7 @@ target_link_libraries(test_l1_cache_plugin_unit PRIVATE cf_plugin)
 
 ```cmake
 # ❌ 错误: cmake configure 时 header 还不存在, 测试永远不会被注册
-if(EXISTS ${CMAKE_SOURCE_DIR}/ip/cache/tlm/L1CachePlugin.h)
+if(EXISTS ${CMAKE_SOURCE_DIR}/ip/cache/plugins/L1CachePlugin.h)
   ...
 endif()
 
