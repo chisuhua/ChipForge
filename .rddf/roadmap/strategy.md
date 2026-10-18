@@ -114,7 +114,6 @@ graph TD
 | `2026-10-08-verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 52 0 |
 | `mmu-chmem-phase-b-c-launch` | wave5-isa-coverage-and-bp | P1 | TODO | 27 0 |
 | `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (29/168) | 139 29 |
-| `tests-soc-topology-restructure` | wave5-isa-coverage-and-bp | P2 | TODO | 47 0 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
@@ -132,6 +131,7 @@ graph TD
 | `2026-10-15-csr-chmem-writeback-complete` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 42 0 |
 | `2026-10-16-mfc-cpu-pipeline-multi-cycle-fsm` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 60 |
 | `2026-10-18-cache-tlm-to-plugins-rename` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 80 0 |
+| `2026-10-18-tests-soc-topology-restructure` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 47 0 |
 | `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
 
 > **Status 解读**:
