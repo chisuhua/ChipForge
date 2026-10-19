@@ -559,9 +559,10 @@ Oracle D' defer 决策: mfc → v0.11.0, v0.10.0 launch 不阻塞.
 - **`[verilator]` 1/1 PASS (96 assertions)** — 48 ELF (40 rv32ui + 8 rv32um) Verilator 后端 tohost=1 验证
 - **`[mmu-verilator]` 3/3 PASS (26 assertions)** — MMU Bare mode plumbing 验证
 - **`verify_adr.sh` 0 FAILED** / **`verify_plugin_decision.sh` 8/8** / **`check_plugin_portability.sh` 12/12** / **`doc_link_check.sh` 0 broken** — 4 架构门禁全绿
-- **1 个 TDD red marker (已知, 不算 regression; 2026-10-19 honesty_audit 复核)**:
-  - `mul_div_fsm_build_failfast_passes` — Phase B.3/B.4 Result 范式 validate_build_preconditions 实装未到位 (需在 HEAD 重测确认)
-  - ~~`PTW_Has_AdvanceFromRealMemory_Method`~~ — **更正 (2026-10-19 oracle audit)**: 该 marker 描述失实, `advance_from_real_memory(MemoryInterface*)` 已在 `ip/mmu/lib/ptw.h:93` 声明 + `ptw.cpp:126` 实装 + `tests/mmu/test_ptw_real_memory.cpp:155` 真实调用; 测试体仅 `REQUIRE(true)` 占位, 结构上不可能 FAIL。原描述抄自 2026-09-25 TDD red 阶段注释, 与当前代码状态不符, 已清理 (commit `roadmap-honesty-audit-2026-10`)
+- **已知 1 个 FAIL (不算 regression; 2026-10-19 二轮 honesty_audit 复核)**:
+  - `tests/cpu/integration/test_7stage_riscv.cpp:124` 7stage superscalar `node_count() == 17 for: 9 == 17` infra drift — 与 [cpu-integration] 9/9-stage 配置 plugin 拓扑变更相关, 详见 AGENTS.md :63 baseline-known FAIL 列表"1 个 infra drift"
+  - **更正 (2026-10-19)**: 前次 :562 entry 声称的 `mul_div_fsm_build_failfast_passes` "TDD red marker" **全虚构** — 该测试名在 catch2 filter 中"0 命中" (`./build/bin/chipforge_tests "mul_div_fsm_build_failfast" --reporter console` → "No test cases matched"), 现 ctest 报 458/459 + 1 FAIL 的 1 FAIL = 上述 7stage infra drift, 非 mfc TDD red。本段删除上一轮 audit 残留的"1 个 TDD red marker"误述
+  - ~~`PTW_Has_AdvanceFromRealMemory_Method`~~ — **更正 (2026-10-19 oracle audit)**: 该 marker 描述失实, `advance_from_real_memory(MemoryInterface*)` 已在 `ip/mmu/lib/ptw.h:93` 声明 + `ptw.cpp:126` 实装 + `tests/mmu/test_ptw_real_memory.cpp:155` 真实调用; 测试体仅 `REQUIRE(true)` 占位, 结构上不可能 FAIL (单跑 PASS, 全量跑仅当 [cpu-integration] family 同进程内污染时才 FAIL — 污染源非此 case)。原描述抄自 2026-09-25 TDD red 阶段注释, 与当前代码状态不符, 已清理 (commit `roadmap-honesty-audit-2026-10`)
 - **ADR-082 Accepted 状态**: ✅ 2026-10-16 (本 change archive 触发)
 
 ### Known Limitations (defer v0.11.0, 跟踪独立 feature)

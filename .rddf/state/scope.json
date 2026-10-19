@@ -5,10 +5,17 @@
     "target": "cpu",
     "sub_target": null
   },
-  "updated_at": "2026-10-19T01:00:00Z",
+  "updated_at": "2026-10-19T04:40:00Z",
   "updated_by": "user",
-  "session_id": "ses_eade339a3ffegy51YIfEd5BeOy",
+  "session_id": "ses_ead8a87c1ffeLznm1JY9Gd8a0k",
   "history": [
+    {
+      "from": "ip/cpu",
+      "to": "ip/cpu",
+      "at": "2026-10-19T04:40:00Z",
+      "by": "user",
+      "trigger": "session continuation: re-test HEAD + S3 decision"
+    },
     {
       "from": "governance/governance",
       "to": "ip/cpu",

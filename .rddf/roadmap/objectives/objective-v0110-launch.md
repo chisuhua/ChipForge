@@ -147,7 +147,8 @@ graph TD
 - **No-Go 触发** (任一):
   - DMIPS/MHz < 1.4 且 01-13 复盘仍无明确修复路径
   - rv32um 01-13 仍有 FAIL
-  - PoC-6 CoreMark 无 BP 支撑 (< 1.9)
+
+> **2026-10-19 决策 (S3)**: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口 (2027 Q3 已有规划 BTB + CoreMark ≥2.3)。本决策理由详见 §11 跟踪台账 + oracle session `ses_ead89ad2`。
 
 ## 10. next_sprint_candidates
 
@@ -173,3 +174,4 @@ graph TD
 |--------|------|------|---------------|------|
 | sprint-2026-10 | sprint-review | objective 创建 (Phase A 已 commit) | — | initial |
 | sprint-2026-10-2 | objective-revision | R1-R5 5 处修订 + 17 周时间盒重排 | 12 周 → 17 周 | §8 R5 时间盒放宽 |
+| sprint-2026-10-3 | objective-revision | **S3 决策: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口** | §6/§9.2/§10 v0.11.0 行 + phase-4 PoC-6 + strategy §3 wave5 同步刷新; v0.11.0 archive 时间盒 2027-01-24 → 2026-12 中下旬 (mmu-chmem archive 后 ≤1 周) | DMIPS 1.43 已由 `f95b2d0` dhrystone harness 修复 (不靠 BP); strategy §10 多数派不含 BP; v1.0.0 已规划 BTB + CoreMark ≥2.3; rollback 不对称 (A 错低成本 hotfix, B 错级联推迟数月); oracle session `ses_ead89ad2` Q1=A + Q3 17 项动作; 实施: rdd-quick `quick-bp-v0110-defer-2026-10` |

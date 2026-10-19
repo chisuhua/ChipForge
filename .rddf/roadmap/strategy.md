@@ -35,7 +35,7 @@
 | `wave3-cpu-pipeline-debt` | Wave 3 CPU Pipeline 清债 | P0#1 canonical-ordering-assert + P0#2 rv32ui LOAD-width (回顾性 v0.6.0) | **v0.7.0** | ✅ 已收官（archived, commit cba5e53 + 8909165 + d98a9dd） |
 | `wave3-mmu-real-memory-and-cycle` | Wave 3 MMU 实内存 + 周期精度 | P1#3 mmu-paddr-consume + P1#4 cycle-precision + P1#5 multi-cycle + **P1#6 mmu-config-json-driven** (拆分自 P1#3, P1#3 archive 后启动, 与 P1#5 并行) | **v0.8.0** | ✅ **已收官（2026-10-08 全量 archive）**：P1#3 已 archive（commit 8a14402）；P1#5 被 wave5 `mfc-cpu-pipeline-multi-cycle-fsm` supersede（原 change 已 archive 2026-10-05）；**P1#4 ✅ archive (2026-10-08, Phase F optional 降级落地)**；P1#6 ✅ DONE (archived, 2026-10-08) |
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
-| **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm ✅ archived (2026-10-16, 53/60 done, 7 defer v0.11.0) + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare + P3#14 soc-freertos-demo + ADR-070~082 ✅ Accepted + ADR-084（14 条新规划，含 084=write-back FSM（重编号，原 083 冲突）净新增）| **v0.10.0 ✅ mfc 收官 → v0.11.0 → v1.0.0** | IN_PROGRESS（mfc ✅ archived, mmu-chmem **29/168 (Phase 2 done 2026-10-17, follow-up `mmu-chmem-phase-b-c-launch` 已开占位 Sprint 2-5)**, BP-BTB 待启动）；详见 [`docs/architecture/roadmap-evolution.md` §4-§4.5](../../docs/architecture/roadmap-evolution.md) |
+| **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm ✅ archived (2026-10-16, 53/60 done, 7 defer v0.11.0) + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare (→ v1.0.0 窗口, 决策 2026-10-19) + P3#14 soc-freertos-demo + ADR-070~082 ✅ Accepted + ADR-084（14 条新规划，含 084=write-back FSM（重编号，原 083 冲突）净新增）| **v0.10.0 ✅ mfc 收官 → v0.11.0 → v1.0.0** | IN_PROGRESS（mfc ✅ archived, mmu-chmem **29/168 (Phase 2 done 2026-10-17, follow-up `mmu-chmem-phase-b-c-launch` 已开占位 Sprint 2-5)**, BP-BTB 归 v1.0.0 窗口 2026-10-19 决策）；详见 [`docs/architecture/roadmap-evolution.md` §4-§4.5](../../docs/architecture/roadmap-evolution.md) |
 | **`wave6-linux-and-productization`**（**2026-10-09 标记, v1.0.0+ 远期**）| Wave 6 Linux + chip-selector 商业化 | P4#15 vexii-riscv-parity-poc (远期 placeholder, v1.0.0+ 启动期启用) | **v1.0.0 → v1.3.0** | deferred (wave6 启动期启用); 详见 [`docs/architecture/roadmap-evolution.md` §5-§7](../../docs/architecture/roadmap-evolution.md) |
 
 ## 4. 依赖图
@@ -87,7 +87,7 @@ graph TD
 | **v0.8.0** | `wave3-mmu-real-memory-and-cycle` archive (含 P1#6 拆分) | 2026-12 中旬 (依赖 v0.7.0 + 5-7 周, P1#3 + P1#4 启动 + P1#5 依赖 P1#3 + P1#6 与 P1#5 并行, ≤ 1 周) |
 | **v0.9.0** | `wave4-csr-cache-dse` archive | 2027-02 下旬 (依赖 v0.8.0 + 6-10 周, 含 umbrella 拆分 + cache 4-way) |
 | **v0.10.0** | `wave5-isa-coverage-and-bp` 部分 archive (mfc Phase H + mmu-chmem Phase A-E + rv32um 覆盖) | 2027 Q1 (依赖 v0.9.0 + Phase 6d + 3-5 个并行 change) |
-| **v0.11.0** | `wave5-isa-coverage-and-bp` 收官 (rv32um 8/8 + BP) | 2027 Q1 末 (依赖 v0.10.0 + mfc-extract-fsm-h + bp-btb-gshare) |
+| **v0.11.0** | `wave5-isa-coverage-and-bp` 收官 (rv32um 8/8 + mmu-chmem Phase B-E) | 2026-12 中下旬 (mmu-chmem archive 后 ≤1 周, 决策 2026-10-19 见 §10 v0.11.0 行) |
 | **v1.0.0** | `wave5-isa-coverage-and-bp` S/U mode + FreeRTOS | 2027 Q3 (依赖 v0.11.0 + ADR-070~076 + 4-5 个月) |
 | **v1.2.0** | 4-way RRIP + PMP + Debug + Spike lockstep + Linux-sim SOFT | 2028 Q2 (依赖 v1.0.0 + 12-15 个月) |
 | **v1.3.0** | `wave6-linux-and-productization` Linux-on-FPGA + chip-selector | 2029 Q1 (依赖 v1.2.0 + chip-selector PoC + ADR-080 转硬门禁) |
@@ -178,7 +178,7 @@ graph TD
 | v0.8.0 中间检查 | P1#3 PADDR 真消费 + cycle-precision 实装 + multi-cycle stall 注 | **如果评估显示剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) |
 | v0.9.0 archive | Phase 1.5 毕业标准达成 (RV32I ≥85%, SoC demo ≥5 ELF tohost=1, cache-dse-sweep CSV, D4+ADR-040+ADR-044+ADR-045 全合规) | 推迟 1 个 wave, 回填 Open Questions, 重审 |
 | v0.10.0 archive | mfc Phase H archive + mmu-chmem Phase A-E（rv32um 8/8 + DMIPS/MHz ≥1.4 defer v0.11.0）| 推迟 v0.11.0, 修 mfc-extract-fsm-h 残留 |（**v0.10.0 archive 门禁为规划时点快照**：v0.10.4 2026-09-30 已发版；mfc Phase H + mmu-chmem Phase A-E 实际归属 v0.11.0，见 `objective-v0110-launch.md §9.1`）|
-| v0.11.0 archive | rv32um 8/8 + DMIPS/MHz ≥1.4 + [cpu-l1-mmu-demo] 7/7（workaround 移除）+ [mmu-verilator] 5/5 + mfc-extract-fsm-h archive + 4 architecture gates 0 error | 推迟 v1.0.0 启动期，发 v0.11.x hotfix 修 mfc-extract-fsm-h 残留 |
+| v0.11.0 archive | rv32um 8/8 + DMIPS/MHz ≥1.4 + [cpu-l1-mmu-demo] 7/7（workaround 移除）+ [mmu-verilator] 5/5 + mfc-extract-fsm-h archive + 4 architecture gates 0 error | 推迟 v1.0.0 启动期，发 v0.11.x hotfix 修 mfc-extract-fsm-h 残留 |（**2026-10-19 决策**: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口, 详见 `objective-v0110-launch.md §11` + oracle session ses_ead89ad2）|
 | v1.0.0 archive | S/U mode + RV32A + BTB + FreeRTOS + CoreMark ≥2.3 | 推迟 v1.2.0, 修 PoC-6 BP 不足 |
 | v1.2.0 archive | lockstep 1M 零分歧 HARD + Linux-sim SOFT + 4-way RRIP + PMP + gdbstub | 触发 R6: 降级 v1.2.0 为"验证基建版", Linux-sim 并入 v1.3.0 合并交付 |
 | v1.3.0 archive | Linux-on-FPGA + chip-selector + ADR-080 转硬门禁 + FPGA CoreMark ≥2.5 | 触发 R3/R7/R8: 商业化定位降级 / soft-float 路线 / FPGA-only 产品化 |
