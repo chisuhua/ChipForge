@@ -426,6 +426,18 @@ CI 会自动 checkout CppTLM/CppHDL 仓库（`${{ vars.CPPTLM_REPO || 'chisuhua/
 
 > **测试脚本不在 CI 自动跑**（Oracle 2026-10-06 决策）：当前 CI workflow 仅运行架构 gate 脚本（`verify_adr.sh` / `verify_plugin_decision.sh` / `check_plugin_portability.sh`）。`tools/run_chipforge_tests.sh --all` 与 `bash tools/run_chipforge_tests.sh` 需 PR 提交者**本地**手动跑并贴结果。原因：CH_MEM binary 已知有 `cpphdl_poc_chbool_contextual_conversion` context-pollution flake（单跑 PASS，全套件场景偶发 FAIL），若加入 PR 阻塞会引入间歇性 CI 失败。Verilator 完整测试 (`run_chipforge_tests.sh --all` 含 `cpu_verilator_sim_add` smoke + `chipforge_tests_chmem [verilator],[mmu-verilator]`) 由 PR 模板强制要求 + 开发者本地执行覆盖。
 
+### 5 架构 gate 脚本 (含 R9 check, 2026-10-19)
+
+| # | 脚本 | 校验内容 | 退出码 |
+|---|------|----------|--------|
+| 1 | `tools/verify_adr.sh` | ADR 一致性 | 0/1 |
+| 2 | `tools/verify_plugin_decision.sh` | D4 业务代码 7 项 | 0/1 |
+| 3 | `tools/check_plugin_portability.sh` | ADR-040 移植性 4 项 | 0/1 |
+| 4 | `tools/doc_link_check.sh` | 文档死链 | 0/1 |
+| **5** | **`tools/roadmap-r9-check.sh`** | **路线图 `primary_scope` 字段 (6 值枚举) + `co_scopes` 推荐** | **0/1/2** |
+
+R9 check 是本项目独立 gate (不依赖 rdd-workflow 上游 `_lib/roadmap_validate.py`), 6 值枚举 `ip-cpu / ip-mmu / ip-cache / soc-cpu / soc-mmu / soc-cache` 与上文"路线图 primary scope 隐式语义"段同步。**STRICT 模式**: `STRICT_ROADMAP_R9_GATE=yes` 升级 WARNING → CRITICAL, 与上游 `STRICT_ROADMAP_REFS_GATE` 风格对齐。
+
 ---
 
 
