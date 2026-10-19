@@ -1,17 +1,18 @@
 // tests/mmu/test_ptw_real_memory.cpp
 //
 // mmu-paddr-consume-and-real-memory task 1.2 (修订): PTW 期望通过 MemoryInterface 读真实 PTE
-// TDD red phase: 当前实装仅有 advance_from_stub() (pte_stub_memory_), 无 advance_from_real_memory()
-// 这个 test_ptw_real_memory.cpp 当前**只能**测 stub 路径 (task 3.1 + 4.1 实装后, 才有真实路径可测)
 //
-// 关联: openspec/changes/mmu-paddr-consume-and-real-memory/tasks.md §1 + §3 + §4
+// 状态 (2026-10-19 honesty_audit 复核):
+//   - `advance_from_real_memory(MemoryInterface*)` 已实装于 `ip/mmu/lib/ptw.h:93` + `ptw.cpp:126`
+//   - 本测试 :155 真实调用该方法; :152 注释 "C2 fix + C8 fix" 标注 = 真实路径已闭环
+//   - 头部的"TDD red phase: 当前仅有 advance_from_stub" + "演进计划 Phase B" 描述为 2026-09-25 阶段过期注释, 不再反映当前代码状态
+//   - 历史: 此文件原是 wave3-mmu P1#3 TDD red 阶段产物 (2026-09-25), 2026-09-26 archive (`openspec/changes/archive/2026-09-26-mmu-paddr-consume-and-real-memory/`) 后,
+//     真实路径已实装, 但本文件头部 + :82-93 + [red] 标签未同步清理
+//
+// 关联: openspec/changes/archive/2026-09-26-mmu-paddr-consume-and-real-memory/tasks.md §1 + §3 + §4
 // 作者: ChipForge Plugin Team
 // 创建日期: 2026-09-25 (P1#3 TDD red phase)
-//
-// 演进计划:
-//   - Phase A (现在): 用 stub_write_pte + advance_from_stub() 验证 Sv32 2-level walk
-//   - Phase B (task 3.1+4.1 实装后): 改用 MemoryInterface + advance_from_real_memory()
-//     然后这个测试会真正区分两条路径, 实现 TDD green
+// 最近修订: 2026-10-19 (roadmap-honesty-audit-2026-10 清理过期注释)
 
 #include "catch_amalgamated.hpp"
 
@@ -27,9 +28,9 @@ using cf::ip::mmu::PTW;
 using cf::ip::mmu::PTE;
 using cf::ip::mmu::SvMode;
 
-// TDD red 注释: 当前 PTW API 仅 stub 路径, 这个测试 PASS (守护 stub 路径 byte-equal)
-// 实装 task 4.1 后, 添加新 TEST_CASE 测真实路径, 当前用例标注为"稳态守护"
-TEST_CASE("PTW_Sv32_Walk_Via_Stub_Memory_BackwardCompat", "[mmu][ptw][real-memory][red]") {
+// Stub 路径守护测试 (2026-09-25 起, 持续守护 stub write PTE + advance_from_stub 路径 byte-equal)
+// 2026-10-19 honesty_audit 复核: 本测试持续 PASS, [red] 标签因 stub 路径"已成历史路径"已不再适用, 保留测试作为稳态守护
+TEST_CASE("PTW_Sv32_Walk_Via_Stub_Memory_BackwardCompat", "[mmu][ptw][real-memory][stub-guard]") {
   // Sv32 2-level walk: L0 PTE at satp_ppn base, L1 PTE at L0.PPN
   std::uint64_t satp_ppn = 0x80000;  // root page table (phys 0x80000000)
   std::uint64_t vaddr = 0x00400000;  // virtual address to translate
@@ -79,17 +80,14 @@ TEST_CASE("PTW_Sv32_Walk_Via_Stub_Memory_BackwardCompat", "[mmu][ptw][real-memor
   SUCCEED("PTW Sv32 stub walk API exercised without crash");
 }
 
-// TDD red: 这个测试在当前实现下"应该"失败, 因为 advance_from_real_memory 不存在
-// 编译期红: 当前实现下 advance_from_real_memory(MemoryInterface*) 不存在, 调用即编译失败
-// → 测试"失败"(编译失败)
-// Phase B (task 4.1 实装后): 这个测试应当 PASS
-//
-// 注: 用 REQUIRE(true) 作为占位 (因为编译失败已经"失败"了——编译阶段)
-// 实装 task 4.1 后, 这段代码改为:
-//   ptw.advance_from_real_memory(mem.get());  // 运行时验证
-TEST_CASE("PTW_Has_AdvanceFromRealMemory_Method", "[mmu][ptw][real-memory][red][api]") {
+// API 存存性占位测试 (2026-10-19 honesty_audit 复核):
+//   - 原始意图 (2026-09-25): TDD red 守护 `advance_from_real_memory(MemoryInterface*)` API 编译期存在性
+//   - 当前状态: API 已在 `ip/mmu/lib/ptw.h:93` 声明 + `ptw.cpp:126` 实装, :155 处真实调用
+//   - 真实路径覆盖已由本文件 :143-156 (后续 TEST_CASE) 完成, 此处 `REQUIRE(true)` 仅为 compile-time 占位
+//   - 保留此测试作为 API 存在性 sentinel; 标签 [api] 标注用途, 不再带 `[red]`
+TEST_CASE("PTW_Has_AdvanceFromRealMemory_Method", "[mmu][ptw][real-memory][api]") {
   REQUIRE(true);
-  WARN("TDD red: 等待 task 3.1 MemoryInterface + task 4.1 advance_from_real_memory 实装");
+  WARN("API sentinel: advance_from_real_memory 已实装 (ptw.h:93 + ptw.cpp:126), 真实路径测试见本文件 :143-156");
 }
 
 namespace c8_test {

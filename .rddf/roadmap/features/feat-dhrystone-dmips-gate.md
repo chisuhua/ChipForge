@@ -1,9 +1,9 @@
 ---
 id: feat-dhrystone-dmips-gate
 kind: feature
-status: active
+status: done
 phase_refs: [phase-4]
-主题: Dhrystone DMIPS/MHz ≥1.4 硬门禁 (mfc Phase G)
+主题: Dhrystone DMIPS/MHz ≥1.4 硬门禁 (mfc Phase G) — ✅ archived 2026-10-15
 ---
 
 ## 概述

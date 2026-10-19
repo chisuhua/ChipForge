@@ -1,14 +1,21 @@
 {
   "schema_version": "scope-v1",
   "current_scope": {
-    "category": "governance",
-    "target": "governance",
+    "category": "ip",
+    "target": "cpu",
     "sub_target": null
   },
-  "updated_at": "2026-10-18T16:23:59Z",
+  "updated_at": "2026-10-19T01:00:00Z",
   "updated_by": "user",
-  "session_id": "unknown",
+  "session_id": "ses_eade339a3ffegy51YIfEd5BeOy",
   "history": [
+    {
+      "from": "governance/governance",
+      "to": "ip/cpu",
+      "at": "2026-10-19T01:00:00Z",
+      "by": "user",
+      "trigger": "user requested scope=ip/cpu to audit roadmap vs code status"
+    },
     {
       "from": null,
       "to": "governance/governance",
