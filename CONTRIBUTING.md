@@ -25,6 +25,18 @@ ChipForge 是基于 CppTLM + CppHDL 的 RISC-V 虚拟验证平台。
 **Type 取值**: `feat`, `fix`, `docs`, `chore`, `test`, `refactor`
 **Scope 示例**: `ci`, `schema`, `tools`, `arch`, `ip/cpu`, `ip/cache`
 
+### 3.1 文档改动按文件粒度 (2026-10-19)
+
+为避免多人协作 PR 冲突, 涉及以下目录的改动应**按文件粒度分 commit**:
+
+- `.rddf/roadmap/{strategy,phases,features,objectives}/**` (路线图 SSOT)
+- `AGENTS.md` 顶部 auto-gen block
+- `CHANGELOG.md`
+- `docs/architecture/**` (架构演进)
+
+**反例**: 一个 PR 同时改 6 个 `feat-*.md` = 6 个 reviewer 必冲突.
+**正例**: 1 PR 含 6 commit, 每个改 1 个 `feat-*.md` (auto-gen block 重生单独 commit) = git 自动 merge.
+
 ## 4. PR 流程
 
 1. 从 `main` 创建 feature branch:`git checkout -b fix/<description>`

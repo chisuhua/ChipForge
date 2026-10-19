@@ -2,6 +2,7 @@
 id: feat-mmu-chmem-integration
 kind: feature
 status: active
+scope: mmu
 phase_refs: [phase-4]
 主题: CH_MEM MMU/PTW pipeline 集成 (v0.11.0 owner)
 ---

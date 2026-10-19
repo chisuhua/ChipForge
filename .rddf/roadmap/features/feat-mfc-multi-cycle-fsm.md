@@ -2,6 +2,7 @@
 id: feat-mfc-multi-cycle-fsm
 kind: feature
 status: active
+scope: cpu
 phase_refs: [phase-2, phase-4]
 主题: MUL/DIV FSM 化 + ADR-082 negotiate 集成
 ---

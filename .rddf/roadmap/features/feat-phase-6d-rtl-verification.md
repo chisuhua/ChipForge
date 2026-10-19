@@ -2,8 +2,9 @@
 id: feat-phase-6d-rtl-verification
 kind: feature
 status: active
+scope: cross
 phase_refs: [phase-4]
-主题: Phase 6d 5-stage Pipeline CH_MEM + Verilator + MMU/PTW FSM
+主题: Phase 6d 5-stage Pipeline CH_MEM + Verilator + MMU/PTW FSM (跨 cpu/mmu/cache)
 ---
 
 ## 概述

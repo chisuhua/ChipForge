@@ -2,8 +2,9 @@
 id: feat-bp-btb-gshare
 kind: feature
 status: active
+scope: cpu
 phase_refs: [phase-4, phase-5]
-主题: 分支预测 BTB + GShare + RAS (PoC-6 CoreMark ≥1.9)
+主题: 分支预测 BTB + GShare + RAS (PoC-6 CoreMark ≥1.9) — defer → v1.0.0 (2026-10-19 决策)
 ---
 
 ## 概述

@@ -2,6 +2,7 @@
 id: feat-rv32um-m-extension
 kind: feature
 status: active
+scope: cpu
 phase_refs: [phase-4]
 主题: RV32UM M 扩展真实 radix-2 覆盖 (rv32um 8/8)
 ---
