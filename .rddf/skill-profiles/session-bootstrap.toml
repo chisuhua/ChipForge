@@ -18,6 +18,7 @@ order = [
   "honesty_audit",         # 原语: 声称 vs 实测 对账 (PoC v0.2)
   "preflight_reminders",   # 逃生舱: tools/bootstrap/sections/preflight.sh
   "hard_prerequisites",    # 逃生舱: tools/bootstrap/sections/gates.sh
+  "scope_snapshot",        # 逃生舱: tools/bootstrap/sections/scope_snapshot.sh (commit scope-aware-session-bootstrap-recommender-2026-10, 2026-10-19)
 ]
 
 test_families = [
@@ -28,6 +29,7 @@ test_families = [
 custom_sections = [
   { name = "preflight_reminders", script = "tools/bootstrap/sections/preflight.sh" },
   { name = "hard_prerequisites",  script = "tools/bootstrap/sections/gates.sh" },
+  { name = "scope_snapshot",       script = "tools/bootstrap/sections/scope_snapshot.sh" },
 ]
 
 [honesty_audit]
