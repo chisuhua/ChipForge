@@ -67,7 +67,7 @@ Underlying: `bash tools/v0100-bootstrap.sh` (thin wrapper, 59 lines) → `bash r
 ## 不要做 (项目特定)
 
 - ❌ backout commit `8a14402` (ADR-049 根基)
-- ❌ 新建与 `mfc-cpu-pipeline-multi-cycle-fsm` 并行的 multi-cycle change
+- ❌ 新建与已 archive `mfc-cpu-pipeline-multi-cycle-fsm` (2026-10-16 archive) 并行的 multi-cycle change (其真 radix-2 实装已由 `mfc-extract-fsm-h` archived 2026-10-10 承接)
 - ❌ 触碰已 archive 的 `wave3-*` initiative
 - ❌ 在 `cpu-pipeline-multi-cycle` 上加任务（已 superseded-by mfc）
 - ❌ 不以 `.omo/drafts/` 内容为决策依据
@@ -75,15 +75,18 @@ Underlying: `bash tools/v0100-bootstrap.sh` (thin wrapper, 59 lines) → `bash r
 ## 启动清单 (项目特定, 6 步)
 
 1. `openspec list` — 确认 active changes
-2. `cat .rddf/roadmap/objectives/objective-v0110-launch.md` — 确认立即下一步
-3. `cat openspec/changes/mfc-cpu-pipeline-multi-cycle-fsm/tasks.md` — 列出 phase 头
+2. `cat .rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md` — 确认立即下一步 (v0.11.0 launch gate; 注意: 本文件名由 commit 766c15b git mv 自 `objective-v0110-launch.md`)
+3. `cat openspec/changes/mmu-chmem-pipeline-integration/tasks.md` — 列出当前活跃 change 的 phase 头 (mfc-cpu-pipeline-multi-cycle-fsm 已 archive 至 `archive/2026-10-16-mfc-cpu-pipeline-multi-cycle-fsm/`)
 4. `./build/bin/chipforge_tests "[cpu-l1-mmu-demo]"` — 确认回归状态
-5. **CI 门禁快验**:
+5. **CI 门禁快验** (5 架构 gate):
    ```bash
    bash tools/verify_adr.sh
    bash tools/verify_plugin_decision.sh
    bash tools/check_plugin_portability.sh
+   bash tools/doc_link_check.sh
+   bash tools/roadmap-r9-check.sh
    ```
+   (note: `roadmap-r9-check.sh` 由 commit 115c7dd 在 2026-10-19 加入; `doc_link_check.sh` 是一直在 4 架构 gate 中; 之前 SKILL.md 步骤 5 只列 3 gate 已漂移)
 6. 报告你看到的状态 + 建议下一步
 
 ## 通用协议 (引用 rdd-session-bootstrap 通用 core)

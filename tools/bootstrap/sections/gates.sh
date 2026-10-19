@@ -53,7 +53,7 @@ echo ""
 # 输出 RISCV 状态 (补充)
 if [ "$RISCV_TOTAL" != "0" ]; then
     if [ "$RISCV_FAILED" = "0" ]; then
-        echo "→ RISCV tests: $RISCV_PASSED/$RISCV_TOTAL ✅ (target: 40/40)"
+        echo "→ RISCV tests: $RISCV_PASSED/$RISCV_TOTAL ✅"
     else
         echo "→ RISCV tests: $RISCV_PASSED/$RISCV_TOTAL ❌ ($RISCV_FAILED failed)"
     fi
