@@ -23,7 +23,7 @@ related_to:
   - ADR-049 (MMU paddr 消费契约)
   - ADR-083 (Plugin-style 单一 source of truth — mmu.h + mmu_chmem.h 双文件分离)
   - ADR-0049 (LLM auto-decision P0 入口, 4-option 决议)
-  - objective-mmu-chmem-phase-b-e.md  (review_by=2027-01-06)
+  - objective-ip-mmu-mmu-chmem-phase-b-e.md  (review_by=2027-01-06)
   - tasks.md mmu-chmem-pipeline-integration Phase B-E deferral comments
   - .rddf/protocols/fetch_stall_requirements_v0.11.0.md (5 BLOCKERS, v0.2 起草 baseline)
 ---
@@ -133,8 +133,8 @@ Sprint_7 (01-13 ~ 01-24, 2d):
 
 - `openspec/changes/mmu-chmem-pipeline-integration/` — Phase 2 done 的 source of truth (proposal §1 + §11 + tasks.md 583 行)
 - `openspec/changes/csr-chmem-writeback-complete/` — 已 archive, R3.5 写通路完整 (R11.1 重审入口)
-- `.rddf/roadmap/objectives/objective-mmu-chmem-phase-b-e.md` (review_by=2027-01-06)
-- `.rddf/roadmap/objectives/objective-v0110-launch.md` §6 Sprint Plan (Phase B Sprint 2-5, Phase C+D Sprint 6-7)
+- `.rddf/roadmap/objectives/objective-ip-mmu-mmu-chmem-phase-b-e.md` (review_by=2027-01-06)
+- `.rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md` §6 Sprint Plan (Phase B Sprint 2-5, Phase C+D Sprint 6-7)
 - `.rddf/protocols/fetch_stall_requirements_v0.11.0.md` (5 BLOCKERS, v0.2 起草 baseline)
 - `docs/architecture/roadmap-evolution.md` §4-§4.5 (v0.11.0 架构演进)
 - `docs/lessons/phase-6c-elaboration-substrate.md` (CH_MEM 模式 15 陷阱)

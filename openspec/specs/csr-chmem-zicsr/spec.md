@@ -91,7 +91,7 @@ The trap PC redirect SHALL be implemented per R2 decision: self-built CtrlLink +
 
 #### Scenario: trap priority over branch
 - **WHEN** `beq x1, x2, target` AND `mret` are both in the pipeline (hypothetical, due to hazard stall)
-- **THEN** `mret` TRAP_PENDING SHALL win (per `trap > branch` priority from `objective-v0110-launch.md §8`)
+- **THEN** `mret` TRAP_PENDING SHALL win (per `trap > branch` priority from `objective-soc-cpu-v0110-launch.md §8`)
 - **AND** `TRAP_TARGET` SHALL equal `mepc`, NOT the branch target
 - **AND** this priority SHALL be explicitly documented as the v0.11.0 baseline; `wave5-bp-btb` change (currently a ghost dependency — change directory does not exist) shall negotiate bp-btb interactions in its own change
 

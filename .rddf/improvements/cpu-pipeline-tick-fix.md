@@ -28,7 +28,7 @@ review_by: 2026-11-15
 
 ## 架构依据
 
-**v0.11.0 launch gate** (P0 objective, 见 `objective-v0110-launch.md §8 Sprint 1`) 判据 #2 = 5 cpu_sim CLI PASS, 现在 5/5 FAIL. 真因已通过 `cpu-pipeline-tick-rca` P2 实测 (run commit `47cd8b8` design.md §0.8.7) 确诊为 **F1+F2+F3 三层复合根因**:
+**v0.11.0 launch gate** (P0 objective, 见 `objective-soc-cpu-v0110-launch.md §8 Sprint 1`) 判据 #2 = 5 cpu_sim CLI PASS, 现在 5/5 FAIL. 真因已通过 `cpu-pipeline-tick-rca` P2 实测 (run commit `47cd8b8` design.md §0.8.7) 确诊为 **F1+F2+F3 三层复合根因**:
 
 - **F1 — config 保真度缺陷**: `tools/cpu_sim/main.cpp:75-115` `load_config()` 静默忽略 8 个 JSON 字段 (`enable_mmu / mmu_mode / satp_ppn / enable_pmp / branch_predictor / btb_entries / clock_freq_mhz / n_threads`)
 - **F2 — 测试 config 意图缺陷**: 4/5 FAIL 测试 config (cpu_default/superscalar/deep_pipeline) 显式 `enable_mmu: true`, 与裸机烟测本意不符 (spec `riscv-tests-fixture:74-80` 锁定 `enable_mmu=false`)
@@ -250,7 +250,7 @@ fetch_ctrl->halt_when([&pb]() {
 
 - `AGENTS.md` §known test status: 5 FAIL 描述翻转 + 引用本 change archive
 - `CHANGELOG.md` v0.11.0 entry: "5 cpu_sim CLI PASS — cpu-pipeline-tick-fix (F1+F2+F3a+F3b)"
-- `objective-v0110-launch.md` §8 Sprint 1 判据 #2 status: "archive cpu-pipeline-tick-fix 后 PASS"
+- `objective-soc-cpu-v0110-launch.md` §8 Sprint 1 判据 #2 status: "archive cpu-pipeline-tick-fix 后 PASS"
 
 ## Acceptance
 

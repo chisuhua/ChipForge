@@ -13,7 +13,7 @@ review_by: 2026-10-23
 
 ### 项目上下文（v0.11.0 Wave 5 收官窗口）
 
-v0.11.0 是 Wave 5 ISA 覆盖 + 分支预测收官版本。`objective-v0110-launch.md §2` 锁定两条 Track A 硬指标：
+v0.11.0 是 Wave 5 ISA 覆盖 + 分支预测收官版本。`objective-soc-cpu-v0110-launch.md §2` 锁定两条 Track A 硬指标：
 
 | 判据 | 当前 | 目标 |
 |------|------|------|
@@ -50,9 +50,9 @@ v0.11.0 是 Wave 5 ISA 覆盖 + 分支预测收官版本。`objective-v0110-laun
 
 ### 非目标（Out of Scope）
 
-- 不改 `objective-v0110-launch.md` / 任何 `feat-*.md`（上游 SSOT）。
+- 不改 `objective-soc-cpu-v0110-launch.md` / 任何 `feat-*.md`（上游 SSOT）。
 - 不改 `openspec/changes/mfc-extract-fsm-h/` 下任何文件（不同层级）。
-- 不引入 CSR plugin、不做 dual-issue（`objective-v0110-launch.md §4` 反模式 R1：先真 radix-2 + fetch stall + BP 协同三件套）。
+- 不引入 CSR plugin、不做 dual-issue（`objective-soc-cpu-v0110-launch.md §4` 反模式 R1：先真 radix-2 + fetch stall + BP 协同三件套）。
 
 ## 3. Acceptance
 
@@ -87,7 +87,7 @@ v0.11.0 是 Wave 5 ISA 覆盖 + 分支预测收官版本。`objective-v0110-laun
 | `tests/framework/test_mul_div_fsm_cycle_parity.cpp` | 迁移 | 同上（proposal/tasks 简称 `test_cycle_parity.cpp`） |
 | `docs/architecture/adr/ADR-040-v2.md` | 文档 | tasks C.4 添加 `multi_cycle_fsm.h` 引用（ADR-040 v2.0 §2.1） |
 
-### 风险（来自 `objective-v0110-launch.md §5`）
+### 风险（来自 `objective-soc-cpu-v0110-launch.md §5`）
 
 - **R-RADIX-1**：mfc-extract-fsm-h 1-2 周估时是 Oracle 经验值，实装时可能发现 ch_state_machine DSL 边界 case → 缓解：Sprint 1 后段留 1 周 buffer，bp-btb 启动期（本 change `review_by: 2026-10-23` 即 Sprint 1 窗口终点）。
 - **R-RADIX-2**：mfc team 双 P1（`mfc-cpu-pipeline-multi-cycle-fsm` 50/60 + 本 change 15）资源冲突 → 缓解：owner 区分——Phase H archive 归前者，真 radix-2 归本 change，共享 `MulDivFsmPlugin::negotiate()` 接续。
@@ -98,4 +98,4 @@ v0.11.0 是 Wave 5 ISA 覆盖 + 分支预测收官版本。`objective-v0110-laun
 ### 下游依赖
 
 - `feat-mfc-multi-cycle-fsm` / `feat-rv32um-m-extension` / `feat-dhrystone-dmips-gate`：本 change 的 FSM 提取是真 radix-2 + rv32um 8/8 + DMIPS ≥1.4 的架构前置。
-- `objective-mmu-chmem-phase-b-e §9.1`：mmu-chmem Phase C（`ibus_chmem.h`）依赖 fetch stall framework 扩展，而 fetch stall 扩展依赖本 change 的 FSM 边界清晰化。
+- `objective-ip-mmu-mmu-chmem-phase-b-e §9.1`：mmu-chmem Phase C（`ibus_chmem.h`）依赖 fetch stall framework 扩展，而 fetch stall 扩展依赖本 change 的 FSM 边界清晰化。

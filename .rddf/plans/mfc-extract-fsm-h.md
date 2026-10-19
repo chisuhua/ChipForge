@@ -11,13 +11,13 @@ verifier: rdd-verifier
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use skill_use("execute") to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 `ip/cpu/arch/riscv/mul_div_fsm.h` 内联的 CH_MEM DSL（`#ifdef CF_PLUGIN_USE_CH_MEM` 块，~180 LOC）提取到框架级 `include/cf/plugin/multi_cycle_fsm.h`（`FsmBase<StateEnum, NStates>` 双模式模板），并借重构边界把 `advance_fsm` 从 ad-hoc busy counter 改写为真 radix-2 iterative —— 解锁 rv32um 8/8 与 DMIPS/MHz ≥ 1.4 硬门禁（objective-v0110-launch Sprint 1）。
+**Goal:** 把 `ip/cpu/arch/riscv/mul_div_fsm.h` 内联的 CH_MEM DSL（`#ifdef CF_PLUGIN_USE_CH_MEM` 块，~180 LOC）提取到框架级 `include/cf/plugin/multi_cycle_fsm.h`（`FsmBase<StateEnum, NStates>` 双模式模板），并借重构边界把 `advance_fsm` 从 ad-hoc busy counter 改写为真 radix-2 iterative —— 解锁 rv32um 8/8 与 DMIPS/MHz ≥ 1.4 硬门禁（objective-soc-cpu-v0110-launch Sprint 1）。
 
 **Architecture:** 新增框架级 `cf::plugin::multi_cycle_fsm::FsmBase<StateEnum, NStates>` 模板：TLM 模式编译为 ad-hoc `enum class` + `tick()`（ADR-048 兼容），CH_MEM 模式编译为 `chlib::ch_state_machine` DSL（`#ifdef CF_PLUGIN_USE_CH_MEM` 内提供 `create_chmem_fsm()` / `state_out()`），`negotiate()` 提供 `multi_cycle_fsm` capability（ADR-082）。`MulDivFsmPlugin` 改继承 `FsmBase<MulDivState, 4>`，业务侧只写一次状态转移表；CH_MEM 专属 DSL 接线集中到 `ip/cpu/plugins/mul_div_fsm_chmem.h`（ADR-040 v2.0 双文件分离严格落地）。
 
 **Tech Stack:** C++23, Plugin-style (D4 / ADR-083), `chlib::ch_state_machine` DSL (ADR-046 v2.0 §2.1.1 算术豁免), `CapabilityTable::negotiate` (ADR-082), Catch2 v3.7.0, `chipforge_tests` / `chipforge_tests_chmem` 双二进制。
 
-> **时长说明（Oracle 估时聚合）**: 本 plan 5 个 step 每个标 2-5 min 是 TDD bite-size 粒度；真实工作量分步聚合为 **2-3 周**（`objective-v0110-launch.md §8` Sprint 1: 10-09 ~ 10-22，R-RADIX-1 预留 1 周 buffer）。Step 3 的 180 LOC 删除 + 真 radix-2 重写是主要耗时点。
+> **时长说明（Oracle 估时聚合）**: 本 plan 5 个 step 每个标 2-5 min 是 TDD bite-size 粒度；真实工作量分步聚合为 **2-3 周**（`objective-soc-cpu-v0110-launch.md §8` Sprint 1: 10-09 ~ 10-22，R-RADIX-1 预留 1 周 buffer）。Step 3 的 180 LOC 删除 + 真 radix-2 重写是主要耗时点。
 
 ---
 

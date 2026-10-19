@@ -131,7 +131,7 @@ MMUPlugin(SvMode, TLBConfig[], PTWConfig, MemoryInterface* mem = nullptr)
 | P1#6 并行 | `mmu-config-json-driven` | MMU 配置 JSON 化（已 archive 2026-10-08，由 mmu-chmem-pipeline-integration 承担）| ≤1 周 |
 
 **验证**:
-- `[cpu-l1-mmu-demo]` ≥8/8（含 ≥2 个新 PADDR 传播用例）*（收官时实际 6/6，v0.11.0 target 调整为 7/7，见 `objective-v0110-launch.md §9.2`）*
+- `[cpu-l1-mmu-demo]` ≥8/8（含 ≥2 个新 PADDR 传播用例）*（收官时实际 6/6，v0.11.0 target 调整为 7/7，见 `objective-soc-cpu-v0110-launch.md §9.2`）*
 - ≥3/5 MUL/DIV ELF 0% diff（cycle-identical）
 - rv32ui 40/40 + rv32um 0/8 维持（=40/48，0 新 fail）
 - 3 门禁全 PASS
@@ -212,7 +212,7 @@ CI 门禁（adr-matrix §6 行 5 / 决策 1）： build() 内 dynamic_cast = 0
 
 ### 4.5 v0.11.0 架构目标（2027 Q1 末，Wave 5 收官）
 
-> 数据源: [`.rddf/roadmap/objectives/objective-v0110-launch.md`](../../.rddf/roadmap/objectives/objective-v0110-launch.md)（7 项完成判据 + Go/No-Go 决策门禁）
+> 数据源: [`.rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md`](../../.rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md)（7 项完成判据 + Go/No-Go 决策门禁）
 
 **核心**: rv32um 8/8 + BP 基础（fetch stall + BTB 4K-entry）+ mmu-verilator 5/5 真 sv32 + DMIPS/MHz ≥1.4 硬门禁 + ADR-082 negotiate 完整集成。
 
@@ -224,7 +224,7 @@ CI 门禁（adr-matrix §6 行 5 / 决策 1）： build() 内 dynamic_cast = 0
 | DMIPS/MHz ≥ 1.4 | Dhrystone 硬门禁（mfc Phase G）| ADR-082 | PoC-1 复测 |
 | ADR-082 negotiate 完整集成 | mfc Phase H archive（MUL/DIV FSM 化 + negotiate 组装）| ADR-082 | PoC-1/2/3 |
 
-**退出标准**（Go 条件，全满足）: `[riscv-tests]` 48/48 + `[mmu]` 53/53 0 退化 + Phase A 新增 6 测试全过（=59/59）+ `[cpu-l1-mmu-demo]` 7/7 + `[mmu-verilator]` 5/5 + `[cpu-integration]` 全绿 + DMIPS/MHz ≥ 1.4 + `run_chipforge_tests.sh --all` 全 PASS（详见 objective-v0110-launch.md §9.2）。
+**退出标准**（Go 条件，全满足）: `[riscv-tests]` 48/48 + `[mmu]` 53/53 0 退化 + Phase A 新增 6 测试全过（=59/59）+ `[cpu-l1-mmu-demo]` 7/7 + `[mmu-verilator]` 5/5 + `[cpu-integration]` 全绿 + DMIPS/MHz ≥ 1.4 + `run_chipforge_tests.sh --all` 全 PASS（详见 objective-soc-cpu-v0110-launch.md §9.2）。
 
 ---
 
@@ -418,7 +418,7 @@ FMAX ≥ 100 MHz
 - 战略 SSOT: [`.rddf/roadmap/strategy.md`](../../.rddf/roadmap/strategy.md)（A+C Hybrid 战略选择 + 版本节点 + Go/No-Go）
 - 实施规划: [`.rddf/roadmap/`](../../.rddf/roadmap/)（phases/features/objectives）
 - 决策门禁: `.rddf/roadmap/objectives/objective-*.md` §9.2 Go/No-Go
-- **v0.11.0 决策门禁**: [`.rddf/roadmap/objectives/objective-v0110-launch.md`](../../.rddf/roadmap/objectives/objective-v0110-launch.md)（7 项完成判据 + Go/No-Go）
+- **v0.11.0 决策门禁**: [`.rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md`](../../.rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md)（7 项完成判据 + Go/No-Go）
 - 跟踪台账: `.rddf/roadmap/objectives/objective-*.md` §11 append-only
 - 任务执行: `openspec/changes/*/tasks.md`
 - ADR 注册表: [`docs/architecture/adr.md`](../architecture/adr.md)

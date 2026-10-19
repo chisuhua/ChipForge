@@ -230,7 +230,7 @@
 
 > **对比 v0.10.0 估算 (Oracle 2026-10-07)**: 1-3 周。本研究两次上调: 原始 5.6 → Oracle 调整 6.0-6.2 人周,因 v0.10.0 估时仅含 Part a/b flip,未含 MMUPlugin CH_MEM + csr_write_satp shadow 修复 + 文档/回归/归档。
 >
-> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: 估时 +0.5d 在 Sprint 2 早期同步启。但抵消 R-CHMEM-1 (objective-v0110-launch.md §5) 1 周 buffer 暴露——Phase C 启动期不需要"先试探 fetch stall 边界再实装 ibus_chmem.h",C2/C3 可直接消费已 stable 的 fetch stall framework 锚点。**净时不变 (≈6.0-6.2 人周)**,但交付置信度从 ~70% 提升到 ~85%。
+> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: 估时 +0.5d 在 Sprint 2 早期同步启。但抵消 R-CHMEM-1 (objective-soc-cpu-v0110-launch.md §5) 1 周 buffer 暴露——Phase C 启动期不需要"先试探 fetch stall 边界再实装 ibus_chmem.h",C2/C3 可直接消费已 stable 的 fetch stall framework 锚点。**净时不变 (≈6.0-6.2 人周)**,但交付置信度从 ~70% 提升到 ~85%。
 >
 > **降级路径** (若 v0.11.0 窗口硬性 < 5 周): D1 收窄版再砍为"TLB-less"(每 access 走 PTW FSM) → 省 ~1.5d,但 5-指令 ELF 可接受,**必须在 proposal 显式标 PoC 限制**。
 

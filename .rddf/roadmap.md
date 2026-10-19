@@ -35,10 +35,10 @@
 - `feat-rv32um-m-extension` — RV32UM M 扩展真实 radix-2 覆盖 (rv32um 8/8) (refs: phase-4)
 
 ### Objectives
-- `objective-v0110-launch` — v0.11.0 launch gate — Wave 5 收官 (P0)
-- `objective-mmu-chmem-phase-b-e` — mmu-chmem Phase B-E CH_MEM 集成实施 (P0)
-- `objective-v100-launch` — v1.0.0 launch gate — Wave 5 S/U + RV32A + BTB 收官 (P0) (refs: objective-v0110-launch, feat-bp-btb-gshare)
-- `objective-v120-launch` — v1.2.0 launch gate — 4-way RRIP + PMP + Debug + Spike lockstep 验证基建版 (P0) (refs: objective-v100-launch)
-- `objective-v130-launch` — v1.3.0 launch gate — Linux-on-FPGA + chip-selector 商业化 + ADR-080 HARD (P0) (refs: objective-v120-launch)
+- `objective-soc-cpu-v0110-launch` — v0.11.0 launch gate — Wave 5 收官 (P0)
+- `objective-ip-mmu-mmu-chmem-phase-b-e` — mmu-chmem Phase B-E CH_MEM 集成实施 (P0)
+- `objective-soc-cpu-v100-launch` — v1.0.0 launch gate — Wave 5 S/U + RV32A + BTB 收官 (P0) (refs: objective-soc-cpu-v0110-launch, feat-bp-btb-gshare)
+- `objective-soc-cpu-v120-launch` — v1.2.0 launch gate — 4-way RRIP + PMP + Debug + Spike lockstep 验证基建版 (P0) (refs: objective-soc-cpu-v100-launch)
+- `objective-soc-cpu-v130-launch` — v1.3.0 launch gate — Linux-on-FPGA + chip-selector 商业化 + ADR-080 HARD (P0) (refs: objective-soc-cpu-v120-launch)
 
 <!-- AUTO-SPRINT -->

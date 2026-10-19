@@ -1,18 +1,20 @@
 ---
-id: objective-v130-launch
+id: objective-soc-cpu-v130-launch
 status: active
 created: 2026-10-09
-last_revised: 2026-10-09
+last_revised: 2026-10-19
+primary_scope: soc-cpu
+co_scopes: [ip-cpu, ip-mmu, ip-cache]
 review_by: 2029-03-31
 owner: rdd-planner
 priority: P0
 manual_deps:
-  - objective-v120-launch
+  - objective-soc-cpu-v120-launch
 supersedes: null
 theme: v1.3.0 launch gate — Linux-on-FPGA + chip-selector 商业化 + ADR-080 HARD
 ---
 
-# Objective: objective-v130-launch
+# Objective: objective-soc-cpu-v130-launch
 
 ## 1. 驱动诊断（Why now）
 
@@ -50,7 +52,7 @@ v1.3.0 launch 全绿：
 ## 9. 目标依赖与 Decision Gate
 
 ### 9.1 前置 objective 依赖
-- `objective-v120-launch` — v1.2.0 launch 全绿（lockstep HARD + 4-way RRIP + PMP + gdbstub + Linux-sim SOFT）
+- `objective-soc-cpu-v120-launch` — v1.2.0 launch 全绿（lockstep HARD + 4-way RRIP + PMP + gdbstub + Linux-sim SOFT）
 
 ### 9.2 Go / No-Go Decision Gate
 - **Go 条件**（全部满足）：

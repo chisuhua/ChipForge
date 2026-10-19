@@ -2,6 +2,8 @@
 id: phase-2
 kind: phase
 status: active
+primary_scope: ip-mmu
+co_scopes: [ip-cpu]
 phase_refs: []
 主题: v0.8.0 Wave 3 MMU 实内存 + 周期精度
 ---

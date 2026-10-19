@@ -1,7 +1,7 @@
 ---
 id: mmu-chmem-pipeline-integration
 linked_change: openspec/changes/mmu-chmem-pipeline-integration/
-linked_objective: .rddf/roadmap/objectives/objective-mmu-chmem-phase-b-e.md
+linked_objective: .rddf/roadmap/objectives/objective-ip-mmu-mmu-chmem-phase-b-e.md
 linked_feature: .rddf/roadmap/features/feat-mmu-chmem-integration.md
 tier: complex
 estimated_steps: 6     # Phase 0 基线 + Phase A-C 实施 + Phase D 验证 + Phase E archive
@@ -28,7 +28,7 @@ deps_status:
 
 **Tech Stack:** C++23、CppHDL `ch_uint<N>` / `ch_reg` / `ch_mem` (ADR-040 v2.0 双模式)、`chlib::ch_state_machine` DSL (ADR-046 v2.0 §2.1.1 算术豁免)、Plugin 框架 (at_stage / payload keys / CtrlLink::halt_when)、Catch2 v3.7.0、`chipforge_tests` (TLM) / `chipforge_tests_chmem` (CH_MEM) 双二进制、`tools/run_chipforge_tests.sh --all` 回归。
 
-> **时长说明（Oracle 估时聚合 + 2026-10-16 user 决策）**: 本 plan 6 个顶层 phase 是实施里程碑（每个 phase 估时 0.5 day 到 5.5 周）；真实工作量分阶段聚合 = **6.0-6.2 人周跨 17 周窗口**。bp-btb-coordination-3items 0.5d 提前到 Sprint 2 早期对冲 R-CHMEM-1 暴露，**净时不增但交付置信度从 ~70% 提升到 ~85%**（详见 `objective-mmu-chmem-phase-b-e.md` §11 sprint-2026-10-3 跟踪行）。
+> **时长说明（Oracle 估时聚合 + 2026-10-16 user 决策）**: 本 plan 6 个顶层 phase 是实施里程碑（每个 phase 估时 0.5 day 到 5.5 周）；真实工作量分阶段聚合 = **6.0-6.2 人周跨 17 周窗口**。bp-btb-coordination-3items 0.5d 提前到 Sprint 2 早期对冲 R-CHMEM-1 暴露，**净时不增但交付置信度从 ~70% 提升到 ~85%**（详见 `objective-ip-mmu-mmu-chmem-phase-b-e.md` §11 sprint-2026-10-3 跟踪行）。
 
 ---
 
@@ -40,7 +40,7 @@ deps_status:
 | `phase-6d-prerequisites` archive | ✅ 完成（2026-09-20）| proposal.md depends_on |
 | Phase A 根因修复 (D4-A + D5-TLM) commit | ✅ 已 commit `a3afcfa`（2026-10-08）| tasks.md §1.1 |
 | `[mmu] 59/59 PASS` 0 退化基线 | ✅ 实测 2026-10-14 baseline 维持 | tasks.md line 41 |
-| `bp-btb owner fetch stage 协议 3 项` (HANDOFF §3) | ⚠ **Sprint 2 早期 (10-23 ~ 10-30) 同步启 0.5d** 为 Phase C 入口对齐 | objective-mmu-chmem-phase-b-e.md §11 sprint-2026-10-3 |
+| `bp-btb owner fetch stage 协议 3 项` (HANDOFF §3) | ⚠ **Sprint 2 早期 (10-23 ~ 10-30) 同步启 0.5d** 为 Phase C 入口对齐 | objective-ip-mmu-mmu-chmem-phase-b-e.md §11 sprint-2026-10-3 |
 
 **验证前置**：`bash tools/run_chipforge_tests.sh --all` 在当前 HEAD（4e5ae36 → 07cf77c 之后）先跑一次记 baseline（TLM 432 catch2 + CHMEM 48-ELF + verilator + 4 gate），供 Phase 4 回归比对。
 
@@ -137,7 +137,7 @@ Expected: 拿到 48 ELF cycle 数 → 写到 `.rddf/plans/mmu-chmem-pipeline-int
 
 ## Phase 1 — bp-btb-coordination + Phase C 入口准备 (估时 2 day, Sprint 2 早期 10-23 ~ 10-30 + Sprint 2 Week 1)
 
-> **R-CHMEM-1 缓解路径 (2026-10-16 user 决策)**: 本 phase 包含 `bp-btb-coordination-3items` 0.5d 提前 (Sprint 2 最早), 后续 Phase C 启动期已有 fetch stall framework 稳定锚点。详见 `objective-mmu-chmem-phase-b-e.md` §11 sprint-2026-10-3。
+> **R-CHMEM-1 缓解路径 (2026-10-16 user 决策)**: 本 phase 包含 `bp-btb-coordination-3items` 0.5d 提前 (Sprint 2 最早), 后续 Phase C 启动期已有 fetch stall framework 稳定锚点。详见 `objective-ip-mmu-mmu-chmem-phase-b-e.md` §11 sprint-2026-10-3。
 
 ### Task 1.1: bp-btb-coordination-3items — fetch stage 协议 0.5d (R-CHMEM-1 缓解)
 

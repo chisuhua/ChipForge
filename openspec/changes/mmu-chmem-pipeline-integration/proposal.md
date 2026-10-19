@@ -124,7 +124,7 @@ oracle_date: 2026-10-07
 - popen `cpu_verilator_sim --enable-mmu --mmu-mode sv32 --elf sv32_pte.elf --cycles 5000`
 - **AC 修订** (Oracle R14): REQUIRE `TOHOST=1` + cycle ≤ sv32 baseline × 1.5 + **EXCEPTION_CODE 正确传播** (替代原"trap PC 跳转断言",因 D3-A 物理不可能) + **pipeline stall 在 PTW_ACTIVE=1 时正确生效**
 
-**Phase C 入口前置** (2026-10-16 user 决策): §4 / §5 AC 中"pipeline stall 在 PTW_ACTIVE=1 时正确生效"硬依赖 fetch stall framework;`bp-btb-coordination-3items` (0.5d) 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启,作为 Phase C (C2/C3 ibus_chmem.h / dmem_chmem.h sv32 消费) 入口对齐。R-CHMEM-1 (objective-v0110-launch.md §5) 缓解路径详见 tasks.md "bp-btb-coordination 提前" 段 + objective-mmu-chmem-phase-b-e.md §11 sprint-2026-10-3 跟踪行。
+**Phase C 入口前置** (2026-10-16 user 决策): §4 / §5 AC 中"pipeline stall 在 PTW_ACTIVE=1 时正确生效"硬依赖 fetch stall framework;`bp-btb-coordination-3items` (0.5d) 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启,作为 Phase C (C2/C3 ibus_chmem.h / dmem_chmem.h sv32 消费) 入口对齐。R-CHMEM-1 (objective-soc-cpu-v0110-launch.md §5) 缓解路径详见 tasks.md "bp-btb-coordination 提前" 段 + objective-ip-mmu-mmu-chmem-phase-b-e.md §11 sprint-2026-10-3 跟踪行。
 
 ### 5. [cpu-l1-mmu-demo] 真 sv32 翻转 (从 mmufault Part a 拆分)
 

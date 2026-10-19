@@ -1,19 +1,21 @@
 ---
-id: objective-v100-launch
+id: objective-soc-cpu-v100-launch
 status: active
 created: 2026-10-09
-last_revised: 2026-10-09
+last_revised: 2026-10-19
+primary_scope: soc-cpu
+co_scopes: [ip-mmu, ip-cache]
 review_by: 2027-06-30
 owner: rdd-planner
 priority: P0
 manual_deps:
-  - objective-v0110-launch
+  - objective-soc-cpu-v0110-launch
   - feat-bp-btb-gshare
 supersedes: null
 theme: v1.0.0 launch gate — Wave 5 S/U + RV32A + BTB 收官 (PoC-4/5/6/7/14)
 ---
 
-# Objective: objective-v100-launch
+# Objective: objective-soc-cpu-v100-launch
 
 ## 1. 驱动诊断（Why now）
 
@@ -58,7 +60,7 @@ v1.0.0 launch 全绿：
 ## 9. 目标依赖与 Decision Gate
 
 ### 9.1 前置 objective 依赖
-- `objective-v0110-launch` — v0.11.0 launch 全绿（v0.10.0 收官 + mfc + mmu-chmem + BP）
+- `objective-soc-cpu-v0110-launch` — v0.11.0 launch 全绿（v0.10.0 收官 + mfc + mmu-chmem + BP）
 - `feat-bp-btb-gshare` — BTB 4K + GShare 13-bit + RAS 8-entry（PoC-6 owner）
 
 ### 9.2 Go / No-Go Decision Gate

@@ -1,24 +1,26 @@
 ---
-id: objective-v0110-launch
+id: objective-soc-cpu-v0110-launch
 status: active
 created: 2026-10-08
-last_revised: 2026-10-09
+last_revised: 2026-10-19
+primary_scope: soc-cpu
+co_scopes: [ip-mmu]
 review_by: 2027-01-24
 owner: rdd-planner
 priority: P0
 manual_deps:
-  - objective-mmu-chmem-phase-b-e
+  - objective-ip-mmu-mmu-chmem-phase-b-e
 feature_deps:
   - feat-mfc-multi-cycle-fsm          # Track A - 真 radix-2 iterative
   - feat-rv32um-m-extension           # Track A - rv32um 8/8
   - feat-mmu-chmem-integration        # Track B - CH_MEM MMU/PTW pipeline
-  - feat-bp-btb-gshare                # Track C - BTB + GShare + RAS
-  - feat-dhrystone-dmips-gate         # Track C/DMIPS 硬门禁 ≥1.4
+  - feat-bp-btb-gshare                # Track C - BTB + GShare + RAS (defer v1.0.0, 2026-10-19)
+  - feat-dhrystone-dmips-gate         # Track C/DMIPS 硬门禁 ≥1.4 (✅ done 2026-10-15)
 supersedes: null
 theme: "v0.11.0 launch gate — Wave 5 收官 (17 周窗口: 2 + 5.5 + 8 + 1)"
 ---
 
-# Objective: objective-v0110-launch
+# Objective: objective-soc-cpu-v0110-launch
 
 ## 1. 驱动诊断（Why now）
 
@@ -128,7 +130,7 @@ graph TD
 ## 9. 目标依赖与 Decision Gate
 
 ### 9.1 前置 objective 依赖
-- `objective-mmu-chmem-phase-b-e` — mmu-chmem Phase B-E 完成 (CH_MEM MMU 集成)
+- `objective-ip-mmu-mmu-chmem-phase-b-e` — mmu-chmem Phase B-E 完成 (CH_MEM MMU 集成)
 - `mfc-cpu-pipeline-multi-cycle-fsm` Phase H archive (50/60 → 60/60)
 - `mfc-extract-fsm-h` 真 radix-2 实装 (rv32um + dhrystone 修)
 

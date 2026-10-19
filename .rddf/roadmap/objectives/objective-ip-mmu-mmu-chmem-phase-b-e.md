@@ -1,8 +1,10 @@
 ---
-id: objective-mmu-chmem-phase-b-e
+id: objective-ip-mmu-mmu-chmem-phase-b-e
 status: active
 created: 2026-10-08
-last_revised: 2026-10-08
+last_revised: 2026-10-19
+primary_scope: ip-mmu
+co_scopes: []
 review_by: 2027-01-06
 owner: rdd-planner
 priority: P0
@@ -11,7 +13,7 @@ supersedes: null
 theme: mmu-chmem Phase B-E CH_MEM 集成实施
 ---
 
-# Objective: objective-mmu-chmem-phase-b-e
+# Objective: objective-ip-mmu-mmu-chmem-phase-b-e
 
 ## 1. 驱动诊断（Why now）
 
@@ -75,7 +77,7 @@ Phase B-E 全绿 (HANDOFF §10 退出标准):
 |--------|------|------|---------------|------|
 | sprint-2026-10 | sprint-review | objective 创建 (Phase A 已 commit) | — | initial |
 | sprint-2026-10-2 | deferral-rationale | **Phase B (B.2-B.5 mmu_chmem.h) 推迟到 Sprint 6+** | Defer Phase B (B.2-B.5) 到 Sprint 6 起头 (12-01) 或 Sprint 7 (12-23),与 Phase D/E 同步推进 | 3 次 deep agent 派发累计 1.5h+ 探查 CppHDL API (ch_uint / ch_reg / ch_mem / ch_state_machine / pipe_node) 均未产出代码 (`ip/mmu/plugins/mmu_chmem.h` 不存在);Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A 真 radix-2 实装 (mfc-extract-fsm-h);Track B 推迟期不阻塞 Track A |
-| sprint-2026-10-3 | sprint-replan | **`bp-btb-coordination-3items` 0.5d 由 Sprint 6 提前到 Sprint 2 早期** | 0.5d (10-23 ~ 10-30) 同步启作为 Phase C (ibus_chmem.h) 入口对齐;原 Sprint 6 (12-01) 同步窗口收口改作 fallback | R-CHMEM-1 暴露 (`objective-v0110-launch.md` §5 风险表) 在 Phase C 启动期无 fetch stall framework 锚点;提前 bp-btb-coordination = 消解 1 周 buffer 暴露;代价 = Sprint 2 占用 0.5d 给 fetch stall 协议(不影响 Sprint 2-5 总 5.5 周窗口净时);user 决策 2026-10-16 |
+| sprint-2026-10-3 | sprint-replan | **`bp-btb-coordination-3items` 0.5d 由 Sprint 6 提前到 Sprint 2 早期** | 0.5d (10-23 ~ 10-30) 同步启作为 Phase C (ibus_chmem.h) 入口对齐;原 Sprint 6 (12-01) 同步窗口收口改作 fallback | R-CHMEM-1 暴露 (`objective-soc-cpu-v0110-launch.md` §5 风险表) 在 Phase C 启动期无 fetch stall framework 锚点;提前 bp-btb-coordination = 消解 1 周 buffer 暴露;代价 = Sprint 2 占用 0.5d 给 fetch stall 协议(不影响 Sprint 2-5 总 5.5 周窗口净时);user 决策 2026-10-16 |
 | sprint-2026-10-4 | archive-deferral | **Phase 2 done 收档 (commit `271c379`) + follow-up `mmu-chmem-phase-b-c-launch` 接管 Sprint 2-5 实施** | H1 决策:**A1.A 延后** (本 change 不 archive,B–E 移交 follow-up,Sprint 2-5 启动期再处置双计) | Phase A ✅ + C.2/C.3 sel 表达式 ✅ 已落 main (`9373808`/`5b9f74a`);29/168 tasks 完成;follow-up change 已开占位,spec.md 2 Requirements + 7 Scenarios,depends_on 仅列已 archive (csr-chmem-writeback-complete),prose 标注 4 项 prerequisite (R11.1 重审 / fetch-stall-protocol-v0.2 / bp-btb-coordination-3items / CtrlLink API gap FP-4) |
 | sprint-2026-10-4 | review-trigger | **`review_by: 2027-01-06` 替代 trigger 已上链** (避免日历日期死字段) | Sprint 17 末 (2026-10-22) review 时确认 follow-up change owner 启动期就绪;如未就绪 → 提早触发 review (替换 2027-01-06 触发) | metis 风险 #6:`review_by: 2027-01-06` 是死的,无人主动触发;本条用 Sprint cadence 替代日历;若 Sprint 2-5 启动期无 owner,本台账作为"紧急 review 触发器"显式激活 |
 

@@ -1,19 +1,21 @@
 ---
-id: objective-v120-launch
+id: objective-soc-cpu-v120-launch
 status: active
 created: 2026-10-09
-last_revised: 2026-10-09
+last_revised: 2026-10-19
+primary_scope: soc-cpu
+co_scopes: [ip-cache, ip-mmu]
 review_by: 2028-04-30
 owner: rdd-planner
 priority: P0
 manual_deps:
-  - objective-v100-launch
-  - objective-mmu-chmem-phase-b-e
+  - objective-soc-cpu-v100-launch
+  - objective-ip-mmu-mmu-chmem-phase-b-e
 supersedes: null
 theme: v1.2.0 launch gate — 4-way RRIP + PMP + Debug + Spike lockstep 验证基建版
 ---
 
-# Objective: objective-v120-launch
+# Objective: objective-soc-cpu-v120-launch
 
 ## 1. 驱动诊断（Why now）
 
@@ -49,8 +51,8 @@ v1.2.0 launch 全绿：
 ## 9. 目标依赖与 Decision Gate
 
 ### 9.1 前置 objective 依赖
-- `objective-v100-launch` — v1.0.0 launch 全绿（S/U + BTB + FreeRTOS）
-- `objective-mmu-chmem-phase-b-e` — MMU CH_MEM 完整（sv32 真翻译）
+- `objective-soc-cpu-v100-launch` — v1.0.0 launch 全绿（S/U + BTB + FreeRTOS）
+- `objective-ip-mmu-mmu-chmem-phase-b-e` — MMU CH_MEM 完整（sv32 真翻译）
 
 ### 9.2 Go / No-Go Decision Gate
 - **Go 条件**（全部满足）：

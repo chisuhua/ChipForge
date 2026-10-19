@@ -31,9 +31,9 @@ priority: P1
 | P1-1 | strategy.md §3 wave4 仍"exploring (占位)"但 2/3 change 已 archive | SHOULD_FIX |
 | P1-2 | strategy.md §6 时间表未刷新：v0.8.0 (2026-12 中旬) 实际 2026-10-08 已 archive / v0.9.0 (2027-02) wave4 2/3 done / v0.10.0 (2027 Q1) v0.10.0-interim tag 已发 | SHOULD_FIX |
 | P1-3 | strategy.md §10 v0.11.0 Go/No-Go 行含 "rv32um 01-13 仍有 FAIL → hotfix" 已失实分支 | SHOULD_FIX |
-| P1-4 | phase-2.md "🟡 部分收官" + phase-3.md "⏸ deferred 未启动" 与 strategy §3 "✅ 已收官" 矛盾 | SHOULD_FIX |
+| P1-4 | phase-2-ip-mmu.md "🟡 部分收官" + phase-3-ip-cache.md "⏸ deferred 未启动" 与 strategy §3 "✅ 已收官" 矛盾 | SHOULD_FIX |
 | P1-5 | feat-rv32um-m-extension / feat-mfc-multi-cycle-fsm / feat-phase-6d-rtl-verification 3 个 feature frontmatter 仍 status: active（archive 已发生） | SHOULD_FIX |
-| P1-6 | objective-v0110-launch.md §2 数字表 "当前 [riscv-tests] 40/48 (rv32um 0/8)" + §1 驱动诊断 #1 "rv32um 0/8 FAIL" 已失实；§8 Sprint 1 (mfc-extract-fsm-h) 已 archive 后台账缺补 3 条 | SHOULD_FIX |
+| P1-6 | objective-soc-cpu-v0110-launch.md §2 数字表 "当前 [riscv-tests] 40/48 (rv32um 0/8)" + §1 驱动诊断 #1 "rv32um 0/8 FAIL" 已失实；§8 Sprint 1 (mfc-extract-fsm-h) 已 archive 后台账缺补 3 条 | SHOULD_FIX |
 
 ### 战略层决策（待 user 拍板）
 
@@ -46,11 +46,11 @@ priority: P1
 
 ### 必做（6 文件纯 docs）
 1. `.rddf/roadmap/strategy.md` §3 + §6 + §10 三处更新
-2. `.rddf/roadmap/phases/phase-2.md` 转 completed + `phases/phase-3.md` 勾 P2#7
+2. `.rddf/roadmap/phases/phase-2-ip-mmu.md` 转 completed + `phases/phase-3-ip-cache.md` 勾 P2#7
 3. `.rddf/roadmap/features/feat-rv32um-m-extension.md` / `feat-mfc-multi-cycle-fsm.md` / `feat-phase-6d-rtl-verification.md` frontmatter status → done
-4. `.rddf/roadmap/objectives/objective-v0110-launch.md` §2 + §1 数字刷新 + §11 台账补 3 条
+4. `.rddf/roadmap/objectives/objective-soc-cpu-v0110-launch.md` §2 + §1 数字刷新 + §11 台账补 3 条
 5. CHANGELOG.md :551 抬头加快照标注（"e9850d2 实测 vs f95b2d0/c1cb8ec 继承"）
-6. S3 决策落到 strategy §6/§10 + objective §9.2 + phase-4.md（按 user 决定方向）
+6. S3 决策落到 strategy §6/§10 + objective §9.2 + phase-4-soc-cpu.md（按 user 决定方向）
 
 ### 治理改进（结构性防漂移）
 7. `.rddf/sync_strategy_status.sh` 加 lint mode 进架构 gate：扫描 features/objectives/phases 引用的 change 名 vs `openspec/changes/archive/` 状态，drift → error
@@ -93,5 +93,5 @@ priority: P1
 - 父 change: `roadmap-honesty-audit-2026-10` (commit 3a33611, 2026-10-19)
 - Oracle 审计 session: `ses_eadc4634` (B1-B3 审查) + `ses_ada679d` (深度诊断)
 - 当前活跃 initiative: `wave5-isa-coverage-and-bp` (v0.11.0 owner)
-- 决策门禁: `objective-v0110-launch.md §9.2 Go/No-Go`
+- 决策门禁: `objective-soc-cpu-v0110-launch.md §9.2 Go/No-Go`
 - ADR: 暂无新增 ADR 需求；现有 ADR-040 v2.0 + ADR-046 + ADR-082 已覆盖

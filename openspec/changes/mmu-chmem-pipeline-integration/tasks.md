@@ -7,9 +7,9 @@
 > **Total estimate**: 6.0-6.2 人周 (Oracle 调整后,vs 原 5.6)
 > **B1 已跳过**: Oracle D1-B 收窄版锁定,scope 决策已前置完成
 > **D0 已完成**: proposal 文本修订 (本 PR 落地)
-> **Phase B 已 defer (2026-10-10)**: 3 次 deep agent 派发累计 1.5h+ 均未产出 mmu_chmem.h 代码 (Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力)。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A (mfc-extract-fsm-h 真 radix-2 实装);Phase B (B2-B5) + C (C1-C6) 推迟到 Sprint 6+ (12-01 起) 与 D/E 同步推进。详见 `objective-mmu-chmem-phase-b-e.md` §11 跟踪台账
-> **Sprint 2-5 window (Phase C only, 10-23 ~ 11-30)**: C1-C6 (per objective-mmu-chmem-phase-b-e.md, B 已 defer)
-> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: `bp-btb-coordination-3items` 0.5d 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启——为 Phase C (C2/C3 ibus_chmem.h / dmem_chmem.h sv32 消费) 入口准备稳定 fetch stall framework 锚点,缓解 R-CHMEM-1 暴露 (objective-v0110-launch.md §5)。Sprint 2 占用 0.5d,但净时不变(消解 R-CHMEM-1 1 周 buffer 暴露换得)。原 Sprint 6 同步窗口收口改作 fallback(若 Sprint 2 提前未达成则 Sprint 6 补救)。
+> **Phase B 已 defer (2026-10-10)**: 3 次 deep agent 派发累计 1.5h+ 均未产出 mmu_chmem.h 代码 (Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力)。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A (mfc-extract-fsm-h 真 radix-2 实装);Phase B (B2-B5) + C (C1-C6) 推迟到 Sprint 6+ (12-01 起) 与 D/E 同步推进。详见 `objective-ip-mmu-mmu-chmem-phase-b-e.md` §11 跟踪台账
+> **Sprint 2-5 window (Phase C only, 10-23 ~ 11-30)**: C1-C6 (per objective-ip-mmu-mmu-chmem-phase-b-e.md, B 已 defer)
+> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: `bp-btb-coordination-3items` 0.5d 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启——为 Phase C (C2/C3 ibus_chmem.h / dmem_chmem.h sv32 消费) 入口准备稳定 fetch stall framework 锚点,缓解 R-CHMEM-1 暴露 (objective-soc-cpu-v0110-launch.md §5)。Sprint 2 占用 0.5d,但净时不变(消解 R-CHMEM-1 1 周 buffer 暴露换得)。原 Sprint 6 同步窗口收口改作 fallback(若 Sprint 2 提前未达成则 Sprint 6 补救)。
 > **Owner**: mfc-chmem team (per ADRs in proposal)
 >
 > **执行顺序** (硬性,不可并行的有依赖标记):
@@ -21,7 +21,7 @@
 
 ## Phase Schedule Table
 
-> **决策记录 (本 PR 内落地,不单独开 PR)**: Track B staging — Phase B (B2-B5) 解锁并入 Sprint 2-5 排期,依据 `objective-v0110-launch.md` §8 (17 周时间盒:Sprint 2-5 = 10-23 ~ 11-30, Track B) + `objective-mmu-chmem-phase-b-e.md` (Phase B-E scope,B1 跳过)。owner = mfc-chmem team (proposal ADRs)。
+> **决策记录 (本 PR 内落地,不单独开 PR)**: Track B staging — Phase B (B2-B5) 解锁并入 Sprint 2-5 排期,依据 `objective-soc-cpu-v0110-launch.md` §8 (17 周时间盒:Sprint 2-5 = 10-23 ~ 11-30, Track B) + `objective-ip-mmu-mmu-chmem-phase-b-e.md` (Phase B-E scope,B1 跳过)。owner = mfc-chmem team (proposal ADRs)。
 
 | Sprint | Window | Phase | Tasks | Owner |
 |--------|--------|-------|-------|-------|
@@ -559,7 +559,7 @@
 | Phase | Tasks | 估时(人天) | 状态 |
 |-------|-------|-----------|------|
 | A 根因 Bug 修复 | A.1, A.2, A.3, A.3.1, A.4, A.5, A.6 | 5 | ✅ verified 2026-10-10 (commit `a3afcfa` 落地代码 + 测试) |
-| B MMUPlugin CH_MEM | B.2, B.3, B.4, B.5 (B.1 跳过) | 10 | ⏸ 待启动 (Sprint 2-5 follow-up `mmu-chmem-phase-b-c-launch` 已开占位, 详见 objective-mmu-chmem-phase-b-e.md review_by=2027-01-06) |
+| B MMUPlugin CH_MEM | B.2, B.3, B.4, B.5 (B.1 跳过) | 10 | ⏸ 待启动 (Sprint 2-5 follow-up `mmu-chmem-phase-b-c-launch` 已开占位, 详见 objective-ip-mmu-mmu-chmem-phase-b-e.md review_by=2027-01-06) |
 | C Pipeline 集成 | C.1, C.2 ✅, C.3 ✅, C.4, C.5, C.6 | 11 | 🔵 部分收丰 2026-10-17 (C.2/C.3 skeleton+sel 已落 commit `9373808`+`5b9f74a`; C.1/C.4/C.5 skeleton shipped + wiring 待 Sprint 2-5) |
 | D 验证与回归 | D.0 ✅, D.1, D.2, D.3, D.4, D.5, D.6 | 5 (D.0 已完成) | 🔵 D.0 done, 余待启动 |
 | E 文档与归档 | E.1, E.2, E.3, E.4, E.5, E.6 | 3 | ⏸ 待启动 (触发: D 阶段全绿后) |

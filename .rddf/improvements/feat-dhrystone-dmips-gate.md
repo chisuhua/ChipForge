@@ -317,7 +317,7 @@ dhrystone,PASS,fsm,5000000,<真值>,FSM mode PASS; 1.4 DMIPS/MHz 期望 feat-bp-
 ## 主题 / 架构依据
 
 **主题**: v0.10.x-v0.11.0 Wave 5 ISA 覆盖 + BP
-**来源**: `objective-v0110-launch.md §8 Sprint 1 判据 #3` + `.rddf/roadmap/features/feat-dhrystone-dmips-gate.md` (现有 stub 状态 active, 4 acceptance 未打勾) + 本会话 Oracle + Explore D1 确认
+**来源**: `objective-soc-cpu-v0110-launch.md §8 Sprint 1 判据 #3` + `.rddf/roadmap/features/feat-dhrystone-dmips-gate.md` (现有 stub 状态 active, 4 acceptance 未打勾) + 本会话 Oracle + Explore D1 确认
 
 **架构引用**:
 - **ADR-049** (MemoryInterface 抽象): harness 修不破 MemoryInterface 契约

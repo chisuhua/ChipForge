@@ -2,6 +2,8 @@
 id: phase-1
 kind: phase
 status: completed
+primary_scope: ip-cpu
+co_scopes: []
 phase_refs: []
 主题: v0.7.0 Wave 3 CPU pipeline 清债
 ---

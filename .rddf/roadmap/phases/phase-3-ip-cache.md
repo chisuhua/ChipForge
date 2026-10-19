@@ -2,6 +2,8 @@
 id: phase-3
 kind: phase
 status: deferred
+primary_scope: ip-cache
+co_scopes: [ip-cpu]
 phase_refs: []
 主题: v0.9.0 Wave 4 Cache DSE
 ---

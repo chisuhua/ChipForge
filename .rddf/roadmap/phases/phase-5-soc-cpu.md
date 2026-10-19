@@ -2,6 +2,8 @@
 id: phase-5
 kind: phase
 status: deferred
+primary_scope: soc-cpu
+co_scopes: [ip-mmu, ip-cache]
 phase_refs: []
 主题: v1.0.0+ Wave 6 产品化
 ---

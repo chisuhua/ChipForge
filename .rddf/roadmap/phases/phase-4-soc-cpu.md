@@ -2,6 +2,8 @@
 id: phase-4
 kind: phase
 status: active
+primary_scope: soc-cpu
+co_scopes: [ip-mmu]
 phase_refs: []
 主题: v0.10.x-v0.11.0 Wave 5 ISA 覆盖 + BP
 ---
@@ -21,7 +23,7 @@ phase_refs: []
 - [ ] DMIPS/MHz ≥ 1.4 (硬门禁)
 - [ ] **PoC-1**: MUL/DIV 1c/33c rv32um 100% · **PoC-2**: RV32C ≥95% · **PoC-3**: ICache ≥90%
 - [ ] ADR-082 negotiate capability 集成（mfc Phase G）
-- [ ] **PoC-6**: CoreMark/MHz ≥ 1.9 (BP 完成) — **defer → v1.0.0** (决策 2026-10-19, 见 `objective-v0110-launch.md §11`)
+- [ ] **PoC-6**: CoreMark/MHz ≥ 1.9 (BP 完成) — **defer → v1.0.0** (决策 2026-10-19, 见 `objective-soc-cpu-v0110-launch.md §11`)
 
 ## 关联
 - OpenSpec: `wave5-isa-coverage-and-bp` initiative

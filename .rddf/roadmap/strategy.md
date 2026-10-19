@@ -177,8 +177,8 @@ graph TD
 | v0.7.0 archive | P0#1 canonical-ordering PASS + 0 新 fail | 暂停, 修复 P0#1 后重试 |
 | v0.8.0 中间检查 | P1#3 PADDR 真消费 + cycle-precision 实装 + multi-cycle stall 注 | **如果评估显示剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) |
 | v0.9.0 archive | Phase 1.5 毕业标准达成 (RV32I ≥85%, SoC demo ≥5 ELF tohost=1, cache-dse-sweep CSV, D4+ADR-040+ADR-044+ADR-045 全合规) | 推迟 1 个 wave, 回填 Open Questions, 重审 |
-| v0.10.0 archive | mfc Phase H archive + mmu-chmem Phase A-E（rv32um 8/8 + DMIPS/MHz ≥1.4 defer v0.11.0）| 推迟 v0.11.0, 修 mfc-extract-fsm-h 残留 |（**v0.10.0 archive 门禁为规划时点快照**：v0.10.4 2026-09-30 已发版；mfc Phase H + mmu-chmem Phase A-E 实际归属 v0.11.0，见 `objective-v0110-launch.md §9.1`）|
-| v0.11.0 archive | rv32um 8/8 + DMIPS/MHz ≥1.4 + [cpu-l1-mmu-demo] 7/7（workaround 移除）+ [mmu-verilator] 5/5 + mfc-extract-fsm-h archive + 4 architecture gates 0 error | 推迟 v1.0.0 启动期，发 v0.11.x hotfix 修 mfc-extract-fsm-h 残留 |（**2026-10-19 决策**: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口, 详见 `objective-v0110-launch.md §11` + oracle session ses_ead89ad2）|
+| v0.10.0 archive | mfc Phase H archive + mmu-chmem Phase A-E（rv32um 8/8 + DMIPS/MHz ≥1.4 defer v0.11.0）| 推迟 v0.11.0, 修 mfc-extract-fsm-h 残留 |（**v0.10.0 archive 门禁为规划时点快照**：v0.10.4 2026-09-30 已发版；mfc Phase H + mmu-chmem Phase A-E 实际归属 v0.11.0，见 `objective-soc-cpu-v0110-launch.md §9.1`）|
+| v0.11.0 archive | rv32um 8/8 + DMIPS/MHz ≥1.4 + [cpu-l1-mmu-demo] 7/7（workaround 移除）+ [mmu-verilator] 5/5 + mfc-extract-fsm-h archive + 4 architecture gates 0 error | 推迟 v1.0.0 启动期，发 v0.11.x hotfix 修 mfc-extract-fsm-h 残留 |（**2026-10-19 决策**: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口, 详见 `objective-soc-cpu-v0110-launch.md §11` + oracle session ses_ead89ad2）|
 | v1.0.0 archive | S/U mode + RV32A + BTB + FreeRTOS + CoreMark ≥2.3 | 推迟 v1.2.0, 修 PoC-6 BP 不足 |
 | v1.2.0 archive | lockstep 1M 零分歧 HARD + Linux-sim SOFT + 4-way RRIP + PMP + gdbstub | 触发 R6: 降级 v1.2.0 为"验证基建版", Linux-sim 并入 v1.3.0 合并交付 |
 | v1.3.0 archive | Linux-on-FPGA + chip-selector + ADR-080 转硬门禁 + FPGA CoreMark ≥2.5 | 触发 R3/R7/R8: 商业化定位降级 / soft-float 路线 / FPGA-only 产品化 |
@@ -220,6 +220,6 @@ graph TD
 >
 > 📍 **[`docs/architecture/roadmap-evolution.md`](../../docs/architecture/roadmap-evolution.md)** — 8 版本节点架构演进 + 跨版本对比 + 11 条 CI 门禁时间轴（动态执行分解）
 >
-> 📍 **[`.rddf/roadmap/`](.)** — rdd-workflow 实施规划（phases/features/objectives），含 v0.11.0 决策门禁 [objective-v0110-launch.md](objectives/objective-v0110-launch.md)（Wave 5 收官 Go/No-Go）
+> 📍 **[`.rddf/roadmap/`](.)** — rdd-workflow 实施规划（phases/features/objectives），含 v0.11.0 决策门禁 [objective-soc-cpu-v0110-launch.md](objectives/objective-soc-cpu-v0110-launch.md)（Wave 5 收官 Go/No-Go）
 >
 > 关联: `openspec/changes/*/tasks.md` (具体 changes) · `.rddf/sync_strategy_status.sh` (§7 SSOT 派生) · `AGENTS.md` 已知测试状态（数字维护原则）
