@@ -40,12 +40,24 @@ The addition of the M-op select layers SHALL NOT change the computed `RD_DATA`/`
 
 #### Scenario: Base-ALU funct7 gate hardening
 - **WHEN** implementing the M-op layer
-- **THEN** the six base R-type ops that currently lack a `funct7` gate (`is_sll`, `is_slt`, `is_sltu`, `is_xor`, `is_or`, `is_and` at `int_alu_chmem.h:155-169`) SHALL optionally receive an `f7_00` gate on their `is_op` side
+- **THEN** the six base R-type ops that currently lack a `funct7` gate (`is_sll`, `is_slt`, `is_sltu`, `is_xor`, `is_or`, `is_and` at `int_alu_chmem.h:155-169`) SHALL receive an `f7_00` gate on their `is_op` side, so that base-op and M-op discrimination are mutually exclusive and do not depend on `select` ordering
 - **AND** this gate MUST NOT be applied to the `is_opimm` side (bits[31:25] of I-type hold immediate bits, not funct7) — see `int_alu_chmem.h:148-150`
 
 ### Requirement: All 8 rv32um ELF SHALL pass on CH_MEM and Verilator
 
 With the combinational M-op datapath in place, the vendored `rv32um-p-*` ELF suite SHALL execute to completion with a passing RISC-V test harness signature on both the CH_MEM Simulator and the Verilator backend.
+
+**Special-case coverage mapping** (disassembly-verified 2026-10-20 against `tests/cpu/riscv_tests/elf/rv32um-p-*`) — these are the ELF cases that force the RISC-V-mandated edge semantics:
+
+| ELF | test | operands | expected | edge covered |
+|---|---|---|---|---|
+| `rv32um-p-div` | test_6 | `div(INT_MIN, 1)` | `0x80000000` | INT_MIN magnitude |
+| `rv32um-p-div` | test_7 | `div(INT_MIN, -1)` | `0x80000000` | **INT_MIN ÷ -1 → INT_MIN (no overflow)** |
+| `rv32um-p-div` | test_8 / 9 / 10 | `div(INT_MIN,0)` / `div(1,0)` / `div(0,0)` | `0xFFFFFFFF` | **signed divide-by-zero → all ones** |
+| `rv32um-p-rem` | test_7 | `rem(INT_MIN, -1)` | `0x00000000` | **INT_MIN % -1 → 0** |
+| `rv32um-p-rem` | test_8 / 9 / 10 | `rem(INT_MIN,0)` / `rem(1,0)` / `rem(0,0)` | `0x80000000` / `0x1` / `0x0` | **signed modulo-by-zero → dividend** |
+| `rv32um-p-divu` | test_8 / 9 / 10 | `divu(INT_MIN,0)` / `divu(1,0)` / `divu(0,0)` | `0xFFFFFFFF` | **unsigned divide-by-zero → all ones** |
+| `rv32um-p-remu` | test_8 / 9 / 10 | `remu(INT_MIN,0)` / `remu(1,0)` / `remu(0,0)` | `0x80000000` / `0x1` / `0x0` | **unsigned modulo-by-zero → dividend** |
 
 #### Scenario: CH_MEM Simulator rv32um all pass
 - **WHEN** the developer runs `./build/bin/chipforge_tests_chmem "chmem_vendored_elf_tohost1"` from the repository root
@@ -56,6 +68,23 @@ With the combinational M-op datapath in place, the vendored `rv32um-p-*` ELF sui
 - **WHEN** the developer runs `./build/bin/chipforge_tests_chmem "[verilator]"` from the repository root
 - **THEN** all 8 rv32um ELF SHALL reach a passing harness signature (real `tohost == 1`, not the `& 0x1u` mask artifact)
 - **AND** the `[mmu-verilator]` 3/3 baseline SHALL continue to PASS
+
+#### Scenario: Special-case guards are explicit (not inherited from the CppHDL default)
+- **WHEN** the combinational M-op datapath emits any divide or modulo node
+- **THEN** that node SHALL be guarded explicitly with a safe divisor (`b_safe = select(b == 0, 1, b)` / `b_safe_mag = select(abs32(b) == 0, 1, abs32(b))`), and the result SHALL be overridden with the RISC-V-mandated special value (`select(b == 0, all_ones, …)` for DIV/DIVU; `select(b == 0, a, …)` for REM/REMU)
+- **AND** the implementation SHALL NOT rely on the CppHDL default divide-by-zero behaviour (`CppHDL/include/ast/instr_op_arith.h:52-73` returns 0 and writes to stderr), because the vendored ELF drives `rs2 == 0` for the unsigned variants (`divu` / `remu` test_8/9/10, see the coverage mapping above)
+
+### Requirement: CH_MEM 组合式 M-op 与 TLM radix-2 cycle 不可比 SHALL 被显式声明
+
+The CH_MEM path resolves every RV32M operation in a single combinational cycle, whereas the TLM path implements a multi-cycle radix-2 iterative FSM (`ip/cpu/arch/riscv/mul_div_fsm.h:144-148` — MUL=1c / MULH=3c / DIV=33c). The two datapaths are therefore **not cycle-homologous**: their cycle counts SHALL NOT be compared against each other, and a parity assertion between them is **not a meaningful acceptance criterion** — it is neither a pass nor a failure condition, it is out of scope.
+
+This change SHALL revise the cycle-comparison scenarios of the `chmem-rv32um-coverage` and `verilator-rv32um-coverage` capabilities via `## MODIFIED Requirements` delta specs (removing the ±5% / +50c parity requirement), and SHALL defer cycle-parity acceptance to change `chmem-mext-fsm-cycle-parity`.
+
+#### Scenario: Cycle parity against the TLM baseline is explicitly out of scope
+- **WHEN** the CH_MEM Simulator or the Verilator backend completes an rv32um ELF
+- **THEN** the cycle index SHALL still be reported (Catch2 `INFO` / runner stdout) and recorded in the commit message for manual inspection
+- **AND** the executor SHALL NOT treat a cycle-count difference against `soc/cpu/docs/dse/rv32um-baseline-matrix.csv` as a test failure
+- **AND** this deferral SHALL be recorded as a `## MODIFIED Requirements` delta in the two affected capabilities, so that it is visible as a deliberate scope decision rather than an omitted check
 
 ### Requirement: Non-goals SHALL be explicitly deferred
 
