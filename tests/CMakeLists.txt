@@ -137,6 +137,8 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_ibus_chmem_sv32.cpp
     # mmu-chmem-pipeline-integration / Phase 2 Task 2.2 (C3): dmem_chmem sv32 消费
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_dmem_chmem_sv32.cpp
+    # 2026-10-20 Oracle 深挖复测 — ch_uint<32> arith 14/4 3*4 PoC (chmem-m-ext-integration 前置)
+    ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_chmem_arith_poc.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES
