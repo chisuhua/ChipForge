@@ -5,6 +5,58 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (2026-10-20, interim) — chmem-alu-unit-semantics: CH_MEM ALU 单元级语义锚 (真跑 19 层 select 树)
+
+> **OpenSpec change**: `chmem-alu-unit-semantics` (wave5-isa-coverage-and-bp)
+> **Author / Date**: build agent, 2026-10-20
+> **Scope**: 1 个新测试文件 + 1 处 legacy 注释 + 文档 + spec delta。**不改任何业务实现。**
+> **触发**: `chmem-mext-comb-datapath` 验收时发现 AGENTS.md 自述的 known issue「CH_MEM ALU 无单元级语义测试」
+
+### Fixed (测试覆盖缺口)
+
+- **既有 "ALU byte-equal" 是 C++ 镜像自比，零覆盖真实 datapath**：`tests/cpu/test_cpu_rtl_regfile_alu.cpp` 的 `m3_poc_alu_byte_equal` 比对的是 `tlm_alu_compute` vs `chmem_ref_alu`、`m3_poc_5stage_byte_equal` 比对的是 `tlm_alu_compute_op` vs `chmem_alu_compute_op` —— **两份手写 C++ 镜像**，完全不跑 `int_alu_chmem.h` 的 select 树；`m3_poc_alu_elaborate` 只验 `alu.v` 非空。⇒ "已对标"的表述给出虚假信心。已在该文件加警告注释（不可当 ALU 回归锚）。
+- **接线层无锚**：`tests/framework/test_chmem_arith_poc.cpp` Part D 覆盖 8 条 M-op 表达式，但那是**裸 `ch_uint` 表达式**，不经 `RiscvIntAluPlugin` ⇒ 不锚 `is_mext` gate、8 层 M-op select 的位置、6 个 base R-type op 的 `f7_00` 加固、`RD_DATA` 写者链。"表达式对、接线错"这一整类 bug 无任何测试能发现。
+- **新增 `tests/cpu/test_cpu_chmem_alu_semantics.cpp`**：真跑 19 层 select 树并断言 `RD_DATA` 数值 —— 机制 = 独立 context → `PipeBuilder` → register ALU → build → **elaborate 之前**填 `execute` 节点 payload（`RS1`/`RS2`/`PC` + `DECODED_INST`）→ `elaborate()` → `create_simulator()` + `tick()` → `get_value(RD_DATA)`。**6 个 TEST_CASE / 39 组求值 / 288 assertions**：
+  - G1 M-op 语义 8 op × 2 向量（MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU，含 64-bit 中间与 sext/zext）
+  - G2 边界 6 条（除零 → DIV/DIVU 全 1、REM/REMU 被除数；`INT_MIN ÷ -1` → INT_MIN / 0）
+  - G3 判别互斥 8 组（每 funct3 验 `funct7=0x01` 走 M-op、`0x00` 走 base op，且两者结果**必须不同**才有区分力）
+  - G4 RV32I 回归 10 条 base R-type op
+  - G5 I-type 不误 gate 6 条（负立即数 I-type，其 `bits[31:25]=0x20` 不得被 `f7_00` 误伤）
+  - G6 LUI / AUIPC 2 条
+  - 期望值全部按 RISC-V ISA **独立手算**（禁用 `int_alu_chmem.h:384` 的 `compute_static`，否则自证）
+
+### 变异对照（自证测试强度）
+
+| 变异 | 结果 |
+|---|---|
+| 去掉 `is_mext` 的 `f7_01` gate | ✅ **被抓住** —— G4 `ADD(5,3)` 得 15（MUL 误捕）+ G3 base op 得 48 |
+| 删除整个 8 层 M-op select 块 | ✅ **被抓住** —— G1+G2+G3 FAIL，`MUL(3,4)` 得 0 |
+| 移动 M-op 层到 base 树之前（`f7_00` 加固仍在） | ⚪ **未被抓住 —— 且这是正确的**：`f7_00` 加固使 base/M 判别**互斥**，select 顺序无关紧要（D2 "双保险"设计生效）⇒ 该变异语义等价，非缺陷 |
+| 移动 M-op 层 **且** 去 `f7_00` 加固 | ✅ **被抓住** —— 3 个 case FAIL，证明无加固时顺序敏感性真实存在 |
+
+### Verification（本 change 实测）
+
+| AC | 描述 | 实测 |
+|---|---|---|
+| **AC1** | 新测试全 PASS | ✅ 6 case / **288 assertions** / 39 组求值 / 0.42s |
+| **AC2** | 变异对照 | ✅ 3 个有效变异全部被抓住（见上表） |
+| **AC3** | `[chmem]` 全套零新增 FAIL | ✅ 72 case / 71 PASS / 1 failed（10 个 pre-existing rv32ui load/store FAIL 不变） |
+| **AC4** | `[verilator]` / `[mmu-verilator]` 不回归 | ✅ 48 ELF / 96 assertions 全 PASS；3/3 PASS |
+| **AC5** | TLM 全量无新增 FAIL | ✅ 481 case / 1 failed（pre-existing `7stage_topology_from_config` infra drift） |
+| **AC6** | 架构门禁 | ✅ 5 脚本全 exit 0 |
+| **AC7** | `m3_poc_alu_elaborate` 仍 PASS | ✅ 6 assertions（Verilog 生成未被打断） |
+
+### 实施踩坑（2 个，勿重犯）
+
+- **`decode_chmem.h` 自身不 include `decoder_table.h`** —— 它依赖 includer 先提供 `cf::cpu::arch::riscv::opcode` 命名空间。该文件 lambda 内有**同名局部变量** `opcode`（`decode_chmem.h:146`），若命名空间未先声明，`opcode::OP_LUI` 会被解析成局部变量，报 **`wrong number of template arguments (1, should be 2)`**（误导性诊断）。修法：先 include `ip/cpu/arch/riscv/decoder_table.h`（`int_alu_chmem.h:74-75` 即该顺序）。
+- **`tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES` 是显式列表（非 GLOB）** —— 新测试文件若不手动加入，`chipforge_tests_chmem` **根本不会编译它**，测试"静默不存在"。TLM 侧 `TEST_SOURCES` 是 `GLOB_RECURSE` 会自动纳入（因 `#ifdef` 守卫 → 空 TU）。
+
+### 期望值自查（独立手算的价值）
+
+实测中 1 处期望值由我手算错误（`ANDI(0xF0, -4096)` 我算 `0xF0`，实为 `0x00` —— `0xFFFFF000` 低 8 位为 0；**ALU 是对的**）→ 已修正期望值。这正是"期望值独立于被测实现手算"的意义：若改用实现内的 `compute_static` 派生期望，该错误会被一并固化而永不暴露。
+
+---
+
 ## v0.11.0 (2026-10-20, interim) — chmem-mext-comb-datapath: CH_MEM 路径 RV32UM M 扩展组合式数据通路落地 (8 rv32um ELF 真 PASS)
 
 > **OpenSpec change**: `chmem-mext-comb-datapath` (wave5-isa-coverage-and-bp, `ready`)

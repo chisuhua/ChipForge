@@ -137,8 +137,10 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_ibus_chmem_sv32.cpp
     # mmu-chmem-pipeline-integration / Phase 2 Task 2.2 (C3): dmem_chmem sv32 消费
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_dmem_chmem_sv32.cpp
-    # 2026-10-20 Oracle 深挖复测 — ch_uint<32> arith 14/4 3*4 PoC (chmem-m-ext-integration 前置)
+    # 2026-10-20 Oracle 深挖复测 — ch_uint<32> arith 14/4 3*4 PoC (chmem-mext-comb-datapath 前置)
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_chmem_arith_poc.cpp
+    # CH_MEM ALU 单元级语义锚 — 真跑 int_alu_chmem.h 的 19 层 select 树 (M-op + RV32I 回归 + 判别互斥)
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_alu_semantics.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

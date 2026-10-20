@@ -15,6 +15,20 @@
 //   - 手喂 payload 验证 read/write (单元级 sim)
 //   - TLM↔CH_MEM 字节对标 (复用 M2/Spike-6 协议)
 //
+// ⚠️ 重要限定 (2026-10-20, chmem-mext-comb-datapath 验收时补充):
+//   本文件里的 "byte-equal" 用例 (m3_poc_alu_byte_equal /
+//   m3_poc_5stage_byte_equal) 比对的是**两份手写 C++ 镜像**
+//   (chmem_ref_alu / chmem_alu_compute_op), **完全不跑**
+//   int_alu_chmem.h 的 select 树 —— 它们验证的是"两份镜像彼此一致",
+//   而非"实现符合 ISA 语义", 也非"TLM 与 CH_MEM 一致".
+//   ⇒ **不可把这些用例当作 CH_MEM ALU 的回归锚**.
+//
+//   真正的 CH_MEM ALU 单元语义锚 (跑真实 select 树, 断言 RD_DATA) 在
+//   tests/cpu/test_cpu_chmem_alu_semantics.cpp —— 39 组用例覆盖
+//   8 条 M-op / 边界特例 / 判别互斥 / RV32I 回归 / I-type 不误 gate /
+//   LUI+AUIPC. 本文件的 m3_poc_alu_elaborate 仍有效 (验 Verilog 生成),
+//   但**不是语义锚**.
+//
 // 编译条件: CF_PLUGIN_USE_CH_MEM (chipforge_tests_chmem target)
 
 #ifdef CF_PLUGIN_USE_CH_MEM
@@ -176,6 +190,12 @@ TEST_CASE("m3_poc_regfile_alu_combined", "[cpu][m3][poc][combined][chmem]") {
 //
 //   TLM:   tlm_alu_compute() → 12-op 纯 C++ 参考
 //   CHMEM: RiscvIntAluPlugin::compute_static() → ALU select 树同构 C++
+//
+// ⚠️ 限定 (2026-10-20): 本用例比对的是两份**手写 C++ 镜像**
+//    (tlm_alu_compute vs chmem_ref_alu), **不跑 int_alu_chmem.h 的
+//    select 树** —— 验证的是"两份镜像彼此一致", 不是"实现符合 ISA 语义"。
+//    真正的 CH_MEM ALU 单元语义锚 (跑真实 select 树, 断言 RD_DATA) 在
+//    tests/cpu/test_cpu_chmem_alu_semantics.cpp。
 //
 // 10 个 R-type 用例 (opcode=0x33) 全部字节对标:
 //   ADD/SUB/SLL/SLT/SLTU/XOR/SRL/SRA/OR/AND + AUIPC (opcode=0x17)
