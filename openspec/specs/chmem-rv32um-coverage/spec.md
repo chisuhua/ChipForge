@@ -17,8 +17,9 @@ The test case MUST be discoverable under family tag `[chmem]` so it integrates w
 #### Scenario: rv32um cycle count is recorded in stdout for manual verification
 - **WHEN** any rv32um ELF completes on CH_MEM Simulator
 - **THEN** the reported cycle index SHALL be printed via Catch2 `INFO` macro (existing pattern at `test_cpu_chmem_vendored_elf.cpp:150-160`)
-- **AND** the executor MUST manually compare the printed cycle index against the TLM baseline in `soc/cpu/docs/dse/rv32um-baseline-matrix.csv` (mul=455, mulh/mulhsu/mulhu=504, div=380, divu=381, rem=380, remu=380) within ±5% relative tolerance OR within absolute tolerance of +50 cycles (whichever is larger), recording the comparison in the commit message
-- **AND** automated cycle assertion is explicitly deferred to a future DSE follow-up change (per design.md Q2)
+- **AND** the executor SHALL record the printed cycle index in the commit message for manual inspection
+- **AND** the executor SHALL NOT compare the printed cycle index against the TLM baseline in `soc/cpu/docs/dse/rv32um-baseline-matrix.csv` (mul=455, mulh/mulhsu/mulhu=504, div=380, divu=381, rem=380, remu=380) within ±5% relative tolerance OR within absolute tolerance of +50 cycles: the combinational CH_MEM M-op datapath resolves in a single cycle and is **not cycle-homologous** with the TLM multi-cycle radix-2 FSM (`ip/cpu/arch/riscv/mul_div_fsm.h:144-148` — MUL=1c / MULH=3c / DIV=33c), so such a comparison is **not meaningful** rather than failing
+- **AND** automated cycle assertion remains deferred; cycle-parity acceptance for the CH_MEM path is deferred to change `chmem-mext-fsm-cycle-parity`, which restores a multi-cycle M-op datapath
 
 #### Scenario: Existing rv32ui coverage remains green
 - **WHEN** the CH_MEM kCases are extended with 8 rv32um entries
