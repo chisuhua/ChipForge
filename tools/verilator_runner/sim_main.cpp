@@ -75,21 +75,29 @@ int cf_run_sim(void* top, std::uint32_t max_cycles, const char* elf_name) {
   vtop->default_clock = 0;
   vtop->eval();
 
-  std::uint32_t tohost = 0;
+  // Spike tohost protocol: done=(tohost&1), pass=(tohost==1).
+  // The loop exits on the "done" bit (LSB) — this includes the rv32um-style
+  // fail values (3/5/33), which the harness writes after the first failing
+  // test case. Final PASS/FAIL is decided afterwards by the "pass" predicate.
+  std::uint32_t tohost_raw = 0;
+  std::uint32_t done_bit = 0;
   std::uint32_t cycles = 0;
-  for (std::uint32_t i = 0; i < max_cycles && tohost == 0; ++i) {
+  for (std::uint32_t i = 0; i < max_cycles && done_bit == 0; ++i) {
     vtop->default_clock = 1;
     vtop->eval();
     vtop->default_clock = 0;
     vtop->eval();
     ++cycles;
-    tohost = vtop->rootp->top__DOT__dmem[kToHostWord] & 0x1u;
+    tohost_raw = vtop->rootp->top__DOT__dmem[kToHostWord];
+    done_bit = tohost_raw & 0x1u;
   }
 
+  const bool done = (done_bit != 0);
+  const bool pass = done && (tohost_raw == 1);
   const char* name = elf_name ? elf_name : "?";
-  std::printf("TOHOST=%u CYCLES=%u ELF=%s %s\n", tohost, cycles, name,
-              tohost == 1 ? "PASS" : "FAIL");
-  return tohost == 1 ? 0 : 1;
+  std::printf("TOHOST=%u CYCLES=%u ELF=%s %s\n", tohost_raw, cycles, name,
+              !done ? "TIMEOUT" : (pass ? "PASS" : "FAIL"));
+  return pass ? 0 : 1;
 }
 
 }  // extern "C"

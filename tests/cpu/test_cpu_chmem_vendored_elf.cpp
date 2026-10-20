@@ -162,12 +162,27 @@ TEST_CASE("chmem_vendored_elf_tohost1", "[cpu][chmem][6d4][vendored-elf]") {
         REQUIRE_NOTHROW(sim->tick());
         tohost_val = static_cast<std::uint64_t>(
             sim->get_value_by_name("tohost_probe_data_proxy"));
-        if (tohost_val != 0) break;
+        // Exit only on the harness "done" bit (LSB). Without this gate the
+        // loop would also exit on a fail value (3/5/33), which is too early
+        // to distinguish from a true pass (tohost=1). Done/pass split per
+        // spike tohost protocol: done=(tohost&1), pass=(tohost==1).
+        if (tohost_val & 0x1u) break;
       }
 
       INFO("vendored ELF " << tc.name << ": tohost = " << tohost_val
            << " after " << kMaxCycles << " cycles");
-      REQUIRE(tohost_val == 1);
+      const bool done = (tohost_val & 0x1u) != 0;
+      const bool pass = (tohost_val == 1);
+      if (!done) {
+        // Cycle cap consumed with no harness write — treat as a hang, not
+        // a pass. This is the failure mode for ELFs that depend on a CH_MEM
+        // pipeline feature that is not yet implemented (e.g. rv32um tests
+        // hitting the unfactored M-extension: see known-issue baseline).
+        FAIL("vendored ELF " << tc.name << ": harness did not write tohost "
+                             << "within " << kMaxCycles << " cycles "
+                             << "(CH_MEM pipeline feature missing or hung)");
+      }
+      REQUIRE(pass);
     }
   }
 }

@@ -144,6 +144,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 >
 > **诚实记录原则**: CHANGELOG §Verification 数字必须基于 HEAD commit 实测,禁止快照引用。原描述误把 baseline `[chmem]` family 全跑数字当成 chmem_vendored_elf_tohost1 单跑数据,本 correction note 显式纠正。本 change 范围未涉及测试源文件 (`test_cpu_chmem_vendored_elf.cpp:170 REQUIRE(tohost_val == 1)`),修复此 pre-existing flake 需要独立 follow-up change。
 
+#### Correction Note (2026-10-20 Oracle 深挖后修订)
+
+> 本节为 2026-10-20 Oracle 诊断后追补。原 Correction Note (2026-10-14) 仍**判错**: 8 rv32um CH_MEM "单跑隔离 8/8 PASS" 数字本身就是 mask 协议副作用, **非** M-plugin 集成成功。**真根因** (Oracle 实测 2026-10-20 HEAD `05adf90`):
+>
+> - **CH_MEM 路径完全缺失 M-extension 集成**: `ip/cpu/cpu_factory_chmem.h:322-333` 注册 7 plugin (Decoder/Hazard/IBus/RegFile/IntAlu/Csr/Branch/DMem) **未注册** `MulDivFsmPlugin<U>` (TLM `ip/cpu/cpu_factory.h:473-493` 12 处注册分支 vs CH_MEM 0 处)。M 指令 (MUL/MULH*/DIV*/REM*) 落到 IntAlu → 11 层 select mux 不识别 funct7=0x01 → result 默认 0 → x regs 错乱。
+> - **CH_MEM 上游算术未就绪**: `ip/cpu/plugins/mul_div_fsm_chmem.h:149-165` `result_reg_` 用 `ch_literal<12,3>` 占位 (注释自承"B.2.1 PoC 占位: ch 算术非 C++ 语义"),因 CppHDL `ch_uint` 算术语义异常 (`CHANGELOG.md:443` B.2.1 PoC 实测 `14/4=1 / 3*4=16`)。真算术路径不通。
+> - **协议二次掩盖**: `tools/verilator_runner/sim_main.cpp:80` `& 0x1u` mask 把 done bit 当 pass bit,riscv-tests harness fail 路径写 `gp=test_num|1` → tohost LSB=1 → mask 把 fail (3/5/33) 误判为 PASS。这是 2026-10-14 "修复"的副作用,**与真集成无关**。
+> - **8 rv32um 实测 (2026-10-20 HEAD 05adf90)**: `chmem_vendored_elf_tohost1` 8/8 rv32um 全部 FAIL (tohost=33/3/3/5/5/3/3/3 for mul/mulh/mulhsu/mulhu/div/divu/rem/remu);`test_cpu_verilator_sim_tohost1` cycles 不变但 PASS/FAIL 标签受 mask 影响失真。
+>
+> **本次修复** (2026-10-20, governance-only commit): 拆 `done=(tohost&1) / pass=(tohost==1)` 双判据到两 path (chmem test + verilator runner),**避免 fail 路径被 mask 掩盖**; AGENTS.md `[chmem]` / `[verilator]` family 表 + CH_MEM 模式状态段 + known-issues 列表诚实化更新 (`[chmem][m-ext-gap]` 索引); 修复**不影响 v0.10.0 收官 / v0.11.0 launch gate** (后者判据 = TLM `[riscv-tests] 48/48`, 走 TLM 路径独立 PASS)。
+>
+> **真集成修复**: 新开 `openspec/changes/chmem-m-ext-integration/` change (挂 phase-6d.x),前置 PoC = 复跑 CHANGELOG.md:443 `14/4=1 / 3*4=16` case + librarian 调研 CppHDL `bv/bv_arith.h` truncate 修复状态 + codegen_verilog mul_op/div_op/mod_op 映射状态 + operators_width.h MULH 64-bit 中间手动 zext 路径。本修正不影响 v0.11.0 launch 节奏。
+
 ---
 
 ## v0.11.0 (interim) — csr-chmem-pipeline-integration: CH_MEM 模式 RISC-V Zicsr 集成 (8 CSR + 8 指令 + 3 trap)
