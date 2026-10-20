@@ -5,6 +5,53 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (2026-10-20, interim) — chmem-mext-comb-datapath: CH_MEM 路径 RV32UM M 扩展组合式数据通路落地 (8 rv32um ELF 真 PASS)
+
+> **OpenSpec change**: `chmem-mext-comb-datapath` (wave5-isa-coverage-and-bp, `ready`)
+> **Improvement draft**: `.rddf/improvements/chmem-mext-comb-datapath.md`
+> **Author / Date**: build agent, 2026-10-20
+> **Base commit**: `cf060ff`（审查轮收口 + `status: ready`）
+> **Scope**: 1 业务文件 (`ip/cpu/arch/riscv/int_alu_chmem.h`) + PoC 表达式定稿 (`tests/framework/test_chmem_arith_poc.cpp`) + 2 个 delta spec + 文档
+> **Non-goals**: 不注册 `MulDivFsmPlugin` / 不做 FSM / 不引入 stall / 不改 TLM 路径 / 不做框架级 API 扩展
+
+### Fixed (主修复)
+- **CH_MEM 数据通路缺 M-op 实现**: `ip/cpu/arch/riscv/int_alu_chmem.h` 原为 11 层 RV32I select 树，**不识别 `funct7==0x01`** → CH_MEM 路径的 8 个 rv32um ELF 全部 FAIL。现追加 8 层 M-op select（合计 **19 层**），`is_mext = is_op && f7_01` gate。
+- **base op 与 M-op 的 funct3 误捕**: `is_sll`/`is_slt`/`is_sltu`/`is_xor`/`is_or`/`is_and` 原**无 funct7 gate**（MULH 撞 SLL、DIV 撞 XOR、REMU 撞 AND）。现 R-type 侧补 `f7_00` gate，与 M-op 判别互斥（**不动 `is_opimm` 侧** —— I-type bits[31:25] 是立即数）。
+- **除零语义**: CppHDL 除零默认行为是打 stderr 并返回 0（`CppHDL/include/ast/instr_op_arith.h:51-76`），而 RISC-V 要求 DIV/DIVU 除零 → 全 1、REM/REMU 除零 → 被除数。PoC 原 `_divu`/`_remu` 是**裸 `a/b`/`a%b` 无 guard**。现全部除/模节点用 **safe divisor**（`select(b==0, 1, b)` / `select(|b|==0, 1, |b|)`）显式 guard。
+- **cycle 计数日志失真**: `tests/cpu/test_cpu_chmem_vendored_elf.cpp` 的 INFO 打印的是 `kMaxCycles`（上限 1500）而非实际 cycle 数 → 现打印真实 cycle 数（spec 的 cycle 记录场景此前只是名义满足）。
+
+### 关键实现约束（新发现，勿回退）
+- **safe divisor 必须是 32-bit 运行时节点，不能是编译期字面量**：`mod_op` 结果宽度 = **除数宽度**（`CppHDL/include/lnode/operators_ext.h:204-209`），且 `get_binary_result_width` 对 `mod_op` + 字面量 RHS 有收缩特化 `compute_bit_width(value-1)`（`CppHDL/include/core/operators_width.h:34-53`）—— 除数字面量 `4` 会让结果宽度缩到 **2 bit**。现 safe divisor 由 `select` 构成（`mux_op::result_width = max(M,N)`），恒 32 bit。PoC 原 `_remu` 用字面量除数 `4`，结果宽度实为 2 bit（数值恰好装得下才"通过"，属侥幸）。
+- **组合式与多周期 FSM 之间无中间态**：CH_MEM 是全组合通路（`cpu_factory_chmem.h:431-435` 无 stage 寄存器），execute 当拍必须出 `RD_DATA`；N 拍 FSM 的结果到达时该指令已流过写回点，且无 stall 机制把晚到结果写回正确的 rd。故 cycle-accurate 版本移交 follow-up `chmem-mext-fsm-cycle-parity`（blocked on CtrlLink 句柄扩展）。
+
+### 旧结论更正（3 处）
+- ✅ **`ch_uint<32>` 算术语义异常**（`:456` B.2.1 PoC）—— **已证伪**（PoC `63bfc8a`/`03667fa`：实测 `14/4=3`、`3*4=12`、`14%4=2`、`MULHU` 高位 `0xFFFFFFFE` 均正确；上游 `f790ca6` 已修且在 HEAD）。占位的真实原因是"CH_MEM 数据通路未实现 M-op"，非算术不可用。
+- ✅ **`ch_reg` lock 顺序 race**（`:457` B.2.1 PoC）—— **已证伪**（rev1 的 `result==0` 是 PoC 自身 tick 序列 bug：在 WRITE_BACK 拍把 opcode 归零；既有 fixture `test_chmem_multi_cycle_fsm.cpp:188` 早断言 `result==3` 且 PASS）。
+- ✅ **2026-10-20 Correction Note 的归因**（`:152`）—— "因 CppHDL `ch_uint` 算术语义异常 → 真算术路径不通"**错误**；真算术路径是通的。同段 `:158` 引用的 `openspec/changes/chmem-m-ext-integration/` 目录**从未存在**（悬空引用），已改指 `chmem-mext-comb-datapath`。
+
+### Verification（本 change 工作树实测, base `cf060ff`）
+
+| AC | 描述 | 实测 |
+|---|---|---|
+| **AC1** | `[chmem] chmem_vendored_elf_tohost1` 8 个 rv32um 真 PASS | ✅ `tohost == 1`（测试判据为**严格** `tohost == 1`，非 mask 产物）；baseline `10855 assertions / 18 failed` → 现 `12727 assertions / **10 failed**`（10 个 = 与 baseline **完全相同**的既有 rv32ui load/store 集 `lb/lbu/ld/lh/lhu/lw/sb/sh/st/sw`，0 回归） |
+| **AC2** | `[verilator]` 48 ELF 全 PASS | ✅ **96 assertions / 0 failed**（baseline 88 assertions / 8 failed）；单 ELF `rv32um-p-div` → `TOHOST=1 CYCLES=94 ELF=rv32um-p-div PASS` |
+| **AC3** | `[arith-poc]` 表达式白盒基线 | ✅ CH_MEM **24/24**（17 原有 + 7 边界 case）/ TLM **22/22**；新增覆盖 design D4 边界自洽表**全部 6 行** + `neg32(0x80000000)==0x80000000` 宽度断言 |
+| **AC4** | TLM binary 0 回归 | ✅ 481 cases / **1 failed** —— 唯一失败为既有 `7stage_topology_from_config` (`test_7stage_riscv.cpp:124` node_count==17 infra drift)，本 change 未触及 TLM 路径（`int_alu_chmem.h` 整文件 `#ifdef CF_PLUGIN_USE_CH_MEM`） |
+| **AC5** | 架构门禁 | ✅ `verify_adr` 0 fail / `verify_plugin_decision` 8/8 / `check_plugin_portability` 12/12 / `roadmap-r9-check` 0 fail / `doc_link_check` 0 broken |
+| **AC6** | Verilog codegen 语义 | ✅ 生成 Verilog 的除/模 operand 本身即 `mux_select` 节点（safe divisor 生效 → `mod` 结果宽度 32 bit）；64×64→128 bit 有符号乘积正常发射（`assign mul_mul_1 = _sext_1 * _sext;`） |
+| **AC7** | `[chmem]` family 全套 | ✅ 66 cases / 65 passed / 1 failed（10 assertions failed = 既有 rv32ui load/store 集）；**耗时 833s**（同机改前基线 **778s**，本 change **+55s / +7.1%**，ALU select 树 11→19 层的 DAG 发射增量）。完整 `chipforge_tests_chmem` binary（= ctest entry 本体，覆盖 `[framework]`/`[cpphdl]`/`[elaborate]`/`[chmem]`/`[verilator]`/`[mmu-verilator]` 全部 family）= **98 cases / 97 passed / 1 failed**，15613 assertions / 10 failed，**866s**。ctest entry `chipforge_tests_chmem` **无显式 TIMEOUT** → CTest 默认 **1500s**，866s 在门限内 |
+
+### cycle 数记录（组合式 vs TLM radix-2 —— 不同构、不可比）
+
+| ELF | CH_MEM simulator | Verilator | TLM radix-2 baseline |
+|---|---|---|---|
+| `rv32um-p-mul` / `mulh` / `mulhsu` / `mulhu` | 472 | — | 455 / 504 / 504 / 504 |
+| `rv32um-p-div` / `divu` / `rem` / `remu` | 94 / 95 / 94 / 94 | 94 (`div`) | 380 / 381 / 380 / 380 |
+
+组合式 M-op 1 拍出结果，TLM 走真 radix-2（`mul_div_fsm.h:144-148` MUL=1c / MULH=3c / DIV=33c）→ 差 ~286 cycles，**远超**原归档 spec 的 "±5% 或 +50c" 判据。该 MUST 在组合式路径**不适用**（既非 pass 亦非 fail，是判据本身无意义），已由本 change 的 2 个 `## MODIFIED Requirements` delta spec 改判为"不适用 + 移交 `chmem-mext-fsm-cycle-parity`"。
+
+---
+
 ## v0.11.0 (2026-10-16, interim) — cpu-pipeline-tick-fix: cpu_sim CLI 5 FAIL → 5 PASS (F1+F2+F3b)
 
 > **OpenSpec change**: `cpu-pipeline-tick-fix` (wave5 P2, ✅ archived 2026-10-16)
@@ -150,12 +197,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 >
 > - **CH_MEM 路径完全缺失 M-extension 集成**: `ip/cpu/cpu_factory_chmem.h:322-333` 注册 7 plugin (Decoder/Hazard/IBus/RegFile/IntAlu/Csr/Branch/DMem) **未注册** `MulDivFsmPlugin<U>` (TLM `ip/cpu/cpu_factory.h:473-493` 12 处注册分支 vs CH_MEM 0 处)。M 指令 (MUL/MULH*/DIV*/REM*) 落到 IntAlu → 11 层 select mux 不识别 funct7=0x01 → result 默认 0 → x regs 错乱。
 > - **CH_MEM 上游算术未就绪**: `ip/cpu/plugins/mul_div_fsm_chmem.h:149-165` `result_reg_` 用 `ch_literal<12,3>` 占位 (注释自承"B.2.1 PoC 占位: ch 算术非 C++ 语义"),因 CppHDL `ch_uint` 算术语义异常 (`CHANGELOG.md:443` B.2.1 PoC 实测 `14/4=1 / 3*4=16`)。真算术路径不通。
+>   > **更正 (2026-10-20, `chmem-mext-comb-datapath`)**: 本条**归因错误**。"ch_uint 算术语义异常" 已被 PoC `63bfc8a` / `03667fa` **证伪** —— 实测 `14/4=3`、`3*4=12`、`14%4=2`、`MULHU` 高位均正确 (上游 `f790ca6` 的 interpreter 宽度截断已修且在 HEAD, install 库 2026-10-18 重建)。占位的**真实原因是 CH_MEM 数据通路未实现 M-op** (见上一条), **不是**算术不可用 —— 真算术路径是通的, 现已由组合式实现落地。
 > - **协议二次掩盖**: `tools/verilator_runner/sim_main.cpp:80` `& 0x1u` mask 把 done bit 当 pass bit,riscv-tests harness fail 路径写 `gp=test_num|1` → tohost LSB=1 → mask 把 fail (3/5/33) 误判为 PASS。这是 2026-10-14 "修复"的副作用,**与真集成无关**。
 > - **8 rv32um 实测 (2026-10-20 HEAD 05adf90)**: `chmem_vendored_elf_tohost1` 8/8 rv32um 全部 FAIL (tohost=33/3/3/5/5/3/3/3 for mul/mulh/mulhsu/mulhu/div/divu/rem/remu);`test_cpu_verilator_sim_tohost1` cycles 不变但 PASS/FAIL 标签受 mask 影响失真。
 >
 > **本次修复** (2026-10-20, governance-only commit): 拆 `done=(tohost&1) / pass=(tohost==1)` 双判据到两 path (chmem test + verilator runner),**避免 fail 路径被 mask 掩盖**; AGENTS.md `[chmem]` / `[verilator]` family 表 + CH_MEM 模式状态段 + known-issues 列表诚实化更新 (`[chmem][m-ext-gap]` 索引); 修复**不影响 v0.10.0 收官 / v0.11.0 launch gate** (后者判据 = TLM `[riscv-tests] 48/48`, 走 TLM 路径独立 PASS)。
 >
-> **真集成修复**: 新开 `openspec/changes/chmem-m-ext-integration/` change (挂 phase-6d.x),前置 PoC = 复跑 CHANGELOG.md:443 `14/4=1 / 3*4=16` case + librarian 调研 CppHDL `bv/bv_arith.h` truncate 修复状态 + codegen_verilog mul_op/div_op/mod_op 映射状态 + operators_width.h MULH 64-bit 中间手动 zext 路径。本修正不影响 v0.11.0 launch 节奏。
+> **真集成修复**: 新开 `openspec/changes/chmem-mext-comb-datapath/` change (挂 phase-6d.x)。
+>   > **更正 (2026-10-20)**: 本条原引用的 `openspec/changes/chmem-m-ext-integration/` 目录**从未存在** (悬空引用), 已改指实际的 `chmem-mext-comb-datapath`。前置 PoC = 复跑 CHANGELOG.md:443 `14/4=1 / 3*4=16` case + librarian 调研 CppHDL `bv/bv_arith.h` truncate 修复状态 + codegen_verilog mul_op/div_op/mod_op 映射状态 + operators_width.h MULH 64-bit 中间手动 zext 路径。**PoC 已完成 (rev 3, commit `63bfc8a`/`03667fa`): 算术语义正常, 结论 = 组合式路径可行**。本修正不影响 v0.11.0 launch 节奏。
 
 ---
 
@@ -454,7 +503,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **in-context cycle 数错** (A.7 暴露): `div.elf` FSM 路径跑出 5 cycles (与 LEGACY baseline 一致, 不是 40+), 暴露 Phase A 3 个 in-context bug (B1: 缺 CtrlLink stall 机制 / B2: execute 闭包每 cycle 都触发 advance_fsm / B3: busy_cycles Payload Key 未写 PayloadStore). Phase B+ 修复, 不阻塞 Phase A 收官.
 - **`ch_uint<32>` 算术语义异常** (B.2.1 PoC): `ch_uint<32>(14) / ch_uint<32>(4) = 1` (非 3), `ch_uint<32>(3) * ch_uint<32>(4) = 16` (非 12). CppHDL `bv_div_truncate` / `bv_mul_truncate` 位截断语义与 C++ 整数算术不一致. PoC 用 `ch_literal<12,3,33>` 占位, 真 fix 跟踪 Phase B.4 + Phase C.2.
+  - ✅ **已证伪 (2026-10-20, `chmem-mext-comb-datapath`)**: 上游 `f790ca6` 已修 interpreter ADD/MUL/SHL/NEG 的宽度截断且在 HEAD (install 库 2026-10-18 重建)。PoC `63bfc8a`/`03667fa` 实测 `14/4=3`、`3*4=12`、`14%4=2`、`MULHU(0xFFFFFFFF,0xFFFFFFFF)` 高位 `0xFFFFFFFE` —— **算术语义正常**, 本条不再是 known limitation; 占位的真实原因改为 "CH_MEM 数据通路未实现 M-op"。
 - **`ch_reg` lock 顺序 race** (B.2.1 PoC): `busy_cycles_reg` ↔ `state_reg` ↔ `counter_reg` select tree 嵌套 lock 顺序与 `in_wb` 评估时机 race. PoC 用 `ch_literal<33>` 占位, 失去 MUL=1 / DIV=counter-1 cycle 计数语义. 跟踪 Phase C.2.
+  - ✅ **已证伪 (2026-10-20, `chmem-mext-comb-datapath`)**: rev1 PoC 的 `result==0` 是 **PoC 自己的 tick 序列 bug** (在 WRITE_BACK 拍把 opcode 归零 → `is_mul`/`is_div` 恒 false), 不是 lock race。既有 fixture `test_chmem_multi_cycle_fsm.cpp:188` 早就断言 `result==3` 且 PASS; PoC Part B 用正确 tick 序列同样得 `result=12` / `=3`。本条不再是 known limitation。
 
 ## v0.11.0 (2026-10-17, interim) — mmu-chmem-pipeline-integration: Phase 2 done 收档 + follow-up Sprint 2-5 占位
 
