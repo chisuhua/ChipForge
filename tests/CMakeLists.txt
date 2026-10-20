@@ -141,6 +141,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_chmem_arith_poc.cpp
     # CH_MEM ALU 单元级语义锚 — 真跑 int_alu_chmem.h 的 19 层 select 树 (M-op + RV32I 回归 + 判别互斥)
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_alu_semantics.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_mem_read_drift.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES
