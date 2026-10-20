@@ -7,7 +7,7 @@ phase: phase-4
 theme: phase-4
 version_target: v0.11.0
 manual_deps:
-  - ctrl-link-chmem-reg-handle (CtrlLink `halt_when` 需接受 `ch_reg<ch_bool>` 句柄 — 框架级 API 扩展，尚未立项)
+  - ctrl-link-chmem-reg-handle (CtrlLink 需支持有状态 `ch_reg<ch_bool>` halt 条件 — 框架级 API 扩展；**2026-10-20 已立项**: `.rddf/improvements/ctrl-link-chmem-reg-handle.md` (P1, HARD-GATE 通过), 解除前置后本 change 可启动)
 review_by: 2026-11-15
 ---
 
