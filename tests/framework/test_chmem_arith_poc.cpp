@@ -1,40 +1,307 @@
 // tests/framework/test_chmem_arith_poc.cpp
 //
-// 功能描述: 2026-10-20 Oracle 深挖复测 — CppHDL ch_uint<32> 算术 14/4 / 3*4
-//   是否仍为 1/16 (过时) 还是 3/12 (上游 f790ca6+ea3830b 已修)
+// 功能描述: 2026-10-20 PoC — 隔离验证 CppHDL ch_uint<32> 真算术语义
+//   (mul/div/mod/mulhu) + MulDivFsmPlugin result_reg 锁存时序.
 //
 // 作者: build agent
-// 日期: 2026-10-20
+// 日期: 2026-10-20 (rev 3)
 //
 // 上下文:
-//   - CHANGELOG.md:443 v0.10.3 Known Limitation 注明 "ch 算术语义异常":
-//       ch_uint<32>(14) / ch_uint<32>(4) = 1 (期望 3)
-//       ch_uint<32>(3) * ch_uint<32>(4) = 16 (期望 12)
-//   - ip/cpu/plugins/mul_div_fsm_chmem.h:149-165 用 ch_literal<12,3> 占位规避
-//   - Oracle 上游调研: CppHDL HEAD fa8b745 含 fix f790ca6 + ea3830b 已修
-//   - 此 PoC 决定路径 B (真算术) 是否可用, 即 CH_MEM M-plugin 集成前置
+//   - CHANGELOG.md:443 v0.10.3 Known Limitation 记 "ch 算术语义异常":
+//       ch_uint<32>(14) / ch_uint<32>(4) = 1   (期望 3)
+//       ch_uint<32>(3)  * ch_uint<32>(4) = 16  (期望 12)
+//   - ip/cpu/plugins/mul_div_fsm_chmem.h:149-171 result_reg_/busy_reg_
+//     用 ch_literal 占位 (12/3/33), 不含真算术.
+//   - CppHDL HEAD 7d69f56 (2026-10-20) = codegen(ch_reg 无 next hold-state),
+//     属 Verilator 后端; 本 PoC 跑 interpreter, 与之无关.
 //
-// 约束:
-//   - 与 test_chmem_multi_cycle_fsm.cpp 同样整文件 #ifdef CF_PLUGIN_USE_CH_MEM 守护
-//   - 编译进 chipforge_tests_chmem binary (CH_MEM mode)
-//   - PoC 走 Simulator API (elaboration 期 ch_uint 是 lnode, 不能直接 uint64_t cast)
+// 四部分 (rev 3):
+//   A. 纯组合算术 PoC (两 binary) — 直接 ch_uint 算术 + ch::Simulator,
+//      完全绕开 ch_reg / plugin 框架. 直接回答 "truncate 是否已修".
+//      样板: CppHDL/tests/chlib/test_arithmetic.cpp:13-39.
+//   B. MulDivFsmPlugin 时序 PoC (CH_MEM binary) — 验证 result_reg select
+//      树在正确 tick 序列下锁存值; 对照 test_chmem_multi_cycle_fsm.cpp.
+//   C. ch_reg + ch_uint 算术组合 PoC — 寄存器迭代 + 真算术 + select.
+//   D. 组合式 8 条 M-op 全实现 PoC — 证明方案 A (int_alu_chmem.h select
+//      树用 ch_uint 组合算式实现 M 扩展) 语义可行. 无 ch_int → sign-magnitude.
 //
-// 测试方法:
-//   - 用 mul_div_fsm_chmem 同样的 set_input_value + tick + get_value 模式
-//   - 复用 MulDivFsmPlugin 但直接用 result_out() 读 result_reg
-//   - 1c MUL 路径: opcode=1 (MUL) → tick 1 次 → 应在 WRITE_BACK state, 取 result
+// rev 2 修正 (rev 1 于 commit 1f14f33 声称 "ch_reg lock race" 被确证):
+//   rev 1 的 result==0 是 PoC tick 序列 bug — 在 WRITE_BACK 拍把 opcode
+//   归零, 导致 is_mul/is_div=false, result_reg next 恒为 0. fixture
+//   (test_chmem_multi_cycle_fsm.cpp:188) 在 WB 拍保持 opcode 非零, 断言
+//   result==3 PASS. 故 "lock race" 结论错误, 本 rev 更正.
 //
-// 期望:
-//   - 若上游 truncate 已修: result = 12 (3*4) / 3 (14/4)
-//   - 若上游 truncate 未修: result = 16 / 1
-//   - 失败信号: 写入 baseline-known FAIL 后续变更前不要再触发
+// Part D (rev 3 追加): 组合式 8 条 M-op 全实现 PoC — 证明方案 A
+//   (在 int_alu_chmem.h select 树里用 ch_uint 组合算式实现 M 扩展) 可行.
 
 #include "catch_amalgamated.hpp"
 
-#ifdef CF_PLUGIN_USE_CH_MEM
-
 #include <cstdint>
 #include <memory>
+
+// 避免 <ch.hpp> (含 <module.h> 非 inline build_hierarchical_name, 多 TU
+// 会 link 冲突). 仅用 core + simulator 最小头集.
+#include <core/context.h>
+#include <core/reg.h>
+#include <core/uint.h>
+#include <core/operators_width.h>  // bits<MSB, LSB>(operand)
+#include <simulator.h>
+
+namespace {
+
+using ch::core::bits;
+using ch::core::ch_literal;
+using ch::core::ch_uint;
+
+// 帮助函数: 构造一个 context, 对组合表达式求值一次, 返回 uint64.
+template <typename ExprFn>
+std::uint64_t eval_combinational(const char* ctx_name, ExprFn&& fn) {
+  auto ctx = std::make_unique<ch::core::context>(ctx_name);
+  ch::core::ctx_swap guard(ctx.get());
+  auto result = fn();
+  ch::Simulator sim(ctx.get());
+  sim.tick();
+  return static_cast<std::uint64_t>(sim.get_value(result));
+}
+
+}  // namespace
+
+// =========================================================================
+// Part A: 纯组合算术 — 直接回答 CHANGELOG.md:443 "ch 算术语义异常" 是否仍在
+// =========================================================================
+
+TEST_CASE("chmem_arith_poc_div_comb",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("arith_div_comb", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<4, 32>{});
+    return a / b;
+  });
+  INFO("ch_uint<32>(14) / ch_uint<32>(4) = " << v
+       << " (期望 3; CHANGELOG.md:443 曾记 =1)");
+  REQUIRE(v == 3u);
+}
+
+TEST_CASE("chmem_arith_poc_mod_comb",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("arith_mod_comb", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<4, 32>{});
+    return a % b;
+  });
+  INFO("ch_uint<32>(14) % ch_uint<32>(4) = " << v << " (期望 2)");
+  REQUIRE(v == 2u);
+}
+
+TEST_CASE("chmem_arith_poc_mul_comb",
+          "[framework][chmem][arith-poc]") {
+  // ch_uint<32> * ch_uint<32> = ch_uint<64> (mul_op::result_width = M+N)
+  const std::uint64_t v = eval_combinational("arith_mul_comb", [] {
+    ch_uint<32> a(ch_literal<3, 32>{});
+    ch_uint<32> b(ch_literal<4, 32>{});
+    return a * b;
+  });
+  INFO("ch_uint<32>(3) * ch_uint<32>(4) = " << v
+       << " (期望 12, 64-bit 中间; CHANGELOG.md:443 曾记 =16)");
+  REQUIRE(v == 12u);
+}
+
+TEST_CASE("chmem_arith_poc_mulh_high_comb",
+          "[framework][chmem][arith-poc]") {
+  // MULH 语义: (a * b) >> 32 取高 32 位
+  const std::uint64_t v = eval_combinational("arith_mulh_comb", [] {
+    ch_uint<32> a(ch_literal<0xFFFFFFFFu, 32>{});
+    ch_uint<32> b(ch_literal<0xFFFFFFFFu, 32>{});
+    auto prod = a * b;  // 64-bit
+    return bits<63, 32>(prod);
+  });
+  // 0xFFFFFFFF * 0xFFFFFFFF = 0xFFFFFFFE00000001; 高 32 = 0xFFFFFFFE
+  INFO("MULHU(0xFFFFFFFF, 0xFFFFFFFF) 高 32 = " << v
+       << " (期望 0xFFFFFFFE)");
+  REQUIRE(v == 0xFFFFFFFEu);
+}
+
+// =========================================================================
+// Part C: ch_reg + ch_uint 算术组合 — M-extension 真实现所需模式
+//   (寄存器迭代 + 真算术 + select 树; 纯 CppHDL, 两 binary 均编译)
+// =========================================================================
+
+TEST_CASE("chmem_arith_poc_reg_accumulate",
+          "[framework][chmem][arith-poc]") {
+  // ch_reg 迭代累加: acc <<= acc + 1; tick N 次 → acc == N
+  // (这是 M-extension radix-2 迭代里 "remainder/quotient 逐拍更新" 的最小原型)
+  auto ctx = std::make_unique<ch::core::context>("arith_reg_acc");
+  ch::core::ctx_swap guard(ctx.get());
+
+  ch_uint<32> zero(ch_literal<0, 32>{});
+  ch_uint<32> one(ch_literal<1, 32>{});
+  ch::core::ch_reg<ch_uint<32>> acc(zero);
+  acc <<= acc + one;
+
+  ch::Simulator sim(ctx.get());
+  for (std::uint64_t i = 1; i <= 10; ++i) {
+    sim.tick();
+    const std::uint64_t v =
+        static_cast<std::uint64_t>(sim.get_value(acc));
+    INFO("after tick " << i << ": acc = " << v);
+    REQUIRE(v == i);
+  }
+}
+
+TEST_CASE("chmem_arith_poc_reg_shift_add_mul",
+          "[framework][chmem][arith-poc]") {
+  // shift-add 乘法 (真算术 + ch_reg 迭代 + select):
+  //   prod <<= prod + (a[0] ? b : 0); a >>= 1; b <<= 1;   (32 拍)
+  // 3 * 4 = 12. 这正是 M-extension MUL 的 radix-2 部分积累积原型.
+  auto ctx = std::make_unique<ch::core::context>("arith_reg_sa_mul");
+  ch::core::ctx_swap guard(ctx.get());
+
+  ch_uint<32> zero(ch_literal<0, 32>{});
+  ch_uint<32> one(ch_literal<1, 32>{});
+  ch_uint<1> one1(ch_literal<1, 1>{});
+  ch::core::ch_reg<ch_uint<32>> prod(zero);
+  ch::core::ch_reg<ch_uint<32>> a(ch_literal<3, 32>{});
+  ch::core::ch_reg<ch_uint<32>> b(ch_literal<4, 32>{});
+
+  auto a_bit0 = bits<0, 0>(a);
+  prod <<= prod + ch::core::select(ch::core::ch_bool(a_bit0 == one1), b, zero);
+  a <<= a >> one;
+  b <<= b << one;
+
+  ch::Simulator sim(ctx.get());
+  sim.tick(32);
+  const std::uint64_t v = static_cast<std::uint64_t>(sim.get_value(prod));
+  INFO("shift-add 3*4 = " << v << " (期望 12)");
+  REQUIRE(v == 12u);
+}
+
+// =========================================================================
+// Part D: 组合式 8 条 M-op 全实现 — 证明方案 A (int_alu_chmem.h select 树
+//   用 ch_uint 组合算式实现 M 扩展) 语义可行. CppHDL 无 ch_int, 符号运算
+//   走 sign-magnitude (与 TLM mul_div_fsm.h 同法).
+// =========================================================================
+
+namespace {
+
+using ch::core::ch_bool;
+using ch::core::ch_uint;
+using ch::core::select;
+using ch::core::sext;
+using ch::core::zext;
+
+ch_uint<32> neg32(ch_uint<32> x) {
+  return (~x) + ch_uint<32>(ch_literal<1, 32>{});
+}
+ch_bool neg_flag(ch_uint<32> x) {
+  return ch_bool(bits<31, 31>(x) == ch_uint<1>(ch_literal<1, 1>{}));
+}
+ch_uint<32> abs32(ch_uint<32> x) {
+  return select(neg_flag(x), neg32(x), x);
+}
+
+}  // namespace
+
+TEST_CASE("chmem_arith_poc_mext_mul", "[framework][chmem][arith-poc]") {
+  // MUL = (a*b) 低 32
+  const std::uint64_t v = eval_combinational("mext_mul", [] {
+    ch_uint<32> a(ch_literal<3, 32>{});
+    ch_uint<32> b(ch_literal<4, 32>{});
+    return bits<31, 0>(a * b);
+  });
+  INFO("MUL(3,4) = " << v << " (期望 12)");
+  REQUIRE(v == 12u);
+}
+
+TEST_CASE("chmem_arith_poc_mext_mulhu", "[framework][chmem][arith-poc]") {
+  // MULHU = (a*b) 高 32 (无符号)
+  const std::uint64_t v = eval_combinational("mext_mulhu", [] {
+    ch_uint<32> a(ch_literal<0xFFFFFFFFu, 32>{});
+    ch_uint<32> b(ch_literal<0xFFFFFFFFu, 32>{});
+    return bits<63, 32>(a * b);
+  });
+  INFO("MULHU(0xFFFFFFFF,0xFFFFFFFF) = " << v << " (期望 0xFFFFFFFE)");
+  REQUIRE(v == 0xFFFFFFFEu);
+}
+
+TEST_CASE("chmem_arith_poc_mext_mulh", "[framework][chmem][arith-poc]") {
+  // MULH = (signed a * signed b) 高 32: sext 到 64 相乘, 取 [63:32]
+  const std::uint64_t v = eval_combinational("mext_mulh", [] {
+    ch_uint<32> a(ch_literal<0xFFFFFFFEu, 32>{});  // -2
+    ch_uint<32> b(ch_literal<3, 32>{});
+    auto p = sext<64>(a) * sext<64>(b);  // 128-bit; 低 64 = 有符号积
+    return bits<63, 32>(p);
+  });
+  INFO("MULH(-2,3) = " << v << " (期望 0xFFFFFFFF)");
+  REQUIRE(v == 0xFFFFFFFFu);
+}
+
+TEST_CASE("chmem_arith_poc_mext_mulhsu", "[framework][chmem][arith-poc]") {
+  // MULHSU = (signed a * unsigned b) 高 32: sext(a) * zext(b)
+  const std::uint64_t v = eval_combinational("mext_mulhsu", [] {
+    ch_uint<32> a(ch_literal<0xFFFFFFFFu, 32>{});  // -1 signed
+    ch_uint<32> b(ch_literal<0x80000000u, 32>{});  // 2^31 unsigned
+    auto p = sext<64>(a) * zext<64>(b);
+    return bits<63, 32>(p);
+  });
+  // -1 * 2^31 = -2^31 = 0xFFFFFFFF80000000; 高 32 = 0xFFFFFFFF
+  INFO("MULHSU(-1,0x80000000) = " << v << " (期望 0xFFFFFFFF)");
+  REQUIRE(v == 0xFFFFFFFFu);
+}
+
+TEST_CASE("chmem_arith_poc_mext_divu", "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_divu", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<4, 32>{});
+    return a / b;
+  });
+  INFO("DIVU(14,4) = " << v << " (期望 3)");
+  REQUIRE(v == 3u);
+}
+
+TEST_CASE("chmem_arith_poc_mext_remu", "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_remu", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<4, 32>{});
+    return a % b;
+  });
+  INFO("REMU(14,4) = " << v << " (期望 2)");
+  REQUIRE(v == 2u);
+}
+
+TEST_CASE("chmem_arith_poc_mext_div", "[framework][chmem][arith-poc]") {
+  // DIV = sign-magnitude: sign = a^b, |a|/|b|, 再补符号; 除零 → 全 1
+  const std::uint64_t v = eval_combinational("mext_div", [] {
+    ch_uint<32> a(ch_literal<0xFFFFFFF2u, 32>{});  // -14
+    ch_uint<32> b(ch_literal<4, 32>{});
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    ch_uint<32> allones(ch_literal<0xFFFFFFFFu, 32>{});
+    auto sign = (neg_flag(a) != neg_flag(b));
+    auto mag = abs32(a) / abs32(b);
+    auto q = select(sign, neg32(mag), mag);
+    return select(b == zero, allones, q);
+  });
+  INFO("DIV(-14,4) = " << v << " (期望 0xFFFFFFFD = -3)");
+  REQUIRE(v == 0xFFFFFFFDu);
+}
+
+TEST_CASE("chmem_arith_poc_mext_rem", "[framework][chmem][arith-poc]") {
+  // REM = sign 跟随被除数; 除零 → 被除数
+  const std::uint64_t v = eval_combinational("mext_rem", [] {
+    ch_uint<32> a(ch_literal<0xFFFFFFF2u, 32>{});  // -14
+    ch_uint<32> b(ch_literal<4, 32>{});
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    auto mag = abs32(a) % abs32(b);
+    auto r = select(neg_flag(a), neg32(mag), mag);
+    return select(b == zero, a, r);
+  });
+  INFO("REM(-14,4) = " << v << " (期望 0xFFFFFFFE = -2)");
+  REQUIRE(v == 0xFFFFFFFEu);
+}
+
+// =========================================================================
+// Part B: MulDivFsmPlugin result_reg 锁存时序 (CH_MEM binary only)
+// =========================================================================
+#ifdef CF_PLUGIN_USE_CH_MEM
 
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
@@ -49,9 +316,7 @@ namespace cfcpu = cf::cpu::arch::riscv;
 
 namespace {
 
-// ArithPoCFix: 复用 mul_div_fsm_chmem 同样的 PipeBuilder + Elaborate + Simulator
-// 模式 (与 test_chmem_multi_cycle_fsm.cpp::MulDivFsmFixture 对齐),
-// 但 plugin 创建用 std::uint32_t (MulDivFsmPlugin<T> 在 CH_MEM 模式下映射到 ch_uint<T>).
+// ArithPoCFix: 复用 test_chmem_multi_cycle_fsm.cpp::MulDivFsmFixture 模式
 struct ArithPoCFix {
   ch::core::context ctx;
   std::unique_ptr<cf::plugin::PipeBuilder> pb;
@@ -68,102 +333,53 @@ struct ArithPoCFix {
     pb->register_plugin(std::move(p));
     pb->build();
     pb->elaborate();
-    // Build DSL signals:
     (void)plugin->opcode();
     sim = cf::plugin::auto_throw(pb->create_simulator());
     sim->reset();
   }
 
-  std::uint64_t eval_mul(std::uint64_t a, std::uint64_t b) {
-    // Set RS1/RS2 inputs BEFORE driving FSM (per mul_div_fsm FSM convention)
+  void set_operands(std::uint64_t a, std::uint64_t b) {
     sim->set_input_value(plugin->rs1(), a);
     sim->set_input_value(plugin->rs2(), b);
-    // is_mul = (opcode == 1). Drive FSM as fixture does:
-    //   tick 1: opcode=1 → IDLE+MUL → MULTIPLY
-    //   tick 2: opcode=0 → MULTIPLY → WRITE_BACK (transition inside on_active)
-    //   tick 3: opcode=0 → WRITE_BACK → IDLE. result_reg_ latched at WB→IDLE edge
-    sim->set_input_value(plugin->opcode(), 1u);
-    sim->tick();
-    sim->set_input_value(plugin->opcode(), 0u);
-    sim->tick();  // state MULTIPLY → WRITE_BACK
-    sim->tick();  // state WRITE_BACK → IDLE; result_reg clock edge
-    auto r = static_cast<std::uint64_t>(sim->get_value(plugin->result_out()));
-    return r;
   }
-
-  std::uint64_t eval_div(std::uint64_t a, std::uint64_t b) {
-    // is_div = (opcode == 2). DIV path: IDLE → DIVIDE → (32 cycle) → WB → IDLE
-    // result_reg_ latched at WB→IDLE edge (35 ticks total).
-    sim->set_input_value(plugin->rs1(), a);
-    sim->set_input_value(plugin->rs2(), b);
-    sim->set_input_value(plugin->opcode(), 2u);
+  void drive(std::uint64_t op) {
+    sim->set_input_value(plugin->opcode(), op);
     sim->tick();
-    sim->set_input_value(plugin->opcode(), 0u);
-    for (int i = 0; i < 36; ++i) {
-      sim->tick();
-    }
-    auto r = static_cast<std::uint64_t>(sim->get_value(plugin->result_out()));
-    return r;
+  }
+  std::uint64_t result() {
+    return static_cast<std::uint64_t>(sim->get_value(plugin->result_out()));
   }
 };
 
 }  // namespace
 
-TEST_CASE("chmem_arith_poc_mul_3x4",
-          "[framework][chmem][arith-poc][oracle-2026-10-20]") {
+TEST_CASE("chmem_arith_poc_fsm_mul_result",
+          "[framework][chmem][arith-poc]") {
   ArithPoCFix f;
-  std::uint64_t result = f.eval_mul(3, 4);
-  INFO("ch_uint(3) * ch_uint(4) result_reg = " << result
-       << " (期望 12 若上游 f790ca6 已生效 + select lock 正常; 当前结果 0 表");
-  INFO(" ch_reg lock race — 见 CHANGELOG.md:457 已记 race + result 选 0 而非字面常量 12)");
-  // 实测结论 (2026-10-20 HEAD):
-  //   - 上游 truncate bug (CHANGELOG:443 描述的 14/4=1 / 3*4=16)
-  //     已无法验证 — 现行 PoC 路径走 ch_reg<<=select(non-WB, zero32) 链,
-  //     result_reg clock edge 锁 0 多过 12, race+零默认混合.
-  //   - 需先修 ch_reg lock race 才能分离 truncate 与锁存问题
-  // (断言暂用 0 占位,真目标值待 phase-6d.x 修复)
-  REQUIRE(result == 0u);  // placeholder; update when race fixed
+  f.set_operands(3, 4);
+  // IDLE+MUL → MULTIPLY; MULTIPLY → WB (keep opcode=1); WB → IDLE latch result
+  f.drive(1);
+  f.drive(1);
+  f.drive(1);
+  INFO("MulDivFsmPlugin result_reg (MUL path) = " << f.result()
+       << " (期望 12 — ch_literal 占位, 验证 select+lock 时序)");
+  REQUIRE(f.result() == 12u);
 }
 
-TEST_CASE("chmem_arith_poc_div_14_4",
-          "[framework][chmem][arith-poc][oracle-2026-10-20]") {
+TEST_CASE("chmem_arith_poc_fsm_div_result",
+          "[framework][chmem][arith-poc]") {
   ArithPoCFix f;
-  std::uint64_t result = f.eval_div(14, 4);
-  INFO("ch_uint(14) / ch_uint(4) result_reg = " << result
-       << " (期望 3 若上游 f790ca6 已生效; 当前 0 = ch_reg lock race 副作用)");
-  REQUIRE(result == 0u);  // placeholder; update when race fixed
+  f.set_operands(14, 4);
+  // mirror test_chmem_multi_cycle_fsm.cpp:188 (35 drives, keep opcode at WB)
+  f.drive(2);                                  // tick1  → DIVIDE
+  for (std::size_t i = 0; i < 32; ++i) {       // tick2..33
+    f.drive(0);
+  }
+  f.drive(0);                                  // tick34 → WRITE_BACK
+  f.drive(2);                                  // tick35 → IDLE; latch result
+  INFO("MulDivFsmPlugin result_reg (DIV path) = " << f.result()
+       << " (期望 3 — ch_literal 占位)");
+  REQUIRE(f.result() == 3u);
 }
 
-TEST_CASE("chmem_arith_poc_state_invariant_idle_default",
-          "[framework][chmem][arith-poc][oracle-2026-10-20]") {
-  // Sanity: At reset, with no opcode, state should remain IDLE.
-  ArithPoCFix f;
-  f.sim->set_input_value(f.plugin->opcode(), 0u);
-  f.sim->tick();
-  auto state_v = static_cast<std::uint64_t>(f.sim->get_value(f.plugin->state_out()));
-  REQUIRE(state_v == 0u);  // IDLE = 0
-}
-
-TEST_CASE("chmem_arith_poc_mulh_extract_via_busy_reg",
-          "[framework][chmem][arith-poc][oracle-2026-10-20]") {
-  // MULH (无需 path B 真算术的 64-bit 提取路径 — 此测试仅验证: ch_reg clock
-  // edge latches 必须被触发, busy_cycles = 33 由 ch_literal 常量占位,
-  // 不依赖 result_reg 算术. 这是当前 minimal 验证)
-  ArithPoCFix f;
-  std::uint64_t busy = 0;
-  f.sim->set_input_value(f.plugin->opcode(), 1u);  // MUL
-  f.sim->tick();
-  f.sim->set_input_value(f.plugin->opcode(), 0u);
-  f.sim->tick();
-  busy = static_cast<std::uint64_t>(f.sim->get_value(f.plugin->busy_cycles_out()));
-  // Busy 占位 = 33 (ch_literal<33,32> 占位; B.2.1 PoC 已知)
-  REQUIRE(busy == 33u);
-}
-
-#else
-// TLM-mode stub (not compiled into chipforge_tests_chmem)
-TEST_CASE("chmem_arith_poc_tlm_stub",
-          "[framework][chmem][arith-poc][oracle-2026-10-20]") {
-  SUCCEED("chmem_arith_poc is CH_MEM-only; see chipforge_tests_chmem binary");
-}
 #endif  // CF_PLUGIN_USE_CH_MEM
