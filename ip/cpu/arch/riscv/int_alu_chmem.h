@@ -20,6 +20,15 @@
 //  10. AND  — 新增
 //  + AUIPC / LUI 顶层 select (在 11 层外)
 //
+// RV32M (M 扩展, 2026-10-20 chmem-mext-comb-datapath):
+//   在 11 层 base 树之后追加 8 层 M-op select (funct7 == 0x01):
+//     MUL / MULH / MULHSU / MULHU / DIV / DIVU / REM / REMU
+//   => 合计 19 层 select 树.
+//   - CppHDL 无 ch_int → 有符号运算走 sign-magnitude (neg32/abs32/neg_flag)
+//   - 除/模必须用 safe divisor 显式 guard 除零 (CppHDL 除零默认返回 0,
+//     RISC-V 要求 DIV/DIVU -> 全 1, REM/REMU -> 被除数)
+//   - base 侧 6 个 R-type op 补 f7_00 gate, 与 M-op 判别互斥 (双保险)
+//
 // M3/Prereq-2 变更:
 //   - 文件从 .disabled 重命名为 .h
 //   - 修正 line 125 select 语法: select(dec ==(dec.reads_rs2), ...)
@@ -144,6 +153,7 @@ class RiscvIntAluPlugin : public PluginBase {
 
       auto f7_00 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x00, 7>{}));
       auto f7_20 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x20, 7>{}));
+      auto f7_01 = (decoded.funct7 == ch_uint<7>(ch::core::ch_literal<0x01, 7>{}));
 
       // ADD/ADDI: funct3=000. OP (R-type) requires funct7=0x00 (SUB uses
       // 0x20); OPIMM (ADDI) must NOT check funct7 — bits[31:25] hold the
@@ -152,21 +162,37 @@ class RiscvIntAluPlugin : public PluginBase {
       // SUB: OP only, funct3=000, funct7=0x20
       auto is_sub  = is_op && f3_0 && f7_20;
       // SLL/SLLI: funct3=001
-      auto is_sll  = is_op_or_opimm && f3_1;
+      // 注: R-type 侧补 f7_00 —— MULH (funct7=0x01, funct3=001) 与 SLL 同
+      // funct3, 无 gate 会误捕. I-type (SLLI) 不检查 funct7 (bits[31:25]
+      // 是立即数 shamt[5]+funct7 字段, 负立即数时非 0).
+      auto is_sll  = (is_op && f3_1 && f7_00) || (is_opimm && f3_1);
       // SLT/SLTI: funct3=010
-      auto is_slt  = is_op_or_opimm && f3_2;
+      auto is_slt  = (is_op && f3_2 && f7_00) || (is_opimm && f3_2);
       // SLTU/SLTIU: funct3=011
-      auto is_sltu = is_op_or_opimm && f3_3;
+      auto is_sltu = (is_op && f3_3 && f7_00) || (is_opimm && f3_3);
       // XOR/XORI: funct3=100
-      auto is_xor  = is_op_or_opimm && f3_4;
+      auto is_xor  = (is_op && f3_4 && f7_00) || (is_opimm && f3_4);
       // SRL/SRLI: funct3=101, funct7=0x00
       auto is_srl  = is_op_or_opimm && f3_5 && f7_00;
       // SRA/SRAI: funct3=101, funct7=0x20
       auto is_sra  = is_op_or_opimm && f3_5 && f7_20;
       // OR/ORI: funct3=110
-      auto is_or   = is_op_or_opimm && f3_6;
+      auto is_or   = (is_op && f3_6 && f7_00) || (is_opimm && f3_6);
       // AND/ANDI: funct3=111
-      auto is_and  = is_op_or_opimm && f3_7;
+      auto is_and  = (is_op && f3_7 && f7_00) || (is_opimm && f3_7);
+
+      // ── RV32M (M 扩展) 判别 ──────────────────────────────────────────
+      // funct7 = 0x01 标识 M-op: MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU
+      // (opcode 0x33 = OP, R-type; decode 侧 reads_rs2/writes_rd 已就绪)
+      auto is_mext   = is_op && f7_01;
+      auto is_mul    = is_mext && f3_0;
+      auto is_mulh   = is_mext && f3_1;
+      auto is_mulhsu = is_mext && f3_2;
+      auto is_mulhu  = is_mext && f3_3;
+      auto is_div    = is_mext && f3_4;
+      auto is_divu   = is_mext && f3_5;
+      auto is_rem    = is_mext && f3_6;
+      auto is_remu   = is_mext && f3_7;
 
       // 10 R-type ALU ops + implicit default = 11 层 select 树
       // 注: 用 ch_literal<V, W> 显式宽度, 避开 _d 后缀字面值的字符解析限制
@@ -230,6 +256,59 @@ class RiscvIntAluPlugin : public PluginBase {
       auto r_or  = rs1_val | op2;
       auto r_and = rs1_val & op2;
 
+      // ── RV32M (M 扩展) 结果计算 ──────────────────────────────────────
+      // CppHDL 无 ch_int → 有符号运算走 sign-magnitude (neg32/abs32/neg_flag)
+      //
+      // 除/模必须用 safe divisor: CppHDL 的除零默认行为是打 stderr 并返回 0
+      // (CppHDL/include/ast/instr_op_arith.h:51-76), 而 RISC-V 要求
+      //   DIV / DIVU 除零 -> 全 1 (0xFFFFFFFF)
+      //   REM / REMU 除零 -> 被除数 (rs1)
+      // vendored ELF 的 divu/remu test_8/9/10 明确以 rs2 == 0 驱动
+      // (反汇编核验见 openspec/changes/chmem-mext-comb-datapath/specs/
+      //  chmem-mext-datapath/spec.md 的 "Special-case coverage mapping").
+      //
+      // 表达式来源: tests/framework/test_chmem_arith_poc.cpp Part D (rev 4,
+      // CH_MEM 24/24 PASS) —— 移植时勿改语义.
+      auto zero32 = T(ch::core::ch_literal<0, kXlenBits>{});
+
+      // 无符号乘积: 32x32 -> 64 bit (mul_op::result_width = M+N)
+      auto mul_prod = rs1_val * rs2_val;
+      auto r_mul    = bits<31, 0>(mul_prod);
+      auto r_mulhu  = bits<63, 32>(mul_prod);
+
+      // 有符号乘积: sext 到 64 后相乘 (128 bit 中间宽度), 其低 64 bit 即
+      // 有符号积的 2 补码 —— 取 bits<63,32> 得高 32 位.
+      auto mulh_prod   = sext<64>(rs1_val) * sext<64>(rs2_val);
+      auto r_mulh     = bits<63, 32>(mulh_prod);
+      auto mulhsu_prod = sext<64>(rs1_val) * zext<64>(rs2_val);
+      auto r_mulhsu   = bits<63, 32>(mulhsu_prod);
+
+      // safe divisor: 必须是 32-bit 运行时节点 (select), 不能是字面量 ——
+      //   mod_op 结果宽度 = 除数宽度 (CppHDL/include/lnode/operators_ext.h:
+      //   204-209), 且对编译期字面量除数有收缩特化 compute_bit_width(value-1)
+      //   (CppHDL/include/core/operators_width.h:34-53).
+      auto b_safe_u   = safe_divisor_u(rs2_val);
+      auto b_safe_mag = safe_divisor_mag(rs2_val);
+
+      // DIV (signed): sign = neg(a) ^ neg(b); mag = |a| / |b|; 除零 -> 全 1
+      auto div_sign = (neg_flag(rs1_val) != neg_flag(rs2_val));
+      auto div_mag  = abs32(rs1_val) / b_safe_mag;
+      auto div_q    = select(div_sign, neg32(div_mag), div_mag);
+      auto r_div    = select(ch_bool(rs2_val == zero32), all_ones, div_q);
+
+      // DIVU (unsigned): 除零 -> 全 1
+      auto r_divu = select(ch_bool(rs2_val == zero32), all_ones,
+                           rs1_val / b_safe_u);
+
+      // REM (signed): 符号跟随被除数; 除零 -> 被除数
+      auto rem_mag = abs32(rs1_val) % b_safe_mag;
+      auto rem_r   = select(neg_flag(rs1_val), neg32(rem_mag), rem_mag);
+      auto r_rem   = select(ch_bool(rs2_val == zero32), rs1_val, rem_r);
+
+      // REMU (unsigned): 除零 -> 被除数
+      auto r_remu = select(ch_bool(rs2_val == zero32), rs1_val,
+                           rs1_val % b_safe_u);
+
       // ── 10 层 R-type select + 1 default = 11 层 mux ──
       result = select(is_add,  r_add,  result);
       result = select(is_sub,  r_sub,  result);
@@ -241,6 +320,18 @@ class RiscvIntAluPlugin : public PluginBase {
       result = select(is_sra,  r_sra,  result);
       result = select(is_or,   r_or,   result);
       result = select(is_and,  r_and,  result);
+
+      // ── RV32M: 8 层 M-op select (追加在 11 层 base 树之后) ──────────
+      // select 后写覆盖前写 → M-op 无条件赢过 base 的同 funct3 误捕.
+      // 与 D2 的 f7_00 加固构成双保险 (互不依赖).
+      result = select(is_mul,    r_mul,    result);
+      result = select(is_mulh,   r_mulh,   result);
+      result = select(is_mulhsu, r_mulhsu, result);
+      result = select(is_mulhu,  r_mulhu,  result);
+      result = select(is_div,    r_div,    result);
+      result = select(is_divu,   r_divu,   result);
+      result = select(is_rem,    r_rem,    result);
+      result = select(is_remu,   r_remu,   result);
 
       // RESULT: LD/ST = byte_addr (rs1+imm) for dmem; otherwise ALU result.
       // Phase 6d.7 bugfix: the old code set RESULT = result where result was
@@ -307,6 +398,54 @@ class RiscvIntAluPlugin : public PluginBase {
                  static_cast<std::make_signed_t<T>>(rs1) >> (rs2 & 0x1F));
       default: return 0;
     }
+  }
+
+ private:
+  // ══════════════════════════════════════════════════════════════════════
+  // RV32M 组合式算术 helper (sign-magnitude; CppHDL 无 ch_int)
+  //
+  // 声明为类模板的 static 成员函数: 隐式 inline (模板 vague linkage),
+  // 无 ODR 风险, 且作用域收敛在本类内 —— 本头文件被多个 TU 包含.
+  //
+  // 表达式来源: tests/framework/test_chmem_arith_poc.cpp Part D (rev 4,
+  // CH_MEM 24/24 PASS) —— 与该 PoC 保持逐字一致.
+  // ══════════════════════════════════════════════════════════════════════
+
+  // 二补数取负: (~x) + 1. 结果宽度 = max(lhs, rhs) = kXlenBits, 不增长,
+  // 故 neg32(0x80000000) == 0x80000000 (INT_MIN 幅值可容纳于无符号 32 bit).
+  static T neg32(T x) {
+    return (~x) + T(ch::core::ch_literal<1, kXlenBits>{});
+  }
+
+  // 符号位: bit[kXlenBits-1]
+  static ch_bool neg_flag(T x) {
+    return ch_bool(bits<kXlenBits - 1, kXlenBits - 1>(x) ==
+                   ch_uint<1>(ch::core::ch_literal<1, 1>{}));
+  }
+
+  // 幅值: |x| (用无符号 32 bit 表示, INT_MIN 装得下, 无需 33 bit)
+  static T abs32(T x) {
+    return select(neg_flag(x), neg32(x), x);
+  }
+
+  // 无符号除/模的 safe divisor: b == 0 时用 1 代替.
+  // 必须是 select 构成的 32-bit 运行时节点 —— mod_op 结果宽度 = 除数宽度
+  // (CppHDL/include/lnode/operators_ext.h:204-209), 且对编译期字面量除数
+  // 有收缩特化 compute_bit_width(value-1)
+  // (CppHDL/include/core/operators_width.h:34-53).
+  static T safe_divisor_u(T b) {
+    T zero(ch::core::ch_literal<0, kXlenBits>{});
+    T one(ch::core::ch_literal<1, kXlenBits>{});
+    return select(ch_bool(b == zero), one, b);
+  }
+
+  // 有符号除/模的 safe divisor: 作用于幅值 |b|, |b| == 0 时用 1 代替.
+  // (abs32(0) == 0, 故 abs32(b) == 0 等价于 b == 0)
+  static T safe_divisor_mag(T b) {
+    T zero(ch::core::ch_literal<0, kXlenBits>{});
+    T one(ch::core::ch_literal<1, kXlenBits>{});
+    auto b_mag = abs32(b);
+    return select(ch_bool(b_mag == zero), one, b_mag);
   }
 };
 

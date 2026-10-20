@@ -14,6 +14,18 @@
 //   - create_fsm() 与 Phase B.1 fixture 调用链兼容 (test_chmem_multi_cycle_fsm.cpp)
 //   - 所有 ch_* 字面留在本文件 (check_plugin_portability.sh Check 2)
 //
+// 定位 (2026-10-20, chmem-mext-comb-datapath):
+//   本文件是 **ch_state_machine DSL 的机制 fixture**, 不是数据通路候选实现.
+//   - result_reg_ / busy_cycles_reg_ 仍是 ch_literal 占位 (12 / 3 / 33),
+//     不做任何真算术 —— 它存在的目的是让 test_chmem_multi_cycle_fsm.cpp
+//     能验证 select tree 嵌套 + ch_reg 锁存时序.
+//   - CH_MEM 路径的 RV32M 数据通路由 **组合式** 实现落地, 见
+//     ip/cpu/arch/riscv/int_alu_chmem.h (19 层 select 树: 11 base + 8 M-op).
+//   - 本文件 **不注册** 到 cpu_factory_chmem.h (stub 输出不进 RD_DATA 通路,
+//     注册只会产生死节点).
+//   - cycle-accurate 的 CH_MEM M 扩展 = follow-up change
+//     `chmem-mext-fsm-cycle-parity` (blocked on CtrlLink 句柄扩展).
+//
 // 约束 (D4 + ADR-040 v2.0 + ADR-046):
 //   - 必须 #ifdef CF_PLUGIN_USE_CH_MEM 整文件包裹 (除 has_chmem_support symbol)
 //   - 无业务 tick() (使用 ch_state_machine DSL 调度)
@@ -146,8 +158,13 @@ class MulDivFsmPlugin
           zero8);
       (*counter_reg_) <<= counter_next;
 
-      // result/busy ch_reg 锁存 (B.2.1 PoC 占位: ch 算术非 C++ 语义,
-      // 用 ch_literal 占位保证 select tree 与 lock 时序可验证)
+      // result/busy ch_reg 锁存 —— **占位, 非真算术**。
+      // 占位意图: 让 select tree 嵌套 + ch_reg 锁存时序可被
+      // test_chmem_multi_cycle_fsm.cpp 验证.
+      // 注: 旧注释 "B.2.1 PoC 占位: ch 算术非 C++ 语义" 的**归因已被证伪**
+      // (PoC commit 63bfc8a / 03667fa: ch_uint 算术与 C++ 一致,
+      //  14/4=3 / 3*4=12 / 14%4=2); 占位的真实原因是
+      // "CH_MEM 数据通路未实现 M-op" —— 见 int_alu_chmem.h 的组合式实现.
       auto in_mul = sm.is_in(State::MULTIPLY);
       auto in_wb = sm.is_in(State::WRITE_BACK);
       auto in_wb_for_mul = ch::core::ch_bool(in_wb && is_mul);

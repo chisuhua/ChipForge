@@ -45,7 +45,7 @@ review_by: 2026-10-27
 ### 变更范围
 
 - **`ip/cpu/arch/riscv/int_alu_chmem.h`**（唯一业务文件）：在现有 11 层 select 树**尾部**追加 `funct7==0x01` gate 的 8 层 M-op select；**必选**给 6 个无 funct7 gate 的 base R-type op 的 `is_op` 侧补 `f7_00` gate（不依赖 select 顺序）。
-- **`tests/framework/test_chmem_arith_poc.cpp`**：8 条 M-op 表达式**定稿** —— 全部加 safe divisor（除零 guard），补 5 个边界 case（`divu(14,0)` / `remu(14,0)` / `div(INT_MIN,-1)` / `rem(INT_MIN,0)` / `neg32(0x80000000)`）。**先于**业务文件落地。
+- **`tests/framework/test_chmem_arith_poc.cpp`**：8 条 M-op 表达式**定稿** —— 全部加 safe divisor（除零 guard），补 7 个边界 case（`divu(14,0)` / `remu(14,0)` / `div(14,0)` / `div(INT_MIN,-1)` / `rem(INT_MIN,-1)` / `rem(INT_MIN,0)` / `neg32(0x80000000)`）。**先于**业务文件落地。
 - **2 个 delta spec**：`specs/chmem-rv32um-coverage/spec.md` + `specs/verilator-rv32um-coverage/spec.md`，用 `## MODIFIED Requirements` 修订 cycle 比对场景。
 - **文档**：`AGENTS.md` `[chmem][m-ext-gap]` 条目 + `CHANGELOG.md` 3 处旧结论更正。
 
@@ -60,7 +60,7 @@ review_by: 2026-10-27
 
 - [ ] `[chmem] chmem_vendored_elf_tohost1` → **46/46 PASS**（38 rv32ui + 8 rv32um 真 PASS，tohost==1 非 mask 产物）
 - [ ] `[verilator]` → **48/48 PASS**（40 rv32ui + 8 rv32um 真 PASS）；`[mmu-verilator]` 3/3 不回归
-- [ ] `[arith-poc]` → CH_MEM 22/22 PASS（TLM 20/20；17+5 与 15+5 —— 5 个新 case 是纯组合式，同时编入两个 binary），含 `divu(14,0)==0xFFFFFFFF`、`remu(14,0)==14`、`div(INT_MIN,-1)==0x80000000`、`rem(INT_MIN,0)==0x80000000`、`neg32(0x80000000)==0x80000000`
+- [ ] `[arith-poc]` → CH_MEM 24/24 PASS（TLM 22/22；17+7 与 15+7 —— 7 个新 case 是纯组合式，同时编入两个 binary），覆盖 design D4 边界自洽表全部 6 行 + neg32 宽度：`divu(14,0)==0xFFFFFFFF`、`remu(14,0)==14`、`div(14,0)==0xFFFFFFFF`、`div(INT_MIN,-1)==0x80000000`、`rem(INT_MIN,-1)==0`、`rem(INT_MIN,0)==0x80000000`、`neg32(0x80000000)==0x80000000`
 - [ ] 3 架构 gate 全 PASS（`verify_adr` / `verify_plugin_decision` 8/8 / `check_plugin_portability` 12/12）+ `roadmap-r9-check` 0 fail
 - [ ] 全量 TLM binary 无新增 FAIL（`7stage_topology_from_config` pre-existing infra drift 除外）
 - [ ] `openspec change validate chmem-mext-comb-datapath` → 0 error；archive 后 2 个 delta spec 正确 apply 到 `openspec/specs/{chmem-rv32um-coverage,verilator-rv32um-coverage}/spec.md`
@@ -80,7 +80,7 @@ review_by: 2026-10-27
 | 文件 | 动作 | 影响 |
 |------|------|------|
 | `ip/cpu/arch/riscv/int_alu_chmem.h` | 改（唯一业务文件） | 11 层 select 树 → 19 层；`is_mext` gate + 8 层 M-op select + 6 个 base op 的 `f7_00` 加固；RV32I 路径 `is_mext` 恒 false |
-| `tests/framework/test_chmem_arith_poc.cpp` | 改 | 8 条表达式加 safe divisor；+5 边界 case（17 → 22 case） |
+| `tests/framework/test_chmem_arith_poc.cpp` | 改 | 8 条表达式加 safe divisor；+7 边界 case（17 → 24 case） |
 | `openspec/specs/chmem-rv32um-coverage/spec.md` | 改（archive 时） | cycle scenario 的 ±5%/+50c MUST → 不适用 + 移交 follow-up |
 | `openspec/specs/verilator-rv32um-coverage/spec.md` | 改（archive 时） | 同上 |
 | `AGENTS.md` | 改 | `[chmem][m-ext-gap]` 条目标记 resolved + 旧结论更正 + path 术语统一 |

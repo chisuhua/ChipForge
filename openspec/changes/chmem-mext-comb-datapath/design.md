@@ -78,7 +78,15 @@ MULH/MULHSU/DIV/REM 用 sign-magnitude：
 - 无符号：`b_safe = select(b == 0, 1, b)` → 除/模吃 `b_safe`，输出再 `select(b == 0, …)` 覆盖特例值。
 - 有符号：`b_safe_mag = select(abs32(b) == 0, 1, abs32(b))` → `mag = abs32(a) / b_safe_mag`；输出 `select(b == 0, all_ones / a, …)`。
 
-**为什么必须 guard**：vendored ELF 的 `divu` / `remu` **test_8/9/10** 明确以 `rs2 == 0` 驱动（2026-10-20 反汇编核验，见 `specs/chmem-mext-datapath/spec.md` 的特例覆盖映射表）；PoC 的 `chmem_arith_poc_mext_divu`（`tests/framework/test_chmem_arith_poc.cpp:272-280`）/ `_remu`（`:282-290`）是**裸 `a/b` / `a%b`、无 guard**，照抄会得到 0 而非 0xFFFFFFFF → 8 ELF 继续 FAIL。
+**为什么必须 guard**：vendored ELF 的 `divu` / `remu` **test_8/9/10** 明确以 `rs2 == 0` 驱动（2026-10-20 反汇编核验，见 `specs/chmem-mext-datapath/spec.md` 的特例覆盖映射表）；PoC 的 `chmem_arith_poc_mext_divu` / `_remu` 是**裸 `a/b` / `a%b`、无 guard**，照抄会得到 0 而非 0xFFFFFFFF → 8 ELF 继续 FAIL。
+
+> **⚠️ 硬约束：safe divisor 必须是 32-bit 运行时节点，不能是字面量。**
+>
+> 1. `mod_op` 的结果宽度 = **除数宽度**（`CppHDL/include/lnode/operators_ext.h:204-209`，`result_width = N`）。除数窄于被除数 → 结果被截断。
+> 2. `get_binary_result_width` 对 `mod_op` + **编译期字面量** RHS 有特化：结果宽度收缩为 `compute_bit_width(value - 1)`（`CppHDL/include/core/operators_width.h:34-53`）。例：除数字面量 `4` → 结果仅 **2 bit**。
+> 3. 因此 safe divisor 必须由 `select` 构成（`mux_op::result_width = max(M, N)`，`CppHDL/include/lnode/operators_ext.h:187-192`），恒为 32 bit。
+>
+> 附带发现：PoC 的 `chmem_arith_poc_mext_remu`（rev 3）用字面量除数 `4`，其结果宽度实际只有 2 bit —— 数值 `2` 恰好装得下才"通过"，属侥幸。rev 4 改用 `safe_divisor_u(b)` 节点后恢复 32 bit。
 
 **边界自洽性**（幅值用无符号 32-bit 表示，`abs32(INT_MIN) = 0x80000000` 装得下，无需 33-bit）：
 
@@ -100,7 +108,7 @@ PoC Part D（`tests/framework/test_chmem_arith_poc.cpp:225-320`）已验证 8 �
 - DIV / REM 的除零与 INT_MIN 分支**从未被驱动**（只跑过 `-14 / 4`）；
 - DIVU / REMU **无除零 guard**。
 
-故本 change 的落地顺序必须是"**先在 PoC 把表达式定稿（含 safe divisor + 5 个边界 case 全绿），再移植到 `int_alu_chmem.h`**"，而非逐字照抄 PoC。
+故本 change 的落地顺序必须是"**先在 PoC 把表达式定稿（含 safe divisor + 7 个边界 case 全绿），再移植到 `int_alu_chmem.h`**"，而非逐字照抄 PoC。
 
 ## D5 — Stub 与 factory 处置
 
@@ -115,6 +123,6 @@ PoC Part D（`tests/framework/test_chmem_arith_poc.cpp:225-320`）已验证 8 �
 |---|---|---|
 | 组合除法 emit Verilog `/`、`%`，真实综合 = 巨型组合除法器 | 中（仅上 FPGA/ASIC 叙事；当前 Verilator-only 为低） | change 文档声明"组合 M-op = 仿真正确性基线；可综合版 = cycle-parity change 的 FSM 除法器" |
 | MULH 64-bit 中间宽度理解错会静默截断 | 中 | 直接移植 PoC 已 PASS 的表达式，不重新推导；PoC 已覆盖 0xFFFFFFFF 边界 |
-| INT_MIN÷-1 / 除零特例 | 中 | PoC Part D 的特例分支**从未被实测**（DIV/REM 只跑 `-14 / 4`）；缓解 = tasks §1 先在 PoC 补 5 个边界 case 定稿（含 safe divisor），再移植；vendored ELF 的 div/rem/divu/remu test_7~test_10 构成 e2e 回归锚 |
+| INT_MIN÷-1 / 除零特例 | 中 | PoC Part D 的特例分支**从未被实测**（DIV/REM 只跑 `-14 / 4`）；缓解 = tasks §1 先在 PoC 补 7 个边界 case 定稿（含 safe divisor），再移植；vendored ELF 的 div/rem/divu/remu test_7~test_10 构成 e2e 回归锚 |
 | DAG 规模变化不体现在 node_count | 低 | `node_count()` = 按 stage 去重的 PipeNode **拓扑计数**（`include/cf/plugin/pipe_builder.h:283`），**不是** lnode/DAG 计数，select 树 11→19 层不改变该值 → **无快照需更新**；RV32I 语义不变由 38 rv32ui ELF 端到端锚定 |
 | 漏加 gate 仅靠 select 顺序，未来重排会静默破 M-op | 低 | 双保险 + 8 ELF 端到端永久回归锚 |

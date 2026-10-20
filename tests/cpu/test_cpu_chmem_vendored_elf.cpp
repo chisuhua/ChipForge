@@ -158,8 +158,10 @@ TEST_CASE("chmem_vendored_elf_tohost1", "[cpu][chmem][6d4][vendored-elf]") {
       // clobbering the PC's init value 0x80000000. Skipping reset keeps the
       // construction-time init (the register file is all-zero anyway).
       std::uint64_t tohost_val = 0;
+      std::size_t cycles = 0;
       for (std::size_t i = 0; i < kMaxCycles; ++i) {
         REQUIRE_NOTHROW(sim->tick());
+        cycles = i + 1;
         tohost_val = static_cast<std::uint64_t>(
             sim->get_value_by_name("tohost_probe_data_proxy"));
         // Exit only on the harness "done" bit (LSB). Without this gate the
@@ -170,7 +172,7 @@ TEST_CASE("chmem_vendored_elf_tohost1", "[cpu][chmem][6d4][vendored-elf]") {
       }
 
       INFO("vendored ELF " << tc.name << ": tohost = " << tohost_val
-           << " after " << kMaxCycles << " cycles");
+           << " after " << cycles << " cycles");
       const bool done = (tohost_val & 0x1u) != 0;
       const bool pass = (tohost_val == 1);
       if (!done) {

@@ -38,7 +38,7 @@ CH_MEM 路径**完全没有 RV32UM M 扩展处理**：
 - **~~"ch_uint 算术语义异常（14/4=1, 3*4=16）"~~ 不存在**：Part A 证明 `14/4=3`、`3*4=12`、`14%4=2`、MULHU 高位正确；Part A' 用 CHANGELOG 报错的整数构造器形式 `ch_uint<32>(14)` 复现，同样正确。归因：上游 `f790ca6`（interpreter ADD/MUL/SHL/NEG 宽度截断）已修且在 HEAD，install 库 2026-10-18 重建。
 - **~~"ch_reg lock 顺序 race"~~ 不存在**：Part B 用正确 tick 序列得 `result=12`/`=3`；既有 fixture `test_chmem_multi_cycle_fsm.cpp:188` 早就断言 `result==3` 且 PASS。旧结论源于 rev1 PoC 在 WRITE_BACK 拍把 opcode 归零。
 - **Part D（决定性）**：用 `ch_uint` + `sext`/`zext` 组合式实现全部 8 条 M-op（含符号-幅值转换，CppHDL 无 `ch_int`），**8/8 PASS** → 组合式路径的**正常路径**语义可行。
-  **注意（实现前置）**：Part D 的 DIV/REM 只跑过 `-14 / 4`，其除零 / INT_MIN 特例分支**从未被驱动**；DIVU/REMU 是裸 `a/b`/`a%b`、**无除零 guard**（`tests/framework/test_chmem_arith_poc.cpp:272-290`）→ 落地顺序必须是"**先在 PoC 把表达式定稿**（加 safe divisor + 补 5 个边界 case），再移植到 `int_alu_chmem.h`"，而非逐字照抄 PoC。
+  **注意（实现前置）**：Part D 的 DIV/REM 只跑过 `-14 / 4`，其除零 / INT_MIN 特例分支**从未被驱动**；DIVU/REMU 是裸 `a/b`/`a%b`、**无除零 guard**（`tests/framework/test_chmem_arith_poc.cpp:272-290`）→ 落地顺序必须是"**先在 PoC 把表达式定稿**（加 safe divisor + 补 7 个边界 case），再移植到 `int_alu_chmem.h`"，而非逐字照抄 PoC。
 
 ### 1.3 风险分析（为何现在做）
 
@@ -53,7 +53,7 @@ CH_MEM 路径**完全没有 RV32UM M 扩展处理**：
 | # | 文件 | 改动 |
 |---|---|---|
 | 1 | `ip/cpu/arch/riscv/int_alu_chmem.h` | 在现有 11 层 select 树**尾部**追加 `funct7==0x01` gate 的 8 层 M-op select（移植 design D4 定稿表达式）。**必选**：给 6 个无 funct7 gate 的 base R-type op 的 `is_op` 侧补 `f7_00` gate。 |
-| 2 | `tests/framework/test_chmem_arith_poc.cpp` | **表达式定稿**：8 条 M-op 全部加 safe divisor（除零 guard），补 5 个边界 case（17 → 22 case）。**先于** `int_alu_chmem.h` 改动落地 —— PoC 是表达式的唯一真值来源。 |
+| 2 | `tests/framework/test_chmem_arith_poc.cpp` | **表达式定稿**：8 条 M-op 全部加 safe divisor（除零 guard），补 7 个边界 case（17 → 24 case）。**先于** `int_alu_chmem.h` 改动落地 —— PoC 是表达式的唯一真值来源。 |
 | 3 | `openspec/changes/chmem-mext-comb-datapath/specs/{chmem-rv32um-coverage,verilator-rv32um-coverage}/spec.md` | **新增** 2 个 `## MODIFIED Requirements` delta spec：修订 cycle 比对场景（组合式与 TLM radix-2 不同构 → parity 判据不适用，移交 follow-up）。requirement 标题须与归档 spec **逐字一致**。 |
 | 4 | `AGENTS.md` `[chmem][m-ext-gap]` 条目 | 修正/标记 resolved（含"算术语义异常 / lock race"旧结论更正 + path 术语统一）。 |
 | 5 | `CHANGELOG.md` | 更正 **3 处**旧结论（`:443` 算术语义异常、`:456-457` lock race、2026-10-20 Correction Note 自身的归因）+ 修正对不存在的 `openspec/changes/chmem-m-ext-integration/` 的引用。 |
@@ -69,7 +69,7 @@ CH_MEM 路径**完全没有 RV32UM M 扩展处理**：
 - **受益**：`[chmem]` 8 rv32um 真 PASS；`[verilator]` 8 rv32um 由**真 FAIL 转真 PASS**；`chmem-rv32um-coverage` / `verilator-rv32um-coverage` 的**覆盖类** Requirement 成立（cycle 场景经 delta spec 改判为"不适用 + 移交 follow-up"）。
 - **回归面**：RV32I 合法指令 `funct7 ∈ {0x00,0x20}` → `is_mext` 恒 false → 38 rv32ui 执行路径逐位不变（语义不变量，由 38 rv32ui ELF 端到端锚定）。
   **无 DAG 快照需更新**：`node_count()` 是按 stage 去重的 PipeNode **拓扑计数**（`include/cf/plugin/pipe_builder.h:283`），不随 select 树层数（11→19）变化。
-- **风险**：组合除法 emit Verilog `/`（Verilator OK，可综合差 → 由 FSM follow-up 长期兜底）；MULH 64-bit 中间宽度 —— 由 PoC Part D 已验证的表达式移植缓解；**除零 / INT_MIN 特例** —— PoC Part D **从未实测**这两条路径（只跑 `-14 / 4`），由 tasks §1 的 5 个边界 case 定稿 + vendored ELF 的 div/rem/divu/remu test_7~test_10 兜底。
+- **风险**：组合除法 emit Verilog `/`（Verilator OK，可综合差 → 由 FSM follow-up 长期兜底）；MULH 64-bit 中间宽度 —— 由 PoC Part D 已验证的表达式移植缓解；**除零 / INT_MIN 特例** —— PoC Part D **从未实测**这两条路径（只跑 `-14 / 4`），由 tasks §1 的 7 个边界 case 定稿 + vendored ELF 的 div/rem/divu/remu test_7~test_10 兜底。
 
 ## Acceptance
 
@@ -81,4 +81,4 @@ CH_MEM 路径**完全没有 RV32UM M 扩展处理**：
 4. 全量 TLM binary 无新增 FAIL（`7stage_topology_from_config` pre-existing infra drift 除外）。
 5. 文档更正（AGENTS.md + CHANGELOG 3 处）。
 6. `openspec change validate chmem-mext-comb-datapath` → 0 error；archive 后 2 个 delta spec 正确 apply 到 `openspec/specs/{chmem-rv32um-coverage,verilator-rv32um-coverage}/spec.md`（cycle scenario 被**替换**而非追加重复 requirement）。
-7. `[arith-poc]` 22/22 PASS（17 原有 + 5 个边界 case）。
+7. `[arith-poc]` 24/24 PASS（17 原有 + 7 个边界 case）。

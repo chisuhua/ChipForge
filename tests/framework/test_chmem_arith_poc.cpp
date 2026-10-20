@@ -33,6 +33,14 @@
 //
 // Part D (rev 3 追加): 组合式 8 条 M-op 全实现 PoC — 证明方案 A
 //   (在 int_alu_chmem.h select 树里用 ch_uint 组合算式实现 M 扩展) 可行.
+//
+// rev 4 (chmem-mext-comb-datapath, 2026-10-20): 除零 guard + 边界 case
+//   - rev 3 的 DIV/REM 只跑过 -14/4, 除零与 INT_MIN 分支从未被驱动;
+//     DIVU/REMU 是裸 a/b / a%b, 无除零 guard.
+//   - rev 4 给 4 条除/模表达式加 safe divisor (显式除零 guard), 并补 7 个
+//     边界 case, 覆盖 design D4 "边界自洽性" 表的全部 6 行 + neg32 宽度断言.
+//   - 硬约束 (CppHDL 编译期宽度规则, 详见下方 safe_divisor_* 注释):
+//     safe divisor 必须是 select 构成的 32-bit 运行时节点, 不能是字面量.
 
 #include "catch_amalgamated.hpp"
 
@@ -220,6 +228,48 @@ ch_uint<32> abs32(ch_uint<32> x) {
   return select(neg_flag(x), neg32(x), x);
 }
 
+// ===========================================================================
+// rev 4: 除零 safe divisor (显式 guard)
+// ===========================================================================
+//
+// 为什么必须有 guard:
+//   CppHDL 的除零默认行为 = 打 stderr 并返回 0
+//   (CppHDL/include/ast/instr_op_arith.h:51-76 Div/Mod::eval),
+//   而 RISC-V 规范要求:
+//     DIV / DIVU 除零  -> 全 1  (0xFFFFFFFF)
+//     REM / REMU 除零  -> 被除数 (rs1)
+//   vendored ELF 的 divu/remu test_8/9/10 明确以 rs2 == 0 驱动
+//   (反汇编核验见 openspec/changes/chmem-mext-comb-datapath/specs/
+//    chmem-mext-datapath/spec.md 的 "Special-case coverage mapping"),
+//   因此不 guard 就会拿到 0 而不是规范值 -> 8 ELF 继续 FAIL.
+//
+// 为什么 safe divisor 必须是「32-bit 运行时节点」而不是字面量:
+//   1) mod_op 的默认结果宽度 = 除数宽度
+//      (CppHDL/include/lnode/operators_ext.h:204-209: result_width = N),
+//      除数窄于被除数会把结果截断.
+//   2) get_binary_result_width 对 mod_op + 编译期字面量 RHS 有特化:
+//      结果宽度收缩为 compute_bit_width(value-1)
+//      (CppHDL/include/core/operators_width.h:34-53),
+//      例如除数字面量 4 -> 结果仅 2 bit.
+//   => safe divisor 必须由 select 构成 (mux_op::result_width = max(M,N),
+//      CppHDL/include/lnode/operators_ext.h:187-192), 恒为 32 bit.
+//
+// 无符号除/模的 safe divisor: b == 0 时用 1 代替.
+ch_uint<32> safe_divisor_u(ch_uint<32> b) {
+  ch_uint<32> zero(ch_literal<0, 32>{});
+  ch_uint<32> one(ch_literal<1, 32>{});
+  return select(ch_bool(b == zero), one, b);
+}
+
+// 有符号除/模的 safe divisor: 作用于幅值 |b|, |b| == 0 时用 1 代替.
+// (abs32(0) == 0, 故 abs32(b) == 0 等价于 b == 0)
+ch_uint<32> safe_divisor_mag(ch_uint<32> b) {
+  ch_uint<32> zero(ch_literal<0, 32>{});
+  ch_uint<32> one(ch_literal<1, 32>{});
+  auto b_mag = abs32(b);
+  return select(ch_bool(b_mag == zero), one, b_mag);
+}
+
 }  // namespace
 
 TEST_CASE("chmem_arith_poc_mext_mul", "[framework][chmem][arith-poc]") {
@@ -273,7 +323,10 @@ TEST_CASE("chmem_arith_poc_mext_divu", "[framework][chmem][arith-poc]") {
   const std::uint64_t v = eval_combinational("mext_divu", [] {
     ch_uint<32> a(ch_literal<14, 32>{});
     ch_uint<32> b(ch_literal<4, 32>{});
-    return a / b;
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    ch_uint<32> allones(ch_literal<0xFFFFFFFFu, 32>{});
+    auto q = a / safe_divisor_u(b);
+    return select(ch_bool(b == zero), allones, q);
   });
   INFO("DIVU(14,4) = " << v << " (期望 3)");
   REQUIRE(v == 3u);
@@ -283,40 +336,155 @@ TEST_CASE("chmem_arith_poc_mext_remu", "[framework][chmem][arith-poc]") {
   const std::uint64_t v = eval_combinational("mext_remu", [] {
     ch_uint<32> a(ch_literal<14, 32>{});
     ch_uint<32> b(ch_literal<4, 32>{});
-    return a % b;
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    auto r = a % safe_divisor_u(b);
+    return select(ch_bool(b == zero), a, r);
   });
   INFO("REMU(14,4) = " << v << " (期望 2)");
   REQUIRE(v == 2u);
 }
 
 TEST_CASE("chmem_arith_poc_mext_div", "[framework][chmem][arith-poc]") {
-  // DIV = sign-magnitude: sign = a^b, |a|/|b|, 再补符号; 除零 → 全 1
+  // DIV = sign-magnitude: sign = a^b, |a|/|b|, 再补符号; 除零 -> 全 1
   const std::uint64_t v = eval_combinational("mext_div", [] {
     ch_uint<32> a(ch_literal<0xFFFFFFF2u, 32>{});  // -14
     ch_uint<32> b(ch_literal<4, 32>{});
     ch_uint<32> zero(ch_literal<0, 32>{});
     ch_uint<32> allones(ch_literal<0xFFFFFFFFu, 32>{});
     auto sign = (neg_flag(a) != neg_flag(b));
-    auto mag = abs32(a) / abs32(b);
+    auto mag = abs32(a) / safe_divisor_mag(b);
     auto q = select(sign, neg32(mag), mag);
-    return select(b == zero, allones, q);
+    return select(ch_bool(b == zero), allones, q);
   });
   INFO("DIV(-14,4) = " << v << " (期望 0xFFFFFFFD = -3)");
   REQUIRE(v == 0xFFFFFFFDu);
 }
 
 TEST_CASE("chmem_arith_poc_mext_rem", "[framework][chmem][arith-poc]") {
-  // REM = sign 跟随被除数; 除零 → 被除数
+  // REM = sign 跟随被除数; 除零 -> 被除数
   const std::uint64_t v = eval_combinational("mext_rem", [] {
     ch_uint<32> a(ch_literal<0xFFFFFFF2u, 32>{});  // -14
     ch_uint<32> b(ch_literal<4, 32>{});
     ch_uint<32> zero(ch_literal<0, 32>{});
-    auto mag = abs32(a) % abs32(b);
+    auto mag = abs32(a) % safe_divisor_mag(b);
     auto r = select(neg_flag(a), neg32(mag), mag);
-    return select(b == zero, a, r);
+    return select(ch_bool(b == zero), a, r);
   });
   INFO("REM(-14,4) = " << v << " (期望 0xFFFFFFFE = -2)");
   REQUIRE(v == 0xFFFFFFFEu);
+}
+
+// ===========================================================================
+// rev 4: 边界 case — 覆盖 design D4 "边界自洽性" 表的全部 6 行
+//   + 1 条 neg32 宽度断言.
+//   这 7 个 case 是 chmem-mext-comb-datapath 的「表达式真值来源」:
+//   移植到 int_alu_chmem.h 之前必须全绿.
+// ===========================================================================
+
+// RISC-V: DIVU 除零 -> 全 1
+TEST_CASE("chmem_arith_poc_mext_divu_div0",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_divu_div0", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<0, 32>{});
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    ch_uint<32> allones(ch_literal<0xFFFFFFFFu, 32>{});
+    auto q = a / safe_divisor_u(b);
+    return select(ch_bool(b == zero), allones, q);
+  });
+  INFO("DIVU(14,0) = " << v << " (期望 0xFFFFFFFF — RISC-V: DIVU 除零 -> 全 1)");
+  REQUIRE(v == 0xFFFFFFFFu);
+}
+
+// RISC-V: REMU 除零 -> 被除数
+TEST_CASE("chmem_arith_poc_mext_remu_div0",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_remu_div0", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<0, 32>{});
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    auto r = a % safe_divisor_u(b);
+    return select(ch_bool(b == zero), a, r);
+  });
+  INFO("REMU(14,0) = " << v << " (期望 14 — RISC-V: REMU 除零 -> 被除数)");
+  REQUIRE(v == 14u);
+}
+
+// RISC-V: DIV 除零 -> 全 1
+TEST_CASE("chmem_arith_poc_mext_div_div0", "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_div_div0", [] {
+    ch_uint<32> a(ch_literal<14, 32>{});
+    ch_uint<32> b(ch_literal<0, 32>{});
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    ch_uint<32> allones(ch_literal<0xFFFFFFFFu, 32>{});
+    auto sign = (neg_flag(a) != neg_flag(b));
+    auto mag = abs32(a) / safe_divisor_mag(b);
+    auto q = select(sign, neg32(mag), mag);
+    return select(ch_bool(b == zero), allones, q);
+  });
+  INFO("DIV(14,0) = " << v << " (期望 0xFFFFFFFF — RISC-V: DIV 除零 -> 全 1)");
+  REQUIRE(v == 0xFFFFFFFFu);
+}
+
+// RISC-V: REM 除零 -> 被除数
+TEST_CASE("chmem_arith_poc_mext_rem_div0", "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_rem_div0", [] {
+    ch_uint<32> a(ch_literal<0x80000000u, 32>{});  // INT_MIN
+    ch_uint<32> b(ch_literal<0, 32>{});
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    auto mag = abs32(a) % safe_divisor_mag(b);
+    auto r = select(neg_flag(a), neg32(mag), mag);
+    return select(ch_bool(b == zero), a, r);
+  });
+  INFO("REM(INT_MIN,0) = " << v
+       << " (期望 0x80000000 — RISC-V: REM 除零 -> 被除数)");
+  REQUIRE(v == 0x80000000u);
+}
+
+// RISC-V: DIV(INT_MIN, -1) -> INT_MIN (不溢出)
+TEST_CASE("chmem_arith_poc_mext_div_intmin_neg1",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_div_intmin_neg1", [] {
+    ch_uint<32> a(ch_literal<0x80000000u, 32>{});  // INT_MIN
+    ch_uint<32> b(ch_literal<0xFFFFFFFFu, 32>{});  // -1
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    ch_uint<32> allones(ch_literal<0xFFFFFFFFu, 32>{});
+    auto sign = (neg_flag(a) != neg_flag(b));
+    auto mag = abs32(a) / safe_divisor_mag(b);
+    auto q = select(sign, neg32(mag), mag);
+    return select(ch_bool(b == zero), allones, q);
+  });
+  INFO("DIV(INT_MIN,-1) = " << v
+       << " (期望 0x80000000 — RISC-V: 除法不溢出, 返回 INT_MIN)");
+  REQUIRE(v == 0x80000000u);
+}
+
+// RISC-V: REM(INT_MIN, -1) -> 0
+TEST_CASE("chmem_arith_poc_mext_rem_intmin_neg1",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_rem_intmin_neg1", [] {
+    ch_uint<32> a(ch_literal<0x80000000u, 32>{});  // INT_MIN
+    ch_uint<32> b(ch_literal<0xFFFFFFFFu, 32>{});  // -1
+    ch_uint<32> zero(ch_literal<0, 32>{});
+    auto mag = abs32(a) % safe_divisor_mag(b);
+    auto r = select(neg_flag(a), neg32(mag), mag);
+    return select(ch_bool(b == zero), a, r);
+  });
+  INFO("REM(INT_MIN,-1) = " << v << " (期望 0 — RISC-V: 余数为 0)");
+  REQUIRE(v == 0u);
+}
+
+// 宽度陷阱: neg32(INT_MIN) 必须仍为 INT_MIN.
+// 若 (~x + 1) 的结果宽度增长到 33 bit, 则会得到 0x80000001 (错).
+TEST_CASE("chmem_arith_poc_mext_neg32_width",
+          "[framework][chmem][arith-poc]") {
+  const std::uint64_t v = eval_combinational("mext_neg32_width", [] {
+    ch_uint<32> x(ch_literal<0x80000000u, 32>{});
+    return neg32(x);
+  });
+  INFO("neg32(0x80000000) = " << v
+       << " (期望 0x80000000 — ~x+1 的结果宽度不得增长)");
+  REQUIRE(v == 0x80000000u);
 }
 
 // =========================================================================
