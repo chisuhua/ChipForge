@@ -121,6 +121,27 @@ TEST_CASE("chmem_arith_poc_mulh_high_comb",
   REQUIRE(v == 0xFFFFFFFEu);
 }
 
+TEST_CASE("chmem_arith_poc_int_ctor_arith",
+          "[framework][chmem][arith-poc]") {
+  // 整数构造器形式 ch_uint<32>(14) — CHANGELOG.md:443 报错用的正是这种形式.
+  // 上游 47af57f (2026-09-18) 修了 ch_uint<N>(0) null-pointer-hijack;
+  // 本 case 直接复现 CHANGELOG 的两个表达式, 排除/确认该路径.
+  auto ctx = std::make_unique<ch::core::context>("arith_int_ctor");
+  ch::core::ctx_swap guard(ctx.get());
+  ch_uint<32> a(14);
+  ch_uint<32> b(4);
+  ch_uint<32> q = a / b;
+  ch_uint<64> p = ch_uint<32>(3) * ch_uint<32>(4);
+  ch::Simulator sim(ctx.get());
+  sim.tick();
+  const std::uint64_t vq = static_cast<std::uint64_t>(sim.get_value(q));
+  const std::uint64_t vp = static_cast<std::uint64_t>(sim.get_value(p));
+  INFO("int-ctor: 14/4 = " << vq << " (期望 3, CHANGELOG 曾记 1); "
+       << "3*4 = " << vp << " (期望 12, CHANGELOG 曾记 16)");
+  REQUIRE(vq == 3u);
+  REQUIRE(vp == 12u);
+}
+
 // =========================================================================
 // Part C: ch_reg + ch_uint 算术组合 — M-extension 真实现所需模式
 //   (寄存器迭代 + 真算术 + select 树; 纯 CppHDL, 两 binary 均编译)
