@@ -99,11 +99,11 @@
 
 ## 8. Commit & Archive
 
-- [ ] 8.1 `git add`：`ip/cpu/arch/riscv/int_alu_chmem.h`（业务实现）+ `tests/framework/test_chmem_arith_poc.cpp`（表达式定稿）+ `tests/cpu/test_cpu_chmem_vendored_elf.cpp`（cycle 数日志修正）+ `ip/cpu/plugins/mul_div_fsm_chmem.h`（注释）+ 2 个 delta spec + `AGENTS.md` + `CHANGELOG.md` + `.rddf/roadmap/features/feat-rv32um-m-extension.md` + openspec change 目录 + `.rddf/improvements/chmem-mext-comb-datapath.md`
+- [x] 8.1 `git add`：`ip/cpu/arch/riscv/int_alu_chmem.h`（业务实现）+ `tests/framework/test_chmem_arith_poc.cpp`（表达式定稿）+ `tests/cpu/test_cpu_chmem_vendored_elf.cpp`（cycle 数日志修正）+ `ip/cpu/plugins/mul_div_fsm_chmem.h`（注释）+ 2 个 delta spec + `AGENTS.md` + `CHANGELOG.md` + `.rddf/roadmap/features/feat-rv32um-m-extension.md` + openspec change 目录 + `.rddf/improvements/chmem-mext-comb-datapath.md`
       （**注意**：`.rddf/plans/quick-roadmap-r9-check-2026-10.md` 是先前会话遗留的未跟踪文件，**不属于本 change**，不要 `git add`）
-- [ ] 8.2 `git commit`（message 含 cycle 记录 + 3 架构 gate 结果 + `[chmem]` 耗时 before/after）
-- [ ] 8.3 `openspec change validate chmem-mext-comb-datapath` → 0 error
-- [ ] 8.4 `openspec archive chmem-mext-comb-datapath -y`
+- [x] 8.2 `git commit`（message 含 cycle 记录 + 3 架构 gate 结果 + `[chmem]` 耗时 before/after）
+- [x] 8.3 `openspec change validate chmem-mext-comb-datapath` → 0 error
+- [x] 8.4 `openspec archive chmem-mext-comb-datapath -y`
       **验证 delta apply**：确认 `openspec/specs/chmem-rv32um-coverage/spec.md` 与 `openspec/specs/verilator-rv32um-coverage/spec.md` 的 cycle scenario 被**替换**（而非追加重复 requirement）
 
 ---
