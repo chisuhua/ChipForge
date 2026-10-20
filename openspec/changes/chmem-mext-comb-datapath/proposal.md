@@ -2,7 +2,7 @@
 initiative: wave5-isa-coverage-and-bp
 priority: P1
 version_target: v0.11.0
-status: draft
+status: ready
 depends_on: []  # 无 active change 前置; 前例 chmem-verilator-rv32um-coverage 已 archived 2026-10-13
 supersedes: []
 related_to:
