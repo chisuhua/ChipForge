@@ -143,6 +143,50 @@ CH_MEM dmem 从未有过任何 load 语义测试（见 `chmem-alu-unit-semantics
 `aread_combinational()` 变体），ChipForge 侧按后端选择。代价：上游 API 扩展 + ChipForge 侧
 条件编译，跨后端行为分叉需在 spec 中显式声明。
 
+### 方案选型决策所需的补充证据（2026-10-21 实测，归档后补记）
+
+以下 3 项为选型 A/B/C 的**决定性输入**，在归档后实测补记，供后续实施 change 直接引用，
+避免重新踩坑：
+
+**(1) Simulator 侧 `aread` 与 `sread` 行为完全相同**（同 CppHDL，同一 DAG，实测逐拍对比）：
+
+| 读端口 | tick 0 | tick 1 | tick 2 | tick 3 |
+|---|---|---|---|---|
+| `aread` | obs=0 | obs=1 | obs=2 | obs=3 |
+| `sread` | obs=0 | obs=1 | obs=2 | obs=3 |
+
+⇒ **两者在 Simulator 中都是 1-cycle 滞后**（与 `ip/cpu/plugins/ibus_chmem.h:83` 的既有注释
+"ch_mem aread/sread both have 1-cycle latency in the simulator" 一致）。
+**因此方案 A 并不会改变 Simulator 的读值时序** —— 它改变的是**生成 Verilog 的一侧**
+（`aread`→`assign proxy = mem[addr]` 0-cycle；`sread`→`always_ff` 1-cycle），
+从而让**两个后端的 load 延迟都变成 1 拍**（后端同构）。
+**推论**：方案 A 实施后，Simulator 侧的读值**仍是滞后 1 拍**，
+必须靠**数据通路侧吸收**（如 hazard RAW stall 覆盖 load-use）才能让 10 个 ELF 转绿；
+**若期望"Simulator 侧读到当拍值"，方案 A 做不到**，只能走 B/C。
+
+**(2) 创建顺序决定滞后是否传导**（受控实验，仅交换读端口与消费寄存器的创建先后）：
+
+| 读端口创建顺序 | 消费寄存器捕获值 |
+|---|---|
+| 先创建（node id 小） | `mem[areg-1]`（**当拍**读值） |
+| 后创建（node id 大） | `mem[areg-2]`（**上一拍**读值） |
+
+CH_MEM CPU 属后者（regfile id 702 < `load_read` 1707）⇒ 滞后传导进 regfile。
+**该结论是"根因 = 顺序"的直接证据**，也说明**若能调整注册顺序即可规避**，
+但那会改动 Phase 6d.4 的全组合数据通路设计前提（`cpu_factory_chmem.h:431-435`
+"fully combinational (no stage pipeline registers)"），属设计变更而非局部补丁。
+
+**(3) 失败面独立佐证**：47 个 vendored ELF 逐个 `objdump` 统计 load 数 ⇒ FAIL 集合与
+"含 load"集合**逐个精确重合**（FAIL 组 19~193；PASS 组 29 个 + rv32um 8 个**全为 0**）⇒
+失败面独立于 tohost 观测被确证为"读内存"。
+
+**选型建议（供评审）**：优先推进 **方案 A**，理由是它把"上游契约 + 全组合数据通路"两个
+既有设计事实**对齐**为后端同构（Verilog 侧改 1 拍，与 Simulator 现状一致），不需要上游
+重新决策；代价是 CH_MEM 侧需要给 dmem 补一级流水的依赖处理（load-use stall + RMW 写通路）。
+**方案 B/C 作为上游协调备选**，其中 C 的"显式 backend 开关"是唯一能让 **Simulator 侧读到
+当拍值**而不动数据通路的路径，但需上游扩展 API。**无论选哪个，都需独立实施 change**
+（本 change 的 Non-Goals 已明确不实施）。
+
 ### Non-Goals
 
 - **不改上游 CppHDL 仓库**（本 change 只提方案，不改代码）
