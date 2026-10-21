@@ -65,9 +65,19 @@
 
 ## 5. 后续（不在本 change）
 
-- [ ] 5.1 方案 A/B/C 决策（需评审；A 涉及 CH_MEM 数据通路级改动）
-- [ ] 5.2 决策后开实施 change，把 10 个 ELF 转绿
-- [ ] 5.3 同步更新 `feat-phase-6d-rtl-verification`（该 feature 是这 10 个 FAIL 的既有 owner）
+- [x] 5.1 方案 A/B/C 决策（2026-10-21 **实测裁决 → 方案 B**）：
+      方案 A（dmem 改 `sread`）单独实施实测**恶化**（`[chmem]` 10 → 11 FAIL，
+      10 个 ELF 依旧全红）；方案 B（上游 `async_read` 归组合 + 数据流边）
+      实测 ChipForge `[chmem]` **10 → 0 FAIL**、47 ELF 全 PASS、`[verilator]` 不变、
+      **ChipForge 业务代码零改动** ⇒ 采纳 B，A 放弃，C 保留为上游只能小步改时的备选。
+      依据见本 proposal §选型建议（2026-10-21 修订段）
+- [ ] 5.2 决策后开实施 change，把 10 个 ELF 转绿（**转上游实施**：
+      `CppHDL/openspec/changes/sim-mem-read-timing-align-2026-10/`，
+      commit `cc41a21` 立项 + `bd56b4c` 补实测决策证据；ChipForge 侧待上游落地后
+      升级依赖 + 重跑 `[chmem]` 全套 + 把 `[mem-drift]` pin 从"钉死已知缺陷"
+      改为"确认 skew 已消除"）
+- [x] 5.3 同步更新 `feat-phase-6d-rtl-verification`（该 feature 是这 10 个 FAIL 的既有 owner）
+      —— "已知问题（owned）"段 + 修复方向改为方案 B + 上游 change 指针 + ChipForge 侧待办
 
 ---
 
