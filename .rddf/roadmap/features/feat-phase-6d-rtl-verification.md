@@ -40,9 +40,16 @@ Phase 6d 端到端：把 Phase 6c 框架能力（CH_MEM elaboration + Verilog �
 - **跨后端**：`[verilator]` 同批 48 ELF 全 PASS ⇒ 差异在后端相位分类，不在插件逻辑
 - **回归锚**：`tests/cpu/test_cpu_chmem_mem_read_drift.cpp`（`[mem-drift]`）钉死 1 拍漂移的
   **幅度**（观测值 == 上一拍地址内容）
-- **修复方向**（待评审，见归位 change 的方案 A/B/C）：A) dmem 改 `sread`（两后端同构，代价 =
-  CH_MEM 数据通路级改动）/ B) 上游按 `port_type()==async_read` 把异步读端口归回 combinational
-  （上游 R3 是 hard requirement）/ C) 上游提供显式 backend 语义开关
+- **修复方向**（2026-10-21 实测后更新）：**方案 B（上游改）已被实测确认为唯一"零 ChipForge
+  数据通路改动"的解法** —— 上游 `async_read` 归组合 + 数据流边 ⇒ ChipForge `[chmem]`
+  **10 → 0 FAIL**、47 个 vendored ELF 全 PASS、`[verilator]` 不变、TLM 不受影响。
+  ⚠️ 方案 A（dmem 改 `sread`）单独实施**反而恶化**（10 → 11 FAIL，10 个 ELF 依旧全红），
+  且必须伴随 CH_MEM 数据通路级改造（load-use stall + RMW 写通路）⇒ **放弃**。
+  方案 C（上游加显式 backend 开关）保留为"上游只能小步改"时的备选。
+- **上游 change**：`CppHDL` 仓库 `openspec/changes/sim-mem-read-timing-align-2026-10/`
+  （含 `mem-read-timing` spec delta：RENAMED ×2 + MODIFIED ×2；8 个 task）
+- **ChipForge 侧待办**（上游落地后）：升级依赖 → 重跑 `[chmem]` 全套 →
+  把 `[mem-drift]` pin 从"钉死已知缺陷"改为"确认 skew 已消除"
 - **阻塞**：E13（`chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS）
 
 ## 验收标准

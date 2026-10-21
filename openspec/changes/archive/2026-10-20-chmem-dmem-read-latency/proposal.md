@@ -180,12 +180,41 @@ CH_MEM CPU 属后者（regfile id 702 < `load_read` 1707）⇒ 滞后传导进 r
 "含 load"集合**逐个精确重合**（FAIL 组 19~193；PASS 组 29 个 + rv32um 8 个**全为 0**）⇒
 失败面独立于 tohost 观测被确证为"读内存"。
 
-**选型建议（供评审）**：优先推进 **方案 A**，理由是它把"上游契约 + 全组合数据通路"两个
-既有设计事实**对齐**为后端同构（Verilog 侧改 1 拍，与 Simulator 现状一致），不需要上游
-重新决策；代价是 CH_MEM 侧需要给 dmem 补一级流水的依赖处理（load-use stall + RMW 写通路）。
-**方案 B/C 作为上游协调备选**，其中 C 的"显式 backend 开关"是唯一能让 **Simulator 侧读到
-当拍值**而不动数据通路的路径，但需上游扩展 API。**无论选哪个，都需独立实施 change**
-（本 change 的 Non-Goals 已明确不实施）。
+**选型建议（2026-10-21 实测后修订 —— 取代此前"优先推进方案 A"的建议）**：
+
+> ⚠️ **原建议"优先推进方案 A"已被实测证伪并撤回。** 理由：把 dmem 的读端口从
+> `aread` 换成 `sread` **单独**实施，实测 **`[chmem]` 从 10 个 FAIL 恶化到 11 个**
+> （新增 `test_cpu_decoded_inst_migration.cpp:342` 失败 —— 该测试按名探
+> `load_read_data_proxy` 节点，而 `sread` 不产生该 proxy 名），**且那 10 个
+> load/store ELF 依然全红**（`sread` 在 Simulator 中与 `aread` 行为完全相同，
+> 都滞后 1 拍；它只改 Verilog 侧）。方案 A **必须**伴随 CH_MEM 数据通路的
+> 一级流水改造（load-use stall + RMW 写通路）才能生效 ⇒ 成本远高于初判。
+
+**修订后的推荐：走方案 B（上游改），且已有实测支撑** —— 2026-10-21 在上游
+CppHDL 仓库实测了"async read port 归组合 + 数据流边"的变体：
+
+| 指标 | 结果 |
+|---|---|
+| ChipForge `[chmem]` | 10 failed → **0 failed**（73 case 全 PASS） |
+| ChipForge vendored ELF | 47 个**全 PASS**（16410 assertions） |
+| ChipForge `[verilator]` | 4 case / 122 assertions **不变**（PASS） |
+| ChipForge TLM | **不受影响**（未动 TLM 路径） |
+| ChipForge 业务代码改动 | **零**（无需 load-use stall / RMW 写通路） |
+| 上游侧净破坏面 | **1 个断言**（R4 竞态钉住值从"写前值"反转为"写后值" —— 属显式契约变更） |
+
+⇒ **方案 B 是唯一"零 ChipForge 数据通路改动"的解法**，且它让 Simulator 追上
+Verilog（双后端 parity 变好）。**方案 A 在上游可全力配合的前提下应放弃**
+（成本高、收益相同）；**方案 C（上游加显式 backend 开关）在"上游只能小步改"
+的场景下仍是备选**。
+
+**上游已立项**：`CppHDL` 仓库 `openspec/changes/sim-mem-read-timing-align-2026-10/`
+（commit `cc41a21` 立项 + `bd56b4c` 补入实测决策证据），含 spec delta
+（`mem-read-timing` RENAMED ×2 + MODIFIED ×2）与 8 个 task。
+**ChipForge 侧的跟踪项 = 等上游落地后升级依赖、重跑 `[chmem]` 全套、
+并把 drift pin 测试从"钉死已知缺陷"改为"确认 skew 已消除"**。
+
+**无论选哪个，都需独立实施 change**（本 change 的 Non-Goals 已明确不实施）。
+
 
 ### Non-Goals
 
