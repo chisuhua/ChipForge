@@ -32,6 +32,32 @@ related_to:
 tohost = `test_num | 1`（riscv-tests harness fail 协议）⇒ 失败发生在各测试的**第一个 load 依赖检查**。
 **其余 29 个不含 load 的 rv32ui 全 PASS** ⇒ 失败面精确等于"读内存"。
 
+**失败面的独立佐证（反汇编统计，2026-10-21 实测）**：对全部 47 个 vendored ELF
+逐个 `objdump -d` 统计 load / store 指令条数，FAIL 集合与"含 load"集合**逐个精确重合**：
+
+| ELF 分组 | 数量 | load 指令数 | 结果 |
+|---|---|---|---|
+| FAIL 组（`lb`/`lbu`/`lh`/`lhu`/`lw`/`sb`/`sh`/`sw`/`ld_st`/`st_ld`） | 10 | 19～193 | 全 FAIL |
+| PASS 组（其余 rv32ui） | 29 | **全为 0** | 全 PASS |
+| rv32um（8 个） | 8 | 全为 0 | 全 PASS |
+
+⇒ **凡含 load 的 ELF 必 FAIL，不含 load 的必 PASS**，无例外。该统计与"load 结果 = 上一拍
+地址内容"的根因预测一致，且**独立于** tohost 观测（不依赖被测路径本身的判定逻辑）。
+
+**tohost 观测值的可信性（2026-10-21 复核）**：`tohost` 判定链路本身也走 `aread`
+（`dmem_chmem.h:216-220` 的 `tohost_probe`），理论上同样受 1-cycle 滞后影响。
+但该链路**不削弱**本证据，理由有二：
+
+1. **地址固定 ⇒ 滞后只影响"读到新值晚一拍"，不改变稳态值。** `tohost_probe`
+   读的是**常量** word offset（`0x400` = `0x80001000`），而 Verilator 侧
+   （`tools/verilator_runner/sim_main.cpp:91`）直接读 `dmem[]` 数组、**绕开读端口**。
+   两后端对"最终写入的 tohost 值"因此一致。
+2. **观测值与 harness 语义自洽。** riscv-tests 的 `fail` 路径为
+   `ori gp,gp,1` + `sw gp,0(tohost)`（`gp` = 当前 test 编号），故
+   `tohost = test_num | 1`。实测反查：`lb` → tohost=11 ⇒ `gp`=10 ⇒ test_10；
+   `lh` → tohost=5 ⇒ `gp`=4 ⇒ test_4；`lw`/`sw`/`sb`/`sh`/`ld_st`/`st_ld` → tohost=3 ⇒ `gp`=2。
+   逐条与反汇编中的 `li gp,N` 位置吻合 ⇒ 观测值确为 harness 真实写入值。
+
 **2026-10-20 回退对照实验**（把 `int_alu_chmem.h` 回退到改前版本重建）证明这 10 个 FAIL 与 M 扩展 change 无关，是 pre-existing。
 
 ### 1.2 根因（源码级 + 实测，已闭环）
@@ -57,9 +83,26 @@ tohost = `test_num | 1`（riscv-tests harness fail 协议）⇒ 失败发生在�
 
 **⇒ 违约方是 ChipForge，不是上游。** 原因：上游假设"下游 regfile 的 1-cycle 依赖可吸收该滞后"，
 这在 **legacy/TLM** dmem 成立；但 **CH_MEM 数据通路全组合**（`cpu_factory_chmem.h:431-435`
-无 stage 寄存器），regfile 在**同一次 `eval_sequential()`** 内锁存，且按 node id 顺序
-（RegFile plugin 在 DMem plugin 之前注册 ⇒ 节点 id 更小 ⇒ **先锁存**）**先于**读端口更新
+无 stage 寄存器），regfile 在**同一次 `eval_sequential()`** 内锁存，且**先于**读端口更新
 ⇒ regfile 捕获到的是**上一拍**的读值 ⇒ **"load 的结果 = 上一个访存地址的内容"**。
+
+**顺序成因（已用受控实验确证，非推断）**：`eval_sequential()` 按
+`sequential_instr_list_` 的插入顺序求值（`src/simulator.cpp:186-226`），该列表由
+`eval_list_`（`context::get_eval_list()`，`src/core/context.cpp:131`）按节点创建序
+拓扑排序后筛选 `type_reg` / `type_mem_read_port` / `type_mem_write_port` 得到
+（`src/simulator_init.cpp:116-121`）。**受控实验**（同一 CppHDL，两种创建顺序，
+仅交换"读端口"与"消费寄存器"的创建先后）：
+
+| 创建顺序 | 消费寄存器捕获到的值 | 结论 |
+|---|---|---|
+| 读端口先创建（node id 小） | `mem[areg-1]`（**当拍**） | 消费方读到新值 ⇒ 无滞后 |
+| 读端口后创建（node id 大） | `mem[areg-2]`（**上一拍**） | 消费方读到旧值 ⇒ 滞后传导 |
+
+CH_MEM CPU 属**后者**：RegFile plugin 先注册（`cpu_factory_chmem.h:225`
+"顺序: Decoder → Hazard → IBus → RegFile → IntAlu → Branch → DMem"）⇒ regfile
+节点 id 更小（实测 `reg_0`=702 … `reg_31`≈763）⇒ **先于** dmem 读端口
+（实测 `load_read`=1707）锁存 ⇒ 滞后被传导进 regfile。**这是"全组合数据通路"
+与"上游按 R3 把读端口归 sequential"两个条件叠加的必然结果**，缺一不成立。
 
 **旁证**：`[verilator]` 路径同一批 ELF **全 PASS**（48 ELF / 96 assertions）——
 同插件、同 DAG，仅后端不同 ⇒ 差异精确落在 interpreter 的读端口相位分类上。
@@ -112,4 +155,4 @@ CH_MEM dmem 从未有过任何 load 语义测试（见 `chmem-alu-unit-semantics
 - **回归面**：本 change 只加 1 个 drift pin 测试（PASS）+ 文档 + spec，**零业务代码改动**
 - **风险**：drift pin 测试是"钉死已知缺陷"型测试 —— 上游若修复 aread 相位，该测试会 FAIL
   （这是**期望行为**：提醒同步更新 dmem 适配与本文档）
-- **度量**：`[chmem]` family 66→67 case；本 change 不改 `[chmem]` 的 10 个 FAIL 状态
+- **度量**：`[chmem]` family 72→73 case（实测：改前 72 case / 71 PASS，改后 73 case / 72 PASS；新增 1 个 `[mem-drift]` case）；本 change 不改 `[chmem]` 的 10 个 FAIL 状态

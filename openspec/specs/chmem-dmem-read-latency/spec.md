@@ -1,11 +1,19 @@
-# Spec: chmem-dmem-read-latency
+# chmem-dmem-read-latency Specification
 
-> **Capability**: CH_MEM dmem 读路径时序
-> **Change**: `chmem-dmem-read-latency`
-> **Created**: 2026-10-20
+## Purpose
+Defines the timing contract of the CH_MEM data-memory read path, records the root cause of
+the 10 vendored `rv32ui-p-*` load/store ELF failures in the CH_MEM Simulator, and pins the
+observed upstream `ch_mem::aread` skew as a regression anchor.
 
-## ADDED Requirements
+> **Known deviation (as of 2026-10-21)**: Requirement 1 below states the **target state**;
+> it is **NOT yet satisfied** — the 10 vendored `rv32ui-p-*` load/store ELF still FAIL in the
+> CH_MEM Simulator. The change that created this capability (`2026-10-20-chmem-dmem-read-latency`)
+> deliberately implements **no fix**; it is a bookkeeping / RCA change only, and the adaptation
+> is deferred to a follow-up change (options A/B/C recorded in that change's proposal).
+> Readers MUST NOT infer from this capability's presence that the dmem read path is currently
+> correct. The authoritative known-issue ledger is the `AGENTS.md` known-issues section.
 
+## Requirements
 ### Requirement: CH_MEM dmem 读结果 SHALL 与生成 Verilog 同构
 
 The CH_MEM data memory (`ip/cpu/plugins/dmem_chmem.h`) SHALL return the value of the addressed word to the consumer, such that a load's result equals the contents of the address that the load instruction specifies — identical in the CH_MEM Simulator backend and in the Verilator backend.
@@ -25,6 +33,7 @@ This is violated today because CppHDL classifies memory read ports as sequential
 #### Scenario: The known read-port skew SHALL remain pinned
 - **WHEN** the CH_MEM test suite runs
 - **THEN** a test SHALL assert the currently observed one-tick skew of `ch_mem::aread` in the Simulator, so that an upstream change to the read-port phase classification is detected
+- **AND** that test SHALL assert the skew's **magnitude** (the observed value equals the contents of the *previous* address), not merely that it differs from the current address — a test asserting only inequality would also pass under an N-tick skew and would therefore not pin the one-tick behaviour
 - **AND** that test SHALL reference the upstream capability `mem-read-timing` (R3/R4) as the governing contract
 
 ### Requirement: The upstream read-port contract SHALL NOT be silently violated
@@ -40,3 +49,4 @@ The CH_MEM dmem SHALL satisfy the upstream contract documented in CppHDL's `open
 - **WHEN** the CH_MEM Simulator executes the vendored `rv32ui-p-*` ELF suite
 - **THEN** any failing ELF SHALL be attributable to a documented root cause and an owning change
 - **AND** the 10 load/store ELF (`lb`, `lbu`, `ld_st`, `lh`, `lhu`, `lw`, `sb`, `sh`, `sw`, `st_ld`) SHALL be listed in the project's known-issues documentation with this root cause
+

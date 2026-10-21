@@ -26,6 +26,10 @@
 //     ChipForge 侧同步更新 dmem 适配 (并重估 feature 归位)
 //   - 上游维持现状 ⇒ 本测试 PASS, 作为该 known issue 的回归锚
 //
+// 断言强度 (2026-10-21 修订): 同时断言 **失配 6/6** 与 **恰好等于上一拍地址
+//   的内容 6/6**. 仅断言 "观测值 != 当前地址" 无法区分 1-cycle 滞后与
+//   N-cycle 滞后 (2-cycle 滞后同样满足 !=), 故额外断言幅度, 把漂移钉死为 1 拍.
+//
 // 编译条件: CF_PLUGIN_USE_CH_MEM (chipforge_tests_chmem target)
 
 #ifdef CF_PLUGIN_USE_CH_MEM
@@ -71,21 +75,33 @@ TEST_CASE("chmem_mem_read_drift_aread_lags_one_cycle",
   ch::Simulator sim(&ctx);
   constexpr int kTicks = 6;
   int mismatches = 0;
+  int off_by_one = 0;
   for (int t = 0; t < kTicks; ++t) {
     sim.tick();
     const std::uint64_t obs = static_cast<std::uint64_t>(sim.get_value(rdata));
     const std::uint64_t aregv =
         static_cast<std::uint64_t>(sim.get_value(ch_uint<4>(areg.impl())));
+    // Verilog `assign` 语义期望: 读端口应给出当前地址的内容 (= mem[areg]).
+    const std::uint64_t expect_now = aregv;
+    // 滞后 1 拍的精确预期: 上一拍地址的内容 (= mem[areg-1], 4-bit 回绕).
+    const std::uint64_t expect_prev = (aregv + 15u) & 15u;
     INFO("tick " << t << ": 当前地址=" << aregv
                  << "  观测读值=" << obs
-                 << "  Verilog 语义期望=" << aregv);
-    if (obs != aregv) ++mismatches;
+                 << "  Verilog 语义期望=" << expect_now
+                 << "  滞后1拍预期=" << expect_prev);
+    if (obs != expect_now) ++mismatches;
+    if (obs == expect_prev) ++off_by_one;
   }
 
   // 已知漂移: **每一拍** 的观测读值都等于 **上一拍地址** 的内容 (含第 0 拍:
   // 读端口在 tick 0 的 posedge 读到的是地址 0, 而此时 areg 已被递增到 1)
   // ⇒ 6/6 全部与 Verilog 语义不符.
   REQUIRE(mismatches == kTicks);
+
+  // 关键强度断言: 观测值必须 **恰好** 等于"上一拍地址"的内容.
+  // 只断言 `obs != expect_now` 无法区分 1-cycle 滞后与 N-cycle 滞后
+  // (2-cycle 滞后同样满足 !=); 本断言把漂移的 **幅度** 也钉死为 1 拍.
+  REQUIRE(off_by_one == kTicks);
 
   SUCCEED("aread 1-cycle 滞后已钉死 (upstream mem-read-timing R3/R4 by-contract); "
           "CH_MEM dmem 需据此适配");
