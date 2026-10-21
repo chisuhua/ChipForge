@@ -74,7 +74,8 @@ Phase 6d 端到端：把 Phase 6c 框架能力（CH_MEM elaboration + Verilog �
 - [ ] E8: Verilator sim 跑 riscv-tests add.elf tohost=1 与 CppHDL sim byte-equal
 - [ ] E12: chipforge_tests TLM baseline 0 回归
 - [ ] E13: chipforge_tests_chmem 完整 5-stage + riscv-tests + Verilator 全 PASS
-      （**当前被"CH_MEM dmem 读路径 1-cycle 滞后"阻塞** —— 见上"已知问题"）
+      （**前置阻塞已解除** —— 上游 `c27543d` 落地后 `[chmem]` 73/73 PASS，
+      见上"已知问题（已闭环）"）
 - [ ] E14: CHANGELOG v0.10.0/v0.11.0 entry + ADR-037 v2.0 Accepted 状态 + ADR-040 v3.0 (Verilator 集成段)
 - [ ] 间接：与 feat-rv32um-m-extension 共享 MUL/DIV 路径
 - [ ] 间接：v0.10.0 PoC-2 RV32C ≥95% + PoC-3 ICache ≥90%
