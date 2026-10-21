@@ -5,6 +5,54 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (2026-10-21, interim) — chmem-dmem-read-latency-aligned: 上游 read-port 契约落地，10 个 load/store ELF 全绿
+
+> **OpenSpec change**: `chmem-dmem-read-latency-aligned` (wave5-isa-coverage-and-bp)
+> **前置 change**: `chmem-dmem-read-latency`（2026-10-20 归位，只做 RCA 不实施）
+> **Author / Date**: build agent, 2026-10-21
+> **Scope**: 1 个测试文件（断言反转）+ 文档 + spec delta。**不改任何业务实现。**
+> **触发**: 上游 CppHDL 提交 `c27543d`（`fix(sim): align ch_mem::aread with generated Verilog 0-cycle assign`）并归档 `sim-mem-read-timing-align-2026-10` + `dual-backend-mem-read-timing-parity-2026-10`
+
+### Fixed（长期 known issue 闭环）
+
+- **CH_MEM dmem 读路径 1 拍滞后 → 10 个 rv32ui load/store ELF FAIL**（2026-10-20 起挂在 known-issues 台账）：上游 CppHDL 把 async 读端口归入组合求值并在 AST 上建立 `read_port → data_proxy` 的 src 边 ⇒ Simulator 的 `ch_mem::aread` 与生成 Verilog 的连续 `assign` **同为 0-cycle**。**ChipForge 侧业务代码零改动**（`ip/cpu/plugins/dmem_chmem.h` 无需改），`[chmem]` 由 72/73 变为 **73/73 PASS**（19389 assertions），vendored ELF **47/47 全 PASS**（16410 assertions）。
+- **回归锚方向反转**：`tests/cpu/test_cpu_chmem_mem_read_drift.cpp` 原断言"**存在** 1 拍滞后"（`mismatches == 6` 且 `off_by_one == 6`），是"钉死已知缺陷"的锚；上游修复后它**必然 FAIL**（实测 `0 == 6`）。现改为断言"**skew 已消除**"（每拍观测值 == 当前地址内容，且 != 上一拍地址内容），test case 更名 `chmem_mem_read_drift_aread_has_no_skew` ⇒ 从"钉死缺陷"变成"**锁住修复**"。
+
+### 根因更正（变异对照精化，勿再沿用旧归因）
+
+上游修复含**两个独立成分**，用两次变异把责任分清：
+
+| 变异 | `[mem-drift]` pin | vendored ELF |
+|---|---|---|
+| 只把 async 读端口改回 `sequential_instr_list_` | **FAIL**（`6 == 0`） | **全 PASS**（0 failed） |
+| 上面的 + `mem_port_impl.h/.cpp` 回退到 `c27543d^`（无 src 边） | **FAIL** | **FAIL，精确 10 failed**（= 原有 10 个 load/store ELF） |
+| 还原 | PASS | 47/47 PASS |
+
+⇒ **承重件是 `read_port → data_proxy` 的 src 边**（提供拓扑序 ⇒ 修好 ELF 失败面）；**分类改动**决定与 Verilog 的 0-cycle 对齐 ⇒ 正是 `[mem-drift]` pin 的检测对象。
+
+- **旧结论更正**：此前记录的"违约方是 ChipForge（上游 by-contract、R3/R4 记录该 drift）"**已被推翻** —— 上游主动改了契约与实现，CH_MEM 全组合数据通路不需要适配。
+- **方案 A 的反证**（已存档）：dmem 改 `sread` 单独实施**反而恶化**（10 → 11 FAIL，10 个 ELF 依旧全红）—— `sread` 在 Simulator 中与 `aread` 行为完全相同（都滞后 1 拍），它只改 Verilog 侧。
+
+### Verification（本 change 实测）
+
+| AC | 描述 | 实测 |
+|---|---|---|
+| **AC1** | drift pin 反转后 PASS | ✅ 3 assertions / 1 case PASS |
+| **AC2** | 变异对照（方向敏感性） | ✅ 2 个变异均被抓住；变异 B 精确重现 10 failed |
+| **AC3** | `[chmem]` 全套零 FAIL | ✅ **73 case / 73 PASS / 0 failed**（19389 assertions） |
+| **AC4** | vendored ELF 全 PASS | ✅ 47/47（16410 assertions，严格 `tohost == 1`） |
+| **AC5** | `[verilator]` / `[mmu-verilator]` 不回归 | ✅ 4 case / 122 assertions 全 PASS |
+| **AC6** | TLM 全量无新增 FAIL | ✅ 67134/67135（唯一失败 = 已知 `test_7stage_riscv.cpp:124` infra drift） |
+| **AC7** | 架构门禁 | ✅ 5 脚本全 exit 0 |
+| **AC8** | spec 校验 | ✅ `openspec validate --changes` 4/4；本 capability `--specs --strict` PASS |
+
+### 影响
+
+- `feat-phase-6d-rtl-verification` 的 **E13 阻塞解除**（`chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS 的前置条件已满足）。
+- CH_MEM 与 Verilator 后端在 dmem 读路径上**真正同构**。
+
+---
+
 ## v0.11.0 (2026-10-20, interim) — chmem-alu-unit-semantics: CH_MEM ALU 单元级语义锚 (真跑 19 层 select 树)
 
 > **OpenSpec change**: `chmem-alu-unit-semantics` (wave5-isa-coverage-and-bp)

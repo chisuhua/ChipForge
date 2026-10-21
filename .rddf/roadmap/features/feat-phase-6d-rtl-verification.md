@@ -29,28 +29,42 @@ Phase 6d 端到端：把 Phase 6c 框架能力（CH_MEM elaboration + Verilog �
 - **状态**：RCA 已闭环（2026-10-20），**修复未实施**
 - **归位 change**：`openspec/changes/archive/2026-10-20-chmem-dmem-read-latency/`
 - **能力 spec**：`openspec/specs/chmem-dmem-read-latency/spec.md`
-- **违约方**：**ChipForge**（上游 CppHDL 行为 by-contract，R3/R4 明确记录该 drift）
-- **根因**：上游 `mem-read-timing` R3 要求 sync+async 读端口都归 `sequential_instr_list_`
-  ⇒ Simulator 的 `ch_mem::aread` 相对生成 Verilog 的连续 `assign` 滞后 1 拍。CH_MEM 数据通路
-  全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器）⇒ regfile 在同一次 `eval_sequential()`
-  内先于读端口锁存（regfile node id 702 < `load_read` 1707）⇒ **load 的结果 = 上一个访存
-  地址的内容**。
-- **失败面**：39 个 rv32ui 中 10 个 FAIL（`lb`/`lbu`/`ld_st`/`lh`/`lhu`/`lw`/`sb`/`sh`/`sw`/`st_ld`），
-  其余 29 个 + 8 个 rv32um 全 PASS（反汇编逐 ELF 统计 load 数：FAIL 组 19~193，PASS 组全 0）
+- **闭环 change**：`openspec/changes/chmem-dmem-read-latency-aligned/`
+- ✅ **状态：已闭环（2026-10-21）** —— 上游 CppHDL 已提交修复并归档
+- **违约方（已更正）**：**上游 CppHDL**（非 ChipForge）。原判断"上游行为 by-contract、
+  违约方是 ChipForge"已被上游修复推翻 —— 上游把 `async_read` 归组合 + 建 `read_port →
+  data_proxy` 数据流边后，Simulator 与生成 Verilog 同为 0-cycle，CH_MEM 侧无需任何改动
+- **根因（2026-10-21 变异对照精化）**：上游 `mem-read-timing` R3 要求 sync+async 读端口都
+  归 `sequential_instr_list_` ⇒ Simulator 的 `ch_mem::aread` 相对生成 Verilog 的连续
+  `assign` 滞后 1 拍。CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage
+  寄存器）⇒ regfile 在同一次 `eval_sequential()` 内先于读端口锁存（regfile node id 702 <
+  `load_read` 1707）⇒ **load 的结果 = 上一个访存地址的内容**。
+  **变异对照结论**：上游修复含两个独立成分 ——
+  ① `read_port → data_proxy` 的 **src 边**（提供拓扑序）才是修好 ELF 失败面的**承重**件：
+     只撤分类（边保留）⇒ ELF 仍全绿；边与分类都撤 ⇒ 精确重现 10 个 ELF FAIL；
+  ② **分类**（async 归组合）决定与 Verilog 的 0-cycle 对齐，即 `[mem-drift]` pin 检测的对象。
+- **失败面（历史，已消除）**：39 个 rv32ui 中 10 个 FAIL（`lb`/`lbu`/`ld_st`/`lh`/`lhu`/`lw`/
+  `sb`/`sh`/`sw`/`st_ld`），其余 29 个 + 8 个 rv32um 全 PASS（反汇编逐 ELF 统计 load 数：
+  FAIL 组 19~193，PASS 组全 0）
 - **跨后端**：`[verilator]` 同批 48 ELF 全 PASS ⇒ 差异在后端相位分类，不在插件逻辑
-- **回归锚**：`tests/cpu/test_cpu_chmem_mem_read_drift.cpp`（`[mem-drift]`）钉死 1 拍漂移的
-  **幅度**（观测值 == 上一拍地址内容）
-- **修复方向**（2026-10-21 实测后更新）：**方案 B（上游改）已被实测确认为唯一"零 ChipForge
-  数据通路改动"的解法** —— 上游 `async_read` 归组合 + 数据流边 ⇒ ChipForge `[chmem]`
-  **10 → 0 FAIL**、47 个 vendored ELF 全 PASS、`[verilator]` 不变、TLM 不受影响。
+- **回归锚**：`tests/cpu/test_cpu_chmem_mem_read_drift.cpp`（`[mem-drift]`）—— 已从
+  "钉死 1 拍漂移" 反转为 "**锁住 0-cycle 对齐**"（每拍观测值 == 当前地址内容，且 != 上一拍
+  地址内容；变异对照：上游 async 端口改回 sequential ⇒ 本测试 FAIL）
+- **修复方向（结论）**：**方案 B（上游改）是唯一"零 ChipForge 数据通路改动"的解法** ——
+  上游 `async_read` 归组合 + 数据流边 ⇒ 实测 ChipForge `[chmem]` **10 → 0 FAIL**、
+  47 个 vendored ELF 全 PASS（16410 assertions）、`[verilator]` 不变（122 assertions）、
+  TLM 不受影响、**ChipForge 业务代码零改动**。
   ⚠️ 方案 A（dmem 改 `sread`）单独实施**反而恶化**（10 → 11 FAIL，10 个 ELF 依旧全红），
   且必须伴随 CH_MEM 数据通路级改造（load-use stall + RMW 写通路）⇒ **放弃**。
   方案 C（上游加显式 backend 开关）保留为"上游只能小步改"时的备选。
-- **上游 change**：`CppHDL` 仓库 `openspec/changes/sim-mem-read-timing-align-2026-10/`
-  （含 `mem-read-timing` spec delta：RENAMED ×2 + MODIFIED ×2；8 个 task）
-- **ChipForge 侧待办**（上游落地后）：升级依赖 → 重跑 `[chmem]` 全套 →
-  把 `[mem-drift]` pin 从"钉死已知缺陷"改为"确认 skew 已消除"
-- **阻塞**：E13（`chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS）
+- **上游已落地**：CppHDL `c27543d`（`fix(sim): align ch_mem::aread with generated Verilog
+  0-cycle assign`）+ `5b37b7d` archive `sim-mem-read-timing-align-2026-10` +
+  `eccf58f` 跨后端 parity + `cba0571` archive `dual-backend-mem-read-timing-parity-2026-10`
+- **实测（2026-10-21，升级上游 deps 后）**：`[chmem]` **73 case / 73 PASS / 0 failed**
+  （19389 assertions）、vendored ELF 47/47 全 PASS、`[verilator]+[mmu-verilator]` 4 case /
+  122 assertions PASS、TLM 480/481（唯一失败 = 已知 `test_7stage_riscv.cpp:124` infra drift）
+- **阻塞**：~~E13（`chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS）~~
+  ⇒ **前置条件已满足**（2026-10-21 上游落地后 `[chmem]` 全绿），待本 feature 自身收官
 
 ## 验收标准
 - [ ] E1-E14 全部 PASS（详见 docs/architecture/roadmap-evolution.md §1）

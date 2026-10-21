@@ -1,34 +1,37 @@
 // tests/cpu/test_cpu_chmem_mem_read_drift.cpp
 //
-// 功能描述: 钉死 CppHDL ch_mem::aread (async_read) 在 **Simulator** 中相对
-//           生成 Verilog 的 `assign` 的 **1-cycle 滞后** —— 这是 CH_MEM 路径
-//           10 个 rv32ui load/store ELF 失败的根因.
+// 功能描述: 锁住 CppHDL ch_mem::aread (async_read) 在 **Simulator** 中与生成
+//           Verilog 的 `assign` **同拍对齐（0-cycle，无滞后）** —— 这是 CH_MEM 路径
+//           10 个 rv32ui load/store ELF 失败的根因, 已由上游修复.
 //
 // 作者: build agent
-// 日期: 2026-10-20
+// 日期: 2026-10-20 (2026-10-21 反转: 钉死缺陷 → 锁住修复)
 //
-// 背景 (chmem-mext-comb-datapath 验收 P0 归位):
-//   上游 CppHDL 契约 `openspec/specs/mem-read-timing/spec.md`:
-//     R3 "Simulator classifies mem read ports as sequential"
-//         —— sync 与 async 两类读端口都归入 sequential_instr_list_
-//     R4 "known simulator-vs-Verilog drift"
-//         —— "Simulator 中代理在下一个 posedge 才更新（有效 1-cycle 滞后）"
-//         —— 设计意图: "由下游 register 提供 1-cycle 依赖，如 ChipForge CPU
-//            reg_file <<="，且 "SHALL NOT 触发任何回归 fail"
-//   ⇒ 上游行为是 **by-contract**，不是 bug。**违约方是 ChipForge 的 CH_MEM dmem**:
+// 历史 (2026-10-20 归位 change `chmem-dmem-read-latency`):
+//   上游契约 `openspec/specs/mem-read-timing/spec.md` R3 曾要求 sync 与 async
+//   两类读端口 **都** 归入 sequential_instr_list_, R4 记录 "Simulator 相对生成
+//   Verilog 滞后 1 拍, 由下游 register 提供 1-cycle 依赖来吸收".
+//   ⇒ 上游行为是 **by-contract**, 违约方是 ChipForge 的 CH_MEM dmem:
 //     CH_MEM 数据通路全组合 (cpu_factory_chmem.h:431-435 无 stage 寄存器),
-//     regfile 在同一次 eval_sequential() 里锁存, 且按 node id 顺序 **先于**
-//     读端口更新 ⇒ regfile 捕获到的是 **上一拍** 的读值 ⇒
-//     "load 的结果 = 上一个访存地址的内容" ⇒ 所有含 load 的测试全错.
+//     regfile 在同一次 eval_sequential() 里锁存且 **先于** 读端口更新
+//     ⇒ "load 的结果 = 上一个访存地址的内容" ⇒ 所有含 load 的 ELF 全错.
 //
-// 本文件把该漂移 **钉死为可执行断言**:
-//   - 上游若把 async 读端口改回 combinational ⇒ 本测试会 FAIL ⇒ 提醒
-//     ChipForge 侧同步更新 dmem 适配 (并重估 feature 归位)
-//   - 上游维持现状 ⇒ 本测试 PASS, 作为该 known issue 的回归锚
+// 现状 (2026-10-21 上游已修复):
+//   上游 CppHDL 提交 `c27543d` (fix(sim): align ch_mem::aread with generated
+//   Verilog 0-cycle assign) 并归档 `sim-mem-read-timing-align-2026-10`,
+//   async 读端口改为 **组合求值** ⇒ Simulator 与 Verilog 同为 0-cycle.
+//   实测: ChipForge `[chmem]` 73 case / **73 PASS / 0 failed**,
+//   47 个 vendored ELF 全 PASS (16410 assertions).
 //
-// 断言强度 (2026-10-21 修订): 同时断言 **失配 6/6** 与 **恰好等于上一拍地址
-//   的内容 6/6**. 仅断言 "观测值 != 当前地址" 无法区分 1-cycle 滞后与
-//   N-cycle 滞后 (2-cycle 滞后同样满足 !=), 故额外断言幅度, 把漂移钉死为 1 拍.
+// 本文件现在的作用:
+//   从 "钉死已知缺陷" 反转为 "**锁住修复**" ——
+//   - 上游若把 async 读端口改回 sequential / 退回 posedge 求值
+//     ⇒ 本测试 FAIL ⇒ 立刻发现回归
+//   - 上游维持 0-cycle 对齐 ⇒ 本测试 PASS
+//
+// 断言强度: 同时断言 "每拍观测值 == 当前地址内容" 与 "观测值 != 上一拍地址内容".
+//   后者不是冗余 —— 若只断言前者, 一个"恰好总是等于上一拍"的错误实现也能
+//   在地址回绕的特定序列下蒙混过关; 两者合起来把"0 拍对齐"钉死.
 //
 // 编译条件: CF_PLUGIN_USE_CH_MEM (chipforge_tests_chmem target)
 
@@ -52,7 +55,7 @@ namespace {
 using ch::core::ch_literal;
 using ch::core::ch_uint;
 
-TEST_CASE("chmem_mem_read_drift_aread_lags_one_cycle",
+TEST_CASE("chmem_mem_read_drift_aread_has_no_skew",
           "[cpu][chmem][mem-drift]") {
   ch::core::context ctx("mem_drift_ctx");
   ch::core::ctx_swap guard(&ctx);
@@ -93,18 +96,17 @@ TEST_CASE("chmem_mem_read_drift_aread_lags_one_cycle",
     if (obs == expect_prev) ++off_by_one;
   }
 
-  // 已知漂移: **每一拍** 的观测读值都等于 **上一拍地址** 的内容 (含第 0 拍:
-  // 读端口在 tick 0 的 posedge 读到的是地址 0, 而此时 areg 已被递增到 1)
-  // ⇒ 6/6 全部与 Verilog 语义不符.
-  REQUIRE(mismatches == kTicks);
+  // 上游 `c27543d` 之后, Simulator 的 aread 与生成的 Verilog `assign` 同为 0-cycle:
+  // 每拍读到的就是 **当前地址** 的内容 ⇒ 与 Verilog 语义期望 **全部相符**.
+  REQUIRE(mismatches == 0);
 
-  // 关键强度断言: 观测值必须 **恰好** 等于"上一拍地址"的内容.
-  // 只断言 `obs != expect_now` 无法区分 1-cycle 滞后与 N-cycle 滞后
-  // (2-cycle 滞后同样满足 !=); 本断言把漂移的 **幅度** 也钉死为 1 拍.
-  REQUIRE(off_by_one == kTicks);
+  // 幅度断言 (保留): 观测值必须 **不** 等于"上一拍地址"的内容.
+  // 若只断言 `mismatches == 0`, 一个"恰好总是取到上一拍"的错误实现在地址
+  // 序列恰好重合时也可能蒙混过关 ⇒ 两者合起来把"0 拍对齐"钉死.
+  REQUIRE(off_by_one == 0);
 
-  SUCCEED("aread 1-cycle 滞后已钉死 (upstream mem-read-timing R3/R4 by-contract); "
-          "CH_MEM dmem 需据此适配");
+  SUCCEED("aread 与生成 Verilog 同拍对齐已锁住 (upstream c27543d; "
+          "mem-read-timing R3/R4 已改写为 async 归组合)");
 }
 
 }  // namespace
