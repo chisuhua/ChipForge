@@ -28,6 +28,30 @@
 > **路径与 key 裁决**: CH_MEM 新文件落 `ip/mmu/plugins/MMUPlugin_chmem.h` (**非** `ip/mmu/tlm/` — 后者同时逃出 `check_plugin_portability.sh` Check 2 与 Check 7 扫描范围 = CI 盲区); **不新建 bundles key 文件**, 复用 `ip/mmu/tlm/mmu_keys.h` 的 `mmu_keys<std::uint64_t>` 既有静态实例 (PayloadStore 按**指针身份**索引 ⇒ key 不同 ⇒ 消费端 `has()` 恒 false ⇒ 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**)。
 > **key 类型 + producer 顺序裁决 (2026-10-22, 硬前置 `chmem-mmu-keys-modality`)**: 上面两条只解决**身份**, 没解决**模态** —— 裸类型 key 在 CH_MEM 下 cell 是 POD, 装不下 `ch_uint` 节点。前置 change 已把 5 个输出 key 模式化 + 2 个消费点改「读节点」+ 成文顺序契约 (ADR-040 v3.0 §10.5/§10.6)。**B.2/B.3 实施时 producer SHALL 与消费端挂同一 stage 名 + `Phase::EARLY`**, **禁**注册新 stage 名 (否则 `canonical_stage_order()` 把 producer 排到 consumer 之后 ⇒ 永久静默 Bare)。
 
+### Phase B 施工前侦察结论 (2026-10-22, 逐条带 file:line 证据)
+
+> 本节是 B.0-B.5 的**施工前提修正**, 4 条结论均改了原计划假设, 实施前必读。
+
+1. **B.2 / B.3 施工顺序修正 —— B.3 必须先行**
+   `RiscvMMUPluginChmem`(B.2, `ip/cpu/plugins/mmu_chmem.h`) 是 `MMUPluginChmem`(B.3, `ip/mmu/plugins/MMUPlugin_chmem.h`) 的**派生适配器**, 与 TLM 侧同构 (蓝本 `ip/cpu/plugins/mmu.h:36` `class RiscvMMUPlugin : public cf::ip::mmu::MMUPlugin`)。基类在 B.3 才存在 ⇒ **B.2 无法独立编译**。原计划"B.2 → B.3"只能作为**逻辑分层**读, 实际施工顺序 = **B.3 基类骨架 → B.2 适配器 → B.3 TLB/PTW 主体 → B.4 测试**, 三者同一 commit 或同一 change 内连续提交, 不可拆成互不编译的中间态。
+
+2. **vaddr 源已可用 —— B.2 不依赖姊妹 change**
+   `ip/cpu/core/payload_common.h:126` `keys<T,XLEN>::PC` 声明为 `Payload<T>` (**按 T 参数化**, 不是硬编码裸类型)。CH_MEM 工厂以 `CpuFactoryChmem<ch_uint<32>>` 实例化 (`tests/cpu/test_cpu_chmem_vendored_elf.cpp:146`) ⇒ `T = ch_uint<32>` ⇒ cell 本就是 `ch_uint<32>` 节点。`ibus_chmem.h:120` / `dmem_chmem.h` 的 `using KT = keys<T, kXlenBits>` 与工厂**同一实例** ⇒ 父节点 `PC` / `MEM_ADDR` 可读到真节点。
+   ⚠ **陷阱**: MMU 侧读父节点时必须用 `keys<ch_uint<32>, 32>`（即同一 `T`）, 写 `keys<std::uint32_t, 32>` 会得到**不同静态实例** ⇒ 指针不等 ⇒ `has()` 恒 false（与 `mmu_keys` 的身份陷阱同源）。TLM 侧现有写法 `mmu.cpp:145-146` 的 `Keys32/Keys64` 是双 KeyType 查找, CH_MEM 侧改为单一 `ch_uint<32>` 实例即可。
+
+3. **`PtWalkFsmPlugin` 不能表达式驱动 —— B.3 复用前必须重构**
+   `ip/cpu/plugins/mmu_ptw_chmem.h:226-243`: 输入 `ch_uint` 信号在 `create_fsm()` **内部**才创建; `start_sig` / `pte_ok_sig` / `v_sig`… 在 `:238-243` 立刻从 `*start_` / `*pte_valid_` **拉边捕获**。`setup()` 在 `:165` 注册 `at_stage("mmu_ptw", NORMAL, create_fsm)` 是唯一入口 ⇒ 外部**无法在捕获发生前**注入表达式（elaboration 结束后再 `*start_ = expr` 只是重绑句柄, 已捕获的 DAG 边仍指向旧字面量 0）。
+   ⇒ B.3 复用前先抽取自由函数：`build_pt_walk_fsm(ch_uint<1>& start, ch_uint<1>& pte_valid, …, ch_uint<22>& pte_ppn) -> PtWalkFsmOutputs{state, done, fault, fault_code, result_ppn}`（输入按值/引用传入, 输出为节点结构）。`PtWalkFsmPlugin` 保留为**薄包装**（`create_fsm()` 内调用该函数）, 保证 `tests/cpu/test_mmu_ptw_fsm_chmem.cpp` 零改动通过。
+   ⚠ **该重构不得脱离 B.3 单独落地** —— 否则成为无消费者的死抽象（违反 scope 最小化）。
+
+4. **姊妹 change 的准确范围（比原立项更宽, 且含一处活体缺陷）**
+   `csr_keys` 并非全 mode-aware：
+   - `bundles/csr_bundles.h:39` `CSR_READ_VALUE` / `:43` `CSR_WRITE_ADDR` / `:44` `CSR_WRITE_VALUE` / `:51` `TRAP_TARGET` 是 `Payload<T>` — 经 `cpu_factory_chmem.h:184` 以 `T = ch_uint<32>` 实例化 ⇒ **已 mode-aware** ✅
+   - `bundles/csr_bundles.h:40` `CSR_READ_VALID` / `:45` `CSR_WRITE_EN` / `:48` `Zicsr_VALID` / `:51` `TRAP_PENDING` 是 **`Payload<bool>`**（POD）❌；`:49` `Zicsr_OP` 是 `Payload<std::uint8_t>` ❌
+   - `ip/cpu/tlm/cpu_keys.h:31-33` `static_assert` **无 `#ifndef CF_PLUGIN_USE_CH_MEM` 守护** ⇒ `cpu_keys` 永远只能以裸 `T` 实例化 ⇒ `SAT` / `SFENCE_*` / `CPU_EXCEPTION_CODE`(`:46`, `Payload<std::uint8_t>`) 全是 POD ❌
+   ⇒ 姊妹 change `chmem-cpu-keys-modality` 覆盖 **`cpu_keys` 一族 + `csr_bundles` 的 5 个裸类型 key**, 且必须一并**拆除 `csr_chmem.h:191-194` 的常量折叠 workaround**（`static_cast<bool>(select(...))` 把 `CSR_READ_VALID` 折成 elaboration 期常量 —— 这是同一缺陷类的**活体实例**; 现有 `[chmem]` 测试因经 `last_csr_write_en_` 观察口而全绿, 属"测试全绿但语义为零"）。
+   另: `TRAP_PENDING` 在 CH_MEM 侧 grep **零消费者**（`csr_bundles.h:17` 声称由 `ibus_chmem.h` NORMAL select 消费, 实际不存在）⇒ trap 重定向路径疑似从未接线, 已登记 ADR-040 v3.0 §10.8, **不并入**姊妹 change。
+
 - [ ] **B.0** (2026-10-22 修订, **0.1d**) **Payload key 前置复核** — **门禁**: `chmem-mmu-keys-modality` 必须已 archive。复核 (a) `MMUPlugin_chmem` 发射用的 key 与 `ibus_chmem.h` / `dmem_chmem.h` 消费的 `MmuKeys` 是**同一静态实例** (`mmu_keys<std::uint64_t>`, 指针相等, 模板参数保持 raw); (b) CH_MEM 下 `get(PADDR_VALID)` 解析为 `ch_uint<1>&` 而非 `bool&`; (c) producer 未注册新 stage 名。参照锚 `tests/mmu/test_mmu_keys_modality.cpp` (`[keys]`, 4 case / 15 assertions)。阻塞全部后续 task
 - [ ] **B.2** 实装 `RiscvMMUPlugin_chmem` — elaboration-time satp ch_reg 初值 + at_stage 闭包 (3d) — 文件 `ip/cpu/plugins/mmu_chmem.h` (新)
 - [ ] **B.3** 实装 `MMUPlugin_chmem` 收窄版 — 单级 ch_mem TLB (8 项直接映射) + 复用 PtWalkFsmPlugin (5d) — 文件 `ip/mmu/plugins/MMUPlugin_chmem.h` (新)

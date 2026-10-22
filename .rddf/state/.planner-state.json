@@ -4,9 +4,9 @@
   "current_sprint": "sprint-2026-11",
   "active_projects": [
     "mmu-chmem-phase-b-c-launch",
-    "chmem-mmu-keys-modality"
+    "chmem-cpu-keys-modality"
   ],
   "recommended_route": "complex",
   "updated_at": "2026-10-22T00:00:00+00:00",
-  "source": "rdd-planner-stage-exit-2026-10-22"
+  "source": "rdd-planner-stage-exit-2026-10-22 + build-立项-2026-10-22"
 }

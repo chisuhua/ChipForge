@@ -5,9 +5,10 @@
   "planner_complete_at": "2026-10-22T00:00:00+00:00",
   "current_sprint": "sprint-2026-11",
   "proposals_ready": [
-    "mmu-chmem-phase-b-c-launch"
+    "mmu-chmem-phase-b-c-launch",
+    "chmem-cpu-keys-modality"
   ],
-  "proposals_approved_count": 1,
+  "proposals_approved_count": 2,
   "features_active": [
     "feat-mfc-multi-cycle-fsm",
     "feat-rv32um-m-extension",
@@ -16,7 +17,8 @@
     "feat-phase-6d-rtl-verification"
   ],
   "awaiting_builder": [
-    "mmu-chmem-phase-b-c-launch"
+    "mmu-chmem-phase-b-c-launch",
+    "chmem-cpu-keys-modality"
   ],
   "recommended_route": "complex",
   "active_objectives": [
@@ -46,5 +48,5 @@
       ]
     }
   ],
-  "notes": "2026-10-22 rdd-planner 阶段退出。前序 handoff (2026-10-09) 的 awaiting_builder=[mfc-extract-fsm-h] 已失效 — 该 change 2026-10-10 archive; features_active 已剔除 feat-dhrystone-dmips-gate (2026-10-15 done)。本次新增两个 ready proposal: (1) ctrl-link-chmem-reg-handle — 框架级纯改动 1d, A4 已移出 scope 改挂 mmu-chmem-phase-b-c-launch 的 C.5 (惰性骨架风险: ch_reg 无 next 驱动源, 惰性窗口跨 Phase 1 -> C.5 ~5 周); (2) mmu-chmem-phase-b-c-launch — Phase B 15d (不采纳 37KB plan 的 10d 压缩版, 该版丢了 B.5 的 5d 集成回归)。Phase B 新文件路径锁 ip/mmu/plugins/ 而非 ip/mmu/tlm/ — 后者同时逃出 check_plugin_portability.sh 的 Check 2 与 Check 7 扫描范围 (CI 盲区)。执行序列决策纪要见 .rddf/plans/20261022-v0110-mmu-chmem-execution-sequence.md (仓内, 降级为非 SSOT); 2026-10-22 双审另新增 Phase B 硬前置 change chmem-mmu-keys-modality (MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约, plan 与 5 段 draft 已落盘) || 2026-10-22 (build) chmem-mmu-keys-modality 已 archive ⇒ 从 proposals_ready / awaiting_builder 移除; 它是 mmu-chmem-phase-b-c-launch 的 Phase B 硬前置, 现已解除 (B.0 从 0.2d 降为 0.1d 复核). 同期新增硬前置门禁: Phase B 开工前须确认 ADR-040 v3.0 §10.6 顺序契约 (同 stage + EARLY/NORMAL)."
+  "notes": "2026-10-22 rdd-planner 阶段退出。前序 handoff (2026-10-09) 的 awaiting_builder=[mfc-extract-fsm-h] 已失效 — 该 change 2026-10-10 archive; features_active 已剔除 feat-dhrystone-dmips-gate (2026-10-15 done)。本次新增两个 ready proposal: (1) ctrl-link-chmem-reg-handle — 框架级纯改动 1d, A4 已移出 scope 改挂 mmu-chmem-phase-b-c-launch 的 C.5 (惰性骨架风险: ch_reg 无 next 驱动源, 惰性窗口跨 Phase 1 -> C.5 ~5 周); (2) mmu-chmem-phase-b-c-launch — Phase B 15d (不采纳 37KB plan 的 10d 压缩版, 该版丢了 B.5 的 5d 集成回归)。Phase B 新文件路径锁 ip/mmu/plugins/ 而非 ip/mmu/tlm/ — 后者同时逃出 check_plugin_portability.sh 的 Check 2 与 Check 7 扫描范围 (CI 盲区)。执行序列决策纪要见 .rddf/plans/20261022-v0110-mmu-chmem-execution-sequence.md (仓内, 降级为非 SSOT); 2026-10-22 双审另新增 Phase B 硬前置 change chmem-mmu-keys-modality (MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约, plan 与 5 段 draft 已落盘) || 2026-10-22 (build) chmem-mmu-keys-modality 已 archive ⇒ 从 proposals_ready / awaiting_builder 移除; 它是 mmu-chmem-phase-b-c-launch 的 Phase B 硬前置, 现已解除 (B.0 从 0.2d 降为 0.1d 复核). 同期新增硬前置门禁: Phase B 开工前须确认 ADR-040 v3.0 §10.6 顺序契约 (同 stage + EARLY/NORMAL). || 2026-10-22 (build, 二批): 姊妹 change chmem-cpu-keys-modality 已立项 (improvement draft + TDD plan), 挂 Phase C.1 入口, 工期 1.0-1.5d. 范围经侦察收窄并精确化: cpu_keys 4 key (含 static_assert 加 #ifndef 守护) + csr_bundles 5 裸类型 key + 拆除 csr_chmem.h:191-194 的 static_cast<bool>(select(...)) 常量折叠 + Check 13 allowlist 从 4 收到 2. 不做 TRAP_PENDING 接线 (归 C.1 行为改动), mmu_keys 其余 8 key 继续 defer. 同期在 mmu-chmem-phase-b-c-launch/tasks.md 落 Phase B 施工前侦察结论 4 条: (1) B.2/B.3 施工顺序须 B.3 先行 (派生适配器 vs 基类) (2) vaddr 源走 payload_common::keys<T,XLEN> (CH_MEM T=ch_uint<32> ⇒ 已 mode-aware, 不依赖本姊妹 change), 陷阱=必须用同一 T (3) PtWalkFsmPlugin 不能表达式驱动 ⇒ B.3 复用前须抽取自由函数 build_pt_walk_fsm(), 且该重构不得脱离 B.3 单独落地 (4) 姊妹 change 范围= cpu_keys + csr_bundles 5 裸 key."
 }
