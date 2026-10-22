@@ -5,6 +5,42 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (2026-10-22, interim) — ctrl-link-chmem-reg-handle: CtrlLink 支持"有状态"（跨拍保持）halt 条件
+
+> **OpenSpec change**: `ctrl-link-chmem-reg-handle` (wave5-isa-coverage-and-bp)
+> **Capability**: `ctrllink-continuous-handle` (新增)
+> **Author / Date**: build agent, 2026-10-22
+> **Scope**: 2 个框架头文件 (`include/cf/plugin/ctrl_link.h` + `pipe_builder.h`) + 1 个业务文件**仅注释** + 1 个框架级测试文件。**零业务逻辑改动、零惰性代码。**
+> **触发**: `chmem-mext-fsm-cycle-parity`（CH_MEM M 扩展多周期 FSM）需要"FSM busy 期间冻结 fetch/decode"，而 CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器）⇒ **没有 stall 机制就没法实现多周期**；当前 CtrlLink 只能接组合条件。
+
+### Added（框架级能力）
+
+- **显式的有状态条件入口**：`CtrlLink::halt_when_stateful(const ch_reg<ch_bool>&)` —— 注册"由寄存器支撑、跨拍保持"的 halt 条件；另有 `halt_when(const ch_reg<ch_bool>&)` **重载**，把 `ch_reg<ch_bool>` 直接传给 `halt_when` 时自动按有状态登记，关闭"能编译能跑但意图被静默丢弃"的缺口。
+  - **能力早已具备、本次是显式化**：`ch_reg<ch_bool>` 是 `ch_bool` 的派生类（上游 `core/reg.h:32`），且其基类 `logic_buffer<ch_bool>::node_impl_` 被上游指向 reg 的 **proxy 节点**（上游 `lnode/reg.tpp`）⇒ 切片成 `ch_bool` 后 OR 门仍引用寄存器节点 ⇒ **随拍更新**。
+- **`OR_combined_halt_conds()`**：OR 合并的**唯一实现**，返回可被消费方 DAG 引用的 `ch_bool` 节点。既有 `halt_condition()` / `flush_condition()` 改为 **inline alias 转发**（A6 定案）—— 杜绝三个语义重叠的合并 API。
+- **诊断接口**：`stateful_halt_count()` / `has_stateful_conditions()` / `unreliable_query_count()`。
+
+### Changed（语义契约显式化）
+
+- **`should_halt()` / `should_throw()` / `should_flush()` 的适用范围被显式声明**：仅对**组合条件**可靠（它们读 C++ 侧缓冲 `c.to_bool()`，对有状态条件永远读到陈旧值）。注册有状态条件后调用它们会**递增 `unreliable_query_count()` 并 emit 一次 stderr 告警**（非静默）—— 验证有状态条件必须走 DAG 路径 `OR_combined_halt_conds()`。
+- **框架内 deprecated `ch_bool::operator||` 全部清零**（4 处 → 0，编译器验证）：`ctrl_link.h:150,160` + `pipe_builder.h:434,435` 改用 `operator|`（1-bit OR，语义等价）。含全部 13 个 framework 头的 probe TU 剩余 deprecated 站点 = **0**。
+  - ⚠️ **统计方法更正**：不能用 grep 数 `||`（同一行不含 `ch_bool` 字面量的用法会漏）—— 必须用编译器 `-Wdeprecated-declarations` 逐 TU 统计。业务侧 `ip/**/*_chmem.h` 另有 ≥60 `||` + ≥90 `&&`，**另立 change**。
+
+### 测试
+
+- 新增 `tests/framework/test_ctrl_link_stateful.cpp`（`[framework][ctrllink-stateful]`，9 case / 35 assertions，全 PASS）。
+  - **核心断言**："OR 合并结果随寄存器逐拍更新" 以 **Simulator tick ≥ 2 拍** 驱动（自翻转寄存器 `reg <<= !reg`），观测 OR 输出在 6 拍内翻转 ≥5 次 ⇒ 若 OR 结果被冻结在初值则测试 FAIL。
+  - **对照断言**：`should_halt()` 读到 stale 值（0）⇒ 锁定"两套路径行为不同"这一事实。
+- ⚠️ **用法约束（新发现）**：`ch_reg::operator<<=` 设置 next 值**必须在 Simulator 创建之前**调用（Simulator 初始化时快照寄存器链）。
+
+### Scope 变更（A4 移出）
+
+- **HazardPlugin 的 mmufault 信号驱动改造（A4）移出本 change**，归属 `mmu-chmem-phase-b-c-launch` 的 **Phase C.5**。理由：真实驱动源是 C.1/C.5 的 `CPU_EXCEPTION_CODE` 写入，本 change 阶段交付的 `ch_reg<ch_bool>` **无 next 驱动源 ⇒ 恒 false 惰性骨架**，惰性窗口跨 Phase 1 → C.5 约 5 周 ⇒ 正是本 capability 要消灭的 G3 同款陷阱。本 change 在 `ip/cpu/plugins/hazard_chmem.h` **仅更新注释**，零逻辑改动。
+
+### 下游解锁
+
+- **`chmem-mext-fsm-cycle-parity` 的硬前置已解除** —— 它只需 A1/A2 的 stateful halt 通道，不需要 A4。
+
 ## v0.11.0 (2026-10-21, interim) — chmem-dmem-read-latency-aligned: 上游 read-port 契约落地，10 个 load/store ELF 全绿
 
 > **OpenSpec change**: `chmem-dmem-read-latency-aligned` (wave5-isa-coverage-and-bp)
