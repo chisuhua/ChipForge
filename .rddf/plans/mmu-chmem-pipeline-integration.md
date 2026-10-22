@@ -478,6 +478,15 @@ Expected: `[mmu] 59/59` + `[cpu-l1-mmu-demo] 7/7` + `[riscv-tests] 48/48` + `[ve
 > **为何 15d 而非 10d**: 本 plan 原 10d 版本**整段丢失了 B.5 的 5d 集成回归**（Task 3.4 只有 2d 单测）⇒ 在"3 次派发失败"的历史上采纳压缩版是错误方向。
 > **依赖序** (`tasks.md` 锁定): **B.0 (key 复用确认)** → B.2 (RiscvMMUPlugin_chmem) → B.3 (MMUPlugin_chmem 收窄版) → B.4 (PTW FSM 复用) → B.5 (test_mmu_chmem_basic) → B.6 (集成回归)
 
+> **⚠ 2026-10-22 路线 C 重算（本节以下估时/编号均以此为准，上方两段为历史留档）**: 用户在施工前裁决 **路线 C —— 本期只做 TLB 命中路径，PTW 页表 walk 推迟**。理由两条（均为施工前实证，见 `openspec/changes/mmu-chmem-phase-b-c-launch/tasks.md` §Phase B 施工前侦察结论）：
+> ① **B.2 无法先于 B.3** —— `RiscvMMUPluginChmem` 是 `MMUPluginChmem` 的派生适配器（蓝本 `ip/cpu/plugins/mmu.h:36`），基类不存在则编译不过 ⇒ 上面写的依赖序只能作逻辑分层读。
+> ② **`PtWalkFsmPlugin` 不能表达式驱动** —— `ip/cpu/plugins/mmu_ptw_chmem.h:226-243` 的输入信号在 `create_fsm()` 内部才创建、且立刻从 `*start_` 拉边捕获；`setup():165` 是唯一入口 ⇒ 外部无法在捕获前注入表达式。复用前必须先把 FSM 构造抽成自由函数 `build_pt_walk_fsm(...)`，而该重构**不得脱离消费者单独落地**。
+> ③ 多周期 walk 期间冻结 fetch 需要 fetch stall 协议（Phase 3.5，未起草）。
+> **重算结果**: 本 change 的 Phase B = **B.0 0.1d + B.3(TLB-only) 1.5d + B.4 1.0d + B.5 0.5d = 3.0d**；推迟部分（B.2 适配器 + `build_pt_walk_fsm` 重构 + walk + fault 语义 + fetch stall 接线）移入新 change **`chmem-ptw-walk`**（估 6.5d，未立项）。TLB 组织由「8 项直接映射」改为 **8 项全相联**（真实 TLB 即全相联；组合 DAG 里比较+OR+select 比 ch 信号 index mux 更简单），entry 数 8 不变 ⇒ Phase D 估算口径不变。
+> **施工期新增两条硬约束（B.3 落地时实证，后续 B.2'/C.4 同样适用）**:
+> ④ **Bare 门控必须读 `satp` 寄存器的 MODE 位，不能读编译期 `sv_mode_`** —— 否则 `csr_write_satp` 后续接线时模式永远改不动（折成常量的门控 = 语义为零）。
+> ⑤ **`Simulator::reset()` 会清掉 `ch_reg` 的 ctor init**（打成 `rst_val`，未给 ⇒ 0；先例 `tests/cpu/test_cpu_chmem_vendored_elf.cpp:153-156`）⇒ 所有"配置型常量寄存器"必须同时写 next 值 `*reg <<= expr`。B.3 的变异 D 实证：只留 ctor init ⇒ `satp.MODE` 恒 0 ⇒ 恒 Bare。
+
 ### Task 3.0: B.0 — Payload key 前置确认 (0.1 day, 阻塞全部后续 task；**0.2d → 0.1d** 因 `chmem-mmu-keys-modality` 已 archive)
 
 **Files:**

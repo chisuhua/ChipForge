@@ -148,6 +148,9 @@ set(CHMEM_TEST_SOURCES
     # MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约
     # — openspec change chmem-mmu-keys-modality (Phase B 的 B.3/B.4 硬前置)
     ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_keys_modality.cpp
+    # MMUPluginChmem TLB 命中路径 (Phase B / B.4, 2026-10-22 路线 C 收窄版)
+    # — openspec change mmu-chmem-phase-b-c-launch
+    ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_chmem_basic.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

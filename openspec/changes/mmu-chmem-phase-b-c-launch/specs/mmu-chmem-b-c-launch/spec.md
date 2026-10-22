@@ -2,15 +2,23 @@
 
 ### Requirement: CH_MEM MMUPlugin with single-level TLB + PtWalkFsmPlugin reuse SHALL achieve sv32 translation
 
-The CH_MEM MMU subsystem (`MMUPlugin_chmem` + `RiscvMMUPlugin_chmem`) SHALL implement sv32 translation end-to-end within the 5-stage CPU pipeline. A fetch or memory access with `cfg.enable_mmu=true` and a valid satp config SHALL route vaddr → TLB lookup (8 entries, fully associative, FIFO replacement) → on hit, emit `PADDR` + `PADDR_VALID=true`; on miss, engage `PtWalkFsmPlugin` (sv32 5-state FSM IDLE/L0_WAIT/L1_WAIT/DONE/FAULT) to walk the page table → emit `PADDR` after FSM reaches DONE → on V=0 PTE, emit `EXCEPTION_CODE=1` (instruction access fault for fetch, load/store access fault for memory access). Bare mode (`cfg.enable_mmu=false` or unset) SHALL be byte-identical to the pre-`MMUPlugin_chmem` baseline per ADR-040 v2.0 D2-A.
+The CH_MEM MMU subsystem (`MMUPlugin_chmem` + `RiscvMMUPlugin_chmem`) SHALL implement sv32 translation end-to-end within the 5-stage CPU pipeline. A fetch or memory access with `cfg.enable_mmu=true` and a valid satp config SHALL route vaddr → TLB lookup (8 entries, fully associative) → on hit, emit `PADDR` + `PADDR_VALID=true`; on miss, SHALL leave `PADDR_VALID=false` (consumer falls back to the raw vaddr — byte-identical to Bare behavior, and **not** a fault). Page-table walk on miss, PTE-driven `EXCEPTION_CODE`, and TLB refill by the walker are **out of scope for this change** (2026-10-22 route-C split; owned by `chmem-ptw-walk`). Bare mode (`cfg.enable_mmu=false` or unset) SHALL be byte-identical to the pre-`MMUPlugin_chmem` baseline per ADR-040 v2.0 D2-A.
 
 #### Scenario: sv32 TLB hit (single level) within the pipeline
 - **WHEN** the CPU executes fetch/load/store with `cfg.enable_mmu=true`, `cfg.satp_mode=sv32`, and a vaddr whose VPN is present in the 8-entry TLB
-- **THEN** the pipeline SHALL emit `PADDR_VALID=true` + `PADDR = tlb_paddr[matched_index]` within 1 cycle
+- **THEN** the pipeline SHALL emit `PADDR_VALID=true` + `PADDR = tlb_entry_paddr[31:12] \| vaddr[11:0]` within 1 cycle
+- **AND** `EXCEPTION_CODE=0` (hit is never a fault)
 - **AND** `PTW_ACTIVE=false` (no PTW state machine engagement)
 - **AND** the aread index for fetch/dmem SHALL equal `PADDR` (not the raw vaddr)
 
-#### Scenario: sv32 TLB miss triggers PTW FSM and resolves to page table walk
+#### Scenario: sv32 TLB miss leaves PADDR_VALID=false (route C — no PTW in this change)
+- **WHEN** the CPU executes fetch/load/store with `cfg.enable_mmu=true` and a vaddr whose VPN is NOT in the 8-entry TLB
+- **THEN** `MMUPlugin_chmem` SHALL leave `PADDR_VALID=false` and `PTW_ACTIVE=false` (no walker)
+- **AND** SHALL leave `EXCEPTION_CODE=0` (a TLB miss is not a fault)
+- **AND** the consumer (`ibus_chmem` / `dmem_chmem`) SHALL fall back to the raw vaddr ⇒ behavior byte-identical to Bare
+- **AND** the TLB refill port (`entry_*` ch_reg handles) SHALL remain drivable so that the deferred walker (`chmem-ptw-walk`) can refill entries without changing this contract
+
+#### Scenario: sv32 TLB miss triggers PTW FSM and resolves to page table walk — DEFERRED to `chmem-ptw-walk`
 - **WHEN** the CPU executes fetch/load/store with `cfg.enable_mmu=true` and a vaddr whose VPN is NOT in the 8-entry TLB
 - **THEN** `MMUPlugin_chmem` SHALL set `PTW_ACTIVE=true`
 - **AND** the pipeline SHALL halt fetch/dmem until `PTW_ACTIVE` transitions to 0 (CtrlLink::halt_when toggle)
@@ -19,7 +27,7 @@ The CH_MEM MMU subsystem (`MMUPlugin_chmem` + `RiscvMMUPlugin_chmem`) SHALL impl
 - **AND** the TLB SHALL refill the matched entry (FIFO, no LRU/RRIP per D1 narrowing)
 - **AND** in the next pipeline cycle, fetch/dmem SHALL resume with `PADDR_VALID=true`
 
-#### Scenario: sv32 PTW fault (V=0 PTE) propagates exception_code=1
+#### Scenario: sv32 PTW fault (V=0 PTE) propagates exception_code=1 — DEFERRED to `chmem-ptw-walk`
 - **WHEN** PTW FSM reads a PTE with V=0 from the test memory backend
 - **THEN** FSM SHALL transition to FAULT state
 - **AND** `MMUPlugin_chmem` SHALL emit `EXCEPTION_CODE=1` (instruction access fault for fetch, or load/store access fault for memory access per RISC-V spec §4.3.1)

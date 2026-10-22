@@ -70,6 +70,11 @@ ADR-083 §2.4（`docs/architecture/adr/ADR-083-plugin-style-single-source-of-tru
   - **B.4** `ip/cpu/plugins/mmu_ptw_chmem.h` 复用（0 修改；**修正 37KB plan Task 3.3 的错误路径** `ip/mmu/plugins/mmu_ptw_chmem.h` → `ip/cpu/plugins/mmu_ptw_chmem.h`）
   - **B.5** `tests/mmu/test_mmu_chmem_basic`（新，5 case）+ **手动加入 `tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES`（`:118-145` 手工 list，GLOB 只覆盖 TLM target）**
   - **B.6** Phase B 集成回归（5d）
+
+  > **⚠ 2026-10-22 路线 C 重算（本节估时以下均以此为准）**: 用户裁决 **本期只做 TLB 命中路径、PTW walk 推迟**（理由：`RiscvMMUPluginChmem` 派生自 `MMUPluginChmem` ⇒ B.2 无法先于 B.3 编译；`PtWalkFsmPlugin` 输入在 `create_fsm()` 内才创建并立即拉边捕获 ⇒ 无法表达式驱动，复用前须先重构；多周期 walk 冻结 fetch 需未起草的 fetch stall 协议）。
+  > **重算后本 change 的 Phase B = 3.0d**：B.0 0.1d + B.3(TLB-only, 8 项**全相联**而非直接映射) 1.5d + B.4(7 case) 1.0d + B.5 0.5d。
+  > **推迟项 → 新 change `chmem-ptw-walk`（估 6.5d，未立项）**：B.2 适配器 + `build_pt_walk_fsm` 自由函数抽取 + walk 触发/refill/fault 语义 + `MEM_ADDR` 源接线 + fetch stall 协议。
+  > **本 change 内的 Phase B 交付物已落地**：`ip/mmu/plugins/MMUPlugin_chmem.h` + `tests/mmu/test_mmu_chmem_basic.cpp`（7 case / 24 assertions，3 个变异对照全部被抓），见 `tasks.md` §Phase B 路线 C 收窄。
 - **Phase C wiring（5d，Sprint 4）**：C.1 `mmu_exception_handler_chmem` wiring → C.4 `cpu_factory_chmem` fprintf 删除 + MMUPluginChmem 注册 → C.5 `hazard_chmem.h` halt_when wiring（**含 `ctrl-link-chmem-reg-handle` 移出的 A4：mmufault pending 改信号驱动**）→ C.6 集成测试（3d，Sprint 5）
 - **Phase D 验证（5d，Sprint 6）**：D.1 `[mmu-verilator]` TEST_CASE 4 sv32 e2e flip + D.2 `[cpu-l1-mmu-demo]` TEST_CASE 7 + D.3 `build_sv32_pte.S` vendor + D.4 `sv32-baseline-matrix.csv`
 - **Phase E 收官（2d，Sprint 7）**：E.1-E.6 文档 + archive

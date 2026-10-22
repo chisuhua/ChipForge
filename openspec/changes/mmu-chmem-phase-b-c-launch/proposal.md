@@ -70,8 +70,9 @@ related_to:
 
 | 范畴 | mmu-chmem-pipeline-integration (Phase A done) | mmu-chmem-phase-b-c-launch (Sprint 2-5) |
 |------|---------|---------|
-| **MMUPlugin CH_MEM 真翻译层** (单级 ch_mem TLB + PtWalkFsmPlugin 复用) | ❌ Phase B 标签, 未实装 | ✅ Sprint 2-3 (10-23 ~ 11-06, 2 周 = 10d) |
-| **RiscvMMUPlugin_chmem 实装** (elaboration-time satp ch_reg 初值 + at_stage 闭包) | ❌ Phase B.2, 未实装 | ✅ Sprint 2 (与 MMUPlugin 同步) |
+| **MMUPluginChmem 真翻译层（TLB 命中路径）** | ❌ Phase B 标签, 未实装 | ✅ **已实装 (2026-10-22, 路线 C 收窄)**: `ip/mmu/plugins/MMUPlugin_chmem.h` + `tests/mmu/test_mmu_chmem_basic.cpp` (7 case) |
+| **PTW 页表 walk + TLB refill by walker + PTE fault 语义** | ❌ Phase B 标签, 未实装 | ⏭ **推迟 → 新 change `chmem-ptw-walk`** (估 6.5d, 未立项; 2026-10-22 用户裁决路线 C) |
+| **RiscvMMUPlugin_chmem 实装** (csr_write_satp / sfence_vma / mmu_exit 适配器) | ❌ Phase B.2, 未实装 | ⏭ **推迟 → `chmem-ptw-walk`**（派生自 `MMUPluginChmem`, 基类已就位） |
 | **ibus_chmem sv32 PADDR_VALID=true 路径激活** | ✅ sel 表达式已落 (裸, 等 plugin 注册) | ✅ Sprint 4 (B 完成后) — wiring 实装 + CtrlLink 解锁后启用真翻译 |
 | **dmem_chmem sv32 PADDR_VALID=true 路径激活** | ✅ sel 表达式已落 (裸) | ✅ Sprint 4 |
 | **mmu_exception_handler_chmem CPU_EXCEPTION_CODE wiring** | ⚠️ skeleton shipped | ✅ Sprint 4 — 实现 `ch_bool mmufault_clear = (CPU_EXCEPTION_CODE != 0)` 组合逻辑 |
@@ -98,12 +99,12 @@ pre_flight:
   2. fetch-stall-protocol-v0.2 起草    [2d, 解 critic 5 BLOCKERS, deps prerequisite]
   3. bp-btb-coordination-3items 协商   [0.5d, deps prerequisite]
   4. CtrlLink API gap (FP-4) 解锁       [1d, Plugin framework owner]
-Sprint_2 (10-23 ~ 11-06, 10d):
-  B.2: RiscvMMUPlugin_chmem 实装        [3d]
-  B.3: MMUPlugin_chmem 单级 TLB 实装    [5d]
-  B.4: test_mmu_chmem_basic 单元测试    [2d]
-Sprint_3 (11-06 ~ 11-30, 5d):
-  B.5: Phase B 集成回归 (chipforge_tests_chmem 全套) [5d]
+Sprint_2 (10-23 ~ 11-06) — **路线 C 收窄后 3.0d (原 10d+5d)**:
+  B.0: payload key 前置复核 (已完成, chmem-mmu-keys-modality) [0.1d ✅]
+  B.3: MMUPluginChmem TLB 命中路径     [1.5d ✅ 2026-10-22]
+  B.4: test_mmu_chmem_basic 单元测试   [1.0d ✅ 2026-10-22, 7 case]
+  B.5: Phase B 集成回归                [0.5d ✅ 2026-10-22, failing-set 逐条相等]
+  ⏭ defer → chmem-ptw-walk: B.2 适配器 + PTW walk + fault + fetch stall [6.5d, 未立项]
 Sprint_4 (11-30 ~ 12-15, 5d):
   C.1: mmu_exception_handler_chmem wiring [2d]
   C.4: cpu_factory_chmem fprintf 删除 + MMUPluginChmem 注册 [2d]
@@ -130,7 +131,7 @@ Sprint_7 (01-13 ~ 01-24, 2d):
 
 ## Acceptance Criteria
 
-- `[mmu] 59/59 PASS` 维持 + `[mmu][chmem] 5/5 PASS` (B.4 新增, 2026-10-22 由 3 case 扩到 5 case) + `[cpu-integration][mmu-chmem] 1/1 PASS` (C.6 新增) + `[cpu-l1-mmu-demo] 7/7 PASS` (D.2 新增) + `[mmu-verilator] 4/4 PASS` (D.1 新增 TEST_CASE 4)
+- `[mmu] 59/59 PASS` 维持 + `[mmu-chmem-basic] 7/7 PASS` (B.4 新增；2026-10-22 路线 C 收窄后由计划的 3→5 case 定为 **7 case / 24 assertions**，4 个变异对照全部被抓) + `[cpu-integration][mmu-chmem] 1/1 PASS` (C.6 新增) + `[cpu-l1-mmu-demo] 7/7 PASS` (D.2 新增) + `[mmu-verilator] 4/4 PASS` (D.1 新增 TEST_CASE 4)
 - 4 architecture gate (verify_adr / verify_plugin_decision / check_plugin_portability / doc_link_check) 0 失败
 - `bash tools/run_chipforge_tests.sh --all` 全 PASS (含 chmem baseline byte-identical)
 - `openspec change validate mmu-chmem-phase-b-c-launch` 0 error

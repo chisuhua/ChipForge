@@ -22,9 +22,10 @@
 - [ ] **3.5.2** bp-btb 收窄 2 项 (1d) — 去掉 `pc_reg mux` 的 **BP 分支** (`feat-bp-btb-gshare` 已 defer 到 v1.0.0), 保留 **stall 语义** + **fetch stage at_stage 顺序**; owner 改 mmu-chmem team (= requirements doc BLOCKER-B1 + B2)
 - [ ] **3.5.3** fetch-stall v0.2 protocol 起草 (3d) — 解 5 BLOCKER + 7 SHOULD_FIX, 产出 `fetch_stall_protocol_v0.11.0.md`, 过 critic 二轮 review (BLOCKER-B5 由 Phase B 的 B.3 交付 ch_bool PTW_ACTIVE)
 
-## Phase B (Sprint 2-3, 2026-10-23 ~ 2026-11-06, **15d**)
+## Phase B (Sprint 2-3, 2026-10-23 ~ 2026-11-06) — **路线 C 收窄后 3.0d（原 15d）**
 
-> **估时口径 (2026-10-22 双审)**: B.2 3d + B.3 5d + B.4 2d + B.5 5d = **15d**。`.rddf/plans/mmu-chmem-pipeline-integration.md` 原写 10d **整段丢失 B.5 的 5d 集成回归**, 已回改。**B.1 跳过** (Oracle D1-B 收窄版锁定)。
+> **估时口径 (2026-10-22 双审 → 2026-10-22 路线 C 重算)**: 原 `B.2 3d + B.3 5d + B.4 2d + B.5 5d = 15d`（`.rddf/plans/mmu-chmem-pipeline-integration.md` 原写 10d **整段丢失 B.5 的 5d 集成回归**, 已回改）。**用户裁决路线 C 后**：B.2（适配器）与 PTW walk 一并推迟到新 change `chmem-ptw-walk`（估 6.5d）⇒ 本 change 的 Phase B = **B.0 0.1d + B.3(TLB-only) 1.5d + B.4 1.0d + B.5 0.5d = 3.0d**。**B.1 跳过** (Oracle D1-B 收窄版锁定)。
+> **路线 C 理由**: `PtWalkFsmPlugin` 不能表达式驱动（侦察结论 #3）⇒ 复用前需先重构, 而该重构不得脱离消费者单独落地; 且多周期 walk 期间冻结 fetch 需要 fetch stall 协议（Phase 3.5 未起草）。收窄为 TLB-only 后上述两个未决问题都不阻塞交付。
 > **路径与 key 裁决**: CH_MEM 新文件落 `ip/mmu/plugins/MMUPlugin_chmem.h` (**非** `ip/mmu/tlm/` — 后者同时逃出 `check_plugin_portability.sh` Check 2 与 Check 7 扫描范围 = CI 盲区); **不新建 bundles key 文件**, 复用 `ip/mmu/tlm/mmu_keys.h` 的 `mmu_keys<std::uint64_t>` 既有静态实例 (PayloadStore 按**指针身份**索引 ⇒ key 不同 ⇒ 消费端 `has()` 恒 false ⇒ 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**)。
 > **key 类型 + producer 顺序裁决 (2026-10-22, 硬前置 `chmem-mmu-keys-modality`)**: 上面两条只解决**身份**, 没解决**模态** —— 裸类型 key 在 CH_MEM 下 cell 是 POD, 装不下 `ch_uint` 节点。前置 change 已把 5 个输出 key 模式化 + 2 个消费点改「读节点」+ 成文顺序契约 (ADR-040 v3.0 §10.5/§10.6)。**B.2/B.3 实施时 producer SHALL 与消费端挂同一 stage 名 + `Phase::EARLY`**, **禁**注册新 stage 名 (否则 `canonical_stage_order()` 把 producer 排到 consumer 之后 ⇒ 永久静默 Bare)。
 
@@ -52,11 +53,59 @@
    ⇒ 姊妹 change `chmem-cpu-keys-modality` 覆盖 **`cpu_keys` 一族 + `csr_bundles` 的 5 个裸类型 key**, 且必须一并**拆除 `csr_chmem.h:191-194` 的常量折叠 workaround**（`static_cast<bool>(select(...))` 把 `CSR_READ_VALID` 折成 elaboration 期常量 —— 这是同一缺陷类的**活体实例**; 现有 `[chmem]` 测试因经 `last_csr_write_en_` 观察口而全绿, 属"测试全绿但语义为零"）。
    另: `TRAP_PENDING` 在 CH_MEM 侧 grep **零消费者**（`csr_bundles.h:17` 声称由 `ibus_chmem.h` NORMAL select 消费, 实际不存在）⇒ trap 重定向路径疑似从未接线, 已登记 ADR-040 v3.0 §10.8, **不并入**姊妹 change。
 
-- [ ] **B.0** (2026-10-22 修订, **0.1d**) **Payload key 前置复核** — **门禁**: `chmem-mmu-keys-modality` 必须已 archive。复核 (a) `MMUPlugin_chmem` 发射用的 key 与 `ibus_chmem.h` / `dmem_chmem.h` 消费的 `MmuKeys` 是**同一静态实例** (`mmu_keys<std::uint64_t>`, 指针相等, 模板参数保持 raw); (b) CH_MEM 下 `get(PADDR_VALID)` 解析为 `ch_uint<1>&` 而非 `bool&`; (c) producer 未注册新 stage 名。参照锚 `tests/mmu/test_mmu_keys_modality.cpp` (`[keys]`, 4 case / 15 assertions)。阻塞全部后续 task
-- [ ] **B.2** 实装 `RiscvMMUPlugin_chmem` — elaboration-time satp ch_reg 初值 + at_stage 闭包 (3d) — 文件 `ip/cpu/plugins/mmu_chmem.h` (新)
-- [ ] **B.3** 实装 `MMUPlugin_chmem` 收窄版 — 单级 ch_mem TLB (8 项直接映射) + 复用 PtWalkFsmPlugin (5d) — 文件 `ip/mmu/plugins/MMUPlugin_chmem.h` (新)
-- [ ] **B.4** `test_mmu_chmem_basic` 单元测试 — **5 case**: TLB hit / TLB miss / PTW fault (unit 级) / sv32 模式 (非恒等页表向量) / Bare 隔离 (2d) — 文件 `tests/mmu/test_mmu_chmem_basic.cpp` (新) + **手动加入 `tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES`**
-- [ ] **B.5** Phase B 集成回归 — chipforge_tests_chmem 全套 (5d) — **期间 `MMUPluginChmem` 不得注册进 `cpu_factory_chmem`** (注册是 C.4 范围)
+5. **`Simulator::reset()` 会清掉 `ch_reg` 的 ctor init（施工期实证, B.3 实施时踩到）**
+   `reset()` 把每个 `ch_reg` 打成 `rst_val`；ctor 未显式给 reset ⇒ `nullptr` ⇒ 0。先例注释：`tests/cpu/test_cpu_chmem_vendored_elf.cpp:153-156`（*"sim->reset() is intentionally NOT called … clobbering the PC's init value 0x80000000"*）。
+   ⇒ **任何"elaboration 期常量初值"型寄存器（satp / pc / 配置寄存器）都不能只靠 ctor init 存活**，必须同时写 next 值（`*reg <<= expr`）—— 后者在 reset 后第一拍恢复。本 change 的 `satp` 即按此实现（`MMUPlugin_chmem.h:176-183`），变异 D 证实只留 ctor init ⇒ `satp.MODE` 恒 0 ⇒ 恒 Bare（3 个 translate case 全红）。
+   ⚠ 该陷阱对后续 `chmem-ptw-walk`（PTW 的 `satp`/page-table base 改写）与 Phase C.4（`cpu_factory_chmem` 接线）**同样适用**。
+
+### Phase B 路线 C 收窄 (2026-10-22 用户裁决) —— PTW walk 推迟到 `chmem-ptw-walk`
+
+原 B.2 (`RiscvMMUPluginChmem` 派生适配器) + B.3 的「复用 `PtWalkFsmPlugin`」**一并推迟**，理由 = 上面侦察结论 #1 + #3：适配器依赖基类（B.3 先行才对），而 PTW 复用又依赖对 `PtWalkFsmPlugin` 的重构，该重构不得脱离消费者单独落地。本期只交付 **TLB 命中路径**，TLB 由测试直接装载（refill = `entry_*` 的 ch_reg 句柄），不做「miss → 逐级读 PTE → refill」。
+
+**估时口径重算**：原 `B.2 3d + B.3 5d + B.4 2d + B.5 5d = 15d` → 收窄后 `B.3(TLB-only) 1.5d + B.4 1.0d + B.5 0.5d = 3.0d`（B.0 0.1d 已完成）；推迟部分（B.2 适配器 + PTW walk + FSM 重构 + fetch stall 协议）移入新 change **`chmem-ptw-walk`**，估 6.5d。
+
+- [x] **B.0** (2026-10-22, **0.1d**) **Payload key 前置复核** — `chmem-mmu-keys-modality` 已 archive；发射 key 与消费端同实例（`mmu_keys<std::uint64_t>`, 模板参数保持 raw）；CH_MEM 下 `get(PADDR_VALID)` 解析为 `ch_uint<1>&`; producer 未注册新 stage 名（只有 `declare_substage` + `at_stage("fetch"/"memory", EARLY)`）。参照锚 `tests/mmu/test_mmu_keys_modality.cpp` (`[keys]`) ✅
+- [x] **B.3** (2026-10-22, **1.5d**) **实装 `MMUPluginChmem`（TLB-only 收窄版）** — 文件 `ip/mmu/plugins/MMUPlugin_chmem.h`（新）。交付内容：
+  - 8 项**全相联** `ch_reg` TLB + 组合查找（8 路 tag 比较 → OR 归约 → select 链 → `page | page_off`）
+  - `satp` 的 `ch_reg` 初值 + **Bare 隔离**：门控读 **`satp` 寄存器的 MODE 位（bit31）**，不是编译期 `sv_mode_` 常量 ⇒ 后续 `csr_write_satp` 接线时模式可改。`encode_satp(mode, satp_value)` 在 ctor 编初值（`Sv32` + `satp_value==0` ⇒ `0x8000_0000`，与 TLM `RiscvMMUPlugin` ctor 对齐）。⚠ 初值必须**同时**走 ctor init 与 next 值 `<<=`：`Simulator::reset()` 会把 reg 打成 `rst_val`（⇒ 0），只写 ctor init 的版本会静默恒 Bare（变异 D 已实证）
+  - `ifetch` / `loadstore` 两个 lookup 端口共享同一 TLB
+  - **顺序契约**：`declare_substage("fetch","tlb_lookup_ifetch")` / `("memory","tlb_lookup_loadstore")`（只建 node）+ `at_stage("fetch"/"memory", `Phase::EARLY`)` 写节点；**未**注册新 stage 名（ADR-040 v3.0 §10.6）
+  - `bind_ifetch_vaddr` / `bind_loadstore_vaddr`（输入端走插件句柄，ADR-040 §10.6）+ 未绑定时惰性 0
+  - ⚠ **偏离记录**：TLB 组织用**全相联**而非原计划的「8 项直接映射」——真实 TLB 即全相联，且组合 DAG 里全相联只需比较+OR+select（直接映射反而要用 ch 信号做 index mux）。entry 数 8 不变 ⇒ Phase D 估算口径不变。
+- [x] **B.4** (2026-10-22, **1.0d**) **`test_mmu_chmem_basic` 单元测试 — 7 case / 24 assertions** — 文件 `tests/mmu/test_mmu_chmem_basic.cpp`（新）+ 已加入 `tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES`。case 表：
+  | case | 判据 |
+  |---|---|
+  | `mmu_chmem_tlb_hit_translates_page` | 命中 ⇒ 非恒等翻译（`PADDR = entry.paddr[31:12] \| vaddr[11:0]`）+ `EXCEPTION_CODE=0` + `PTW_ACTIVE=0` |
+  | `mmu_chmem_tlb_miss_keeps_paddr_invalid` | miss ⇒ `PADDR_VALID=0` **且** `EXCEPTION_CODE=0`（miss ≠ fault） |
+  | `mmu_chmem_bare_mode_is_isolated` | `SvMode::Bare` + 有命中项 ⇒ 仍不翻译 |
+  | `mmu_chmem_invalid_entry_does_not_translate` | `entry.valid=0` 而 tag/paddr 都对 ⇒ 不命中（变异对照锚） |
+  | `mmu_chmem_loadstore_port_shares_tlb` | 两端口共享同一 TLB |
+  | `mmu_chmem_unbound_ports_are_inert` | 未绑定时惰性 0，无悬空句柄 |
+  | `mmu_chmem_payload_is_live_node` | 逐拍翻转 ≥4 次（常量折叠实现 ⇒ 0 翻转 ⇒ RED） |
+  **变异对照 4/4 被抓**（驱动脚本 `/tmp/opencode/mutate_b4.py`，证据 `/tmp/opencode/red-evidence/mmu-chmem-phase-b-B4-mutation.txt`；每次单点替换 → 重建 → 单跑 → 回退，回退后确认仍 7/7 全绿）：
+
+  | # | 变异 | RED case |
+  |---|---|---|
+  | A | 去掉 `entry_valid` 参与命中判定（只比 tag） | `invalid_entry_does_not_translate` |
+  | B | `PADDR_VALID` 折成 elaboration 期常量 1 | **5 case**（miss / bare / invalid-entry / unbound / live-node） |
+  | C | `sv_active` 折成常量 `true`（取消 Bare 门控） | `bare_mode_is_isolated` |
+  | D | 去掉 `satp` 的 next 值（只留 ctor init） | **3 case**（hit / loadstore / live-node） |
+
+  变异 D 不是假想：**它是我第一版实现的真实 bug** —— 夹具调了 `Simulator::reset()`，而 `reset()` 把每个 `ch_reg` 打成 `rst_val`（ctor 未给 ⇒ `nullptr` ⇒ 0），清掉了 ctor init ⇒ `satp.MODE` 恒 0 ⇒ 恒 Bare（先例注释见 `tests/cpu/test_cpu_chmem_vendored_elf.cpp:156`）。修法 = satp 初值同时走 ctor init（无 reset 的宿主）与 next 值 `<<=`（有 reset 的宿主），见 `MMUPlugin_chmem.h:176-183`。
+- [x] **B.5** (2026-10-22, **0.5d**) **Phase B 集成回归** — 判据 = **failing-set 逐条相等**（非"全绿"）：
+  - TLM `chipforge_tests`：**481 case / 1 failed**（`test_7stage_riscv.cpp:124`，baseline-known，不修）＝ baseline 相等
+  - CH_MEM `chipforge_tests_chmem`：**125 case / 19661 assertions / All passed**（10m19s）；baseline `118 / 19637` ⇒ **+7 case / +24 assertions 全部来自 B.4**，0 回归
+  - 5 架构 gate 全 PASS：`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` **13/13**（含 Check 13 payload key 模式化）/ `doc_link_check` / `roadmap-r9-check`
+  - **期间 `MMUPluginChmem` 未注册进 `cpu_factory_chmem`**（注册是 C.4 范围）✅
+
+### Phase B 推迟项 → 新 change `chmem-ptw-walk`（未立项，待路线确认）
+
+- [ ] **B.2'** `RiscvMMUPluginChmem` 派生适配器（`ip/cpu/plugins/mmu_chmem.h`）— `csr_write_satp` / `sfence_vma` / `mmu_exit` 闭包 + 3 substage。**前置**：本文件（`MMUPluginChmem` 基类）
+- [ ] **B.3'** PTW 页表 walk — 前置重构：从 `PtWalkFsmPlugin::create_fsm()` 抽取自由函数 `build_pt_walk_fsm(...)`（返回值/节点结构），插件保留为薄包装（`tests/cpu/test_mmu_ptw_fsm_chmem.cpp` 零改动）
+- [ ] **B.3''** TLB miss ⇒ walk 触发 + refill + fault 语义（`EXCEPTION_CODE` 12/13/15）+ fetch stall 协议（依赖 CtrlLink 有状态 halt, capability `ctrllink-continuous-handle` 已就位）
+- [ ] **B.4'** `chmem-ptw-walk` 测试：PTW fault (unit 级) / sv32 非恒等页表向量（真走 walk, 非预载 TLB）
+- [ ] **B.3'''** `MEM_ADDR` 源接线（改父节点读 `keys<ch_uint<32>,32>::MEM_ADDR`）或由 C.4 绑 DMEM 地址信号 —— 二选一需在 C.4 前定
+
 
 ## Phase C wiring (Sprint 4, 2026-11-30 ~ 2026-12-15, 5d)
 
@@ -70,8 +119,12 @@
 
 ## Phase D 验证与回归 (Sprint 6, 2026-12-22 ~ 2027-01-13, 5d, 与 Phase B/C 跟踪同步)
 
-- [ ] **D.1** `test_mmu_bare_plumbing_verilator` TEST_CASE 4 sv32 e2e flip (3d)
-- [ ] **D.2** `test_cpu_l1_mmu_demo` TEST_CASE 7 真 sv32 翻转 (3d)
+> ⚠ **路线 C 对 Phase D 的连带影响（2026-10-22 记录，D.1 启动前必须裁决）**: D.1 / D.2 的「真 sv32 翻转」原设计走"页表在内存里由 PTW 走"路线。PTW 已推迟到 `chmem-ptw-walk` ⇒ 本 change 内 D.1/D.2 要拿到真翻译，只有两条路：
+> **(i)** 等 `chmem-ptw-walk` 落地后再开 D.1（Phase D 顺延）；**(ii)** 给 `MMUPluginChmem` 加 **elaboration 期 TLB 初始装载**（ctor 传 entry 初值，而非只能靠 `<<=` next 值），让 Verilog/Verilator 路径也能带预载 TLB 跑 sv32 翻译。
+> 注意现有 `entry_*` 的 `<<=` 通道主要服务 C++ Simulator 单测（无条件 next 赋值 ⇒ Verilog 侧会生成 `always_ff r <= const`，PTW 接线后必须换成条件写）；`ch_reg` 的 **ctor init** 才会进 Verilog 的寄存器初值。**(ii) 是新增 API，属 D 的范围，不在本 change 的 Phase B 交付内。**
+
+- [ ] **D.1** `test_mmu_bare_plumbing_verilator` TEST_CASE 4 sv32 e2e flip (3d) — **依赖上面的裁决**
+- [ ] **D.2** `test_cpu_l1_mmu_demo` TEST_CASE 7 真 sv32 翻转 (3d) — **依赖上面的裁决**
 - [ ] **D.3** `build_sv32_pte.S` vendor (1d)
 - [ ] **D.4** `sv32-baseline-matrix.csv` — 5 ELF × median cycle × mode=sv32_mmu (2d)
 
