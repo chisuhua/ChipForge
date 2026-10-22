@@ -5,7 +5,7 @@
 | 状态 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity)** — v2.0 (2026-09-17) 基础不变，新增 §10 Verilator 集成段 |
 | 来源 | v1.0: Phase 1 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告（cf::plugin 底层语义翻转，2026-09-16）<br>v3.0: Phase 6d.5 Verilator 后端落地 + 上游 `c27543d` 跨后端 parity 修复（2026-10-21） |
 | v2.0 决策 | **CH_MEM 是新正道**（翻转 v1.0 "ch 渗透禁令"）：<br>① 业务代码在 `-DCF_PLUGIN_USE_CH_MEM` 下必须用 `ch_uint/ch_reg/ch_bool/ch_mem`（elaboration 正道）<br>② 引入 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免机制（ADR-046）<br>③ 新增 Tier-1 Check 5: at_stage 回调内禁运行期 if(ch_bool)（ch_bool explicit operator bool 上下文转换）<br>④ `tools/check_plugin_portability.sh` v2.0 重订（5 项检查） |
-| v3.0 决策 | **Verilator 成为 CH_MEM 路径的第二仿真后端 ⇒ 移植性约束从"单后端语义"扩展为"双后端语义必须一致"**：<br>① 生成 Verilog 与 CppHDL Simulator 的**同拍语义**成为硬要求（§10.1）<br>② 后端语义差异**必须显式契约化**（上游 `mem-read-timing` R3/R4 先例，§10.2）<br>③ 弃用算子治理：`ch_bool::operator\|\|` → `operator\|`（上游 deprecation，§10.3）<br>④ 回归锚形态翻转：跨后端回归锚 SHALL **锁住对齐**而非**钉死漂移**（§10.4） |
+| v3.0 决策 | **Verilator 成为 CH_MEM 路径的第二仿真后端 ⇒ 移植性约束从"单后端语义"扩展为"双后端语义必须一致"**：<br>① 生成 Verilog 与 CppHDL Simulator 的**同拍语义**成为硬要求（§10.1）<br>② 后端语义差异**必须显式契约化**（上游 `mem-read-timing` R3/R4 先例，§10.2）<br>③ 弃用算子治理：`ch_bool::operator\|\|` → `operator\|`（上游 deprecation，§10.3）<br>④ 回归锚形态翻转：跨后端回归锚 SHALL **锁住对齐**而非**钉死漂移**（§10.4）<br>⑤ **payload key 模态约束**：key 的 value type SHALL 用 `cf::plugin::uint_t<N>`，SHALL NOT 用裸 `bool`/`uintN_t` —— 否则 CH_MEM 下 cell 只能装常量 ⇒ 信号退化为 elaboration 期常量（§10.5）<br>⑥ **生产者/消费者顺序契约**：同 stage 内 EARLY(生产者) 必先于 NORMAL(消费者)，SHALL NOT 依赖 plugin 注册顺序（§10.6） |
 | 实现 commit | **25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a** (2026-09-17, M1-M5 8+1 commit 全部推送)<br>v3.0: Phase 6d.5 Verilator 后端 + 上游 `c27543d` / `5b37b7d` / `eccf58f` / `cba0571`（2026-10-21） |
 | 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免）、ADR-080（TLM↔CH_MEM 双模对拍协议，v1.3.0 转硬门禁） |
 
@@ -475,7 +475,42 @@ CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器
 
 **断言强度**：同时断言"每拍观测值 == 当前地址内容"与"观测值 != 上一拍地址内容"。后者不是冗余 —— 若只断言前者，一个"恰好总是等于上一拍"的错误实现也能在地址回绕的特定序列下蒙混过关。
 
-### 10.5 v3.0 范围纪律
+### 10.5 payload key 模态约束（CH_MEM 双模的隐含前提）
+
+**规则**：跨阶段共享的 `cf::plugin::Payload<T>` key，其 value type `T` **SHALL** 用 `cf::plugin::uint_t<N>`（或 `bool_t`），**SHALL NOT** 用裸 `bool` / `uintN_t` / `std::uintN_t`。
+
+**理由**：`PayloadStore` 的 `put` / `get` / `has` 是**精确类型匹配**（`include/cf/plugin/payload.h:122-128`）。
+
+| key 声明 | TLM 模式 cell | CH_MEM 模式 cell | 可否承载运行期 DAG 节点 |
+|---|---|---|---|
+| `Payload<uint_t<64>>` | `uint64_t`（POD） | `ch_uint<64>`（代理） | ✅ CH_MEM |
+| `Payload<std::uint64_t>` | `uint64_t`（POD） | `uint64_t`（**POD**） | ❌ CH_MEM 只能装常量 |
+
+⇒ 裸类型 key 在 CH_MEM 模式下 cell 里装的是 **POD 常量**：消费端读取得到的是 elaboration 期求值的快照 ⇒ **信号退化为常量**。
+
+**已发生的实例**：`ip/cpu/plugins/csr_chmem.h:191-194` 用 `static_cast<bool>(select(...))` 把运行期表达式折成常量 bool 写入 `Payload<bool>`，消费端 `csr_chmem.h:318` / `ip/cpu/arch/riscv/int_alu_chmem.h:374` 再 `ch_bool(bool)` 读回 ⇒ **CSR 写使能经 payload 通道实际是常量化**（测试改走 `last_csr_write_en_` 观察口 `csr_chmem.h:280-281` 绕开了 payload 通道，故全绿）⇒ **"全绿但零语义"在本仓是既有模式，不是理论风险**。
+
+**TLM 模式零影响**：`uint_t<N>` 在 TLM 解析为裸整型（`include/cf/plugin/uint_t.h:73-87`），`uint_t<8>` ≡ `uint8_t`、`uint_t<64>` ≡ `uint64_t`。唯一差异是 1-bit 标志位：TLM 下 `uint_t<1>` = `uint8_t`（非 `bool`）⇒ 值语义仍 0/1，读点 SHALL 用 `static_cast<bool>` 或等价显式转换。
+
+**CI 落地**：`tools/check_plugin_portability.sh` **Check 13**（WARN-only + 已知违规 allowlist）扫 `ip/**` + `bundles/**` 的非 `*_chmem.h` 文件，禁止裸类型 payload key。修完已知违规后可升级为 FAIL。
+
+### 10.6 生产者/消费者顺序契约（CH_MEM elaboration）
+
+**规则**：payload cell 内的 ch 代理是「C++ 侧重绑的指针」—— `logic_buffer<T>::operator=` 仅重绑 `node_impl_`（上游 `lnode/logic_buffer.tpp:21-26`），不发射 assign 节点；消费者通过 `PayloadStore::get` 拿到的是**读取瞬间的快照**。
+
+⇒ **生产者 SHALL 先写，消费者随后读**。
+
+**唯一不依赖 plugin 注册顺序的做法**：生产者与消费者 SHALL 挂在**同一个 stage 名**下，生产者用 **EARLY** phase、消费者用 **NORMAL** phase（`Phase` enum: `EARLY=0 < NORMAL=1 < LATE=2`；`include/cf/plugin/pipe_builder.h` 的 `elaborate()` 在同一 stage 内按 phase 顺序执行，同 phase 桶内按插入序稳定排序）。
+
+生产者 **SHALL NOT** 注册新的 stage 名 —— `canonical_stage_order()` 是 stage 名字在 `stages_` 的**首现序**，与 plugin 注册顺序无关；新增 stage 名会改变 canonical order 并可能把生产者排到消费者**之后**。生产者需要额外 node 时 SHOULD 用 `declare_substage(parent, sub)`（只建 node，不进 `stages_`）。
+
+**已确认的失效形态**：`ip/cpu/cpu_factory_chmem.h:204` 在 `pb->build()` 之前注册 `at_stage("fetch", EARLY, populate)` ⇒ `"fetch"` 被钉在 `stages_` 最前；而插件的 `at_stage(...)` 只能在 `pb->build()` 内注册（`pipe_builder.h:156-157`）⇒ 任何以 `"fetch"` 为消费端的 producer 若用新 stage 名，**必然排在消费者之后** ⇒ `has()` 恒 false ⇒ **永久静默 Bare**（CH_MEM 的 `elaborate()` 只跑一遍，没有 TLM "下一拍 cell 还在"的补偿）。
+
+**验证纪律**：动态行为 SHALL 经 Simulator 求值（tick ≥ 2 拍后读值）判定；SHALL NOT 用 C++ 侧直接转换或缓冲读取判定（上游 `ch_uint<N>::operator uint64_t` 对非常量节点报错并返回默认值）；探测 cell 是否存在 SHALL 用 `has()` + const-get，SHALL NOT 用非 const `operator()`（miss 时会 emplace `ch_uint<N>()` null impl，污染 `has()` 与 DAG）。
+
+**K5 边界约束**：CppHDL 的表达式即节点 ⇒ 同一 API（如 `OR_combined_halt_conds()`）两次调用得到两个**语义等价但指针不同**的节点 ⇒ 测试断言「值等价」而非「指针相等」；只有「cell 传递」路径（消费者读生产者重绑进 cell 的 proxy）才可断言指针相等。
+
+### 10.7 v3.0 范围纪律
 
 **In scope**：
 
@@ -483,13 +518,27 @@ CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器
 - 后端语义差异的**契约化方法论**（§10.2）
 - 弃用算子标准与范围（§10.3）
 - 跨后端回归锚的形态要求（§10.4）
+- **payload key 模态约束 + 生产者/消费者顺序契约**（§10.5 / §10.6）
 
 **Out of scope**：
 
 - **不改 v2.0 的任何约束**（三级模型 / `array_store` / FSM 豁免 / Tier-1 Check 1-5）
 - **不改 TLM 模式语义**
-- **不引入新的 CI 门禁**（跨后端 parity 的硬门禁归 ADR-080，v1.3.0 窗口）
+- **不引入新的 CI 门禁**（跨后端 parity 的硬门禁归 ADR-080，v1.3.0 窗口）—— 本次新增的 Check 13 是 **WARN-only**，不阻塞 CI
 - **不清业务侧 deprecated 算子**（另立 change）
+- **不修 CSR / CPU 侧 payload key**（姊妹 change `chmem-cpu-keys-modality`，挂 Phase C.1 入口）
+
+### 10.8 已知违规登记（payload key 模态）
+
+| 文件 | 违规 key | 归属 |
+|---|---|---|
+| `bundles/csr_bundles.h:42-54` | `CSR_READ_VALID` / `CSR_WRITE_EN` / `Zicsr_VALID` / `Zicsr_OP` / `TRAP_PENDING`（4 个 `Payload<bool>` + 1 个 `Payload<uint8_t>`） | 姊妹 change `chmem-cpu-keys-modality` |
+| `ip/cpu/plugins/csr_chmem.h:191-194,258` | 运行期表达式被 `static_cast<bool>(select(...))` **折成常量**后写入 | 同上 |
+| `bundles/csr_bundles.h:17` | 声称 `TRAP_PENDING` 由 `ibus_chmem.h` 消费 —— 实测 `ibus_chmem.h` 中 `TRAP_PENDING` 出现 **0** 次 ⇒ CH_MEM trap 重定向路径疑似从未接线 | 同上（**仅登记，不在本 change 修**） |
+| `bundles/csr_bundles.h:12` | 注释自陈 "1-bit (ch_bool)" 与实际声明 `Payload<bool>` 矛盾 | 同上 |
+| `ip/cpu/tlm/cpu_keys.h:48` | `CPU_EXCEPTION_CODE`（`Payload<uint8_t>`） | 同上（Phase C.1 入口） |
+| `ip/cache/plugins/cache_keys.h:52` | `vipt_fallback`（`Payload<uint8_t>`） | 同上 |
+| `ip/mmu/tlm/mmu_keys.h` | 其余 8 个 key（`PERMS` / `PTW_ASID` / `PTW_L0_RAW` / `PTW_L1_RAW` / `PTW_L2_RAW` / `PTW_FAULT` / `SATP_MODE` 等） | 同上（CH_MEM 侧消费点未落地 ⇒ 现在改无消费点可验证） |
 
 
 

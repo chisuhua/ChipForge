@@ -71,15 +71,21 @@
 - **后果**: Sv32 + 未写 satp (PPN=0) 的启动瞬态,按原 spec 应"fetch_stall 永远不触发",按 D4 则应判为 Sv-mode → PTW walk → **必须** stall。实现者无法同时满足。
 - **设计挑战**: Bare path 判定必须**严格按 `satp_mode` 字段** (TLM=byte, CH_MEM=`ch_uint<8>`),而非 `satp_ppn`。owner 起草 v0.2 时须直接引用 `MMUPlugin.cpp:89-93` 注释。
 
-### 1.5 [BLOCKER-B5] `ptw_active` 是 `Payload<bool>` POD,CH_MEM `CtrlLink::halt_when` 需要 `ch_bool` — 无合法信号源
+### 1.5 [BLOCKER-B5] ~~`ptw_active` 是 `Payload<bool>` POD,CH_MEM `CtrlLink::halt_when` 需要 `ch_bool` — 无合法信号源~~ → **已由 `chmem-mmu-keys-modality` 解除一半，另一半归 Phase C**
 
-- **现状** (critic 实证):
+- **原状** (critic 实证):
   - `ip/mmu/tlm/mmu_keys.h:35` `PTW_ACTIVE` 是 **`Payload<bool>` (POD)**
   - CH_MEM 下 `CtrlLink::halt_when(Condition)` 的 `Condition = ch::core::ch_bool` (`ctrl_link.h:54,67`)
   - 跨类型取用正是 `mmu_exception_handler_chmem.h:15-27` 标注为"未确认"的路径
   - plan (`WT/.rddf/plans/mmu-chmem-pipeline-integration.md`) 把 key 类型统一推给 "Phase B (12-01)"
-- **后果**: §1.2 stall 语义 (§2 `drive_stall_signal`) 在 Sprint 2 窗口内**没有可用的信号源**。
-- **设计挑战**: 必须先定义 `ch_bool` 类型的 PTW_ACTIVE 信号(Phase B 实装),然后才能 stall。owner 在 Phase B 实装前无法起草 fetch_stall_chmem.h。
+- **原后果**: §1.2 stall 语义 (§2 `drive_stall_signal`) 在 Sprint 2 窗口内**没有可用的信号源**。
+- **原设计挑战**: 必须先定义 `ch_bool` 类型的 PTW_ACTIVE 信号(Phase B 实装),然后才能 stall。owner 在 Phase B 实装前无法起草 fetch_stall_chmem.h。
+
+- **✅ 2026-10-22 更新（两半拆解）**:
+  - **① key 类型（已解除）**: `chmem-mmu-keys-modality`（已 archive）把 `PTW_ACTIVE` 改为 `cf::plugin::uint_t<1>`（CH_MEM = `ch_uint<1>`）⇒ cell 能承载**运行期节点**，不再是 POD 常量。
+  - **② `ch_uint<1>` → CtrlLink 条件的接线路径（已明确，无需新机制）**: **不走** `CtrlLink::halt_when` 的直接参数，而是经**聚合路径**（`include/cf/plugin/pipe_builder.h:435-452`）—— 插件把 `ch_uint<1>` 节点写进 payload cell，由 provider 在聚合点转成 `ch_bool` 条件交给 CtrlLink。`ch_uint<1>` 满足 `select()` 的 `HardwareType` 约束，也可经 `ch_uint<1>::operator ch_bool()`（上游 `core/uint.h:123-125`，仅 `N==1`）转成 `ch_bool` 节点（**不是常量折叠**）。
+  - **③ 剩余阻塞（不属本 BLOCKER）**: `chmem-cpu-keys-modality`（姊妹 change，挂 Phase C.1 入口）负责 CPU 侧 `CPU_EXCEPTION_CODE` 等裸类型 key；本条 BLOCKER 的**信号源缺失**已不再是 Sprint 2 的硬障碍。
+  - **结论**: 本条从 **BLOCKER** 降级为 **Sprint 3.5 可施工**（owner 仍为 mmu-chmem team；实施时须遵守 ADR-040 v3.0 §10.6 的「同 stage + EARLY/NORMAL」顺序契约）。
 
 ---
 

@@ -145,6 +145,9 @@ set(CHMEM_TEST_SOURCES
     # CtrlLink 有状态 (跨拍保持) halt 条件 — openspec change ctrl-link-chmem-reg-handle
     # (capability ctrllink-continuous-handle; 多拍驱动证明 OR 随寄存器逐拍更新)
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_ctrl_link_stateful.cpp
+    # MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约
+    # — openspec change chmem-mmu-keys-modality (Phase B 的 B.3/B.4 硬前置)
+    ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_keys_modality.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

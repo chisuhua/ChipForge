@@ -31,6 +31,10 @@ deps_status:
 > **路径裁决 (2026-10-22 双审)**: CH_MEM 新文件落 `ip/mmu/plugins/MMUPlugin_chmem.h` 而**非** `ip/mmu/tlm/MMUPlugin_chmem.h` —— `tools/check_plugin_portability.sh` 的 Check 2 (`:95` `find -path "*/plugins/*_chmem.h"`) 与 Check 7 (`:273-284` 按文件名排除 `*_chmem.h`) **都扫不到 `ip/mmu/tlm/`** ⇒ 放那里等于让 4 门禁对该文件完全失明。ADR-083 §2.4 (`:125-155`) 亦要求 `ip/{cpu,cache,mmu,memory}/plugins/<name>.{h,_chmem.h}`。`ip/mmu/tlm/` 整体迁移另立治理 change。
 >
 > **Payload key 裁决 (2026-10-22 双审)**: **不新建 bundles key 文件**，复用 `ip/mmu/tlm/mmu_keys.h` 既有静态实例，且实例化参数必须与消费端一致（`mmu_keys<std::uint64_t>`）。`PayloadStore` 按**指针身份**索引 (`include/cf/plugin/payload.h:124,136,153,166,196,204,220,233` 全部 `cells_.find(&key)`) ⇒ key 对象不同 ⇒ 消费端 `has()` 恒 false ⇒ sel 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**。
+>
+> **Payload key 类型裁决 (2026-10-22，`chmem-mmu-keys-modality` 已 archive)**: 上面两条只解决了**身份**问题，没解决**模态**问题 —— 裸类型 key（`Payload<std::uint64_t>` / `Payload<bool>`）在 CH_MEM 下 cell 是 **POD**，`put` 精确类型匹配 ⇒ **装不下 `ch_uint` 节点**，消费端 `ch_bool(cell)` 会把节点折成 elaboration 期常量。该缺口已由前置 change `chmem-mmu-keys-modality` 修复：5 个输出 key（`MMU_VADDR` / `PADDR` / `EXCEPTION_CODE` / `PTW_ACTIVE` / `PADDR_VALID`）改为 `cf::plugin::uint_t<N>`，2 个 CH_MEM 消费点改为「读节点」，并成文**顺序契约**。详见 ADR-040 v3.0 §10.5 / §10.6。
+>
+> **Producer 挂载裁决 (同批)**: `MMUPlugin_chmem` 的 payload 生产点 **SHALL** 与消费端挂**同一 stage 名**（`tlb_lookup_ifetch` / `tlb_lookup_loadstore`）+ `Phase::EARLY`，消费端保持 `Phase::NORMAL`；**禁**注册新 stage 名（`canonical_stage_order()` 只看 stage 名字在 `stages_` 的首现序，而 `cpu_factory_chmem.h:204` 已在 `pb->build()` 之前把 `"fetch"` 钉在最前 ⇒ 新 stage 名必排在消费端之后 ⇒ 永久静默 Bare）。需要 node 时用 `declare_substage`（不进 `stages_`）。
 
 **Tech Stack:** C++23、CppHDL `ch_uint<N>` / `ch_reg` / `ch_mem` (ADR-040 v2.0 双模式)、`chlib::ch_state_machine` DSL (ADR-046 v2.0 §2.1.1 算术豁免)、Plugin 框架 (at_stage / payload keys / CtrlLink::halt_when)、Catch2 v3.7.0、`chipforge_tests` (TLM) / `chipforge_tests_chmem` (CH_MEM) 双二进制、`tools/run_chipforge_tests.sh --all` 回归。
 
@@ -474,23 +478,33 @@ Expected: `[mmu] 59/59` + `[cpu-l1-mmu-demo] 7/7` + `[riscv-tests] 48/48` + `[ve
 > **为何 15d 而非 10d**: 本 plan 原 10d 版本**整段丢失了 B.5 的 5d 集成回归**（Task 3.4 只有 2d 单测）⇒ 在"3 次派发失败"的历史上采纳压缩版是错误方向。
 > **依赖序** (`tasks.md` 锁定): **B.0 (key 复用确认)** → B.2 (RiscvMMUPlugin_chmem) → B.3 (MMUPlugin_chmem 收窄版) → B.4 (PTW FSM 复用) → B.5 (test_mmu_chmem_basic) → B.6 (集成回归)
 
-### Task 3.0: B.0 — Payload key 复用确认 (0.2 day, 阻塞全部后续 task)
+### Task 3.0: B.0 — Payload key 前置确认 (0.1 day, 阻塞全部后续 task；**0.2d → 0.1d** 因 `chmem-mmu-keys-modality` 已 archive)
 
 **Files:**
-- Verify: `ip/mmu/tlm/mmu_keys.h:44-53` (既有 5 key 定义, **不新建**)
-- Verify: `ip/cpu/plugins/ibus_chmem.h:121` + `ip/cpu/plugins/dmem_chmem.h:142` (消费端 `MmuKeys` 实例化)
+- Verify: `ip/mmu/tlm/mmu_keys.h` (5 个目标 key 已模式化为 `cf::plugin::uint_t<N>`，**不新建**)
+- Verify: `ip/cpu/plugins/ibus_chmem.h` + `ip/cpu/plugins/dmem_chmem.h` (消费端 `MmuKeys` 实例化 + 已改「读节点」)
+- Gate: `openspec/changes/archive/*chmem-mmu-keys-modality*/` 存在（本 task 是**复核**，不是施工）
 
 - [ ] **Step 1: 断言实例化参数与静态实例地址一致**
 
 `MMUPlugin_chmem` 发射用的 key 必须是 `cf::ip::mmu::payload::mmu_keys<std::uint64_t>` 的**同一静态实例**（与消费端指针相等）。`mmu_keys` 是模板 struct + static inline 成员 ⇒ `mmu_keys<uint64_t>` 与 `mmu_keys<uint32_t>` 是**不同实例、不同地址**。
 
+> **模板参数必须保持 raw** —— 写 `mmu_keys<ch_uint<64>>` 会撞 `mmu_keys.h:46-48` 的 `static_assert`（要求裸整型），且与消费端实例不同 ⇒ 指针不等。
+
 Expected: 指针相等断言 PASS
 
 - [ ] **Step 2: 消费端 `has()` 契约自检**
 
-确认 `ibus_chmem.h:144` / `dmem_chmem.h:144` 的 `payloads().has(MmuKeys::PADDR_VALID)` 在 MMU plugin 注册后**返回 true**（而非恒 false）。
+确认 `ibus_chmem.h` / `dmem_chmem.h` 的 `payloads().has(MmuKeys::PADDR_VALID)` 在 MMU plugin 注册后**返回 true**（而非恒 false）。
 
 Expected: FAIL-before / PASS-after（B.3 实装后复跑）
+
+- [ ] **Step 3: 模态 + 顺序自检（新增，前置 change 的兑现检查）**
+
+(a) `get(MmuKeys::PADDR_VALID)` 在 CH_MEM 下解析为 `ch_uint<1>&`（不是 `bool&`）；
+(b) producer 挂 `("tlb_lookup_ifetch", Phase::EARLY)` / consumer 保持 `("tlb_lookup_ifetch", Phase::NORMAL)`，且 producer **未**注册任何新 stage 名（`pb.stages()` 不含 `tlb_lookup_*` 之外的新条目）。
+
+参照锚：`tests/mmu/test_mmu_keys_modality.cpp`（4 case / 15 assertions，`[keys]`）。
 
 > **不新建 bundles key 文件** —— `PayloadStore` 按指针身份索引，新 key 对象 ⇒ 消费端 `has()` 恒 false ⇒ sel 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**。
 

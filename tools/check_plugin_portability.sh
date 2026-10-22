@@ -453,13 +453,54 @@ fi
 echo ""
 
 # ----------------------------------------------------------------------------
+# Check 13 (NEW chmem-mmu-keys-modality 2026-10-22): payload key 必须模式化
+#
+# 规则: Payload key 的 value type 必须用 `cf::plugin::uint_t<N>` / `bool_t`,
+#       **禁止**裸 `bool` / `uintN_t`.
+#   - TLM 模式: `uint_t<N>` ≡ 裸整型 (uint_t.h:73-87) ⇒ 行为等价, 零回归
+#   - CH_MEM 模式: `uint_t<N>` = `ch::core::ch_uint<N>` ⇒ cell 里装 **ch 代理**,
+#     可承载**运行期 DAG 节点**; 而裸类型在 CH_MEM 下只能装 **POD 常量**
+#     (`PayloadStore::put` 是精确类型匹配, include/cf/plugin/payload.h:122-128)
+#     ⇒ sv32 翻译退化为 elaboration 期常量 ⇒ **测试全绿但翻译从未生效**
+#
+# 状态: [WARN] —— 已知违规由姊妹 change `chmem-cpu-keys-modality` 处理
+#       (csr_bundles 5 key + cpu_keys 1 key + cache_keys 1 key + mmu_keys 7 key);
+#       修完后本检查可升级为 FAIL.
+# ----------------------------------------------------------------------------
+echo "[13/13] 检查 payload key 模式化 (禁裸 bool / uintN_t) [WARN] ..."
+KEY_MODALITY_VIOLATIONS=""
+KEY_MODALITY_FILES=$(find ${ROOT_DIR}/ip ${ROOT_DIR}/bundles -type f \( -name "*.h" -o -name "*.hpp" \) \
+  ! -name "*_chmem.h" ! -path "*/build/*" 2>/dev/null || true)
+# 已知违规 allowlist (姊妹 change chmem-cpu-keys-modality 处理)
+KEY_MODALITY_ALLOWLIST=" ${ROOT_DIR}/bundles/csr_bundles.h ${ROOT_DIR}/ip/cache/plugins/cache_keys.h ${ROOT_DIR}/ip/cpu/tlm/cpu_keys.h ${ROOT_DIR}/ip/mmu/tlm/mmu_keys.h "
+for f in ${KEY_MODALITY_FILES}; do
+  case "${KEY_MODALITY_ALLOWLIST}" in
+    *" ${f} "*) continue ;;
+  esac
+  HITS=$(grep -nE "Payload<(bool|std::uint(8|16|32|64)_t)>" "$f" \
+    | grep -vE "^[[:space:]]*[0-9]+:[[:space:]]*(//|/\*|\*)" || true)
+  if [ -n "${HITS}" ]; then
+    KEY_MODALITY_VIOLATIONS="${KEY_MODALITY_VIOLATIONS}${f}:"$'\n'"${HITS}"$'\n'
+  fi
+done
+if [ -z "${KEY_MODALITY_VIOLATIONS}" ]; then
+  echo "  [PASS] payload key 全部模式化 (无裸 bool / uintN_t)"
+else
+  echo "  [WARN] 下列文件含裸类型 payload key (CH_MEM 下只能装常量 ⇒ 翻译退化为常量路径):"
+  echo "${KEY_MODALITY_VIOLATIONS}" | sed 's/^/    /'
+  echo "  [FIX] 改用 cf::plugin::uint_t<N> / bool_t (ADR-040 v3.0 payload key 模态约束)"
+  WARN_COUNT=$((WARN_COUNT + 1))
+fi
+echo ""
+
+# ----------------------------------------------------------------------------
 # 汇总
 # ----------------------------------------------------------------------------
 if [ ${FAIL_COUNT} -eq 0 ]; then
   if [ ${WARN_COUNT} -gt 0 ]; then
-    echo "=== ADR-040 v2.0 + ADR-047 移植性检查通过 (12/12, 含 ${WARN_COUNT} 项 WARN) ==="
+    echo "=== ADR-040 v2.0 + ADR-047 移植性检查通过 (13/13, 含 ${WARN_COUNT} 项 WARN) ==="
   else
-    echo "=== ADR-040 v2.0 + ADR-047 移植性检查全部通过 (12/12) ==="
+    echo "=== ADR-040 v2.0 + ADR-047 移植性检查全部通过 (13/13) ==="
   fi
   exit 0
 else

@@ -5,10 +5,9 @@
   "planner_complete_at": "2026-10-22T00:00:00+00:00",
   "current_sprint": "sprint-2026-11",
   "proposals_ready": [
-    "mmu-chmem-phase-b-c-launch",
-    "chmem-mmu-keys-modality"
+    "mmu-chmem-phase-b-c-launch"
   ],
-  "proposals_approved_count": 2,
+  "proposals_approved_count": 1,
   "features_active": [
     "feat-mfc-multi-cycle-fsm",
     "feat-rv32um-m-extension",
@@ -17,8 +16,7 @@
     "feat-phase-6d-rtl-verification"
   ],
   "awaiting_builder": [
-    "mmu-chmem-phase-b-c-launch",
-    "chmem-mmu-keys-modality"
+    "mmu-chmem-phase-b-c-launch"
   ],
   "recommended_route": "complex",
   "active_objectives": [
@@ -48,5 +46,5 @@
       ]
     }
   ],
-  "notes": "2026-10-22 rdd-planner 阶段退出。前序 handoff (2026-10-09) 的 awaiting_builder=[mfc-extract-fsm-h] 已失效 — 该 change 2026-10-10 archive; features_active 已剔除 feat-dhrystone-dmips-gate (2026-10-15 done)。本次新增两个 ready proposal: (1) ctrl-link-chmem-reg-handle — 框架级纯改动 1d, A4 已移出 scope 改挂 mmu-chmem-phase-b-c-launch 的 C.5 (惰性骨架风险: ch_reg 无 next 驱动源, 惰性窗口跨 Phase 1 -> C.5 ~5 周); (2) mmu-chmem-phase-b-c-launch — Phase B 15d (不采纳 37KB plan 的 10d 压缩版, 该版丢了 B.5 的 5d 集成回归)。Phase B 新文件路径锁 ip/mmu/plugins/ 而非 ip/mmu/tlm/ — 后者同时逃出 check_plugin_portability.sh 的 Check 2 与 Check 7 扫描范围 (CI 盲区)。执行序列决策纪要见 .rddf/plans/20261022-v0110-mmu-chmem-execution-sequence.md (仓内, 降级为非 SSOT); 2026-10-22 双审另新增 Phase B 硬前置 change chmem-mmu-keys-modality (MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约, plan 与 5 段 draft 已落盘)"
+  "notes": "2026-10-22 rdd-planner 阶段退出。前序 handoff (2026-10-09) 的 awaiting_builder=[mfc-extract-fsm-h] 已失效 — 该 change 2026-10-10 archive; features_active 已剔除 feat-dhrystone-dmips-gate (2026-10-15 done)。本次新增两个 ready proposal: (1) ctrl-link-chmem-reg-handle — 框架级纯改动 1d, A4 已移出 scope 改挂 mmu-chmem-phase-b-c-launch 的 C.5 (惰性骨架风险: ch_reg 无 next 驱动源, 惰性窗口跨 Phase 1 -> C.5 ~5 周); (2) mmu-chmem-phase-b-c-launch — Phase B 15d (不采纳 37KB plan 的 10d 压缩版, 该版丢了 B.5 的 5d 集成回归)。Phase B 新文件路径锁 ip/mmu/plugins/ 而非 ip/mmu/tlm/ — 后者同时逃出 check_plugin_portability.sh 的 Check 2 与 Check 7 扫描范围 (CI 盲区)。执行序列决策纪要见 .rddf/plans/20261022-v0110-mmu-chmem-execution-sequence.md (仓内, 降级为非 SSOT); 2026-10-22 双审另新增 Phase B 硬前置 change chmem-mmu-keys-modality (MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约, plan 与 5 段 draft 已落盘) || 2026-10-22 (build) chmem-mmu-keys-modality 已 archive ⇒ 从 proposals_ready / awaiting_builder 移除; 它是 mmu-chmem-phase-b-c-launch 的 Phase B 硬前置, 现已解除 (B.0 从 0.2d 降为 0.1d 复核). 同期新增硬前置门禁: Phase B 开工前须确认 ADR-040 v3.0 §10.6 顺序契约 (同 stage + EARLY/NORMAL)."
 }

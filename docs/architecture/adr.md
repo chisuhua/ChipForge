@@ -110,7 +110,7 @@
 | ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
 | ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制；gitignored 草稿不链接）+ **v2.0 Phase 6c M5 落地 (2026-09-17, D4 elaboration 语义兑现)** |
 | ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
-| ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity；v2.0 2026-09-17 Phase 6c M5 落地)** | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
+| ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity；§10.5 payload key 模态约束 + §10.6 生产者/消费者顺序契约 于 2026-10-22 `chmem-mmu-keys-modality` 补齐；v2.0 2026-09-17 Phase 6c M5 落地)** | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
 | ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |

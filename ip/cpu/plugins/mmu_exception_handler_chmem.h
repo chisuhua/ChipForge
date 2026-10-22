@@ -76,18 +76,28 @@ class MmuExceptionHandlerPlugin : public cf::plugin::PluginBase {
   // build — 注册 combinational network 闭包 (D3-A 最小)
   //
   // 闭包 skeleton 已注册,实际 ch_bool 接线待 Phase B (mmu_chmem.h) 落地后
-  // 启用。当前 no-op:CPU_EXCEPTION_CODE 跨类型 operator() 在 CppHDL 0.x
-  // 未验证,Phase B 同步做 key 类型 ch_uint<8> 化后这里 OR-merge 启用。
+  // 启用。当前 no-op: CPU_EXCEPTION_CODE 的 key 类型仍是裸 `Payload<std::uint8_t>`
+  // (ip/cpu/tlm/cpu_keys.h:48), CH_MEM 下装不下 ch 信号。
+  //
+  // ⚠ 2026-10-22 `chmem-mmu-keys-modality`: 本文件依赖的 MMU 侧 key
+  //    (`mmu_keys::EXCEPTION_CODE`) 已模式化为 `cf::plugin::uint_t<8>`;
+  //    但 CPU 侧 `cpu_keys::CPU_EXCEPTION_CODE` 归姊妹 change
+  //    `chmem-cpu-keys-modality`(挂 Phase C.1 入口), 本文件保持 no-op 直到
+  //    该 change archive。参见 ADR-040 v3.0 §10.5 / §10.8。
   void build(cf::plugin::PipeBuilder& pb) override {
     pb.at_stage("memory", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("memory").get();
       if (n && stall_ctrl_) {
-        // C.1 接线点 (Phase B post-merge):
-        //   const auto exc_code = n->operator()(cpu_keys<ch_uint<8>>::CPU_EXCEPTION_CODE);
+        // C.1 接线点 (Phase B post-merge, 前置 = chmem-cpu-keys-modality archive):
+        //   const auto exc_code = n->operator()(cpu_keys<std::uint32_t>::CPU_EXCEPTION_CODE);
         //   const auto zero8 = ch::core::ch_uint<8>(ch::core::ch_literal<0, 8>{});
         //   const auto mmufault_clear = (exc_code != zero8);
         //   stall_ctrl_->halt_when(mmufault_clear);
         // 维持 bare path byte-identical 直到 Phase B 落地
+        //
+        // 注: key 模板参数必须保持 **raw** `std::uint32_t`(与消费端同实例化),
+        //     不能写 `cpu_keys<ch_uint<8>>` —— Task 类模板的 static_assert
+        //     (cpu_keys.h:34-36) 要求 T 是裸整型, 且 PayloadStore 按指针身份索引。
       }
     });
   }

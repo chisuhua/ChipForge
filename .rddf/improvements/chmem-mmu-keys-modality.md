@@ -1,6 +1,6 @@
 ---
 id: chmem-mmu-keys-modality
-status: ready
+status: done
 initiative: wave5-isa-coverage-and-bp
 priority: P1
 phase: phase-4

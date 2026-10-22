@@ -5,6 +5,44 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (2026-10-22, interim) — chmem-mmu-keys-modality: MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约
+
+> **OpenSpec change**: `chmem-mmu-keys-modality` (wave5-isa-coverage-and-bp)
+> **Capability**: `payload-key-modality` (新增)
+> **Author / Date**: build agent, 2026-10-22
+> **Scope**: 1 个 key 头 + 2 个 CH_MEM 消费点 + 1 个新测试 + 1 个门禁脚本 + 文档。**TLM 路径零行为变化。**
+> **触发**: `mmu-chmem-phase-b-c-launch` Phase B 的 B.3（`MMUPlugin_chmem` 真翻译）**按原设计不可实现** —— MMU payload key 用裸类型，CH_MEM 模式下 cell 只能装 POD 常量 ⇒ 运行期 ch 信号写不进去；叠加 elaboration 顺序缺陷（消费者恒先于生产者跑）⇒ **编译通过、测试全绿、翻译永不发生**。
+
+### Fixed（通道 + 顺序）
+
+- **MMU payload key 模式化** —— `ip/mmu/tlm/mmu_keys.h` 的 5 个输出 key（`MMU_VADDR` / `PADDR` / `EXCEPTION_CODE` / `PTW_ACTIVE` / `PADDR_VALID`）改用 `cf::plugin::uint_t<N>`。
+  - **为什么**：`PayloadStore` 的 `put`/`get`/`has` 是精确类型匹配（`payload.h:122-128`）⇒ 裸类型 cell 在 CH_MEM 下只能装 **POD 常量**，装不下 `ch_bool`/`ch_uint`。
+  - **编译器实证**：`put(Payload<bool>&, ch_uint<1>)` → `error: no matching function for call to 'PayloadStore::put(Payload<bool>&, ch_uint<1>)'`。
+  - **TLM 零影响**：`uint_t<64>` ≡ `uint64_t`、`uint_t<8>` ≡ `uint8_t`；1-bit 标志位 TLM 下为 `uint8_t`（非 `bool`），全部读点均为 `static_cast<bool>` ⇒ 行为等价。
+- **CH_MEM 消费点改为「读节点」** —— `ip/cpu/plugins/ibus_chmem.h` + `ip/cpu/plugins/dmem_chmem.h` 不再 `ch_bool(cell)`（把 DAG 节点折成 elaboration 期常量），改为直取 `ch_uint<1>` 作为 `select()` 条件 + `ch_uint<32>(ch_uint<64>)` 跨宽截断。
+- **顺序契约成文**（ADR-040 v3.0 §10.6）—— 同 stage 内 **EARLY(生产者) 必先于 NORMAL(消费者)**，与 plugin 注册顺序**无关**；生产者 SHALL NOT 注册新 stage 名（`canonical_stage_order()` 只看 stage 名字首现序）。
+
+### Added（规则与门禁）
+
+- **`tools/check_plugin_portability.sh` Check 13**（**WARN-only** + 已知违规 allowlist）—— 禁 `ip/**` + `bundles/**` 的非 `*_chmem.h` 文件出现裸类型 payload key（`Payload<bool>` / `Payload<std::uintN_t>`）。修复已知违规后可升级为 FAIL。
+- **ADR-040 v3.0 §10.5 / §10.6 / §10.8** —— payload key 模态约束、生产者/消费者顺序契约、已知违规登记（7 类）。
+- **capability `payload-key-modality`** —— `openspec/specs/payload-key-modality/spec.md`（3 个 Requirement）。
+- **`tests/mmu/test_mmu_keys_modality.cpp`**（4 case / 15 assertions）：类型断言（编译期）+ 鉴别力（consumer 读到**同一节点**且随拍更新）+ 顺序契约 + 变异对照。
+
+### 测试
+
+- **变异对照 3 个全红**（真实改码 → 确认变红 → 回退）：① 消费端折常量（2 断言 RED）② 消费端读错 key（2 断言 RED）③ 顺序倒挂（1 断言 RED）。
+- **回归 0 退化**：TLM `481 | 480 passed | 1 failed`（唯一失败仍是已知的 `test_7stage_riscv.cpp:124 node_count==17` infra drift）；CH_MEM `114 + 4 新增 = 118 case` / All passed。
+
+### Scope 变更
+
+- **CSR / CPU 侧 payload key 不在本 change** —— `bundles/csr_bundles.h`（4 bool + 1 uint8）、`ip/cpu/tlm/cpu_keys.h`（`CPU_EXCEPTION_CODE`）、`ip/cache/plugins/cache_keys.h`（`vipt_fallback`）、`mmu_keys` 其余 8 key 归**姊妹 change `chmem-cpu-keys-modality`**，挂 **Phase C.1 入口**（部分改会留下同款雷）。
+- **已登记未修**：`bundles/csr_bundles.h:17` 声称 `TRAP_PENDING` 由 `ibus_chmem.h` 消费，实测 `ibus_chmem.h` 中该 key 出现 **0** 次 ⇒ CH_MEM trap 重定向路径疑似从未接线（ADR-040 §10.8）。
+
+### 下游解锁
+
+- **`mmu-chmem-phase-b-c-launch` Phase B 的 B.3/B.4 硬前置已解除** —— 单级 `ch_mem` TLB + `PtWalkFsmPlugin` walk 从"不可实现"变为"可实现"；且 Phase 3.5 的 BLOCKER-B5（"必须先定义 ch_bool 类型的 PTW_ACTIVE 信号（Phase B 实装）"）的依赖方向**真正成立**（PTW_ACTIVE 经 CtrlLink 聚合路径兑现，`pipe_builder.h:435-452`）。
+
 ## v0.11.0 (2026-10-22, interim) — ctrl-link-chmem-reg-handle: CtrlLink 支持"有状态"（跨拍保持）halt 条件
 
 > **OpenSpec change**: `ctrl-link-chmem-reg-handle` (wave5-isa-coverage-and-bp)

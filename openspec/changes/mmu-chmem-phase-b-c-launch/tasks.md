@@ -26,8 +26,9 @@
 
 > **估时口径 (2026-10-22 双审)**: B.2 3d + B.3 5d + B.4 2d + B.5 5d = **15d**。`.rddf/plans/mmu-chmem-pipeline-integration.md` 原写 10d **整段丢失 B.5 的 5d 集成回归**, 已回改。**B.1 跳过** (Oracle D1-B 收窄版锁定)。
 > **路径与 key 裁决**: CH_MEM 新文件落 `ip/mmu/plugins/MMUPlugin_chmem.h` (**非** `ip/mmu/tlm/` — 后者同时逃出 `check_plugin_portability.sh` Check 2 与 Check 7 扫描范围 = CI 盲区); **不新建 bundles key 文件**, 复用 `ip/mmu/tlm/mmu_keys.h` 的 `mmu_keys<std::uint64_t>` 既有静态实例 (PayloadStore 按**指针身份**索引 ⇒ key 不同 ⇒ 消费端 `has()` 恒 false ⇒ 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**)。
+> **key 类型 + producer 顺序裁决 (2026-10-22, 硬前置 `chmem-mmu-keys-modality`)**: 上面两条只解决**身份**, 没解决**模态** —— 裸类型 key 在 CH_MEM 下 cell 是 POD, 装不下 `ch_uint` 节点。前置 change 已把 5 个输出 key 模式化 + 2 个消费点改「读节点」+ 成文顺序契约 (ADR-040 v3.0 §10.5/§10.6)。**B.2/B.3 实施时 producer SHALL 与消费端挂同一 stage 名 + `Phase::EARLY`**, **禁**注册新 stage 名 (否则 `canonical_stage_order()` 把 producer 排到 consumer 之后 ⇒ 永久静默 Bare)。
 
-- [ ] **B.0** (2026-10-22 新增, 0.2d) **Payload key 复用确认** — `MMUPlugin_chmem` 发射用的 key 必须与 `ibus_chmem.h:121` / `dmem_chmem.h:142` 消费的 `MmuKeys` 是**同一静态实例** (`mmu_keys<std::uint64_t>`, 指针相等)。阻塞全部后续 task
+- [ ] **B.0** (2026-10-22 修订, **0.1d**) **Payload key 前置复核** — **门禁**: `chmem-mmu-keys-modality` 必须已 archive。复核 (a) `MMUPlugin_chmem` 发射用的 key 与 `ibus_chmem.h` / `dmem_chmem.h` 消费的 `MmuKeys` 是**同一静态实例** (`mmu_keys<std::uint64_t>`, 指针相等, 模板参数保持 raw); (b) CH_MEM 下 `get(PADDR_VALID)` 解析为 `ch_uint<1>&` 而非 `bool&`; (c) producer 未注册新 stage 名。参照锚 `tests/mmu/test_mmu_keys_modality.cpp` (`[keys]`, 4 case / 15 assertions)。阻塞全部后续 task
 - [ ] **B.2** 实装 `RiscvMMUPlugin_chmem` — elaboration-time satp ch_reg 初值 + at_stage 闭包 (3d) — 文件 `ip/cpu/plugins/mmu_chmem.h` (新)
 - [ ] **B.3** 实装 `MMUPlugin_chmem` 收窄版 — 单级 ch_mem TLB (8 项直接映射) + 复用 PtWalkFsmPlugin (5d) — 文件 `ip/mmu/plugins/MMUPlugin_chmem.h` (新)
 - [ ] **B.4** `test_mmu_chmem_basic` 单元测试 — **5 case**: TLB hit / TLB miss / PTW fault (unit 级) / sv32 模式 (非恒等页表向量) / Bare 隔离 (2d) — 文件 `tests/mmu/test_mmu_chmem_basic.cpp` (新) + **手动加入 `tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES`**

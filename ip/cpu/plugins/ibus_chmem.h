@@ -138,11 +138,17 @@ class IBusPlugin : public PluginBase {
     //     实现 vaddr → paddr 真翻译
     //   闭包外层 "tlb_lookup_ifetch" 节点不存在时 (Bare) → PADDR_VALID=false → 走 vaddr
     auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
-    ch::core::ch_bool    paddr_valid = ch::core::ch_bool(false);
+    ch::core::ch_uint<1>  paddr_valid = ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{});
     ch::core::ch_uint<32> paddr      = ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{});
     ch::core::ch_uint<32> mmu_vaddr  = pc_val;  // Bare default = pc_val
     if (tlb_n && tlb_n->payloads().has(MmuKeys::PADDR_VALID)) {
-      paddr_valid = ch::core::ch_bool(tlb_n->operator()(MmuKeys::PADDR_VALID));
+      // ⚠ 读**节点**而非常量 (chmem-mmu-keys-modality, 2026-10-22):
+      //    MMU payload key 已模式化 ⇒ cell 里装的是 ch 代理 (ch_uint<N>)。
+      //    旧写法 `ch_bool(cell)` 会把 DAG 节点**折成 elaboration 期常量**
+      //    ⇒ sv32 翻译退化为常量路径 (测试全绿但翻译从未生效)。
+      //    `ch_uint<32>(ch_uint<64>)` 走跨宽构造的截断路径
+      //    (core/uint.h:104-121, M>N ⇒ bits<N-1,0>) —— sv32 下 vaddr/paddr ≤32bit。
+      paddr_valid = tlb_n->operator()(MmuKeys::PADDR_VALID);
       paddr       = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::PADDR));
       mmu_vaddr   = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::MMU_VADDR));
     }

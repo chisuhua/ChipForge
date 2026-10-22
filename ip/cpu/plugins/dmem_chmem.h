@@ -142,7 +142,8 @@ class DMemPlugin : public PluginBase {
       using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
       if (auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_loadstore").get();
           tlb_n && tlb_n->payloads().has(MmuKeys::PADDR_VALID)) {
-        auto paddr_valid = ch::core::ch_bool(tlb_n->operator()(MmuKeys::PADDR_VALID));
+        // ⚠ 读**节点**而非常量 (chmem-mmu-keys-modality, 2026-10-22) —— 同 ibus_chmem.h
+        auto paddr_valid = tlb_n->operator()(MmuKeys::PADDR_VALID);   // ch_uint<1>
         auto paddr = ch::core::ch_uint<32>(tlb_n->operator()(MmuKeys::PADDR));
         byte_addr = ch::core::select(paddr_valid, paddr, vaddr_byte_addr);
       }
