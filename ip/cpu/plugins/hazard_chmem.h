@@ -151,7 +151,7 @@ class HazardPlugin : public cf::plugin::PluginBase {
   // C.5 [GREEN] 骨架 (2026-10-11): mark/clear 维护 instance state, mmufault_pending
   // 读回 state. 未实际调 stall_ctrl_->halt_when — CH_MEM 模式下 CtrlLink
   // 只接 ch::core::ch_bool 句柄, 反复调会累积到 OR 网无法 toggle, 是
-  // CtrlLink API gap (解决路径 = 扩展接受 ch_reg/bit 句柄, 独立 change).
+  // CtrlLink API gap.
   // bare path 维持 byte-identical: state 默认 false, 不影响 HazardPlugin RAW stall.
   //
   // mmu-chmem-pipeline-integration (2026-10-16, Phase 2 Task 2.4 / C5 接线更新):
@@ -163,14 +163,24 @@ class HazardPlugin : public cf::plugin::PluginBase {
   //   - blocker 2: CtrlLink API gap — halt_when() 接收 ch_bool 信号句柄,但 mark/clear
   //                toggle 不对应 elaboration period;需要 CtrlLink 扩展接受 ch_reg<ch_bool>
   //                句柄 (instance state 在 elaboration 期 form persistent signal).
-  //                解决路径 = 独立 change (per c5 commit comment),建议 PR 命名
-  //                "ctrl-link-chmem-reg-handle"
   //   - bare path 维持: 上面 mmufault_pending_ 默认 false,即使 build() 闭包 OR-merge,
   //                HazardPlugin RAW stall 路径不受影响
-  //   - 解锁条件: Phase B (12-01 起) + CtrlLink API gap 解决后,在 build() 闭包内加
-  //                auto mmufault_signal = ch_bool(mmufault_pending_);
-  //                stall_ctrl_->halt_when(raw_hazard || mmufault_signal);
-  //                (此 1 行 OR-merge, 不破坏 CtrlLink 现状 API, 仅 toggle via build-time)
+  //
+  // 2026-10-22 (openspec change `ctrl-link-chmem-reg-handle` 阶段退出后的归属修订):
+  //   - **blocker 2 (CtrlLink API gap) 已解除**: `CtrlLink` 现提供显式的有状态条件
+  //     入口 `halt_when_stateful(const ch_reg<ch_bool>&)` + `halt_when(ch_reg<ch_bool>)`
+  //     重载, OR 合并结果随寄存器**逐拍更新** (真 DAG 行为, 不读 C++ 侧缓冲).
+  //     见 `include/cf/plugin/ctrl_link.h` + capability `ctrllink-continuous-handle`.
+  //   - **本改造 (A4: mark/clear instance state → 信号驱动) 移出该 change, 归属
+  //     `mmu-chmem-phase-b-c-launch` 的 Phase C.5**. 理由: 真实驱动源是 C.1/C.5 的
+  //     `CPU_EXCEPTION_CODE` 写入 (见上 blocker 1), 而 Phase B 阶段尚无该信号 ⇒
+  //     在框架级 change 里交付 `ch_reg<ch_bool>` 会得到**恒 false 惰性骨架**
+  //     (无 next 驱动源), 惰性窗口跨 Phase 1 → C.5 约 5 周 ⇒ 正是 G3 同款陷阱
+  //     ("看起来接上了但永不触发").
+  //   - **本文件在 `ctrl-link-chmem-reg-handle` 中零逻辑改动** (仅本注释更新).
+  //   - 解锁条件 (不变): Phase B 落地 + C.1/C.5 的 CPU_EXCEPTION_CODE 写入就绪后,
+  //     在 build() 闭包内用 `ch_reg<ch_bool>` 表达 fault pending, 其 next 由 DAG 内
+  //     的故障检测逻辑驱动, 再经 `halt_when_stateful(...)` 接进 stall 通路.
   void mark_mmufault() noexcept {
     mmufault_pending_ = true;
   }

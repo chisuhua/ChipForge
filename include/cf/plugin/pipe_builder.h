@@ -424,6 +424,14 @@ class PipeBuilder {
     }
 
     // W3-3: per-stage CtrlLink halt/flush aggregation → commit_payload_map
+    //
+    // ⚠ 有状态条件 (ch_reg<ch_bool>) 的 OR 门**引用寄存器 proxy 节点** ⇒ 随拍更新 ✓
+    //   (上游 lnode/reg.tpp: ch_reg 基类 logic_buffer<T>::node_impl_ = proxy_node;
+    //    切片成 ch_bool 后该指针保留 ⇒ OR 门读的是寄存器当前值, 非 C++ 侧缓冲快照)
+    //   ⇒ 此处**不得**改用 CtrlLink::should_halt() 之类的 C++ 侧读取路径
+    //      (对有状态条件永远读到陈旧值 —— 见 capability ctrllink-continuous-handle).
+    //   注: `operator|` (1-bit OR) 取代已 deprecated 的 `ch_bool::operator||`
+    //      (上游 core/operators_logic.h:166 的 [[deprecated]] 标注).
     for (auto& [stage_name, entries] : stage_payload_map_) {
       ch::core::ch_bool stall(false);
       ch::core::ch_bool flush(false);
@@ -431,8 +439,8 @@ class PipeBuilder {
       if (cl_it != stage_ctrl_links_.end()) {
         for (const auto& cl : cl_it->second) {
           if (cl) {
-            stall = stall || cl->halt_condition();
-            flush = flush || cl->flush_condition();
+            stall = stall | cl->halt_condition();
+            flush = flush | cl->flush_condition();
           }
         }
       }
