@@ -37,13 +37,14 @@ v0.11.0 launch 全绿 (HANDOFF §10 退出标准 + AGENTS.md 已知测试状态)
 
 | 判据 | 当前 | 目标 |
 |------|------|------|
-| [riscv-tests] | 40/48 (rv32um 0/8) | **48/48** |
-| [mmu] | 59/59 (Phase A 后) | 维持 |
-| [cpu-l1-mmu-demo] | 6/6 | **7/7** (workaround 移除) |
-| [mmu-verilator] | 3/3 (plumbing only) | **5/5** (真 sv32) |
-| [cpu-integration] | 85 PASS + 8 rv32um FAIL + dhrystone livelock | **全绿** |
-| DMIPS/MHz | 0.0351 | **≥ 1.4** (硬门禁) |
-| 4 architecture gates | 维护 | **0 error** |
+| [riscv-tests] | **48/48 PASS**（2026-10-13 HEAD `c277799` 实测；40 rv32ui + 8 rv32um） | 维持 |
+| [mmu] | **59/59 PASS**（2026-10-22 HEAD `962ecb2` 实测，146 assertions） | 维持 |
+| [cpu-l1-mmu-demo] | **6/6 PASS**（2026-10-22 实测，40 assertions） | **7/7** (D.2 新增 TEST_CASE 7 真 sv32 翻转) |
+| [mmu-verilator] | **3/3 PASS**（plumbing only，2026-10-22 实测） | **4/4**（D.1 新增 TEST_CASE 4 sv32 e2e flip；**2026-10-22 更正**：原写 5/5 有误） |
+| [cpu-integration] | **95/96 PASS + 1 baseline-known fail**（2026-10-22 HEAD `962ecb2` 实测；唯一 fail = `test_7stage_riscv.cpp:124` infra drift，**不修**） | **全绿**（该 fail 修复归 Phase 6d.7，owner = `feat-phase-6d-rtl-verification`） |
+| DMIPS/MHz | **1.43**（2026-10-15 `f95b2d0` 实测，已破 ≥1.4 硬门禁；`feat-dhrystone-dmips-gate` ✅ archived） | 维持 **≥ 1.4** |
+| 4 architecture gates | **0 error**（2026-10-22 HEAD `962ecb2` 实测 5/5 PASS） | 维持 **0 error** |
+| [mmu-chmem-basic] | **7/7 PASS**（2026-10-22 新增，Phase B 路线 C 产出） | 维持 |
 
 ## 3. 架构依据
 
@@ -117,8 +118,8 @@ graph TD
 |------|----|----|------|-------|------|
 | Sprint 1 (mfc-extract-fsm-h 启动) | 10-09 | 10-22 | 2.0 | A | rdd-builder P0-P3 + 真 radix-2 iterative advance_fsm 实装 + rv32um 8/8 中检 ✅ 已 archive |
 | Sprint 2 早期 (框架热身 + 排期对齐) | 10-23 | 10-30 | 1.0 | B | `ctrl-link-chmem-reg-handle` 纯框架 1d (stateful halt 通道 A1/A2 — Phase C.5 物理前置, **同时是 CppHDL API 热身 session**) + 排期对齐 1d + `feat-phase-6d-rtl-verification` 收官 1d |
-| **Sprint 2-3 (mmu-chmem Phase B)** | **10-23** | **11-06** | **2.0** | B | Phase B 15d — `ip/mmu/plugins/MMUPlugin_chmem.h` (新) + `ip/cpu/plugins/mmu_chmem.h` (新) + `test_mmu_chmem_basic` 5 case + 集成回归。**2026-10-22 双审: 由 Sprint 6+ 提前; 估时 15d (非 10d — 原压缩版丢了 B.5 的 5d 集成回归)** |
-| **Sprint 3 后段 (Phase 3.5)** | **11-06** | **11-30** | **3.5** | B | R11.1 trap PC 重审 0.5d + bp-btb 收窄 2 项 1d + fetch-stall v0.2 protocol 3d。**由原 pre_flight #2/#3 重构而来 (owner 已 defer ⇒ 无人可交付; 且 fetch-stall v0.2 反向依赖 Phase B)** |
+| **Sprint 2-3 (mmu-chmem Phase B)** | **10-23** | **11-06** | **2.0** | B | Phase B **3.0d（路线 C 收窄后）** — ✅ **2026-10-22 已完成**（commit `962ecb2`）：`ip/mmu/plugins/MMUPlugin_chmem.h`（新，TLB 命中路径：8 项全相联 + satp MODE 运行期门控）+ `tests/mmu/test_mmu_chmem_basic.cpp`（新，7 case / 24 assertions，4 变异对照全抓）。**PTW walk / `RiscvMMUPluginChmem` 适配器 → 推迟到新 change `chmem-ptw-walk`（估 6.5d，未立项）**。估时 15d → 3.0d |
+| **Sprint 3 后段 (Phase 3.5)** | **11-06** | **11-30** | **3.5** | B | R11.1 trap PC 重审 0.5d + bp-btb 收窄 2 项 1d + fetch-stall v0.2 protocol 3d。**由原 pre_flight #2/#3 重构而来 (owner 已 defer ⇒ 无人可交付; 且 fetch-stall v0.2 反向依赖 Phase B)**。**2026-10-22（提前执行，Phase 3.5 三项全完成）**: ① **3.5.1 R11.1 重审** ✅（oracle 裁决 5 条落 tasks.md）; ② **3.5.2 bp-btb 收窄 2 项** ✅（stall 语义 + fetch stage 顺序并入 v0.2 protocol 条款）; ③ **3.5.3 v0.2 protocol 起草** ✅（`.rddf/protocols/fetch_stall_protocol_v0.11.0.md` **v0.2 rev.14 定稿**，**critic 十五轮 APPROVE** —— 判据层从 5 BLOCKER 磨到零，机制层连续 13 轮零触碰）。其中 B2 的实证结论**推翻 v0.1 的方案骨架**: CH_MEM 生产代码 `stage_payload_map_` 为空 ⇒ CtrlLink 的 per-stage stall 零消费者 ⇒ 改走 `FLUSH` 扩展 + `pc_reg` 保持 mux, **不新建插件 / 不新增 key / 不改框架**。**落地归属**: 接线归 `chmem-ptw-walk` 的 3g（与 PTW 的 live 信号同批落地，避免恒 false 惰性骨架）；3c 验收需同时满足 **AC-FS-9 + AC-FS-15 + AC-FS-16** |
 | Sprint 4-5 (mmu-chmem Phase C + C.6) | 11-30 | 12-22 | 3.0 | B | Phase C wiring 5d (`mmu_exception_handler_chmem` / `cpu_factory_chmem` 注册 / `hazard_chmem` halt_when — **含 A4 mmufault 信号驱动**) + C.6 集成测试 3d |
 | Sprint 6 (mmu-chmem Phase D) | 12-22 | 01-13 | 3.0 | B | Phase D 验证 5d (`[mmu-verilator]` TEST_CASE 4 sv32 e2e flip + `[cpu-l1-mmu-demo]` TEST_CASE 7 + `sv32-baseline-matrix.csv`) |
 | Sprint 7 (Phase E 收官) | 01-13 | 01-24 | 1.0 | B | Phase E 文档 + archive (`mmu-chmem-phase-b-c-launch` + `mmu-chmem-pipeline-integration` 同步归档) + DMIPS ≥1.4 复验 + riscv-tests 48/48 |
@@ -127,9 +128,9 @@ graph TD
 > **2026-10-22 双审调整说明**: ① 原 "Sprint 2-5 (Phase B-C)" 拆为 Sprint 2-3 (Phase B) / Sprint 3 后段 (Phase 3.5) / Sprint 4-5 (Phase C + C.6); ② Phase B 由 Sprint 6+ 提前到 Sprint 2-3 (根因 = 失败模式是 single-shot 派发方式而非日历位置, 由 Sprint 2 早期的 ctrl-link 热身 session 承接), 估时 10d → 15d; ③ 新增 Phase 3.5 slot 承载原 pre_flight 的 fetch-stall v0.2 + bp-btb 2 项 (原 owner wave5-bp-btb 已于 2026-10-19 S3 defer 到 v1.0.0 ⇒ 无人可交付); ④ **原 Sprint 7-8 的 BTB 4K / GShare 13-bit 已按 S3 决策移出 v0.11.0 窗口** (§8 表与 §10 候选此前未同步 S3, 2026-10-22 一并更正)。
 
 **关键检查点**:
-- **11-30 DMIPS 中检**:radix-2 跑通后 DMIPS 是否从 0.0351 上升到 ≥0.5(若 < 0.3 触发 R-RADIX-2 资源回收,转 focus 写测试不抢 BP)
-- **11-06 Phase B 收口中检**:Phase B 15d 是否按 session 0/1/2 拆分推进;若 session 1 结束 `mmu_chmem.h` 仍未过编译 → 触发 R1 回退 (Phase B 后退到 Sprint 6-7, 本表 Sprint 2-3 行可整体后移)
-- **01-13 riscv-tests 48/48 中检**:是否全部 ELF PASS(若仍有 FAIL 触发 R-CHMEM-1 defer 到 v0.11.x)
+- ~~**11-30 DMIPS 中检**~~:~~radix-2 跑通后 DMIPS 是否从 0.0351 上升到 ≥0.5(若 < 0.3 触发 R-RADIX-2 资源回收,转 focus 写测试不抢 BP)~~ — **2026-10-22 更正：该项已失效**。DMIPS 实测 **1.43**（2026-10-15 `f95b2d0` 修复 harness 后，`feat-dhrystone-dmips-gate` ✅ archived），**硬门禁 ≥1.4 已达成** ⇒ 「0.0351 → ≥0.5」与「< 0.3 触发资源回收」两个判据都基于过期的 0.0351 基线，不再有判别力。**替代跟踪项**：CoreMark ≥1.9（`feat-bp-btb-gshare`，已 defer 到 v1.0.0 窗口）
+- ~~**11-06 Phase B 收口中检**~~:~~Phase B 15d 是否按 session 0/1/2 拆分推进;若 session 1 结束 `mmu_chmem.h` 仍未过编译 → 触发 R1 回退~~ — **2026-10-22 已完成**：Phase B 以**路线 C 收窄版**交付（3.0d，commit `962ecb2`），`MMUPluginChmem.h` 编译通过 + 7 case 全绿 + CH_MEM 全量 125 case 全 PASS ⇒ **R1 回退未触发**。后续 PTW 部分转 `chmem-ptw-walk`（未立项）
+- **01-13 riscv-tests 48/48 中检**:是否全部 ELF PASS(若仍有 FAIL 触发 R-CHMEM-1 defer 到 v0.11.x) — **注**：`[riscv-tests]` 48/48 已于 2026-10-13 实测达成，本检查点降级为"防退化"复核
 - ~~**12-15 BTB 命中率初检**~~:~~BTB 4K 装好后 vs static baseline 命中率增量~~ — **已按 2026-10-19 S3 决策移出 v0.11.0 窗口 (归 v1.0.0)**
 
 ## 9. 目标依赖与 Decision Gate
@@ -144,7 +145,7 @@ graph TD
   - [ ] [riscv-tests] 48/48
   - [ ] [mmu] 59/59 + [cpu-l1-mmu-demo] 7/7
   - [ ] [mmu-verilator] 4/4  <!-- 2026-10-22 更正: 原写 5/5 有误 — 现状 3/3 plumbing-only baseline + D.1 新增 TEST_CASE 4 (sv32 e2e flip) = 4/4, 与 mmu-chmem-phase-b-c-launch proposal §Acceptance 一致 -->
-  - [ ] [mmu][chmem] 5/5  <!-- 2026-10-22 新增: Phase B 的 test_mmu_chmem_basic (原 3 case → 5 case, 扩 Case 4 非恒等页表向量 + Case 5 Bare 隔离/satp 边界) -->
+  - [ ] [mmu-chmem-basic] 7/7  <!-- 2026-10-22 更正: 原写 `[mmu][chmem] 5/5` 有误 — 该过滤实际命中 14 case (3 PTW + 4 keys + 7 新增)；Phase B 路线 C 的精确 tag 是 `[mmu-chmem-basic]`，7 case / 24 assertions，2026-10-22 实测全绿 -->
   - [ ] DMIPS/MHz ≥ 1.4
   - [ ] 4 architecture gates 0 error
   - [ ] `bash tools/run_chipforge_tests.sh --all` 全 PASS

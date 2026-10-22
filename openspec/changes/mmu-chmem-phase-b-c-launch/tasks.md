@@ -11,16 +11,40 @@
 > **2026-10-22 双审重构**: 原 4 项 pre_flight 中, #2 (`fetch-stall-protocol-v0.2`) 与 #3 (`bp-btb-coordination-3items`) **移出 pre_flight** —— #2 的 owner (wave5-bp-btb) 已于 2026-10-19 S3 决策 defer 到 v1.0.0 ⇒ **Sprint 2-5 窗口内无人可交付**; 且 `fetch_stall_requirements_v0.11.0.md` §1.5 (BLOCKER-B5, `:74-82`) 明写 *"必须先定义 ch_bool 类型的 PTW_ACTIVE 信号（Phase B 实装），然后才能 stall"* ⇒ **fetch-stall v0.2 反向依赖 Phase B**, 放在 Phase B 的 pre_flight 里是**逻辑倒挂**。二者合并为 **Phase 3.5 slot** (见下), 挂载点 = **C.4 入口条件**。
 > **剩 2 项 pre_flight 均有 owner + 交付物 + 窗口 + 挂载点, 全部可满足**。
 
-- [ ] **R11.1 重审**: trap PC 跳转可行性 (per `csr-chmem-writeback-complete` archive 2026-10-15 后, R11 已失效, 重审是否在 Phase C 实装) — **owner: mfc-chmem / 窗口: Sprint 3 后段 / 挂载点: Phase 3.5 Task 3.5.1 (0.5d)**
-- [ ] **CtrlLink API gap (FP-4) 解锁**: `hazard_chmem.h:152-154` 注释承认, 实装 `halt_when(ch_bool)` toggle — **owner: framework / 窗口: Sprint 2 早期 / 挂载点: openspec change `ctrl-link-chmem-reg-handle` (stateful halt 通道 A1/A2; A4 信号驱动改造改挂本 change 的 C.5)**
+- [x] **R11.1 重审** (2026-10-22, **0.5d**) — 裁决见 §Phase 3.5 的 **3.5.1**（分拆二判：ECALL/EBREAK/MRET redirect 实装为独立 change `csr-chmem-trap-pc-jump`；MMU-fault redirect defer 到 `chmem-ptw-walk` 之后）
+- [x] **CtrlLink API gap (FP-4) 解锁** (2026-10-22) — 已由 **`ctrl-link-chmem-reg-handle`**（archive 2026-10-22）交付 A1/A2/A3/A5：`halt_when_stateful(const ch_reg<ch_bool>&)` + `halt_when(ch_reg<ch_bool>)` 自动有状态重载 + `OR_combined_halt_conds()` 单一 OR 实现（DAG 节点，可被消费方引用）。A4（`hazard_chmem` 的 mmufault instance bool → 信号驱动）按原计划改挂本 change 的 **C.5**
 
 ## Phase 3.5 (Sprint 3 后段, 2026-11-06 ~ 2026-11-30, 3.5d)
 
 > **由 pre_flight #2 + #3 重构而来** —— 挂载点 = **C.4 入口条件** (C.2/C.3 已落地不需要它; 真正需要它的是 C.4 注册激活 + C.6 集成测试)。
 
-- [ ] **3.5.1** R11.1 trap PC 跳转可行性重审 (0.5d) — 见上 pre_flight
-- [ ] **3.5.2** bp-btb 收窄 2 项 (1d) — 去掉 `pc_reg mux` 的 **BP 分支** (`feat-bp-btb-gshare` 已 defer 到 v1.0.0), 保留 **stall 语义** + **fetch stage at_stage 顺序**; owner 改 mmu-chmem team (= requirements doc BLOCKER-B1 + B2)
-- [ ] **3.5.3** fetch-stall v0.2 protocol 起草 (3d) — 解 5 BLOCKER + 7 SHOULD_FIX, 产出 `fetch_stall_protocol_v0.11.0.md`, 过 critic 二轮 review (BLOCKER-B5 由 Phase B 的 B.3 交付 ch_bool PTW_ACTIVE)
+- [x] **3.5.1** (2026-10-22, **0.5d**) **R11.1 trap PC 跳转可行性重审** — 调研结论：**分拆二判**（`2026-10-15 csr-chmem-writeback-complete` archive 后 R11 失效的前提已变，重审后不是"全实装"也不是"全 defer"）。
+  **① ECALL / EBREAK / MRET redirect（R2.3 范围）→ 实装，但作为独立 change `csr-chmem-trap-pc-jump`（≈1.5d），不并入 C.1**
+  - **硬前置**：`chmem-cpu-keys-modality` 必须先 **commit + archive** ✅ **已于 2026-10-22 满足**（commit `d08d3ba` + archive `2026-10-22-chmem-cpu-keys-modality`）—— `TRAP_PENDING`/`TRAP_TARGET`/`CSR_WRITE_EN` 已模式化为 `uint_t<1>`，且 `csr_chmem.h:459-461` 已拆掉 `static_cast<bool>` 折叠、改为直写 DAG 节点。**若晚于该 archive 重做本项，须复核这批 key 未被改回 POD**（回滚即 G3 惰性骨架：redirect 消费到常量 false）
+  - **插入点**：`ip/cpu/plugins/ibus_chmem.h:171-185` 的 `update_pc` —— `next_pc = select(trap_pending, trap_target, select(br_taken, br_target, pc_plus_4))`（**trap > branch 优先级**，per `openspec/specs/csr-chmem-zicsr/spec.md:94`）；同步把 `br_taken_buf <<= br_taken` 扩为 `br_taken | ch_bool(trap_pending)`（复用本 protocol 的 `FLUSH` 抑制机制压 fall-through）
+  - ⚠ **生产者必须从 branch-LATE 移到 branch-EARLY**（`csr_chmem.h:426` 的 trap 闭包）：同 stage+phase 桶内按 `stages_` 插入序执行，而 IBus 的 `update_pc`（plugin #3，`cpu_factory_chmem.h:331`）**先于** CSR 的 trap 写（plugin #6，`:338`）⇒ 现状是**消费者先于生产者**（违反 ADR-040 §10.6，会读到 emplace-on-miss 的空 cell）。改 EARLY 后依赖 `last_funct12_`（execute-LATE 产出，execute < branch ✓）与 `mepc_`/`mtvec_`（自有 `ch_reg` ✓）与 `KeyType::PC`（decode-LATE propagate，decode < branch ✓）
+  - **时序可行，零 bubble**：canonical 序实测 `fetch → decode → execute → memory → branch → writeback` ⇒ memory < branch；且 CH_MEM 数据通路**无 stage 间寄存器**（全组合 DAG）⇒ 同拍组合 redirect 成立，无需额外 bubble。**R11 旧假设"物理不可能"在时序上不复成立**
+  - **原 R2.3 设计（在 ibus 新增 branch-NORMAL 消费闭包）作废**：现行 ibus 只有 `fetch NORMAL` + `branch LATE` 两个注册点（`ibus_chmem.h:70-71`），`pc_reg` 的唯一驱动者在 branch LATE。最小改法 = 生产者移 EARLY + 改 `update_pc` 一处
+  **② MMU-fault redirect → 继续 defer 到 `chmem-ptw-walk` 之后**（打包为 follow-up change，建议名 `chmem-mmu-fault-trap-entry`，目标 v0.11.1 或 PTW 窗口）
+  - **理由**：Phase C 内其驱动 `EXCEPTION_CODE` 在真实运行**恒 0**（`ip/mmu/plugins/MMUPlugin_chmem.h:282`，路线 C 无 fault 语义）⇒ 实装即"看起来接上了但永不触发"，与 `hazard_chmem.h:174-179` 已明文拒绝的 G3 同款；且必须捆绑 R11.3 三 driver 仲裁 + mtvec 跨 plugin 读取，scope 从 +1d 膨胀到 +3d 以上
+  - **不留代码占位**：F6 注释（`csr_chmem.h:346-357`）已登记三 driver 仲裁扩展点且 owner 明确，本身就是合格路标（项目纪律：不留 for future use 死代码）
+  **③ 排期影响**：C.1（2d）/ C.4（2d）/ C.5（1d）/ C.6（3d）范围与估时**均不变**；新增独立 change ≈1.5d
+  **④ R11.2 必须包含的事实更正**（本项不做，留给 R11.2 的 7 文件批次）：
+  - `openspec/specs/csr-chmem-zicsr/spec.md:69` —— 现文「consumed by IBus at `at_stage("branch", NORMAL)` (registered after IBus branch-LATE, so IBus NORMAL wins in elaboration order)」**双错**：① `ibus_chmem.h:70-71` 只有 `fetch NORMAL` + `branch LATE` 两个注册点，**没有** branch-NORMAL 闭包；② 「NORMAL wins in elaboration order」的推理方向反了 —— `elaborate()` 的 phase 循环是 EARLY→NORMAL→LATE（`pipe_builder.h:416-423`），NORMAL 恒先于 LATE，不是"NORMAL wins"。正确表述：「CH_MEM 侧当前**零消费者**（`grep TRAP_PENDING ip/cpu/plugins/ibus_chmem.h` = 0）；接线插入点 = `ibus_chmem.h::update_pc`（branch 阶段），且**生产者须从 branch-LATE 移到 EARLY**」
+  - `bundles/csr_bundles.h:29` —— 「接线归 mmu-chmem-phase-b-c-launch 的 C.1」⇒ 改指新 change `csr-chmem-trap-pc-jump`（R11.1 裁决：不并入 C.1）
+  - ✅ `bundles/csr_bundles.h:26-29` 的「零消费者」登记**已由 `d08d3ba` 修好**，无需再动
+  **⑤ 过时线索更正**：`TRAP_PENDING` **已不是** `Payload<bool>` —— `d08d3ba` 已改 `Payload<uint_t<1>>` 并直写 DAG 节点（`csr_chmem.h:459-461`）；任何仍称其为 POD 的文档均需 R11.2 一并修
+- [x] **3.5.2** (2026-10-22, **1d**) **bp-btb 收窄 2 项** — 去掉 `pc_reg mux` 的 **BP 分支**（`feat-bp-btb-gshare` 已 defer 到 v1.0.0），保留 **stall 语义** + **fetch stage at_stage 顺序**；owner 改 mmu-chmem team（= requirements doc BLOCKER-B1 + B2）。
+  **交付**：两项均已并入 v0.2 protocol 的规范性条款（**2026-10-22 rev.5 定稿后同步更新本节**）——
+  - **stall 语义** → `fetch_stall_protocol_v0.11.0.md` §2.2（`FLUSH` 第二来源 = **`br_taken_buf | hold_z`**，`hold_z` 是 `hold = ptw_active & !paddr_valid` 的 1 拍延迟副本）+ §2.3（`pc_reg` 的 `hold` 保持分量；**`br_taken_buf` 保持原样不做门控**）+ §2.4（**14 项「提交点与新增状态」覆盖矩阵**，含 3 项显式"允许/排除"；含发现的新漏洞：CSR 写回无 FLUSH 守卫 + `is_trap_1` 仲裁绕开 `we_*` + branch-LATE trap 直写，共 **3 处**守卫）。⚠ **该 pc_reg mux 只含 stall 分量，不含 BP 分支** ⇒ 与 2026-10-19 S3 的 BP defer 决策不冲突
+  - **fetch stage at_stage 顺序** → v0.2 §3 B1：生产者在 `("fetch", Phase::EARLY)` 写、消费者在 `("fetch", Phase::NORMAL)`（发布 FLUSH）+ `("branch", Phase::LATE)`（算 `hold` / 驱动 PC 与 `hold_z`）读；canonical 序 = **`fetch → decode → execute → memory → branch → writeback`**（`branch` **早于** `writeback`；由阶段名**首现序**决定 —— `cpu_factory_chmem.h:213-216` 四行 `at_stage` 的 stage 参数**全是 `"decode"`**，不引入新 stage）⇒ 跨 stage 读安全
+  > ⚠ **rev.1/rev.2 期的本节描述已作废**：曾写「`FLUSH` 第二来源 `br_taken_buf | ptw_active`」「4 个提交点」「canonical 序 … memory → writeback → branch」——三者均已被 rev.3~rev.5 的实证推翻（见 protocol §10 跟踪表）。
+- [x] **3.5.3** (2026-10-22, **critic 十五轮 APPROVE**) **fetch-stall v0.2 protocol 起草** — 产出 `.rddf/protocols/fetch_stall_protocol_v0.11.0.md`（**v0.2 rev.14 终稿**）。
+  **5 BLOCKER 全部有解**（v0.2 §3，每条带 file:line 证据）：B1 同 stage+phase 契约（不需扩展 substage 排序 API）｜ B2 **实证推翻 v0.1 方案骨架** —— `register_stage_payload_connector` 全仓仅测试用 ⇒ 生产代码 `stage_payload_map_` 为空 ⇒ **CtrlLink 的 per-stage stall 在 CH_MEM 下零消费者** ⇒ 改走 payload 信号路径（`FLUSH` 扩展 + PC 保持 mux），**不新建插件 / 不新增 key / 不改框架** ｜ B3 `PTW_ACTIVE` 已 mode-aware ⇒ 无需新 key ｜ B4 严格按 `satp` MODE 字段（`MMUPlugin.cpp:97-110`）｜ B5 key+载体+顺序+类型转换路径全通
+  **7 SHOULD_FIX 全部处置**（v0.2 §4）：S1/S2/S5 作废 ｜ S3 改为**信号级**等价断言 ｜ S4 已消解 ｜ S6 已对账（Phase B 用同名 `declare_substage("fetch","tlb_lookup_ifetch",1)`）｜ S7 已过时
+  **关键结论 — 落地归属调整**（v0.2 §6.3）：接线**不得**作为"先接线后填驱动"的独立增量（`PTW_ACTIVE` 在路线 C 下是常量 0 ⇒ 会得到恒 false 惰性骨架）⇒ **归 `chmem-ptw-walk` 的 3g**，与 PTW 的 live 信号同批落地
+  **依赖状态**：对 `chmem-cpu-keys-modality` 的依赖 **已闭合**（archive 2026-10-22, commit `d08d3ba`；`CSR_WRITE_EN` 等已由 `Payload<bool>` 改为 `uint_t<1>`）
+  **策划史**：critic **十五轮** review（rev.1 REJECT 5 BLOCKER → rev.2 REJECT 2 → rev.3 REJECT 4 → rev.4 REJECT 2 → rev.5 REJECT 1 → rev.6 REJECT 1 → rev.7 REJECT 2 → rev.8 REJECT 1 → rev.9 REJECT 1 → rev.10 REJECT 1 → rev.11 REJECT 1 → rev.12 REJECT 2 → rev.13 REJECT 2 → rev.14 **APPROVE_WITH_NITS** → rev.15 **APPROVE**）；**机制层自 rev.3 起连续 13 轮 APPROVE**（零触碰）—— REJECT 全部落在**判据层**（AC 的可执行性 / 可绕过性）、**交付物结构**（rev.11 围栏嵌表格）与**判据自洽性**（rev.12 白名单）；**判据层在 rev.15 首次归零**。逐轮修法见 protocol §10 跟踪表。**验收**：protocol §8.1 桩编译演练 EXIT=0（`-fsyntax-only`）、AC-FS-16 判据自测 13/13（`/tmp/opencode/wl_check.py`；**3c change MUST 把等价自测收进 `tests/`/`tools/`**）、`doc_link_check` 0 broken、`roadmap-r9-check` pass=10
 
 ## Phase B (Sprint 2-3, 2026-10-23 ~ 2026-11-06) — **路线 C 收窄后 3.0d（原 15d）**
 
@@ -145,8 +169,8 @@
 
 > 详见 `mmu-chmem-pipeline-integration/tasks.md` line 519-548 (R11.1/R11.2/R11.3 段)
 
-- [ ] **R11.1** trap PC 跳转可行性重新评估 (combinational network → NORMAL select 覆写 PC 节点)
-- [ ] **R11.2** 批量更新 R11 表述 (7 处文件: HANDOFF.md + proposal.md + research-v0.11.0-prep.md)
+- [x] **R11.1** (2026-10-22) **trap PC 跳转可行性重新评估** —— 裁决与证据见 §Phase 3.5 的 **3.5.1**。要点：插入点**不是** NORMAL select 覆写，而是 `ibus_chmem.h:171-185` 的 `update_pc`（branch 阶段，`pc_reg` 唯一驱动者）；memory < branch ⇒ 同拍组合 redirect 可行、零 bubble；ECALL/EBREAK/MRET 部分实装（独立 change `csr-chmem-trap-pc-jump` ≈1.5d），MMU-fault 部分 defer
+- [ ] **R11.2** 批量更新 R11 表述 (7 处文件: HANDOFF.md + proposal.md + research-v0.11.0-prep.md + **`bundles/csr_bundles.h:26`** + **`openspec/specs/csr-chmem-zicsr/spec.md:69`** — 后两处由 R11.1 结论新增，内容见 3.5.1 ④)
 - [ ] **R11.3** D3-A 多 driver 仲裁扩展点 (csr_chmem.h writeback 闭包 mcause/mepc 仲裁 → 3 driver)
 
 ---
