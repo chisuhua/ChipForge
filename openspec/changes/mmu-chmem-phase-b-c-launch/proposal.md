@@ -12,10 +12,17 @@ depends_on:
   - mmu-chmem-pipeline-integration  # ✅ Phase 2 done 2026-10-17 (Phase A + C.2/C.3 sel 已落 commit 9373808+5b9f74a+1429f5a+8bb55a9+06bb1d3+992dbf5+c71c9e7)
   - csr-chmem-writeback-complete    # ✅ archived 2026-10-15 (R3.5 写通路完整, R11.1 重审入口就绪)
 # Note: 其他 planned 前置 (非 openspec change, 仅作 prose, 不入 depends_on yaml)
-#   - bp-btb-coordination-3items:   Sprint 2-5 协商项 (pc_reg mux / stall / fetch stage 协议)
-#   - fetch-stall-protocol-v0.2:    Sprint 2-5 v0.2 起草 (Phase 1.1 requirements doc v0.1 → v0.2, 解 critic 5 BLOCKERS)
-#   - CtrlLink API gap (FP-4):      hazard_chmem.h:152-154 admitted, Phase C.5 wiring 段物理前置
-#   - pre-existing baseline 退化:   18 ELF FAIL (Phase 6d.7 owner) — 不阻塞本 change, 由 feat-phase-6d-rtl-verification 修
+#   - fetch-stall-protocol-v0.2:  **已移出 pre_flight (2026-10-22 双审)** — 原 owner wave5-bp-btb 已 defer 到 v1.0.0
+#                                ⇒ Sprint 2-5 窗口内无人可交付; 且 fetch_stall_requirements_v0.11.0.md
+#                                §1.5 BLOCKER-B5 明写 "必须先定义 ch_bool 类型的 PTW_ACTIVE 信号
+#                                (Phase B 实装), 然后才能 stall" ⇒ **反向依赖 Phase B, 逻辑倒挂**.
+#                                现合并为 Phase 3.5 slot (Sprint 3 后段 3.5d), 挂载点 = C.4 入口条件.
+#   - bp-btb-coordination-3items:   **已收窄为 2 项并合并进 Phase 3.5 slot** (去 pc_reg mux 的 BP 分支;
+#                                保留 stall 语义 + fetch stage 顺序); owner 改 mmu-chmem team
+#   - CtrlLink API gap (FP-4):      由 openspec change `ctrl-link-chmem-reg-handle` 解除 (Sprint 2 早期, 1d);
+#                                其 A4 (HazardPlugin mmufault 信号驱动) 改挂本 change 的 **C.5**
+#   - pre-existing baseline 退化:   ✅ **已消除 (2026-10-21 上游 c27543d)** — 原记 "18 ELF FAIL" 已过期;
+#                                现 `[chmem]` 73/73 PASS + vendored ELF 47/47 PASS + `[verilator]` 48 ELF 全 PASS
 supersedes: []  # 空 — 而非 [mmu-chmem-pipeline-integration],原因 OpenSpec archive 校验历史 pattern 偏好 [], see archive/2026-10-13-chmem-verilator-rv32um-coverage/precedent. 语义上"接管" mmu-chmem-pipeline-integration Phase B-E 在 prose §What Changes 表显式标注.
 related_to:
   - ADR-040 v2.0 (TLM↔CH_MEM 双模同语义)
@@ -123,7 +130,7 @@ Sprint_7 (01-13 ~ 01-24, 2d):
 
 ## Acceptance Criteria
 
-- `[mmu] 59/59 PASS` 维持 + `[mmu][chmem] 3/3 PASS` (B.4 新增) + `[cpu-integration][mmu-chmem] 1/1 PASS` (C.6 新增) + `[cpu-l1-mmu-demo] 7/7 PASS` (D.2 新增) + `[mmu-verilator] 4/4 PASS` (D.1 新增 TEST_CASE 4)
+- `[mmu] 59/59 PASS` 维持 + `[mmu][chmem] 5/5 PASS` (B.4 新增, 2026-10-22 由 3 case 扩到 5 case) + `[cpu-integration][mmu-chmem] 1/1 PASS` (C.6 新增) + `[cpu-l1-mmu-demo] 7/7 PASS` (D.2 新增) + `[mmu-verilator] 4/4 PASS` (D.1 新增 TEST_CASE 4)
 - 4 architecture gate (verify_adr / verify_plugin_decision / check_plugin_portability / doc_link_check) 0 失败
 - `bash tools/run_chipforge_tests.sh --all` 全 PASS (含 chmem baseline byte-identical)
 - `openspec change validate mmu-chmem-phase-b-c-launch` 0 error

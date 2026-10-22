@@ -7,9 +7,11 @@
 > **Total estimate**: 6.0-6.2 人周 (Oracle 调整后,vs 原 5.6)
 > **B1 已跳过**: Oracle D1-B 收窄版锁定,scope 决策已前置完成
 > **D0 已完成**: proposal 文本修订 (本 PR 落地)
-> **Phase B 已 defer (2026-10-10)**: 3 次 deep agent 派发累计 1.5h+ 均未产出 mmu_chmem.h 代码 (Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力)。Sprint 1-2 (10-09 ~ 11-30) 集中 Track A (mfc-extract-fsm-h 真 radix-2 实装);Phase B (B2-B5) + C (C1-C6) 推迟到 Sprint 6+ (12-01 起) 与 D/E 同步推进。详见 `objective-ip-mmu-mmu-chmem-phase-b-e.md` §11 跟踪台账
+> **Phase B 曾 defer (2026-10-10, 已于 2026-10-22 解除)**: 3 次 deep agent 派发累计 1.5h+ 均未产出 mmu_chmem.h 代码 (Oracle 2026-10-09 6 答案给全仍不够,需交互式 CppHDL API 探查 + build/test 反馈循环,超出 deep agent single-shot 30-min timeout 能力)。当时 Sprint 1-2 (10-09 ~ 11-30) 集中 Track A (mfc-extract-fsm-h 真 radix-2 实装);Phase B (B2-B5) + C (C1-C6) 推迟到 Sprint 6+ (12-01 起)。**2026-10-22 双审裁决: Phase B 提前回 Sprint 2-3 (10-23 ~ 11-06) + 估时回改 15d**,根因是"失败模式 = single-shot 派发方式"而非日历位置 ⇒ 由 `ctrl-link-chmem-reg-handle` (Sprint 2 早期 1d, 同一套 `ch_reg` + OR 网 API 的交互式热身 session) 承接。详见 `objective-ip-mmu-mmu-chmem-phase-b-e.md` §11 跟踪台账
 > **Sprint 2-5 window (Phase C only, 10-23 ~ 11-30)**: C1-C6 (per objective-ip-mmu-mmu-chmem-phase-b-e.md, B 已 defer)
-> **bp-btb-coordination 提前 (2026-10-16 user 决策)**: `bp-btb-coordination-3items` 0.5d 由原 Sprint 6 (12-01) 提前到 Sprint 2 早期 (10-23 ~ 10-30) 同步启——为 Phase C (C2/C3 ibus_chmem.h / dmem_chmem.h sv32 消费) 入口准备稳定 fetch stall framework 锚点,缓解 R-CHMEM-1 暴露 (objective-soc-cpu-v0110-launch.md §5)。Sprint 2 占用 0.5d,但净时不变(消解 R-CHMEM-1 1 周 buffer 暴露换得)。原 Sprint 6 同步窗口收口改作 fallback(若 Sprint 2 提前未达成则 Sprint 6 补救)。
+> **Phase B 启动窗口提前 + 估时回改 (2026-10-22 双审裁决)**: Phase B 由 Sprint 6+ (12-01) **提前到 Sprint 2-3 (10-23 ~ 11-06)**,估时按本表 B.2 3d + B.3 5d + B.4 2d + B.5 5d = **15d**（`.rddf/plans/mmu-chmem-pipeline-integration.md` 原写 10d,**整段丢失 B.5 的 5d 集成回归**,已在 2026-10-22 回改）。**为何提前**: 12-01 起只剩 8 周要塞 B(15d)+C(5d)+C.6(3d)+D(5d)+E(2d) ≈ 30d + DMIPS 硬门禁,buffer ≈ 0。**为何 15d 而非 10d**: 历史 3 次 deep agent 派发失败（见上注）,采纳压缩版是错误方向。
+> **pre_flight 重构 (2026-10-22)**: 原 pre_flight #2 (`fetch-stall-protocol-v0.2`) 与 #3 (`bp-btb-coordination-3items`) **移出 pre_flight** —— #2 的 owner (wave5-bp-btb) 已于 2026-10-19 S3 决策 defer 到 v1.0.0 ⇒ 无人可交付; 且 `fetch_stall_requirements_v0.11.0.md` §1.5 (BLOCKER-B5) 明写 *"必须先定义 ch_bool 类型的 PTW_ACTIVE 信号（Phase B 实装），然后才能 stall"* ⇒ **fetch-stall v0.2 反向依赖 Phase B**,逻辑倒挂。二者合并为 **Phase 3.5 slot**（Sprint 3 后段 3.5d）,挂载点 = **C.4 入口条件**。
+> **Phase B 路径与 key 裁决 (2026-10-22)**: CH_MEM 新文件落 `ip/mmu/plugins/MMUPlugin_chmem.h`（**非** `ip/mmu/tlm/` — 后者同时逃出 `check_plugin_portability.sh` Check 2 与 Check 7 扫描范围 = CI 盲区）; **不新建 bundles key 文件**,复用 `ip/mmu/tlm/mmu_keys.h` 的 `mmu_keys<std::uint64_t>` 既有静态实例（PayloadStore 按指针身份索引 ⇒ key 不同 ⇒ 消费端 `has()` 恒 false ⇒ 静默回退 Bare ⇒ 测试全绿但 sv32 从未生效）。
 > **Owner**: mfc-chmem team (per ADRs in proposal)
 >
 > **执行顺序** (硬性,不可并行的有依赖标记):
@@ -26,10 +28,13 @@
 | Sprint | Window | Phase | Tasks | Owner |
 |--------|--------|-------|-------|-------|
 | Sprint 1 | 10-09 ~ 10-22 | Phase A (verified ✅) | A1-A6 | mfc-chmem |
-| Sprint 2 (early, 10-23 ~ 10-30) | **bp-btb-coordination-3items** (0.5d, **Sprint 2 早期**——R-CHMEM-1 缓解) | mfc-chmem + bp-btb owner |
-| Sprint 2-5 | 10-23 ~ 11-30 | Phase C (B defer 维持到 Sprint 6+) | C1-C6(其中 C2/C3 依赖 bp-btb-coordination 完成) | mfc-chmem |
-| Sprint 6-7 | 12-01 ~ 12-22 | Phase B + D (B2-B5 解锁并入; bp-btb-coordination fallback 收口) | B2-B5 + D1-D6 | mfc-chmem |
-| Sprint 7-8 | 12-23 ~ 01-13 | Phase E | E1-E6 | mfc-chmem |
+| Sprint 2 (early, 10-23 ~ 10-30) | **ctrl-link-chmem-reg-handle** (1d 框架级, stateful halt 通道 — Phase C.5 物理前置 + CppHDL API 热身 session) + 排期对齐 (1d) + `feat-phase-6d-rtl-verification` 收官 (1d) | mfc-chmem + framework |
+| Sprint 2-3 | 10-23 ~ 11-06 | **Phase B** (15d — 2026-10-22 双审回改自 10d, 原压缩版丢了 B.5 的 5d 集成回归) | **B.0** (key 复用确认 0.2d) + B.2 + B.3 + B.4 + B.5 + **B.6** (集成回归 5d) | mfc-chmem |
+| Sprint 3 (late) | 11-06 ~ 11-30 | **Phase 3.5** (3.5d — 由 pre_flight 重构而来) | R11.1 (0.5d) + bp-btb 收窄 2 项 (1d) + fetch-stall v0.2 protocol (3d) | mfc-chmem |
+| Sprint 4 | 11-30 ~ 12-15 | Phase C wiring | C1-C6 | mfc-chmem |
+| Sprint 5 | 12-15 ~ 12-22 | C.6 集成测试 | C.6 | mfc-chmem |
+| Sprint 6-7 | 12-22 ~ 01-13 | Phase D 验证 | D1-D6 | mfc-chmem |
+| Sprint 7 | 01-13 ~ 01-24 | Phase E | E1-E6 | mfc-chmem |
 
 ---
 
@@ -151,76 +156,88 @@
 
 ### B.2 [GREEN] 实装 `RiscvMMUPlugin_chmem.h` (D5-CH_MEM 约束)
 
-- [ ] **新建文件**:`ip/cpu/plugins/mmu_chmem.h` (~150 LOC,纯头文件) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **namespace**:`cf::cpu::plugins` (与 TLM `RiscvMMUPlugin` 同 namespace,但 `_chmem.h` 后缀区分) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **CH_MEM 适配**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **新建文件**:`ip/cpu/plugins/mmu_chmem.h` (~150 LOC,纯头文件) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **namespace**:`cf::cpu::plugins` (与 TLM `RiscvMMUPlugin` 同 namespace,但 `_chmem.h` 后缀区分) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **CH_MEM 适配**: <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - `#ifdef CF_PLUGIN_USE_CH_MEM` 整文件包裹 (ADR-040 v2.0 强制)
   - 包含 `<ch.hpp>` + `<core/bool.h>` + `<core/uint.h>` + `<core/reg.h>`
   - 包含 `cf/plugin/{plugin_base,pipe_builder,ctrl_link,uint_t}.h`
-- [ ] **类定义**:`RiscvMMUPluginChmem : public cf::plugin::PluginBase` <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **elaboration-time satp config 注入**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **类定义**:`RiscvMMUPluginChmem : public cf::plugin::PluginBase` <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **elaboration-time satp config 注入**: <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - 构造参数接受 `satp_mode_value` (从 `cpu_factory_chmem` ctor 传入)
   - elaboration 期创建 `ch_reg<64>` 作为 satp 寄存器初值 (D5-CH_MEM 约束:无运行期 CSR 写)
-- [ ] **at_stage 闭包** (CH_MEM 模式): <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **at_stage 闭包** (CH_MEM 模式): <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - `pb.at_stage("mmu_ptw", NORMAL, [...])` 调 `PtWalkFsmPlugin::create_fsm()` 复用现有 FSM
   - `pb.at_stage("mmu_lookup", NORMAL, [...])` 单级 TLB lookup 闭包
-- [ ] **payload key 发射**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **payload key 发射**: <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - 写 `mmu_keys<T>::PADDR` + `PADDR_VALID` + `MMU_VADDR` (复用 `mmu_keys.h`)
   - 不发明新 key (ADR-040 Tier-2 兼容)
-- [ ] **回归项**:`[chmem]` 既有测试不退化;`[mmu] 53/53` 维持 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[chmem]"` <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **回归项**:`[chmem]` 既有测试不退化;`[mmu] 53/53` 维持 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[chmem]"` <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
 
 ### B.3 [GREEN] 实装 `MMUPlugin_chmem.h` 收窄版 (D1-B 单级 TLB + 复用 PtWalkFsmPlugin)
 
-- [ ] **新建文件**:`ip/mmu/tlm/MMUPlugin_chmem.h` (~200 LOC,纯头文件) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **ADR-040 v2.0 强制**:`#ifdef CF_PLUGIN_USE_CH_MEM` 整文件包裹;**不含** `ch_mem`/`ch_reg`/`ch_uint`/`ch::core` 在 TLM 文件中 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **CH_MEM 适配**:与 B.2 同样 include 列表 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **类定义**:`MMUPluginChmem : public cf::plugin::PluginBase` <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **单级 TLB** (8 项直接映射, 收窄版 D1-B, **修订 2026-10-09 per Oracle Q1/Q2 验证**): <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **新建文件**:`ip/mmu/plugins/MMUPlugin_chmem.h` (~200 LOC,纯头文件) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **ADR-040 v2.0 强制**:`#ifdef CF_PLUGIN_USE_CH_MEM` 整文件包裹;**不含** `ch_mem`/`ch_reg`/`ch_uint`/`ch::core` 在 TLM 文件中 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **CH_MEM 适配**:与 B.2 同样 include 列表 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **类定义**:`MMUPluginChmem : public cf::plugin::PluginBase` <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **单级 TLB** (8 项直接映射, 收窄版 D1-B, **修订 2026-10-09 per Oracle Q1/Q2 验证**): <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - **存储模式**:`std::vector<ch_reg<ch_uint<kVpnBits>>>` + `std::vector<ch_reg<ch_uint<kPaddrBits>>>` + `std::vector<ch_reg<ch_uint<1>>>` (valid), 8 entries each
   - **为什么不用 ch_mem 数组**:`include/cf/plugin/storage.h:76` static_assert 要求 T trivially_copyable, `ch::core::ch_uint<N>` 验证非 trivially_copyable (Oracle 2026-10-09 Q1 compile-verified); `ch_mem::aread` 1-cycle latency 破坏单拍命中语义, 须组合读
   - **铁律** (照抄 `ip/cpu/plugins/reg_file_chmem.h:13-29` 注释): ① 实例成员非 static (跨 context use-after-free 教训) ② lazy init 推迟到 `at_stage` 闭包内 (ch_reg 构造需要活跃 context) ③ 必须显式命名每个 reg (`"tlb_v_0"`, `"tlb_tag_0"` 等), 否则 32 个默认名 `"reg"` 撞名 → Verilator duplicate declaration 错误
   - **结构**: 8 entries 单级直接映射, 全相联 (无 set-associative), 直写 (write-through, 无 write-back), 替换策略 = FIFO (无 LRU, 满足 D1 收窄版)
   - **TLB lookup 组合逻辑**:`valid[i] && tag[i] == vaddr_vpn[i]` 三向比较, 命中出 PADDR (单拍)
-- [ ] **复用 PtWalkFsmPlugin**:`#include "ip/cpu/plugins/mmu_ptw_chmem.h"` 直接调其 API,不改其内部 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **TLB lookup 组合逻辑**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **复用 PtWalkFsmPlugin**:`#include "ip/cpu/plugins/mmu_ptw_chmem.h"` 直接调其 API,不改其内部 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **TLB lookup 组合逻辑**: <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - 命中:`result_paddr = tlb_paddr_[index]` + `PADDR_VALID = true`
   - miss:启动 PtWalkFsmPlugin (调 `set_input_value(start=1)`) + 等 `done=1` 拍读 `result_ppn`
-- [ ] **payload key 发射**:同 B.2 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **ptw_active gate**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **payload key 发射**:同 B.2 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **ptw_active gate**: <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - miss 时 `PTW_ACTIVE = 1` 同步发射
   - `done` 拍 `PTW_ACTIVE = 0` + 同时 `TLB` refill (单级直写下一项,无 LRU/RRIP)
-- [ ] **回归项**:`[chmem]` 既有测试不退化;`[mmu]` 维持 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[chmem]" "[mmu]"` (注意: `[mmu]` 是 TLM,只验证不互相污染) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **代码自审**:不写 `as any` / `@ts-ignore` / 空 catch (项目硬约束) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **D4 检查**:不写 enum class.*State 状态机 (有 PTW FSM 走 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免);TLB lookup 是纯组合逻辑 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **回归项**:`[chmem]` 既有测试不退化;`[mmu]` 维持 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[chmem]" "[mmu]"` (注意: `[mmu]` 是 TLM,只验证不互相污染) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **代码自审**:不写 `as any` / `@ts-ignore` / 空 catch (项目硬约束) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **D4 检查**:不写 enum class.*State 状态机 (有 PTW FSM 走 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免);TLB lookup 是纯组合逻辑 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
 
-### B.4 [GREEN] 单元测试 `test_mmu_chmem_basic` (TLB hit / TLB miss 两条路径)
+### B.4 [GREEN] 单元测试 `test_mmu_chmem_basic` (5 case — 2026-10-22 双审由 3 case 扩到 5)
 
-- [ ] **新建文件**:`tests/mmu/test_mmu_chmem.cpp` (~150 LOC) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **Family tag**:使用 `[mmu][chmem]` (与 `[chmem]` 多 tag 一致) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **覆盖范围**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **新建文件**:`tests/mmu/test_mmu_chmem.cpp` (~200 LOC) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **Family tag**:使用 `[mmu][chmem]` (与 `[chmem]` 多 tag 一致) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **必须手动加入 `tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES` (`:118-145`)** — 该 list 是**逐条手写**的;GLOB (`:6`) 只覆盖 TLM target ⇒ 不加就**静默不编译不运行** <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **覆盖范围** (2026-10-22 双审扩到 5 case — 原 3 case 无法判别"真 sv32 翻译"与"Bare 回退"): <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - **Case 1:TLB hit** — 配置单级 TLB 含一项,lookup 命中 vaddr → 期望 PADDR = TLB.paddr (单周期,不走 PTW)
   - **Case 2:TLB miss** — TLB 全空 + 提供 test memory 接口返回 PTE → 走 PtWalkFsmPlugin → 期望 PADDR = PTE.ppn (2-3 周期,经 FSM)
-  - **Case 3:PTW fault** — 提供 test memory 返回 V=0 PTE → 期望 PADDR_VALID = false + EXCEPTION_CODE = 1
-- [ ] **断言数**:9-12 assertions (3 case × 3-4 断言) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **CH_MEM 测试 lifecycle**:每个 SECTION 入口显式 `set_as_current_context()` (Phase 6c PoC 教训,详 research §9.3) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **回归项**:A.1-A.6 全部 PASS;`[mmu][chmem]` 不影响 `[chmem]` 既有 baseline <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[mmu][chmem]"` <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+  - **Case 3:PTW fault** — 提供 test memory 返回 V=0 PTE → 期望 PADDR_VALID = false + EXCEPTION_CODE = 1。**注: Phase B 窗口无 fetch stall 机制 (CH_MEM 数据通路全组合,`cpu_factory_chmem.h:431-435` 无 stage 寄存器) ⇒ 本 case 只能是 TLB 内部单元级,不可做成 pipeline 级**
+  - **Case 4:sv32 真翻译 (非恒等页表向量)** — vaddr X → paddr Y (Y ≠ X) → 断言翻译后地址为 Y。**identity page table 无法区分真 sv32 与 Bare 回退 (两者输出恒等) ⇒ 必须非恒等向量**。另断言消费端 `has(MmuKeys::PADDR_VALID) == true` 且 sel 真选 `PADDR` (非 `MMU_VADDR`)
+  - **Case 5:Bare 隔离 + satp 边界** — sv_mode=Bare / satp_value=0 / satp_ppn 未编程 → 期望走 identity translation 且不启动 PTW。**注: v0.10.1 deep-rca 记录过"PTW 从不在 window 0x0 读 PTE"同类历史 bug;Bare-shortcut 严格化 (v0.10.4 `a3afcfa`) + CH_MEM 初值注入的交互会埋雷**
+- [ ] **变异对照 ≥2 个** (遵循仓库近期惯例,自证测试强度): ① 拔掉 `PADDR_VALID` 接线 → 消费端测试应红; ② TLB 改恒 hit → Case 2 应红 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **断言数**:15-20 assertions (5 case × 3-4 断言) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **CH_MEM 测试 lifecycle**:每个 SECTION 入口显式 `set_as_current_context()` (Phase 6c PoC 教训,详 research §9.3) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **回归项**:A.1-A.6 全部 PASS;`[mmu][chmem]` 不影响 `[chmem]` 既有 baseline <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **运行命令**:`./build/bin/chipforge_tests_chmem "[mmu][chmem]"` <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+
+### B.0 [前置] Payload key 复用确认 (0.2 day, 阻塞 B.2-B.5 全部 task)
+
+> **2026-10-22 双审新增** —— 防止"测试全绿但 sv32 从未生效"的静默失效。
+
+- [ ] **实例化参数一致**:`MMUPlugin_chmem` 发射用的 key 必须是 `cf::ip::mmu::payload::mmu_keys<std::uint64_t>` 的**同一静态实例** (与 `ibus_chmem.h:121` / `dmem_chmem.h:142` 指针相等)。`mmu_keys` 是模板 struct + static inline 成员 ⇒ `mmu_keys<uint64_t>` 与 `mmu_keys<uint32_t>` 是**不同实例、不同地址**
+- [ ] **不新建 bundles key 文件**:`PayloadStore` 按**指针身份**索引 (`include/cf/plugin/payload.h:124,136,153,166,196,204,220,233` 全部 `cells_.find(&key)`) ⇒ key 对象不同 ⇒ 消费端 `has()` 恒 false ⇒ sel 静默回退 Bare ⇒ **所有测试照 PASS 而 sv32 从未生效**
+- [ ] **消费端 `has()` 契约自检**:确认 `ibus_chmem.h:144` / `dmem_chmem.h:144` 的 `payloads().has(MmuKeys::PADDR_VALID)` 在 MMU plugin 注册后返回 true (B.3 实装后复跑)
 
 ### B.5 [GREEN] Phase B 集成回归 (chipforge_tests_chmem 全套)
 
-- [ ] **B.2-B.4 全部完成** 后跑 CH_MEM binary 全套 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **跑**:`./build/bin/chipforge_tests_chmem` (含 `[chmem]`/`[cpphdl]`/`[elaborate]`/`[verilator]`/`[mmu-verilator]` + B.4 新增 `[mmu][chmem]`) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **预期 PASS**: <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **B.2-B.4 全部完成** 后跑 CH_MEM binary 全套 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **跑**:`./build/bin/chipforge_tests_chmem` (含 `[chmem]`/`[cpphdl]`/`[elaborate]`/`[verilator]`/`[mmu-verilator]` + B.4 新增 `[mmu][chmem]`) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **预期 PASS**: <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
   - `[chmem] 9/9 PASS`
   - `[cpphdl] 6/6 PASS`
   - `[pipeline2_stall_matrix] 16/16 PASS`
-  - `[mmu][chmem] 3/3 PASS` (B.4 新增)
+  - `[mmu][chmem] 5/5 PASS` (B.4 新增, 2026-10-22 由 3 case 扩到 5 case)
   - `[mmu-verilator] 3/3 PASS`
-- [ ] **bare 路径 byte-identical 检查** — `[verilator] 1/1 case PASS (5 ELF tohost=1)` 维持 (Oracle D2-A 强调) <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **CH_MEM known issue 跟踪**:`cpphdl_poc_chbool_contextual_conversion` 全量跑受 context pollution 失败 (单独跑 PASS) 已知 — 不阻塞本 Phase,需 PoC follow-up 修 <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
-- [ ] **本 Phase 完成标志**:全 PASS + bare 路径 byte-identical <!-- sprint-6+: 2026-12-01 ~ owner=mfc-chmem (deferred per 行 8) -->
+- [ ] **bare 路径 byte-identical 检查** — `[verilator] 1/1 case PASS (5 ELF tohost=1)` 维持 (Oracle D2-A 强调) <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **CH_MEM known issue 跟踪**:`cpphdl_poc_chbool_contextual_conversion` 全量跑受 context pollution 失败 (单独跑 PASS) 已知 — 不阻塞本 Phase,需 PoC follow-up 修 <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
+- [ ] **本 Phase 完成标志**:全 PASS + bare 路径 byte-identical <!-- sprint-2-3: 2026-10-23 ~ 2026-11-06 ~ owner=mfc-chmem (2026-10-22 双审提前, 15d) -->
 
 ---
 
@@ -417,7 +434,7 @@
 - [ ] **跑**:`bash tools/run_chipforge_tests.sh --all` (TLM + CH_MEM + Verilator + gate,~167s)
 - [ ] **预期 PASS**:
   - TLM binary (432 catch2 instances / 67026 assertions):`[framework] 89/89` + `[cache]` + `[cpu] 19/19` + `[cpu-integration] 81/81` + `[cpu-l1-mmu-demo] 7/7` + `[bundles]` + `[mmu] 53/53` + `[riscv-tests] 40/48` + `[soc]` + `[tlb-refill]`
-  - CH_MEM binary:`[chmem] 9/9` + `[cpphdl] 6/6` + `[elaborate]` + `[verilator] 1/1` + `[mmu-verilator] 3/3` + `[mmu][chmem] 3/3` (B.4 新增) + `[cpu-integration][mmu-chmem] 1/1` (C.6 新增)
+  - CH_MEM binary:`[chmem] 9/9` + `[cpphdl] 6/6` + `[elaborate]` + `[verilator] 1/1` + `[mmu-verilator] 3/3` + `[mmu][chmem] 5/5` (B.4 新增) + `[cpu-integration][mmu-chmem] 1/1` (C.6 新增)
   - Verilator smoke:`cpu_verilator_sim_add` 5/5 PASS (2026-10-14 修订: 历史 5/5 快照; 当前 cpu_verilator_sim 扩 48 ELF = 40 rv32ui + 8 rv32um, 96 assertions, 详见 AGENTS.md v0.10.4 实测; 此处 cpu_verilator_sim_add 走的是 ctest entry 单 ELF smoke, 数字与全量 48 ELF 不可互换)
 - [ ] **若失败**:
   - 是本 PR 引入 → 修复
@@ -559,7 +576,7 @@
 | Phase | Tasks | 估时(人天) | 状态 |
 |-------|-------|-----------|------|
 | A 根因 Bug 修复 | A.1, A.2, A.3, A.3.1, A.4, A.5, A.6 | 5 | ✅ verified 2026-10-10 (commit `a3afcfa` 落地代码 + 测试) |
-| B MMUPlugin CH_MEM | B.2, B.3, B.4, B.5 (B.1 跳过) | 10 | ⏸ 待启动 (Sprint 2-5 follow-up `mmu-chmem-phase-b-c-launch` 已开占位, 详见 objective-ip-mmu-mmu-chmem-phase-b-e.md review_by=2027-01-06) |
+| B MMUPlugin CH_MEM | B.0, B.2, B.3, B.4, B.5 (B.1 跳过) | 15 | 🟡 待启动 (2026-10-22 双审: 窗口提前到 Sprint 2-3 10-23 ~ 11-06, 估时由 10d 回改 15d —— 原 10d 丢了 B.5 的 5d 集成回归; owner = mfc-chmem; 前置 = `ctrl-link-chmem-reg-handle` 的 A1/A2 stateful halt 通道) |
 | C Pipeline 集成 | C.1, C.2 ✅, C.3 ✅, C.4, C.5, C.6 | 11 | 🔵 部分收丰 2026-10-17 (C.2/C.3 skeleton+sel 已落 commit `9373808`+`5b9f74a`; C.1/C.4/C.5 skeleton shipped + wiring 待 Sprint 2-5) |
 | D 验证与回归 | D.0 ✅, D.1, D.2, D.3, D.4, D.5, D.6 | 5 (D.0 已完成) | 🔵 D.0 done, 余待启动 |
 | E 文档与归档 | E.1, E.2, E.3, E.4, E.5, E.6 | 3 | ⏸ 待启动 (触发: D 阶段全绿后) |

@@ -9,13 +9,15 @@ estimated_steps: 6     # Phase 0 基线 + Phase A-C 实施 + Phase D 验证 + Ph
 estimated_total_weeks: "6.0-6.2 人周 (≈ 5 个 sprint 跨 17 周窗口)"
 verifier: rdd-verifier
 sprint_window:
-  sprint-2-early: "10-23 ~ 10-30 (bp-btb-coordination-3items 0.5d, R-CHMEM-1 缓解)"
-  sprint-2-5:    "10-23 ~ 11-30 (5.5 周, Phase C only)"
-  sprint-6-7:    "12-01 ~ 12-22 (Phase B 解锁并入 + Phase D + bp-btb-coordination fallback)"
-  sprint-7-8:    "12-23 ~ 01-13 (Phase E archive)"
+  sprint-2-early: "10-23 ~ 10-30 (ctrl-link-chmem-reg-handle 1d 框架热身 + 排期对齐 1d + 6d 收官 1d)"
+  sprint-2-3:     "10-23 ~ 11-06 (Phase B 解锁并入, 15d — 2026-10-22 双审裁决: 由源 change tasks.md 的 15d 回改, 原 10d 压缩版丢了 B.5 的 5d 集成回归)"
+  sprint-3-late:  "11-06 ~ 11-30 (Phase 3.5: R11.1 0.5d + bp-btb 收窄 2 项 1d + fetch-stall v0.2 protocol 3d — 原 pre_flight 反向依赖 Phase B, 2026-10-22 重构出独立 slot)"
+  sprint-4:       "11-30 ~ 12-15 (Phase C wiring)"
+  sprint-5:       "12-15 ~ 12-22 (C.6 集成测试)"
+  sprint-6-7:     "12-22 ~ 01-13 (Phase D 验证 + Phase E archive)"
 deps_status:
   blocked_by: []   # depends_on 全部 archived (cpu-pipeline-mmufault-handler + phase-6d-prerequisites)
-  manual_deps: ["bp-btb owner fetch stage 协议 (HANDOFF §3, 0.5d 提前到 Sprint 2 早期)"]
+  manual_deps: ["ctrl-link-chmem-reg-handle (stateful halt 通道 — Phase C.5 物理前置, 2026-10-22 已建 openspec change)"]
 ---
 
 # Plan: mmu-chmem-pipeline-integration
@@ -24,7 +26,11 @@ deps_status:
 
 **Goal:** 落地 Oracle 2026-10-07 锁定的 5 项决议 (D1-D5), 实装 CH_MEM 模式 sv32 翻译完整链路 (MMUPlugin CH_MEM + IBus/DBus sv32 消费 + HazardPlugin mmufault_clear + mmufault exception handler), 使 `[mmu-verilator]` 从 3/3 plumbing-only 升级为 5/5 真 sv32 translation + `[cpu-l1-mmu-demo]` 从 6/6 升级为 7/7 (workaround `cfg.enable_mmu=false` 移除), 解锁 v0.11.0 launch gate §9 Go 条件核心三项。
 
-**Architecture:** 单一 source-of-truth plugin-style (ADR-083): 新建 `ip/mmu/tlm/MMUPlugin_chmem.h` (D1-B 收窄 = 单级 ch_mem TLB 8 项直接映射 + 复用 `PtWalkFsmPlugin`) + 新建 `ip/cpu/plugins/mmu_chmem.h` (RiscvMMUPlugin CH_MEM, D5-CH_MEM) + 修改 `ibus_chmem.h`/`dmem_chmem.h` 消费 sv32 翻译结果 (D2-A bare 路径零额外 latency 保护) + 修改 `mmu_exception_handler_chmem.h` combinational network (D3-A 最小可行 `mmufault_clear = (EXCEPTION_CODE != 0)`, **无** trap PC 跳转因 CSR plugin 物理不可能) + 修改 `hazard_chmem.h` 接 `mark_mmufault`/`clear_mmufault` (D2 hazard 协议) + Phase A 根因修复 (D4-A Bare shortcut 严格化 + D5-TLM shadow 双 bug 修复, 已 commit `a3afcfa` 维护阶段)。
+**Architecture:** 单一 source-of-truth plugin-style (ADR-083): 新建 `ip/mmu/plugins/MMUPlugin_chmem.h` (D1-B 收窄 = 单级 ch_mem TLB 8 项直接映射 + 复用 `PtWalkFsmPlugin`) + 新建 `ip/cpu/plugins/mmu_chmem.h` (RiscvMMUPlugin CH_MEM, D5-CH_MEM) + 修改 `ibus_chmem.h`/`dmem_chmem.h` 消费 sv32 翻译结果 (D2-A bare 路径零额外 latency 保护) + 修改 `mmu_exception_handler_chmem.h` combinational network (D3-A 最小可行 `mmufault_clear = (EXCEPTION_CODE != 0)`, **无** trap PC 跳转因 CSR plugin 物理不可能) + 修改 `hazard_chmem.h` 接 `mark_mmufault`/`clear_mmufault` (D2 hazard 协议) + Phase A 根因修复 (D4-A Bare shortcut 严格化 + D5-TLM shadow 双 bug 修复, 已 commit `a3afcfa` 维护阶段)。
+
+> **路径裁决 (2026-10-22 双审)**: CH_MEM 新文件落 `ip/mmu/plugins/MMUPlugin_chmem.h` 而**非** `ip/mmu/tlm/MMUPlugin_chmem.h` —— `tools/check_plugin_portability.sh` 的 Check 2 (`:95` `find -path "*/plugins/*_chmem.h"`) 与 Check 7 (`:273-284` 按文件名排除 `*_chmem.h`) **都扫不到 `ip/mmu/tlm/`** ⇒ 放那里等于让 4 门禁对该文件完全失明。ADR-083 §2.4 (`:125-155`) 亦要求 `ip/{cpu,cache,mmu,memory}/plugins/<name>.{h,_chmem.h}`。`ip/mmu/tlm/` 整体迁移另立治理 change。
+>
+> **Payload key 裁决 (2026-10-22 双审)**: **不新建 bundles key 文件**，复用 `ip/mmu/tlm/mmu_keys.h` 既有静态实例，且实例化参数必须与消费端一致（`mmu_keys<std::uint64_t>`）。`PayloadStore` 按**指针身份**索引 (`include/cf/plugin/payload.h:124,136,153,166,196,204,220,233` 全部 `cells_.find(&key)`) ⇒ key 对象不同 ⇒ 消费端 `has()` 恒 false ⇒ sel 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**。
 
 **Tech Stack:** C++23、CppHDL `ch_uint<N>` / `ch_reg` / `ch_mem` (ADR-040 v2.0 双模式)、`chlib::ch_state_machine` DSL (ADR-046 v2.0 §2.1.1 算术豁免)、Plugin 框架 (at_stage / payload keys / CtrlLink::halt_when)、Catch2 v3.7.0、`chipforge_tests` (TLM) / `chipforge_tests_chmem` (CH_MEM) 双二进制、`tools/run_chipforge_tests.sh --all` 回归。
 
@@ -448,11 +454,34 @@ Expected: `[mmu] 59/59` + `[cpu-l1-mmu-demo] 7/7` + `[riscv-tests] 48/48` + `[ve
 
 ---
 
-## Phase 3 — Phase B 解锁并入 Sprint 6-7 (估时 10 day, Sprint 6 Week 1 ~ Sprint 7 Week 1)
+## Phase 3 — Phase B 解锁并入 Sprint 2-3 (估时 **15 day**, Sprint 2 Week 1 ~ Sprint 3 前段)
 
-> **依赖序** (`tasks.md` 锁定): B2 (RiscvMMUPlugin_chmem) → B3 (MMUPlugin_chmem 收窄版) → B4 (PTW FSM 复用) → B5 (test_mmu_chmem_basic)
+> **2026-10-22 双审裁决**: Phase B 启动窗口由 Sprint 6-7 (12-01) **提前到 Sprint 2-3 (10-23 ~ 11-06)**，估时由本 plan 原写的 10d **回改为 15d**（源 change `tasks.md:18-21` = B.2 3d + B.3 5d + B.4 2d + B.5 5d）。
+> **为何提前**: 12-01 起只剩 8 周要塞 B(15d)+C(5d)+C.6(3d)+D(5d)+E(2d) ≈ 30d + DMIPS 硬门禁，buffer ≈ 0。且 Phase B 历史 3 次 deep-agent 派发失败的根因是 **single-shot 派发方式**（非日历位置），`ctrl-link-chmem-reg-handle`（Sprint 2 早期 1d）恰是同一套 `ch_reg` + OR 网 API 的交互式热身 session。
+> **为何 15d 而非 10d**: 本 plan 原 10d 版本**整段丢失了 B.5 的 5d 集成回归**（Task 3.4 只有 2d 单测）⇒ 在"3 次派发失败"的历史上采纳压缩版是错误方向。
+> **依赖序** (`tasks.md` 锁定): **B.0 (key 复用确认)** → B.2 (RiscvMMUPlugin_chmem) → B.3 (MMUPlugin_chmem 收窄版) → B.4 (PTW FSM 复用) → B.5 (test_mmu_chmem_basic) → B.6 (集成回归)
 
-### Task 3.1: B2 — `RiscvMMUPlugin_chmem.h` 实装
+### Task 3.0: B.0 — Payload key 复用确认 (0.2 day, 阻塞全部后续 task)
+
+**Files:**
+- Verify: `ip/mmu/tlm/mmu_keys.h:44-53` (既有 5 key 定义, **不新建**)
+- Verify: `ip/cpu/plugins/ibus_chmem.h:121` + `ip/cpu/plugins/dmem_chmem.h:142` (消费端 `MmuKeys` 实例化)
+
+- [ ] **Step 1: 断言实例化参数与静态实例地址一致**
+
+`MMUPlugin_chmem` 发射用的 key 必须是 `cf::ip::mmu::payload::mmu_keys<std::uint64_t>` 的**同一静态实例**（与消费端指针相等）。`mmu_keys` 是模板 struct + static inline 成员 ⇒ `mmu_keys<uint64_t>` 与 `mmu_keys<uint32_t>` 是**不同实例、不同地址**。
+
+Expected: 指针相等断言 PASS
+
+- [ ] **Step 2: 消费端 `has()` 契约自检**
+
+确认 `ibus_chmem.h:144` / `dmem_chmem.h:144` 的 `payloads().has(MmuKeys::PADDR_VALID)` 在 MMU plugin 注册后**返回 true**（而非恒 false）。
+
+Expected: FAIL-before / PASS-after（B.3 实装后复跑）
+
+> **不新建 bundles key 文件** —— `PayloadStore` 按指针身份索引，新 key 对象 ⇒ 消费端 `has()` 恒 false ⇒ sel 静默回退 Bare ⇒ **测试全绿但 sv32 从未生效**。
+
+### Task 3.1: B2 — `RiscvMMUPlugin_chmem.h` 实装 (3 day)
 
 **Files:**
 - Create: `ip/cpu/plugins/mmu_chmem.h` (~180 LOC)
@@ -485,28 +514,78 @@ public:
 
 Expected: PASS + `[mmu] 59/59` 0 退化 + Bare 路径 cycle 数 byte-identical
 
-### Task 3.2: B3 — `MMUPlugin_chmem.h` 收窄版实装
+### Task 3.2: B3 — `MMUPlugin_chmem.h` 收窄版实装 (5 day)
 
 **Files:**
-- Create: `ip/mmu/tlm/MMUPlugin_chmem.h` (~280 LOC)
+- Create: `ip/mmu/plugins/MMUPlugin_chmem.h` (~280 LOC)
+  - **路径理由**: `ip/mmu/tlm/` 同时逃出 `check_plugin_portability.sh` Check 2 (`:95` 只扫 `*/plugins/*_chmem.h`) 与 Check 7 (`:273-284` 按文件名排除 `*_chmem.h`) ⇒ 放那里 4 门禁对该文件完全失明。ADR-083 §2.4 亦要求 `plugins/` 目录。
 
 - [ ] **Step 1-4: TDD 实装 8 项直接映射 TLB + 调用 `PtWalkFsmPlugin` + 发射 payload key**
 
 - [ ] **Step 5: Bare path byte-identical 0 退化**
 
-### Task 3.3: B4 — `PtWalkFsmPlugin` 复用 (0 修改)
+### Task 3.3: B.4 — `test_mmu_chmem_basic` 5 case PASS (2 day)
 
-**Files:**
-- Verify: `ip/mmu/plugins/mmu_ptw_chmem.h` (现有 FSM, 0 改动仅 verify)
-
-### Task 3.4: B5 — `test_mmu_chmem_basic` 5 case PASS
+> **编号语义已对齐 (2026-10-22)**: 本 plan 原把 B.4 当作 "PTW FSM 复用"、B.5 当作 "单测", 且**整段丢失集成回归 5d** —— 现按源 change `openspec/changes/mmu-chmem-pipeline-integration/tasks.md:18-21` 的 canonical 编号回改（B.2 插件 / B.3 插件 / B.4 单测 / B.5 集成回归 = 15d）。`PtWalkFsmPlugin` 复用（0 修改）**内含于 B.3**,不单列 task。
 
 **Files:**
 - Create: `tests/mmu/test_mmu_chmem_basic.cpp` (~180 LOC)
+- Modify: `tests/CMakeLists.txt` — **手动加入 `CHMEM_TEST_SOURCES` (`:118-145`)**
+  - **理由**: 该 list 是**逐条手写**的；GLOB (`:6`) 只覆盖 TLM target ⇒ 不加就**静默不编译不运行**
 
 - [ ] **Step 1-4: TLB hit 走 lookup + miss 走 PTW walk 5 case**
 
 Expected: `[mmu][chmem][basic]` 5/5 PASS
+
+- [ ] **Step 5: 真翻译生效判据（防"全绿交付零翻译"）**
+
+  - (a) **非恒等页表向量**: vaddr X → paddr Y（Y ≠ X），断言翻译后地址为 Y。*identity page table 无法区分真 sv32 与 Bare 回退 —— 两者输出恒等*
+  - (b) **消费端断言**: 经 `ibus_chmem` / `dmem_chmem` 共享节点验证 `has(MmuKeys::PADDR_VALID) == true` 且 sel 真选 `PADDR`（非 `MMU_VADDR`）
+  - (c) **satp=0 / satp_ppn 未编程边界用例**（v0.10.1 deep-rca 记录过"PTW 从不在 window 0x0 读 PTE"同类历史 bug；Bare-shortcut 严格化 v0.10.4 + CH_MEM 初值注入的交互会埋雷）
+  - (d) **变异对照 ≥2 个**: ① 拔掉 `PADDR_VALID` 接线 → 消费端测试应红；② TLB 改恒 hit → miss case 应红
+
+### Task 3.4: B.5 — Phase B 集成回归 (5 day)
+
+- [ ] **Step 1: 回归基线比对**
+
+`bash tools/run_chipforge_tests.sh --all` 全 PASS + `[chmem]` 73/73 基线不变（+ 新增 case 计入）+ `[mmu] 59/59` TLM 路径 0 退化 + 4 架构 gate 0 失败。
+
+> **回归成本**: `[chmem]` 全量 **833s/轮**（ctest 默认 1500s 上限内但余量不大）⇒ 按 6+ 轮 × 14min 纯等待计入。快速迭代用单 family 过滤（`./build/bin/chipforge_tests_chmem "[chmem]"`），全量只在 GREEN 收敛点跑。
+
+- [ ] **Step 2: 边界条件自检**
+
+**B.5 集成回归期间 `MMUPluginChmem` 不得注册进 `cpu_factory_chmem`**（注册是 C.4 的范围）⇒ 管道里 `PADDR_VALID` 仍恒 false ⇒ 无 stall 需求。若误注册，PTW 期间 fetch 会用未翻译地址取指（真错误）。
+
+### Task 3.5: B.6 — spec / tasks 勾选 (0.5 day)
+
+- [ ] **Step 1**: `openspec/changes/mmu-chmem-phase-b-c-launch/tasks.md` Phase B 段勾选 + `openspec/specs/` 新增 Requirement
+- [ ] **Step 2**: `openspec change validate mmu-chmem-phase-b-c-launch` ⇒ 0 error
+
+---
+
+## Phase 3.5 — fetch-stall v0.2 + bp-btb 收窄 2 项 + R11.1 (估时 3.5 day, Sprint 3 后段 11-06 ~ 11-30)
+
+> **2026-10-22 双审重构**: 原 `pre_flight` 的 #2 (`fetch-stall-protocol-v0.2`, 2d) 与 #3 (`bp-btb-coordination-3items`, 0.5d) **移出 pre_flight** —— 前者的 owner (wave5-bp-btb) 已于 2026-10-19 S3 决策 defer 到 v1.0.0 ⇒ **无人可交付**；且 `fetch_stall_requirements_v0.11.0.md` §1.5 (BLOCKER-B5, `:74-82`) 明写 *"必须先定义 ch_bool 类型的 PTW_ACTIVE 信号（Phase B 实装），然后才能 stall"* ⇒ **fetch-stall v0.2 反向依赖 Phase B**，放在 Phase B 的 pre_flight 里是**逻辑倒挂**。
+> **本 slot 挂载点 = C.4 的入口条件**（不是泛泛的"Phase C 入口" —— C.2/C.3 已落地不需要它，真正需要它的是 C.4 注册激活 + C.6 集成测试）。
+
+### Task 3.5.1: R11.1 — trap PC 跳转可行性重审 (0.5 day)
+
+- [ ] **Step 1**: 按 `csr-chmem-writeback-complete` archive 2026-10-15 后的现状重审 trap PC 跳转可行性（combinational network → NORMAL select 覆写 PC 节点）
+- [ ] **Step 2**: 产出结论并同步 `tasks.md` R11.1/R11.2/R11.3（7 处文件表述批量更新）
+
+### Task 3.5.2: bp-btb 收窄 2 项 (1 day)
+
+- [ ] **Step 1**: 确认收窄 —— 去掉 `pc_reg mux` 的 **BP 分支**（`feat-bp-btb-gshare` 已 defer 到 v1.0.0，该分支无意义），保留 **stall 语义** + **fetch stage at_stage 顺序**
+- [ ] **Step 2**: owner 改归属 mmu-chmem team（wave5-bp-btb 是**真空**不是让渡；需求源头本来就是 MMU PTW 冻结 fetch）
+- [ ] **Step 3**: 与 `fetch_stall_requirements_v0.11.0.md` 的 BLOCKER-B1 (substage ordering) + BLOCKER-B2 (stall 表达路径) 对齐 —— 本项即这两条的协调入口
+
+### Task 3.5.3: fetch-stall v0.2 protocol 起草 (3 day)
+
+- [ ] **Step 1**: 解 5 BLOCKER（B1 substage ordering API 扩展路径 / B2 stall 表达路径 / B3 双模 payload key 命名 / B4 Bare path 严格按 satp_mode 判定 / B5 ch_bool PTW_ACTIVE 信号源 —— **B5 由 Phase B 的 B.3 交付**）
+- [ ] **Step 2**: 产 `fetch_stall_protocol_v0.11.0.md`（v0.1 已因 critic REJECT + 5 BLOCKERS 撤回降级为 requirements doc）
+- [ ] **Step 3**: 过 critic 二轮 review 才能进入实装
+
+> **估时说明**: 3d 而非 2d —— BLOCKER-B1/B2 是**框架级**缺口（B1 可能需 ADR-048 扩展 substage ordering API；B2 = CtrlLink 在 elaborate 路径不冻结 pc_reg），2d 偏乐观。
 
 ---
 

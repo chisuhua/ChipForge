@@ -80,7 +80,7 @@ oracle_date: 2026-10-07
 
 ### 1. CH_MEM MMU/PTW pipeline 集成层实装
 
-**位置**: `ip/cpu/cpu_factory_chmem.h` (修改) + `ip/cpu/plugins/mmu_ptw_chmem.h` (复用,0 修改) + `ip/cpu/plugins/ibus_chmem.h` (修改) + `ip/cpu/plugins/mmu_exception_handler_chmem.h` (修改) + `ip/mmu/tlm/MMUPlugin_chmem.h` (新增) + `ip/cpu/plugins/mmu_chmem.h` (新增 RiscvMMUPlugin CH_MEM 版)
+**位置**: `ip/cpu/cpu_factory_chmem.h` (修改) + `ip/cpu/plugins/mmu_ptw_chmem.h` (复用,0 修改) + `ip/cpu/plugins/ibus_chmem.h` (修改) + `ip/cpu/plugins/mmu_exception_handler_chmem.h` (修改) + `ip/mmu/plugins/MMUPlugin_chmem.h` (新增) + `ip/cpu/plugins/mmu_chmem.h` (新增 RiscvMMUPlugin CH_MEM 版)
 
 实装 CH_MEM 模式 fetch/memory 路径:
 - IBus CH_MEM 接入 sv32 翻译结果 (`pl::MMU_VADDR` / `pl::PADDR_VALID` 消费)
@@ -92,7 +92,7 @@ oracle_date: 2026-10-07
 
 ### 2. MMUPlugin Bare shortcut 严格化
 
-**位置**: `ip/mmu/tlm/MMUPlugin.cpp:109` (修) + `ip/mmu/tlm/MMUPlugin_chmem.h` (新增)
+**位置**: `ip/mmu/tlm/MMUPlugin.cpp:109` (修) + `ip/mmu/plugins/MMUPlugin_chmem.h` (新增)
 
 **修复** (D4-A 锁定): 删除 `MMUPlugin.cpp:109` 的 `|| satp_ppn_ == 0` 析取项。现代码 `:95-108` 已正确从 `satp_value_` 提取 `satp_mode`,bug 仅在 `:109` 保留误判条件。**不重写判定逻辑,只删除析取项**。
 
