@@ -5,7 +5,7 @@
 # 作者: ChipForge Plugin Team
 # 最后修改日期: 2026-09-16 (Phase 6c M5: CH_MEM 是新正道, 翻转"ch 渗透禁令")
 #
-# 验证 (ADR-040 v2.0 §2.1):
+# 验证 (ADR-040 v2.0 §2.1; v3.0 §10 未改 Tier-1 检查项):
 #   1. ip/*/plugins/**/*.cpp 中 at_stage 回调内无 'if (cond) return;' 早返
 #   2. (REVISED) ip/*/plugins/ 业务代码 必须 使用 ch_* (CH_MEM 模式正道)
 #      ip/*/plugins/*_chmem.h 文件存在性检查 + TLM-only 文件禁用 ch
@@ -26,7 +26,7 @@ TARGET_DIRS="${ROOT_DIR}/ip"
 FAIL_COUNT=0
 WARN_COUNT=0
 
-echo "=== ADR-040 v2.0 TLM→HDL 移植性检查 (Phase 6c 重订) ==="
+echo "=== ADR-040 v2.0/v3.0 TLM→HDL 移植性检查 (Phase 6c 重订; v3.0 Verilator 集成段未改 Tier-1 检查项) ==="
 echo "目标目录: ${TARGET_DIRS}"
 echo ""
 

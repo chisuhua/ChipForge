@@ -1,12 +1,13 @@
-# ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）—— v2.0
+# ADR-040：TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）—— v3.0
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17) — v1.0 由 Phase 1 提案升级 |
-| 来源 | v1.0: Phase 1 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告（cf::plugin 底层语义翻转，2026-09-16） |
+| 状态 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity)** — v2.0 (2026-09-17) 基础不变，新增 §10 Verilator 集成段 |
+| 来源 | v1.0: Phase 1 Oracle 报告（L1CachePlugin TLM→HDL 前向兼容性分析，2026-06-10）<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告（cf::plugin 底层语义翻转，2026-09-16）<br>v3.0: Phase 6d.5 Verilator 后端落地 + 上游 `c27543d` 跨后端 parity 修复（2026-10-21） |
 | v2.0 决策 | **CH_MEM 是新正道**（翻转 v1.0 "ch 渗透禁令"）：<br>① 业务代码在 `-DCF_PLUGIN_USE_CH_MEM` 下必须用 `ch_uint/ch_reg/ch_bool/ch_mem`（elaboration 正道）<br>② 引入 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免机制（ADR-046）<br>③ 新增 Tier-1 Check 5: at_stage 回调内禁运行期 if(ch_bool)（ch_bool explicit operator bool 上下文转换）<br>④ `tools/check_plugin_portability.sh` v2.0 重订（5 项检查） |
-| 实现 commit | **25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a** (2026-09-17, M1-M5 8+1 commit 全部推送) |
-| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免） |
+| v3.0 决策 | **Verilator 成为 CH_MEM 路径的第二仿真后端 ⇒ 移植性约束从"单后端语义"扩展为"双后端语义必须一致"**：<br>① 生成 Verilog 与 CppHDL Simulator 的**同拍语义**成为硬要求（§10.1）<br>② 后端语义差异**必须显式契约化**（上游 `mem-read-timing` R3/R4 先例，§10.2）<br>③ 弃用算子治理：`ch_bool::operator\|\|` → `operator\|`（上游 deprecation，§10.3）<br>④ 回归锚形态翻转：跨后端回归锚 SHALL **锁住对齐**而非**钉死漂移**（§10.4） |
+| 实现 commit | **25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a** (2026-09-17, M1-M5 8+1 commit 全部推送)<br>v3.0: Phase 6d.5 Verilator 后端 + 上游 `c27543d` / `5b37b7d` / `eccf58f` / `cba0571`（2026-10-21） |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免）、ADR-080（TLM↔CH_MEM 双模对拍协议，v1.3.0 转硬门禁） |
 
 ---
 
@@ -408,8 +409,89 @@ bash tools/check_plugin_portability.sh  # 5/5 PASS (含 ADR-046 FSM 豁免)
 | | | 配套 `tools/check_plugin_portability.sh` v2.0（5 项检查）|
 | | | 配套 `tests/framework/test_cppHDL_hello_poc.cpp` + `test_plugin_elaborate_hello_poc.cpp` |
 | | | 配套 `ip/cpu/plugins/reg_file_chmem.h` + `int_alu_chmem.h` (M3 PoC 骨架) |
+| 2026-10-21 | **3.0** | **Phase 6d.5 Verilator 后端落地 + 跨后端 parity**（详见 §10） |
+| | | - Verilator 成为 CH_MEM 路径**第二仿真后端** ⇒ 移植性约束扩为"双后端语义必须一致" |
+| | | - 上游 CppHDL `c27543d`：async 读端口归组合 + 建 `read_port → data_proxy` 数据流边 ⇒ Simulator 的 `ch_mem::aread` 与生成 Verilog 的连续 `assign` **同为 0-cycle** |
+| | | - 上游归档 `sim-mem-read-timing-align-2026-10` (`5b37b7d`) + 跨后端 parity (`eccf58f`) + `dual-backend-mem-read-timing-parity-2026-10` (`cba0571`) |
+| | | - **ChipForge 侧业务代码零改动**；`[chmem]` 72/73 → **73/73 PASS**（19389 assertions），vendored ELF **47/47 全 PASS**（16410 assertions），`[verilator]` 48 ELF 全 PASS |
+| | | - 弃用算子治理：`ch_bool::operator\|\|` → `operator\|`（上游 deprecation）—— 框架内 4 处已清零（`ctrl-link-chmem-reg-handle`） |
+| | | - 回归锚形态翻转：`tests/cpu/test_cpu_chmem_mem_read_drift.cpp` 从"钉死 1 拍漂移"反转为"**锁住 0-cycle 对齐**" |
 
 ---
+
+## 10. v3.0 — Verilator 集成段（2026-10-22）
+
+> **本段记录 Phase 6d.5 落地后 CH_MEM 路径的移植性约束变化**。v2.0 的三级约束模型（Tier-1 / Tier-2 / Tier-3）、`array_store` 抽象、`CF_PLUGIN_USE_FSM_EXEMPT` 豁免机制、Tier-1 Check 1-5 全部**不变**。v3.0 只增加一条**跨后端**维度的约束。
+
+### 10.1 双后端语义必须一致（新增硬约束）
+
+CH_MEM 路径现在有**两个**仿真后端：
+
+| 后端 | 入口 | 用途 |
+|---|---|---|
+| CppHDL Simulator（解释器） | `pb->create_simulator()` | 快速功能仿真 / 单元测试 |
+| Verilator（生成 Verilog 后编译） | `pb->to_verilog()` → `verilator` → `sim_main` | RTL 级验证 / 时序形态检查 |
+
+⇒ **同一份 `ch_*` 业务代码 SHALL 在两个后端产出语义一致的结果**。
+
+这不是新约束而是 v2.0 的**自然推论**，但 Phase 6d.5 落地时它第一次成为**可观测的失败面**：上游 `mem-read-timing` R3 曾要求 sync + async 两类读端口都归入 `sequential_instr_list_` ⇒ Simulator 的 `ch_mem::aread` 相对生成 Verilog 的连续 `assign` **滞后 1 拍**。
+
+CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器）⇒ regfile 在同一次 `eval_sequential()` 内先于读端口锁存（regfile node id < `load_read` node id）⇒ **load 的结果 = 上一个访存地址的内容** ⇒ 10 个含 load 的 rv32ui ELF 全错。
+
+### 10.2 后端语义差异必须显式契约化（方法论）
+
+上游把该差异写成**显式 capability + 契约条款 + 配套 pin 测试**（`openspec/specs/mem-read-timing/spec.md` R3/R4），而非隐含在实现里。
+
+⇒ **ChipForge 侧沿用同一方法论**（ADR-083 单一 source of truth 的延伸）：
+
+1. 后端语义差异 SHALL 落在**上游显式契约**里，而不是靠 ChipForge 适配
+2. ChipForge 的回归锚 SHALL **钉住契约要求的行为**（此处 = 0-cycle 对齐），而不是钉住当前的缺陷
+3. 修复若由上游落地，ChipForge 侧 SHALL **零业务代码改动**
+
+**本次落地的实证**（上游 `c27543d`，2026-10-21）：
+
+| 成分 | 作用 | 变异对照结果 |
+|---|---|---|
+| ① `read_port → data_proxy` 的 **src 边**（提供拓扑序） | **承重件** | 只撤分类、边保留 ⇒ ELF 仍全绿；两者都撤 ⇒ 精确重现 10 个 FAIL |
+| ② **分类**（async 归组合） | 决定与 Verilog 的 0-cycle 对齐 | 决定 `[mem-drift]` pin 的检测对象 |
+
+### 10.3 弃用算子治理（可移植性）
+
+上游把 `ch_bool::operator||` / `operator&&` 标记为 `[[deprecated]]`，提示改用 `operator|` / `operator&`（1-bit OR/AND；`select()` 用于值选择）。
+
+⇒ **本项目标准**：CH_MEM 路径的 1-bit 布尔运算 SHALL 用 `operator|` / `operator&`，SHALL NOT 用已弃用的 `operator||` / `operator&&`。
+
+**框架内范围已清零**（openspec change `ctrl-link-chmem-reg-handle`，2026-10-22）：`include/cf/plugin/` 内 4 处（`ctrl_link.h:150,160` + `pipe_builder.h:434,435`）全部改为 `operator|`。
+
+**业务侧剩余**：`ip/**/*_chmem.h` 另有 ≥60 `||` + ≥90 `&&` ⇒ **另立 change**（30+ 文件各需 `[chmem]` 73/73 + `[verilator]` 48 ELF 回归）。
+
+⚠️ **统计方法约束**：统计 deprecated 算子站点**不能用 grep 数 `||`** —— 同行不含 `ch_bool` 字面量的用法会漏（例：`pipe_builder.h:434` 的 `stall = stall || cl->halt_condition();`）。SHALL 用编译器 `-Wdeprecated-declarations` 逐 TU 统计。
+
+### 10.4 回归锚形态翻转：锁住对齐，而非钉死漂移
+
+`tests/cpu/test_cpu_chmem_mem_read_drift.cpp`（`[mem-drift]`）在缺陷期断言"**存在** 1 拍滞后"（`mismatches == 6` 且 `off_by_one == 6`）。上游修复后它**必然 FAIL**（实测 `0 == 6`）。
+
+⇒ 现改为断言"**skew 已消除**"（每拍观测值 == 当前地址内容，且 != 上一拍地址内容），test case 更名 `chmem_mem_read_drift_aread_has_no_skew` ⇒ 回归锚从"钉死缺陷"变成"**锁住修复**"。
+
+**断言强度**：同时断言"每拍观测值 == 当前地址内容"与"观测值 != 上一拍地址内容"。后者不是冗余 —— 若只断言前者，一个"恰好总是等于上一拍"的错误实现也能在地址回绕的特定序列下蒙混过关。
+
+### 10.5 v3.0 范围纪律
+
+**In scope**：
+
+- Verilator 作为 CH_MEM 第二后端的**移植性约束**表述（§10.1）
+- 后端语义差异的**契约化方法论**（§10.2）
+- 弃用算子标准与范围（§10.3）
+- 跨后端回归锚的形态要求（§10.4）
+
+**Out of scope**：
+
+- **不改 v2.0 的任何约束**（三级模型 / `array_store` / FSM 豁免 / Tier-1 Check 1-5）
+- **不改 TLM 模式语义**
+- **不引入新的 CI 门禁**（跨后端 parity 的硬门禁归 ADR-080，v1.3.0 窗口）
+- **不清业务侧 deprecated 算子**（另立 change）
+
+
 
 ## 8. v2.0 范围纪律
 
