@@ -1,0 +1,52 @@
+{
+  "schema": "planner-handoff-v1",
+  "version": 1,
+  "owner": "rdd-planner",
+  "planner_complete_at": "2026-10-22T00:00:00+00:00",
+  "current_sprint": "sprint-2026-11",
+  "proposals_ready": [
+    "mmu-chmem-phase-b-c-launch",
+    "chmem-mmu-keys-modality"
+  ],
+  "proposals_approved_count": 2,
+  "features_active": [
+    "feat-mfc-multi-cycle-fsm",
+    "feat-rv32um-m-extension",
+    "feat-mmu-chmem-integration",
+    "feat-bp-btb-gshare",
+    "feat-phase-6d-rtl-verification"
+  ],
+  "awaiting_builder": [
+    "mmu-chmem-phase-b-c-launch",
+    "chmem-mmu-keys-modality"
+  ],
+  "recommended_route": "complex",
+  "active_objectives": [
+    {
+      "id": "objective-soc-cpu-v0110-launch",
+      "priority": "P0",
+      "status": "active",
+      "review_by": "2027-01-24",
+      "theme": "v0.11.0 launch gate — Wave 5 收官 (17 周时间盒: 2 + 5.5 + 8 + 1)",
+      "next_sprint_candidates": [
+        "Sprint 2 早期 (10-23 ~ 10-30): ctrl-link-chmem-reg-handle 纯框架 1d (stateful halt 通道, 同时是 CppHDL API 热身 session) + 排期对齐 1d + feat-phase-6d-rtl-verification 收官 1d (填 3d 空档)",
+        "Sprint 2-3 (10-23 ~ 11-06): mmu-chmem-phase-b-c-launch Phase B (15d, B.2 RiscvMMUPlugin_chmem 3d -> B.3 MMUPlugin_chmem 5d -> B.4 复用 1d -> B.5 单测 2d -> B.6 集成回归 5d 溢入 Sprint 3 前段)",
+        "Sprint 3 后段 (11-06 ~ 11-30): Phase 3.5 新 slot — R11.1 trap PC 重审 0.5d + bp-btb 收窄 2 项 1d + fetch-stall v0.2 protocol 起草 3d (原 pre_flight 反向依赖 Phase B, 已重构)",
+        "Sprint 4-7 (11-30 ~ 01-24): Phase C wiring 5d -> C.6 集成测试 3d -> Phase D 验证 5d -> Phase E archive 2d"
+      ]
+    },
+    {
+      "id": "objective-ip-mmu-mmu-chmem-phase-b-e",
+      "priority": "P0",
+      "status": "active",
+      "review_by": "2027-01-06",
+      "theme": "mmu-chmem Phase B-E CH_MEM 集成实施",
+      "next_sprint_candidates": [
+        "Phase B (Sprint 2-3, 15d): MMUPlugin_chmem 实装 — ip/mmu/plugins/MMUPlugin_chmem.h (新) + ip/cpu/plugins/mmu_chmem.h (新, RiscvMMUPlugin_chmem); key 必须复用 ip/mmu/tlm/mmu_keys.h 的 mmu_keys<uint64_t> 同一静态实例 (指针身份, 否则静默 Bare 回退)",
+        "Phase 3.5 (Sprint 3 后段, 3.5d): R11.1 + bp-btb 收窄 2 项 + fetch-stall v0.2 protocol (挂 C.4 入口条件)",
+        "Phase C (Sprint 4-5, 5d + 3d): C.1 mmu_exception_handler_chmem wiring + C.4 cpu_factory_chmem 注册 + C.5 hazard_chmem halt_when (含 A4 mmufault 信号驱动, 从 ctrl-link-chmem-reg-handle 移入) + C.6 集成测试"
+      ]
+    }
+  ],
+  "notes": "2026-10-22 rdd-planner 阶段退出。前序 handoff (2026-10-09) 的 awaiting_builder=[mfc-extract-fsm-h] 已失效 — 该 change 2026-10-10 archive; features_active 已剔除 feat-dhrystone-dmips-gate (2026-10-15 done)。本次新增两个 ready proposal: (1) ctrl-link-chmem-reg-handle — 框架级纯改动 1d, A4 已移出 scope 改挂 mmu-chmem-phase-b-c-launch 的 C.5 (惰性骨架风险: ch_reg 无 next 驱动源, 惰性窗口跨 Phase 1 -> C.5 ~5 周); (2) mmu-chmem-phase-b-c-launch — Phase B 15d (不采纳 37KB plan 的 10d 压缩版, 该版丢了 B.5 的 5d 集成回归)。Phase B 新文件路径锁 ip/mmu/plugins/ 而非 ip/mmu/tlm/ — 后者同时逃出 check_plugin_portability.sh 的 Check 2 与 Check 7 扫描范围 (CI 盲区)。执行序列决策纪要见 .rddf/plans/20261022-v0110-mmu-chmem-execution-sequence.md (仓内, 降级为非 SSOT); 2026-10-22 双审另新增 Phase B 硬前置 change chmem-mmu-keys-modality (MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约, plan 与 5 段 draft 已落盘)"
+}

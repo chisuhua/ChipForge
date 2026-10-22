@@ -1,0 +1,12 @@
+{
+  "schema": "planner-state-v1",
+  "version": 1,
+  "current_sprint": "sprint-2026-11",
+  "active_projects": [
+    "mmu-chmem-phase-b-c-launch",
+    "chmem-mmu-keys-modality"
+  ],
+  "recommended_route": "complex",
+  "updated_at": "2026-10-22T00:00:00+00:00",
+  "source": "rdd-planner-stage-exit-2026-10-22"
+}
