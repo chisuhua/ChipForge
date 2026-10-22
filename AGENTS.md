@@ -287,10 +287,28 @@ ip/{name}/
 
 | ADR | 标题 | 关键决策 |
 |-----|------|---------|
-| **ADR-040 v2.0** | TLM→HDL 移植性约束 | **CH_MEM 是新正道** (翻转 v1.0 ch 渗透禁令); `array_store` 双缓冲; `CtrlLink::halt_when(ch_bool)` |
+| **ADR-040 v2.0** | TLM→HDL 移植性约束 | **CH_MEM 是新正道** (翻转 v1.0 ch 渗透禁令); `array_store` 双缓冲; `CtrlLink::halt_when(ch_bool)` + **`halt_when_stateful(ch_reg<ch_bool>)`** (2026-10-22 `ctrl-link-chmem-reg-handle` 落地, capability `ctrllink-continuous-handle`) |
 | **ADR-046** | 多周期协议引擎豁免 D4 无状态机禁令 | `CF_PLUGIN_USE_FSM_EXEMPT` 标记 + `chlib::ch_state_machine` DSL |
 
 **ADR-037 v2.0 状态 (Oracle 2026-09-20 确认)**: `docs/architecture/adr.md:1235` 已标 `✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17, D4 elaboration 语义兑现)`。Phase 6d prereqs change 仅验证内容完整性 + 修正 adr.md:1251 拆分描述不一致 (原 6c/6d/6e 与现行 6a/6b/6c/6d), 不重新写 v2.0。
+
+### CtrlLink 有状态 (跨拍保持) halt 条件 — capability `ctrllink-continuous-handle` (2026-10-22)
+
+`CtrlLink` 在 CH_MEM 模式下现提供**显式的有状态条件入口** (openspec change `ctrl-link-chmem-reg-handle`):
+
+| API | 语义 |
+|---|---|
+| `halt_when_stateful(const ch_reg<ch_bool>&)` | 显式登记"跨拍保持"的 halt 条件 |
+| `halt_when(const ch_reg<ch_bool>&)` | 重载 — 把 `ch_reg<ch_bool>` 传给 `halt_when` 时**自动**按有状态登记 (关闭"意图被静默丢弃"的缺口) |
+| `OR_combined_halt_conds()` | OR 合并的**唯一实现**, 返回可被消费方 DAG 引用的 `ch_bool` 节点; 既有 `halt_condition()` / `flush_condition()` 为 inline alias 转发 |
+| `stateful_halt_count()` / `has_stateful_conditions()` / `unreliable_query_count()` | 诊断: 有状态条件计数 + "不可靠查询"计数 |
+
+⚠️ **三条使用纪律**:
+1. **`should_halt()` / `should_throw()` / `should_flush()` 仅对组合条件可靠** —— 它们读 C++ 侧缓冲 (`c.to_bool()`), 对有状态条件永远读到**陈旧值**。验证有状态条件必须走 DAG 路径 `OR_combined_halt_conds()` (其 OR 门引用寄存器 proxy 节点 ⇒ **随拍更新**)。
+2. 注册有状态条件后调用 `should_*()` 会**递增 `unreliable_query_count()` 并 emit 一次 stderr 告警** (非静默) —— 这是刻意的: 让"用错 API"可被观测。
+3. `ch_reg::operator<<=` 设置 next 值**必须在 Simulator 创建之前**调用 (Simulator 初始化时快照寄存器链)。自翻转写法: `reg <<= !reg;`。
+
+**下游解锁**: `chmem-mext-fsm-cycle-parity` (CH_MEM M 扩展多周期 FSM) 的**硬前置已解除** —— FSM busy 期间冻结 fetch/decode 的 stateful halt 通道就位 (它只需 A1/A2, 不需 HazardPlugin 的 A4 改造)。`A4` (HazardPlugin mmufault instance state → 信号驱动) 归属 `mmu-chmem-phase-b-c-launch` 的 **Phase C.5** (真实驱动源是 C.1/C.5 的 `CPU_EXCEPTION_CODE` 写入; 提前交付会得到恒 false 惰性骨架)。
 
 ### 路线 / Roadmap 类文档（2026-10-09 rdd-workflow 单层治理）
 
