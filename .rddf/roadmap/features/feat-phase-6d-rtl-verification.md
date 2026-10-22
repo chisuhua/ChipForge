@@ -67,15 +67,15 @@ Phase 6d 端到端：把 Phase 6c 框架能力（CH_MEM elaboration + Verilog �
   ⇒ **前置条件已满足**（2026-10-21 上游落地后 `[chmem]` 全绿），待本 feature 自身收官
 
 ## 验收标准
-- [ ] E1-E14 全部 PASS（详见 docs/architecture/roadmap-evolution.md §1）
-- [ ] E3: riscv-tests RV32I 5 指令 tohost=1 CppHDL sim 端到端 PASS
-- [ ] E4: 生成 cpu.v 含 5-stage 完整 Verilog
-- [ ] E5: 8/8 check_plugin_portability.sh PASS（含新增 Check 9: _chmem.h 必须有 CF_PLUGIN_USE_FSM_EXEMPT 标注 if FSM）
-- [ ] E8: Verilator sim 跑 riscv-tests add.elf tohost=1 与 CppHDL sim byte-equal
-- [ ] E12: chipforge_tests TLM baseline 0 回归
-- [ ] E13: chipforge_tests_chmem 完整 5-stage + riscv-tests + Verilator 全 PASS
-      （**前置阻塞已解除** —— 上游 `c27543d` 落地后 `[chmem]` 73/73 PASS，
-      见上"已知问题（已闭环）"）
-- [ ] E14: CHANGELOG v0.10.0/v0.11.0 entry + ADR-037 v2.0 Accepted 状态 + ADR-040 v3.0 (Verilator 集成段)
-- [ ] 间接：与 feat-rv32um-m-extension 共享 MUL/DIV 路径
-- [ ] 间接：v0.10.0 PoC-2 RV32C ≥95% + PoC-3 ICache ≥90%
+- [x] E1-E14 全部 PASS（详见 `docs/architecture/roadmap-evolution.md` §1，**2026-10-22 逐条核验 + 验证命令按实际 test case 名更正**）
+- [x] E3: riscv-tests RV32I 5 指令 tohost=1 CppHDL sim 端到端 PASS — 实际 `chmem_vendored_elf_tohost1` **47/47 vendored ELF 全 PASS**（39 rv32ui + 8 rv32um，16410 assertions）
+- [x] E4: 生成 cpu.v 含 5-stage 完整 Verilog — `m4_poc_5stage_elaborate_verilog`
+- [x] E5: 8/8 check_plugin_portability.sh PASS（含 Check 9: _chmem.h 必须有 CF_PLUGIN_USE_FSM_EXEMPT 标注 if FSM）— 实测 **12/12 PASS**
+- [x] E8: Verilator sim 跑 riscv-tests add.elf tohost=1 与 CppHDL sim byte-equal — `cpu_verilator_sim_tohost1` **48 ELF 全 PASS**（96 assertions，严格 `TOHOST=1` 判据）
+- [x] E12: chipforge_tests TLM baseline 0 回归 — **481 case / 480 PASS / 1 failed**（唯一失败 = 已知 infra drift `test_7stage_riscv.cpp:124` `node_count()==17` 实测 9；67135 assertions；与基线逐 case 一致，**0 新增 FAIL**）
+- [x] E13: chipforge_tests_chmem 完整 5-stage + riscv-tests + Verilator 全 PASS — **73 case / 73 PASS / 0 failed**（19389 assertions）
+      （**前置阻塞已解除** —— 上游 `c27543d` 落地后 `[chmem]` 全绿，见上"已知问题（已闭环）"）
+- [x] E14: CHANGELOG v0.10.0/v0.11.0 entry + ADR-037 v2.0 Accepted 状态 + ADR-040 v3.0 (Verilator 集成段)
+      — **2026-10-22 完成**: CHANGELOG v0.11.0 段（`chmem-dmem-read-latency-aligned` + `ctrl-link-chmem-reg-handle`）+ ADR-037 v2.0 Accepted（`adr.md:111`）+ **ADR-040 v3.0 §10 Verilator 集成段**（新增：双后端语义必须一致 + 后端语义差异契约化方法论 + 弃用算子治理 + 回归锚形态翻转）
+- [x] 间接：与 feat-rv32um-m-extension 共享 MUL/DIV 路径 — ✅ 已兑现（`[riscv-tests]` 48/48 PASS，含 8 个 rv32um ELF 真 PASS，判据严格 `tohost==1`）
+- [ ] 间接：v0.10.0 PoC-2 RV32C ≥95% + PoC-3 ICache ≥90% — ❌ **未实现**（2026-10-22 实测：仓内无 RV32C/C 扩展实现；无 ICache plugin，仅 `ip/cpu/cpu_factory.h:150` 有个 `icache_latency` 字段占位）⇒ **本 fragment 保持 `active`，不转 `done`**（诚实性原则：E1-E14 是本 feature 的退出标准，已全绿；但两个"间接"验收项归属 v0.10.0/v1.0.0 窗口的其他 feature）
