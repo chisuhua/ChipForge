@@ -67,29 +67,31 @@
 
 **退出标准**（最小 M6d.1 = E1-E6 + 标准 M6d.2 = E7-E14）:
 
+> **2026-10-22 收官核验（`feat-phase-6d-rtl-verification` 收官）**: 下表的"验证命令"列已按**实际落地的 test case 名**更正 —— 原表用的是 Phase 6d 规划期的占位名（`m4_poc_5stage_full_simulator` / `riscv_tests_rv32ui_*`），实测仓内**无同名 case**（实际名见下表"实际 test case"列）。E1-E14 全部核验完毕，状态见各行。
+
 #### 1.1 最小退出标准 (M6d.1, "5-stage Pipeline CH_MEM 端到端")
 
-| # | 标准 | 验证命令 |
-|---|------|----------|
-| E1 | `m4_poc_5stage_simulator_tick` 升级为完整 5-stage 版本 | `./build/bin/chipforge_tests_chmem "m4_poc_5stage_full_simulator"` |
-| E2 | DecoderPlugin/BranchPlugin/HazardPlugin 完整 CH_MEM 实现 | `git log` + `tests/cpu/test_cpu_5stage.cpp` PASS |
-| E3 | riscv-tests RV32I 5 指令 (add/addi/auipc/jal/beq) `tohost=1` CppHDL sim 端到端 PASS | `./build/bin/chipforge_tests_chmem "riscv_tests_rv32ui_*"` |
-| E4 | 生成 `cpu.v` 含 5-stage 完整 Verilog | `ch::toVerilog("cpu.v", ctx)` 输出含 5 个 stage `always_ff` |
-| E5 | 12/12 `check_plugin_portability.sh` 仍 PASS（Check 9 FSM_EXEMPT 已实装，Phase 6d 需维持）| `bash tools/check_plugin_portability.sh` |
-| E6 | `verify_adr.sh` 0 FAILED + `verify_plugin_decision.sh` PASS | 同上 |
+| # | 标准 | 实际 test case / 验证命令 | 状态 (2026-10-22) |
+|---|------|----------|---|
+| E1 | `m4_poc_5stage_simulator_tick` 升级为完整 5-stage 版本 | `./build/bin/chipforge_tests_chmem "m4_poc_5stage*"` — 实际 3 case：`m4_poc_5stage_build` / `m4_poc_5stage_elaborate_verilog` / `m4_poc_5stage_simulator_tick`（`tests/cpu/test_cpu_5stage.cpp:49,71,118`） | ✅ PASS |
+| E2 | DecoderPlugin/BranchPlugin/HazardPlugin 完整 CH_MEM 实现 | `ip/cpu/plugins/{decode,branch,hazard}_chmem.h` + `tests/cpu/test_cpu_5stage.cpp` PASS | ✅ PASS |
+| E3 | riscv-tests RV32I 5 指令 (add/addi/auipc/jal/beq) `tohost=1` CppHDL sim 端到端 PASS | `./build/bin/chipforge_tests_chmem "chmem_vendored_elf_tohost1"` — 47 vendored ELF（39 rv32ui + 8 rv32um）全 `tohost==1`（`tests/cpu/test_cpu_chmem_vendored_elf.cpp:131`） | ✅ PASS（47/47, 16410 assertions） |
+| E4 | 生成 `cpu.v` 含 5-stage 完整 Verilog | `m4_poc_5stage_elaborate_verilog` + `ch::toVerilog` 输出含 5 个 stage `always_ff` | ✅ PASS |
+| E5 | 12/12 `check_plugin_portability.sh` 仍 PASS（Check 9 FSM_EXEMPT 已实装，Phase 6d 需维持）| `bash tools/check_plugin_portability.sh` | ✅ 12/12 PASS |
+| E6 | `verify_adr.sh` 0 FAILED + `verify_plugin_decision.sh` PASS | 同上 | ✅ 0 FAILED + 8/8 PASS |
 
 #### 1.2 标准退出标准 (M6d.2, "+ Verilator + MMU FSM")
 
-| # | 标准 | 验证命令 |
-|---|------|----------|
-| E7 | Verilator 编译 `cpu.v` 无 error | `verilator --lint-only cpu.v` |
-| E8 | Verilator sim 跑 riscv-tests add.elf `tohost=1` 与 CppHDL sim byte-equal | TLM↔Verilog 对比 trace |
-| E9 | MMU PTW 5 状态 FSM (`chlib::ch_state_machine`) 实装 + `CF_PLUGIN_USE_FSM_EXEMPT` 标记 | `ip/cpu/plugins/mmu_ptw_chmem.h` |
-| E10 | L1Cache refill FSM (4 状态) 实装 | `ip/cache/plugins/l1_cache_refill_fsm_chmem.h` |
-| E11 | Harness 切换 (`tools/cpu_sim/main.cpp` → CppHDL sim runner) + 保留 CLI 兼容 | `build/src/cf_plugin/cpu_sim --elf add.elf` 跑 CppHDL sim |
-| E12 | `chipforge_tests` TLM baseline 0 回归（数字维护原则：以 archive 时 AGENTS.md 已知测试状态为准，禁止快照引用硬编码数字；当前 v0.10.4 实测 432/432 PASS, 67026 assertions）| `ctest -R chipforge_tests` |
-| E13 | `chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS | `ctest -R chipforge_tests_chmem` |
-| E14 | CHANGELOG v0.10.0/v0.11.0 entry + ADR-037 v2.0 Accepted 状态 + ADR-040 v3.0 (Verilator 集成段) | `CHANGELOG.md` + `docs/architecture/adr.md` |
+| # | 标准 | 实际 test case / 验证命令 | 状态 (2026-10-22) |
+|---|------|----------|---|
+| E7 | Verilator 编译 `cpu.v` 无 error | `verilator --lint-only cpu.v` | ✅ PASS |
+| E8 | Verilator sim 跑 riscv-tests add.elf `tohost=1` 与 CppHDL sim byte-equal | `cpu_verilator_sim_tohost1`（`tests/cpu/test_cpu_verilator_sim.cpp:115`）+ `ctest -R cpu_verilator_sim_add` | ✅ PASS（48 ELF, 96 assertions；严格 `TOHOST=1` 判据，非 mask 假绿） |
+| E9 | MMU PTW 5 状态 FSM (`chlib::ch_state_machine`) 实装 + `CF_PLUGIN_USE_FSM_EXEMPT` 标记 | `ip/cpu/plugins/mmu_ptw_chmem.h` | ✅ 实装 |
+| E10 | L1Cache refill FSM (4 状态) 实装 | `ip/cache/plugins/l1_cache_refill_fsm_chmem.h` | ✅ 实装 |
+| E11 | Harness 切换 (`tools/cpu_sim/main.cpp` → CppHDL sim runner) + 保留 CLI 兼容 | `build/src/cf_plugin/cpu_sim --elf add.elf` 跑 CppHDL sim | ✅ CLI 兼容保留 + CppHDL runner 就位 |
+| E12 | `chipforge_tests` TLM baseline 0 回归（数字维护原则：以 archive 时 AGENTS.md 已知测试状态为准，禁止快照引用硬编码数字）| `ctest -R chipforge_tests` | ✅ **481 case / 480 PASS / 1 failed**（唯一失败 = 已知 infra drift `tests/cpu/integration/test_7stage_riscv.cpp:124` `node_count()==17` 实测 9；67135 assertions）—— 与基线逐 case 一致，0 新增 FAIL |
+| E13 | `chipforge_tests_chmem` 完整 5-stage + riscv-tests + Verilator 全 PASS | `ctest -R chipforge_tests_chmem` | ✅ **73 case / 73 PASS / 0 failed**（19389 assertions；vendored ELF 47/47）—— 前置阻塞（10 个 load/store ELF）已于 2026-10-21 由上游 `c27543d` 消除 |
+| E14 | CHANGELOG v0.10.0/v0.11.0 entry + ADR-037 v2.0 Accepted 状态 + ADR-040 v3.0 (Verilator 集成段) | `CHANGELOG.md` + `docs/architecture/adr.md` | ✅ **2026-10-22 完成**: CHANGELOG v0.11.0 段（`chmem-dmem-read-latency-aligned` + `ctrl-link-chmem-reg-handle`）+ ADR-037 v2.0 Accepted（`adr.md:111`）+ **ADR-040 v3.0 §10 Verilator 集成段**（新增，2026-10-22） |
 
 ---
 
