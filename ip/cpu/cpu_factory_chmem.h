@@ -184,8 +184,11 @@ class CpuFactoryChmem {
       using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
       n->operator()(CsrKT::CSR_WRITE_ADDR)  = T(ch::core::ch_literal<0, 32>{});
       n->operator()(CsrKT::CSR_WRITE_VALUE) = T(ch::core::ch_literal<0, 32>{});
-      // CSR_WRITE_EN 是 Payload<bool>, 用 put(false) 避开 contextual conversion 歧义
-      n->payloads().put(CsrKT::CSR_WRITE_EN, false);
+      // CSR_WRITE_EN 是 `uint_t<1>` (CH_MEM = ch_uint<1>) —— 预填**零值节点**
+      //   (不是 POD false: 裸 bool cell 在 CH_MEM 下装不下 ch 节点, 且折叠后
+      //    写使能恒假 ⇒ CSR 写回通路失效。chmem-cpu-keys-modality 修复)
+      n->payloads().put(CsrKT::CSR_WRITE_EN,
+                        ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}));
       // DECODED_INST: 用真实 ch_literal 零值初始化 (v0.3.1 M6: 默认构造
       // DecodedInst{} 的 ch_uint 成员是 null impl → Hazard 比较 SEGV)
       cf::cpu::plugins::DecodedInst zero_decoded;

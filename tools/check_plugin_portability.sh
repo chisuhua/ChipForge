@@ -463,16 +463,18 @@ echo ""
 #     (`PayloadStore::put` 是精确类型匹配, include/cf/plugin/payload.h:122-128)
 #     ⇒ sv32 翻译退化为 elaboration 期常量 ⇒ **测试全绿但翻译从未生效**
 #
-# 状态: [WARN] —— 已知违规由姊妹 change `chmem-cpu-keys-modality` 处理
-#       (csr_bundles 5 key + cpu_keys 1 key + cache_keys 1 key + mmu_keys 7 key);
-#       修完后本检查可升级为 FAIL.
+# 状态: [WARN] —— 已知违规剩余 2 个文件 (chmem-cpu-keys-modality 2026-10-22 已清掉
+#       csr_bundles 5 key + cpu_keys 4 key, allowlist 从 4 收到 2):
+#         - cache_keys.h 1 key  (CH_MEM 消费点未落地)
+#         - mmu_keys.h 8 key   (CH_MEM 消费点归 chmem-ptw-walk)
+#       两个文件收敛后本检查可升级为 FAIL。
 # ----------------------------------------------------------------------------
 echo "[13/13] 检查 payload key 模式化 (禁裸 bool / uintN_t) [WARN] ..."
 KEY_MODALITY_VIOLATIONS=""
 KEY_MODALITY_FILES=$(find ${ROOT_DIR}/ip ${ROOT_DIR}/bundles -type f \( -name "*.h" -o -name "*.hpp" \) \
   ! -name "*_chmem.h" ! -path "*/build/*" 2>/dev/null || true)
 # 已知违规 allowlist (姊妹 change chmem-cpu-keys-modality 处理)
-KEY_MODALITY_ALLOWLIST=" ${ROOT_DIR}/bundles/csr_bundles.h ${ROOT_DIR}/ip/cache/plugins/cache_keys.h ${ROOT_DIR}/ip/cpu/tlm/cpu_keys.h ${ROOT_DIR}/ip/mmu/tlm/mmu_keys.h "
+KEY_MODALITY_ALLOWLIST=" ${ROOT_DIR}/ip/cache/plugins/cache_keys.h ${ROOT_DIR}/ip/mmu/tlm/mmu_keys.h "
 for f in ${KEY_MODALITY_FILES}; do
   case "${KEY_MODALITY_ALLOWLIST}" in
     *" ${f} "*) continue ;;
@@ -490,6 +492,21 @@ else
   echo "${KEY_MODALITY_VIOLATIONS}" | sed 's/^/    /'
   echo "  [FIX] 改用 cf::plugin::uint_t<N> / bool_t (ADR-040 v3.0 payload key 模态约束)"
   WARN_COUNT=$((WARN_COUNT + 1))
+fi
+# allowlist 内文件的**既有**违规 (不计入 WARN_COUNT, 但必须可见 —— 否则
+# "allowlist 收缩后 0 新增 WARN" 这条判据无法被人眼核对)
+ALLOWLIST_HITS=""
+for f in ${KEY_MODALITY_ALLOWLIST}; do
+  [ -f "${f}" ] || continue
+  H=$(grep -nE "Payload<(bool|std::uint(8|16|32|64)_t)>" "${f}" \
+    | grep -vE "^[[:space:]]*[0-9]+:[[:space:]]*(//|/\*|\*)" || true)
+  if [ -n "${H}" ]; then
+    ALLOWLIST_HITS="${ALLOWLIST_HITS}${f}:"$'\n'"${H}"$'\n'
+  fi
+done
+if [ -n "${ALLOWLIST_HITS}" ]; then
+  echo "  [INFO] allowlist 内文件的既有违规 (不计入 WARN; 归属见 ADR-040 v3.0 §10.8):"
+  echo "${ALLOWLIST_HITS}" | sed 's/^/    /'
 fi
 echo ""
 

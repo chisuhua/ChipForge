@@ -3,7 +3,7 @@
 > **施工依据**：`.rddf/improvements/chmem-cpu-keys-modality.md`（AC-CK-1..14）
 > **前置**：`chmem-mmu-keys-modality`（已 archive 2026-10-22）—— 复用其规则、测试范式、CI 检查
 > **工期**：1.0-1.5 人日 ｜ **窗口**：Phase C.1 入口（Sprint 3）
-> **基线（HEAD `e2a1a74`）**：TLM `481 case / 1 known fail`（`test_7stage_riscv.cpp:124`）；CH_MEM `118 case / 19637 assertions`；`openspec validate --specs --strict` `72 passed + 4 failed`
+> **基线（HEAD `962ecb2`，2026-10-22 更新）**：TLM `481 case / 1 known fail`（`test_7stage_riscv.cpp:124`）；CH_MEM `125 case / 19661 assertions`（原写 118 是 Phase B 之前的数，已过期）；`openspec validate --specs --strict` `72 passed + 4 failed`
 
 ## Architecture
 
@@ -212,7 +212,7 @@ Expected: PASS，WARN 数 = 剩余 2 个文件的既有 WARN，**不比改前多
 
 ```bash
 ./build/bin/chipforge_tests 2>&1 | tail -3          # 期望 481 case / 1 known fail
-./build/bin/chipforge_tests_chmem 2>&1 | tail -3    # 期望 118 → 122 case / All passed
+./build/bin/chipforge_tests_chmem 2>&1 | tail -3    # 期望 125 → 129 case / All passed
 for s in verify_adr verify_plugin_decision check_plugin_portability doc_link_check roadmap-r9-check; do
   bash tools/$s.sh >/dev/null 2>&1 && echo "$s PASS" || echo "$s FAIL"
 done

@@ -1,6 +1,6 @@
 ---
 id: chmem-cpu-keys-modality
-status: ready
+status: done
 initiative: wave5-isa-coverage-and-bp
 priority: P1
 phase: phase-4
@@ -164,20 +164,20 @@ auto csr_read_valid = n->operator()(CsrKT::CSR_READ_VALID);   // ch_uint<1>
 
 ## Acceptance
 
-- [ ] **AC-CK-1**：CH_MEM 下 `cpu_keys<std::uint64_t>::SAT` / `SFENCE_VADDR` / `SFENCE_ASID` ≡ `ch_uint<64>&`；`CPU_EXCEPTION_CODE` ≡ `ch_uint<8>&`（编译期断言）
-- [ ] **AC-CK-2**：CH_MEM 下 `csr_keys<ch_uint<32>>::CSR_READ_VALID` / `CSR_WRITE_EN` / `Zicsr_VALID` / `TRAP_PENDING` ≡ `ch_uint<1>&`；`Zicsr_OP` ≡ `ch_uint<8>&`
-- [ ] **AC-CK-3**：**鉴别力** —— `csr_chmem` 写入的 `CSR_READ_VALID` 被消费端读到时**节点指针相同**且**随拍翻转**（`get_value` 相邻两拍不同）
-- [ ] **AC-CK-4**：**反回归 grep** —— `grep -rn "static_cast<bool>(\s*select" ip/cpu/plugins/*_chmem.h` **零命中**；`grep -rn "cpu_keys<ch_uint\|csr_keys<ch_uint<1>>" ip/` 零命中
-- [ ] **AC-CK-5**：TLM 侧行为等价（`uint_t<N>` ≡ `uintN_t`；9 个读点 `static_cast<bool>` 全兼容）；`[cpu]` / `[cpu-integration]` / `[cache]` 的 TLM 用例**零改动**通过
-- [ ] **AC-CK-6**：**failing-set 逐条相等** —— baseline 钉死：TLM `481 case / 1 known fail`（`test_7stage_riscv.cpp:124`）/ CH_MEM **118 case** / `openspec validate --specs --strict` **72 passed + 4 failed**
-- [ ] **AC-CK-7**：**变异对照 ≥2 全红**（恢复 `static_cast<bool>` 折叠 / 消费端继续 `ch_bool(常量)` / 读错 key）
-- [ ] **AC-CK-8**：Check 13 allowlist 收缩后 **0 新增 WARN**（除 allowlist 剩余 2 文件外全场干净）
-- [ ] **AC-CK-9**：5 架构 gate 全 PASS + `doc_link_check.sh` 0 失败
-- [ ] **AC-CK-10**：`csr_bundles.h` 的 14 处 `ch_bool` 措辞注释与实际声明一致（无自相矛盾残留）
-- [ ] **AC-CK-11**：**无惰性代码** —— 不新增 `TRAP_PENDING` 消费者；不触碰 `mmu_keys` 其余 8 key
-- [ ] **AC-CK-12**：新测试已加入 `CHMEM_TEST_SOURCES`，`--list-tests` 可列出
-- [ ] **AC-CK-13**：**RED 证据** —— HEAD 状态下新测试的所有断言在旧代码上失败（编译期断言 = 编译失败；运行期断言 = 断言失败），输出贴进 `tasks.md`
-- [ ] **AC-CK-14**：ADR-040 §10.8 违规表删 `cpu_keys.h:48` + `csr_bundles.h:42-54` 两行，`csr_chmem.h:191-194,258` 行标注已修
+- [x] **AC-CK-1**：CH_MEM 下 `cpu_keys<std::uint64_t>::SAT` / `SFENCE_VADDR` / `SFENCE_ASID` ≡ `ch_uint<64>&`；`CPU_EXCEPTION_CODE` ≡ `ch_uint<8>&`（编译期断言）
+- [x] **AC-CK-2**：CH_MEM 下 `csr_keys<ch_uint<32>>::CSR_READ_VALID` / `CSR_WRITE_EN` / `Zicsr_VALID` / `TRAP_PENDING` ≡ `ch_uint<1>&`；`Zicsr_OP` ≡ `ch_uint<8>&`
+- [x] **AC-CK-3**：**鉴别力** —— `csr_chmem` 写入的 `CSR_READ_VALID` 被消费端读到时**节点指针相同**且**随拍翻转**（`get_value` 相邻两拍不同）
+- [x] **AC-CK-4**：**反回归 grep** —— `grep -rn "static_cast<bool>(\s*select" ip/cpu/plugins/*_chmem.h` **零命中**；`grep -rn "cpu_keys<ch_uint\|csr_keys<ch_uint<1>>" ip/` 零命中
+- [x] **AC-CK-5**：TLM 侧行为等价（`uint_t<N>` ≡ `uintN_t`；9 个读点 `static_cast<bool>` 全兼容）；`[cpu]` / `[cpu-integration]` / `[cache]` 的 TLM 用例**零改动**通过
+- [x] **AC-CK-6**：**failing-set 逐条相等** —— baseline 钉死：TLM `481 case / 1 known fail`（`test_7stage_riscv.cpp:124`）/ CH_MEM **125 case / 19661 assertions**（2026-10-22 Phase B 后更新；原写 118 已过期）/ `openspec validate --specs --strict` **72 passed + 4 failed**
+- [x] **AC-CK-7**：**变异对照 ≥2 全红**（恢复 `static_cast<bool>` 折叠 / 消费端继续 `ch_bool(常量)` / 读错 key）
+- [x] **AC-CK-8**：Check 13 allowlist 收缩后 **0 新增 WARN**（除 allowlist 剩余 2 文件外全场干净）
+- [x] **AC-CK-9**：5 架构 gate 全 PASS + `doc_link_check.sh` 0 失败
+- [x] **AC-CK-10**：`csr_bundles.h` 的 14 处 `ch_bool` 措辞注释与实际声明一致（无自相矛盾残留）
+- [x] **AC-CK-11**：**无惰性代码** —— 不新增 `TRAP_PENDING` 消费者；不触碰 `mmu_keys` 其余 8 key
+- [x] **AC-CK-12**：新测试已加入 `CHMEM_TEST_SOURCES`，`--list-tests` 可列出
+- [x] **AC-CK-13**：**RED 证据** —— HEAD 状态下新测试的所有断言在旧代码上失败（编译期断言 = 编译失败；运行期断言 = 断言失败），输出贴进 `tasks.md`
+- [x] **AC-CK-14**：ADR-040 §10.8 违规表删 `cpu_keys.h:48` + `csr_bundles.h:42-54` 两行，`csr_chmem.h:191-194,258` 行标注已修
 
 ## Capabilities
 
@@ -225,3 +225,23 @@ auto csr_read_valid = n->operator()(CsrKT::CSR_READ_VALID);   // ch_uint<1>
 | `mmu_keys` 其余 8 key 继续 defer | 无 CH_MEM 消费者 ⇒ 改了无法验证（与先行 change 同理由）；保留 §10.8 登记 | 先行 change Out of Scope 承接 |
 | `csr_keys` 的 `Payload<T>` 4 个 key（`CSR_READ_VALUE` / `CSR_WRITE_ADDR` / `CSR_WRITE_VALUE` / `TRAP_TARGET`）**不动** | `cpu_factory_chmem.h:184` 以 `T = ch_uint<32>` 实例化 ⇒ 已 mode-aware，无需改 | 侦察实证 |
 | 工期 1.0-1.5d（先行 change 为 1.5-2.0d） | 缺陷发现 / 顺序契约 / CI 检查 / 测试范式全部复用；本 change 增量是 9 个 key + 1 处折叠拆除 | 同族实测比值 |
+
+---
+
+## 归档注记（2026-10-22）
+
+> **已实施并 archive** ⇒ `openspec/changes/archive/2026-10-22-chmem-cpu-keys-modality/`
+> （capability `payload-key-modality` 扩展：**+2 added, ~1 modified**）。
+
+**实测要点（与立项时的预估对照）**：
+
+| 项 | 立项预估 | 实测 |
+|---|---|---|
+| 工期 | 1.0-1.5 人日 | 1 session（Phase B 之后同日完成） |
+| 缺陷范围 | 9 个裸 key + 1 处折叠（`csr_chmem.h:191-194`） | 9 个裸 key + **3 处折叠**（`CSR_READ_VALID` / `CSR_WRITE_EN` / `TRAP_PENDING`）—— `CSR_WRITE_EN` 那处是施工前 grep 时新发现的，且它导致 **CH_MEM 的 CSR 写回通路整体失效**（此前整条通路是死的） |
+| 测试 | 4 case | **5 case / 25 assertions**（多 1 个 = **直接用生产代码 `RiscvCsrPluginChmem` 驱动的端到端判据**：断言 cell 持有的是**计算节点**而非 literal） |
+| 变异对照 | ≥2 | **6 个**（其中 2 个打在生产代码上，且是**编译期**拦住：折回 `static_cast<bool>` ⇒ `put(Payload<ch_uint<1>>&, bool)` 无匹配重载） |
+| Check 13 allowlist | 4 → 2 | 4 → 2 ✅（并补 `[INFO]` 段让剩余 2 文件的既有违规可见） |
+| 回归 | failing-set 相等 | TLM `481/1 known fail`（不变）；CH_MEM `125 → 130 case`（+5 全来自本 change），All passed |
+
+**遗留（明确不在本 change）**：`cache_keys.h` 1 key + `mmu_keys` 8 key（无 CH_MEM 消费点 ⇒ 无验证的改动）；`TRAP_PENDING` 接线（C.1）；`mmu_exception_handler_chmem` 闭环接线（C.1，且剩余阻塞 = 无 CH_MEM 生产者 ⇒ 归 `chmem-ptw-walk`）。

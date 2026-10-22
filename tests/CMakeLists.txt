@@ -151,6 +151,9 @@ set(CHMEM_TEST_SOURCES
     # MMUPluginChmem TLB 命中路径 (Phase B / B.4, 2026-10-22 路线 C 收窄版)
     # — openspec change mmu-chmem-phase-b-c-launch
     ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_chmem_basic.cpp
+    # CPU/CSR payload key 模式化 + 拆 csr_chmem 常量折叠 (Phase C.1 硬前置)
+    # — openspec change chmem-cpu-keys-modality
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_keys_modality.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

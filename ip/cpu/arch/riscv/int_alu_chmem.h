@@ -370,9 +370,14 @@ class RiscvIntAluPlugin : public PluginBase {
           // 2) 读 NORMAL 阶段已写的 RD_DATA 作为 fallback
           auto default_rd_data = n->operator()(KeyType::RD_DATA);
           // 3) 读 csr plugin 写的 CSR_READ_VALUE / CSR_READ_VALID
+          //    ⚠ `CSR_READ_VALID` 的 value type 是 `uint_t<1>` (CH_MEM = ch_uint<1>)
+          //    ⇒ 这里读到的是**运行期 DAG 节点**而不是 POD 快照
+          //    (chmem-cpu-keys-modality 修复前它是 `Payload<bool>` ⇒ 恒为折叠常量
+          //     ⇒ 下面的 select 条件恒定 ⇒ CSR 读值覆写 RD_DATA 通道语义为零)。
           auto csr_read_value  = n->operator()(CsrKT::CSR_READ_VALUE);
           auto csr_read_valid  = n->operator()(CsrKT::CSR_READ_VALID);
           // 4) select 树: 1-bit valid 选 CSR 读值, 否则 default
+          //    条件是 ch_uint<1> 节点 ⇒ select 走节点级 mux (非字面量 mux)
           n->operator()(KeyType::RD_DATA) =
               select(csr_read_valid, csr_read_value, default_rd_data);
         }

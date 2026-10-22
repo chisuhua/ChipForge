@@ -5,6 +5,58 @@ All notable changes to ChipForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 (2026-10-22, interim) — chmem-cpu-keys-modality: CPU/CSR payload key 模式化 + 拆除 csr_chmem 常量折叠
+
+> **OpenSpec change**: `chmem-cpu-keys-modality` (wave5-isa-coverage-and-bp)
+> **Capability**: `payload-key-modality`（**扩展** —— 覆盖范围从 MMU 扩到 CPU/CSR，并新增「生产者 MUST 直写 ch 节点」Requirement）
+> **Author / Date**: build agent, 2026-10-22
+> **Scope**: 2 个 key 头 + 1 个 CH_MEM 生产者（3 处折叠）+ 2 个消费点 + 1 个新测试 + 1 个门禁脚本 + 文档。**TLM 路径零行为变化。**
+> **触发**: `mmu-chmem-phase-b-c-launch` Phase C.1（`mmufault_clear = (CPU_EXCEPTION_CODE != 0)` 成为运行期信号）**按原设计不可实现** —— CPU/CSR 侧 9 个 payload key 仍是裸类型，CH_MEM 下 cell 只能装 POD 常量 ⇒ C.1 只能交付"闭包已接线、条件恒假"的惰性骨架。
+
+### Fixed（通道 + 折叠）
+
+- **CPU/CSR payload key 模式化** —— `ip/cpu/tlm/cpu_keys.h` 的 4 个 key（`SAT` / `SFENCE_VADDR` / `SFENCE_ASID` / `CPU_EXCEPTION_CODE`）与 `bundles/csr_bundles.h` 的 5 个 key（`CSR_READ_VALID` / `CSR_WRITE_EN` / `Zicsr_VALID` / `Zicsr_OP` / `TRAP_PENDING`）改用 `cf::plugin::uint_t<N>`。
+  - `cpu_keys` 的 `static_assert` 加 `#ifndef CF_PLUGIN_USE_CH_MEM` 守护 —— 否则 `T` 永远被锁死在裸整型，value type 模式化无从谈起。
+  - **编译器实证（RED）**：15 个编译错误，其中 9 条 `static_assert` 全红 + `no matching function for call to 'PayloadStore::put(Payload<bool>&, ch_uint<1>)'` + `cannot convert 'ch_uint<1>' to 'bool' in assignment`。
+  - **TLM 零影响**：`uint_t<1>` ≡ `uint8_t`、`uint_t<8>` ≡ `uint8_t`、`uint_t<64>` ≡ `uint64_t` ⇒ 既有 TLM 读点全部照常编译（`[cpu]` / `[cpu-integration]` / `[cache]` 零改动通过）。
+- **拆 `csr_chmem.h` 的 3 处常量折叠** —— 这是本 change 的核心交付。折叠 = 把运行期 DAG 表达式用 `static_cast<bool>` 折成 POD 后写入 cell ⇒ **cell 类型正确但值恒定** ⇒ 消费端 `select()` 的条件是常量 ⇒ **不产生任何编译/运行期错误**：
+  | 位置 | key | 折叠前后果 |
+  |---|---|---|
+  | `csr_chmem.h:188-194` | `CSR_READ_VALID` | CSR 读值覆写 `RD_DATA` 的通道（`CSRRW` old value / `CSRRS`）语义为零 |
+  | `csr_chmem.h:258` | `CSR_WRITE_EN` | CH_MEM 的 **CSR 写回通路整体失效**（写使能恒 false） |
+  | `csr_chmem.h:449` | `TRAP_PENDING` | 恒为折叠常量（该 key 目前无消费者） |
+  - 修法：`ch_uint<1>(<ch_bool 表达式>)` —— 走上游 `ch_uint(const ch_bool&)` 的 `"bool_to_uint"` 分支 ⇒ **复用同一 `impl()` 指针**（`core/uint.h:69-79`），节点不丢。
+  - **消费点改「读节点」**：`csr_chmem.h:313-318` 用 `ch_bool(cell.impl())` 显式走 impl 指针；`int_alu_chmem.h:369-374` 的 `select` 条件从 POD 快照变成 `ch_uint<1>` DAG 节点。
+- **`cpu_factory_chmem.h:188` 预填值** —— `put(CSR_WRITE_EN, false)`（POD）→ `ch_uint<1>` 零值**节点**。
+
+### Added（规则与门禁）
+
+- **`check_plugin_portability.sh` Check 13 allowlist 4 → 2** —— 删 `bundles/csr_bundles.h` + `ip/cpu/tlm/cpu_keys.h`；剩余 `ip/cache/plugins/cache_keys.h`（1 key）+ `ip/mmu/tlm/mmu_keys.h`（7 key），二者的 CH_MEM 消费点尚未落地 ⇒ 现在改**无消费点可验证**。Check 13 补 `[INFO]` 段，让 allowlist 内文件的既有违规**人眼可见**（否则"0 新增 WARN"这条判据无法核对）。
+- **ADR-040 v3.0 §10.8** —— 违规表删 2 行 + `csr_chmem.h` 3 处折叠标注已修；`TRAP_PENDING` 未接线 / `cache_keys` / `mmu_keys` 剩余 8 key 仍登记。
+- **capability `payload-key-modality` 扩展** —— 新增 Requirement「mode-aware key 的生产者 MUST 写入 ch 节点，MUST NOT 折叠成 POD」（含 3 个已知反例登记）+「已知裸类型 key 的收敛 MUST 与其 CH_MEM 消费点落地绑定」。
+- **AGENTS.md 纪律 #11**（新增）—— **mode-aware 还不够**：key 类型对了但生产者折成 POD 时，cell 里仍是 elaboration 期常量 ⇒ 判据 = `cell.impl()->is_const()` 必须为 `false`。
+- **`tests/cpu/test_cpu_chmem_keys_modality.cpp`**（5 case / 25 assertions）：9 条编译期类型断言 + 鉴别力（consumer 读到**同一节点**且随拍更新）+ 顺序契约 + 变异对照 + **生产代码端到端判据**（直接用 `RiscvCsrPluginChmem` 驱动，断言 cell 持有的是**计算节点**而非 literal，且随 `csr_addr` 逐拍翻转）。
+
+### 测试
+
+- **变异对照 6 个全红**（真实改码 → 确认变红 → 回退；驱动脚本 `/tmp/opencode/mutate_ck.py` 无人值守）：
+  - **M1a / M2a**（生产代码折回 `static_cast<bool>`）⇒ **编译失败** —— `no matching function for call to 'PayloadStore::put(Payload<ch_uint<1>>&, bool)'` ⇒ **编译期当场拦住折叠回归**（比运行期红更强）。
+  - **M1b / M2b**（生产代码写成字面量 = 折叠的语义等价物）⇒ 1 case RED（`cpu_chmem_keys_csr_producer_cells_are_live_nodes` 精准命中）。
+  - **M3**（探针读错 key）⇒ 2 case RED；**M4**（探针把 cell 折成 literal）⇒ 2 case RED。
+- **回归 0 退化**：TLM `481 | 480 passed | 1 failed`（唯一失败仍是已知的 `test_7stage_riscv.cpp:124 node_count==17` infra drift）；CH_MEM `125 + 5 新增 = 130 case / 19686 assertions` / All passed（9m12s）。
+
+### Scope 变更
+
+- **不改** `ip/cache/plugins/cache_keys.h`（1 key）与 `ip/mmu/tlm/mmu_keys.h`（其余 8 key）—— 其 CH_MEM 消费点未落地 ⇒ 改了也**无消费点可验证**（无验证的改动）。归属"引入其 CH_MEM 消费者的那个 change"（前者待 cache 消费点，后者归 `chmem-ptw-walk` 的 `RiscvMMUPluginChmem` 适配器）。
+- **不接线** `TRAP_PENDING` 到 `ibus_chmem.h` —— 属 Phase C.1 的行为改动；本 change 只消除"未来接线必读常量"的隐患，并把 `csr_bundles.h:17` 的**不实声称**（"由 `ibus_chmem.h` 消费"）改为如实记录。
+- **不接线** `mmu_exception_handler_chmem.h` 的 `CPU_EXCEPTION_CODE` 消费闭包 —— 属 C.1；本 change 只解除其**类型**阻塞（cell 不再是 POD），并更新两处已过期注释。剩余阻塞 = **无 CH_MEM 生产者**（写者归 `chmem-ptw-walk`）。
+
+### 下游解锁
+
+- **`mmu-chmem-phase-b-c-launch` Phase C.1 的硬阻塞已解除** —— `CPU_EXCEPTION_CODE` 的 cell 现在能承载运行期节点 ⇒ `mmufault_clear` 可以成为**运行期信号**而不是恒假条件。
+- **CH_MEM 的 CSR 写回通路恢复** —— `CSR_WRITE_EN` 不再恒 false ⇒ `csr_chmem.h` writeback 闭包的 8 个 CSR `ch_reg` 真正可写（此前整条通路是死的）。
+- **Check 13 allowlist 从 4 收到 2** —— 为最终"0 豁免"铺路。
+
 ## v0.11.0 (2026-10-22, interim) — chmem-mmu-keys-modality: MMU payload key 模式化 + CH_MEM 生产者/消费者顺序契约
 
 > **OpenSpec change**: `chmem-mmu-keys-modality` (wave5-isa-coverage-and-bp)

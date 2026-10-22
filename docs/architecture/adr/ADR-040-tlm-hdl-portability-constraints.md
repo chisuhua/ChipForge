@@ -532,13 +532,13 @@ CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器
 
 | 文件 | 违规 key | 归属 |
 |---|---|---|
-| `bundles/csr_bundles.h:42-54` | `CSR_READ_VALID` / `CSR_WRITE_EN` / `Zicsr_VALID` / `Zicsr_OP` / `TRAP_PENDING`（4 个 `Payload<bool>` + 1 个 `Payload<uint8_t>`） | 姊妹 change `chmem-cpu-keys-modality` |
-| `ip/cpu/plugins/csr_chmem.h:191-194,258` | 运行期表达式被 `static_cast<bool>(select(...))` **折成常量**后写入 | 同上 |
-| `bundles/csr_bundles.h:17` | 声称 `TRAP_PENDING` 由 `ibus_chmem.h` 消费 —— 实测 `ibus_chmem.h` 中 `TRAP_PENDING` 出现 **0** 次 ⇒ CH_MEM trap 重定向路径疑似从未接线 | 同上（**仅登记，不在本 change 修**） |
-| `bundles/csr_bundles.h:12` | 注释自陈 "1-bit (ch_bool)" 与实际声明 `Payload<bool>` 矛盾 | 同上 |
-| `ip/cpu/tlm/cpu_keys.h:48` | `CPU_EXCEPTION_CODE`（`Payload<uint8_t>`） | 同上（Phase C.1 入口） |
-| `ip/cache/plugins/cache_keys.h:52` | `vipt_fallback`（`Payload<uint8_t>`） | 同上 |
-| `ip/mmu/tlm/mmu_keys.h` | 其余 8 个 key（`PERMS` / `PTW_ASID` / `PTW_L0_RAW` / `PTW_L1_RAW` / `PTW_L2_RAW` / `PTW_FAULT` / `SATP_MODE` 等） | 同上（CH_MEM 侧消费点未落地 ⇒ 现在改无消费点可验证） |
+| `bundles/csr_bundles.h:42-54` | `CSR_READ_VALID` / `CSR_WRITE_EN` / `Zicsr_VALID` / `Zicsr_OP` / `TRAP_PENDING`（4 个 `Payload<bool>` + 1 个 `Payload<uint8_t>`） | ✅ **已修 (2026-10-22 `chmem-cpu-keys-modality`)** —— 5 个 key 改 `uint_t<1>` / `uint_t<8>` |
+| `ip/cpu/plugins/csr_chmem.h:191-194,258` | 运行期表达式被 `static_cast<bool>(select(...))` **折成常量**后写入 | ✅ **已修 (2026-10-22 `chmem-cpu-keys-modality`)** —— 3 处折叠（`CSR_READ_VALID` / `CSR_WRITE_EN` / `TRAP_PENDING`）改为直写 `ch_uint<1>` 节点（`ch_uint<1>(ch_bool)` 走上游 `bool_to_uint` 分支 ⇒ 复用同一 impl 指针） |
+| `bundles/csr_bundles.h:17` | 声称 `TRAP_PENDING` 由 `ibus_chmem.h` 消费 —— 实测 `ibus_chmem.h` 中 `TRAP_PENDING` 出现 **0** 次 ⇒ CH_MEM trap 重定向路径疑似从未接线 | ⏸ **仍登记**（`chmem-cpu-keys-modality` 已把注释改为如实记录；**接线**归 `mmu-chmem-phase-b-c-launch` 的 C.1） |
+| `bundles/csr_bundles.h:12` | 注释自陈 "1-bit (ch_bool)" 与实际声明 `Payload<bool>` 矛盾 | ✅ **已修 (2026-10-22 `chmem-cpu-keys-modality`)** —— 改为 "1-bit (uint_t<1>)" |
+| `ip/cpu/tlm/cpu_keys.h:48` | `CPU_EXCEPTION_CODE`（`Payload<uint8_t>`） | ✅ **已修 (2026-10-22 `chmem-cpu-keys-modality`)** —— 4 个 key 全改 `uint_t<N>`，且 `static_assert` 加 `#ifndef CF_PLUGIN_USE_CH_MEM` 守护 |
+| `ip/cache/plugins/cache_keys.h:52` | `vipt_fallback`（`Payload<uint8_t>`） | ⏸ **仍登记** —— CH_MEM 侧消费点未落地 ⇒ 现在改无消费点可验证（归"引入其 CH_MEM 消费者的那个 change"） |
+| `ip/mmu/tlm/mmu_keys.h` | 其余 8 个 key（`PERMS` / `PTW_ASID` / `PTW_L0_RAW` / `PTW_L1_RAW` / `PTW_L2_RAW` / `PTW_FAULT` / `SATP_MODE` 等） | ⏸ **仍登记** —— 同上（其 CH_MEM 消费点由 `chmem-ptw-walk` 的 `RiscvMMUPluginChmem` 适配器引入） |
 
 
 

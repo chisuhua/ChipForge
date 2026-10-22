@@ -185,13 +185,16 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
         using CsrKT = cf::cpu::csr::payload::csr_keys<T>;
         n->payloads().put(CsrKT::CSR_READ_VALUE, read_value);
         // CSR_READ_VALID = !mcycle_addr  (R3.3 决策: mcycle 走单独路径, valid=false)
-        // 注: csr_keys::CSR_READ_VALID 是 Payload<bool>, 但 cpphdl 5.052 bool 与
-        //   ch_bool 互转歧义, 改成 Payload<ch_uint<1>> 在 R3.1 模板 (但已 commit,
-        //   此处用 ch_bool() 包装 + static_cast<bool> 转换)
-        const bool read_valid_bool = static_cast<bool>(
-            select(csr_addr_eq_B00, ch_uint<1>(ch_literal<0, 1>{}),
-                   ch_uint<1>(ch_literal<1, 1>{})));
-        n->payloads().put(CsrKT::CSR_READ_VALID, read_valid_bool);
+        //
+        // ⚠ **禁止** 把 select 结果用 `static_cast<bool>` 折成 POD (chmem-cpu-keys-modality 修复):
+        //   那是把运行期 DAG 表达式折成 **elaboration 期常量** —— cell 类型正确但
+        //   值恒定 ⇒ 消费端 `select(csr_read_valid, ...)` 的条件是常量 ⇒ CSR 读值
+        //   覆写 RD_DATA 的通道语义为零 (且不产生任何编译/运行期错误)。
+        //   `ch_uint<1>(ch_bool)` 走上游 `ch_uint(const ch_bool&)` 的 "bool_to_uint"
+        //   分支 (core/uint.h:69-79) ⇒ **复用同一 impl 指针**, 节点不丢。
+        const auto read_valid_ch = select(csr_addr_eq_B00, ch_uint<1>(ch_literal<0, 1>{}),
+                                          ch_uint<1>(ch_literal<1, 1>{}));
+        n->payloads().put(CsrKT::CSR_READ_VALID, ch_uint<1>(read_valid_ch));
 
         // ── R3.5 [GREEN]: 写 CSR_WRITE_* payload + 4 层 funct3/rs1/imm5 门控 ──
         //   write_en = zicsr_valid      (L1: opcode==0x73)
@@ -255,7 +258,10 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
             zicsr_valid_ch,
             ecall_layer,
             ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}));
-        const bool write_en_bool = static_cast<bool>(write_en_ch);
+        // ⚠ **禁止** 把 `write_en_ch` 用 `static_cast<bool>` 折成 POD (chmem-cpu-keys-modality 修复):
+        //   折成 POD ⇒ cell 里是常量 ⇒ `csr_chmem.h` writeback 闭包的写使能恒 false
+        //   ⇒ CH_MEM 的 CSR 写回通路整体失效。
+        const auto write_en_1 = ch_uint<1>(write_en_ch);
         // write_value: funct3[2] (最高位) → uimm, 否则 → rs1
         //   CSRRW=001 (funct3[2]=0) → rs1
         //   CSRRS=010 (funct3[2]=0) → rs1
@@ -274,7 +280,7 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
         auto write_value_ch = select(funct3_bit2, uimm_32, rs1_val);
         n->payloads().put(CsrKT::CSR_WRITE_ADDR,  last_csr_addr_);
         n->payloads().put(CsrKT::CSR_WRITE_VALUE, write_value_ch);
-        n->payloads().put(CsrKT::CSR_WRITE_EN,    write_en_bool);
+        n->payloads().put(CsrKT::CSR_WRITE_EN,    write_en_1);
 
         // R3.5 单测观察口 (写通路 DAG signal post-tick)
         last_csr_write_value_ = write_value_ch;
@@ -313,9 +319,10 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
         if (n->payloads().has(CsrKT::CSR_WRITE_EN)) {
         auto write_addr  = n->operator()(CsrKT::CSR_WRITE_ADDR);
         auto write_value = n->operator()(CsrKT::CSR_WRITE_VALUE);
-        // write_en 是 bool (csr_keys 定义 Payload<bool>),
-        //   显式 ch_bool() 包装避开 C++17 contextual conversion 歧义
-        auto write_en_ch = ch_bool(n->operator()(CsrKT::CSR_WRITE_EN));
+        // write_en 是 `uint_t<1>` (CH_MEM = ch_uint<1>) —— **读节点**, 不读 POD。
+        //   `ch_bool(cell.impl())` 显式走 impl 指针 ⇒ 保持同一 DAG 节点
+        //   (不能用 `ch_bool(cell)` 的隐式转换, 也不该把节点折成 POD 常量)。
+        auto write_en_ch = ch_bool(n->operator()(CsrKT::CSR_WRITE_EN).impl());
 
         // 7 个独立 write-enable + select 树 (R4 强制: 不用 if(ch_bool))
         //   mcycle_ 不写 (R3 决策 + R2.5 自由计数)
@@ -446,8 +453,11 @@ class RiscvCsrPluginChmem : public cf::plugin::PluginBase {
                                   ch_uint<32>(ch_literal<0, 32>{}))));
 
         // 写 TRAP_PENDING / TRAP_TARGET 到 PayloadStore
+        // ⚠ **禁止** 把 `trap_pending` 用 `static_cast<bool>` 折成 POD (chmem-cpu-keys-modality 修复):
+        //   折成 POD ⇒ cell 里是常量。(该 key 目前**无消费者** —— 接线归 C.1;
+        //   但生产者不留折叠, 避免未来接线时读到常量。)
         n->payloads().put(CsrKT::TRAP_PENDING,
-                          static_cast<bool>(trap_pending));
+                          ch_uint<1>(trap_pending));
         n->payloads().put(CsrKT::TRAP_TARGET, trap_target);
 
         // R2.4 单测观察口 (trap 路径 DAG signal 始终写, 不依赖 PC 驱动)

@@ -160,6 +160,12 @@ class HazardPlugin : public cf::plugin::PluginBase {
   //                CppHDL 0.x 未验证,需要 Phase B (mmu_chmem.h) 落地后统一 key 类型
   //                为 ch_uint<8>,然后 MmuExceptionHandlerPlugin 写
   //                pl::CPU_EXCEPTION_CODE → mmufault_clear, HazardPlugin 这里读
+  //                ✅ **key 类型部分已解除 (2026-10-22 `chmem-cpu-keys-modality`)**:
+  //                   `cpu_keys::CPU_EXCEPTION_CODE` 的 cell 类型已是
+  //                   `ch::core::ch_uint<8>` (CH_MEM) ⇒ 可直接读**节点**而非常量.
+  //                   ⏸ 剩余阻塞 = **无 CH_MEM 生产者** (写者是
+  //                   `RiscvMMUPluginChmem::mmu_exit`, 归 `chmem-ptw-walk`) ⇒
+  //                   在那之前 A4 改造仍不能落地 (否则又是恒 false 惰性骨架).
   //   - blocker 2: CtrlLink API gap — halt_when() 接收 ch_bool 信号句柄,但 mark/clear
   //                toggle 不对应 elaboration period;需要 CtrlLink 扩展接受 ch_reg<ch_bool>
   //                句柄 (instance state 在 elaboration 期 form persistent signal).

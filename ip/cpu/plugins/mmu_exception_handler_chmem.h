@@ -13,14 +13,19 @@
 //     合并所有 halt_conds_ 为 OR 网
 //   - ✅ build() 注册 at_stage("memory", NORMAL) 闭包骨架
 //   - ⏸ build() 闭包内**未**实际读 CPU_EXCEPTION_CODE → 原因:CH_MEM 模式下
-//     CPU_EXCEPTION_CODE key 类型为 `Payload<std::uint8_t>` (TLM-typed,
+//     CPU_EXCEPTION_CODE key 类型原为 `Payload<std::uint8_t>` (TLM-typed,
 //     见 ip/cpu/tlm/cpu_keys.h),而 PipeNode 在 CH_MEM 模式实例化为
 //     `PipeNode<ch::core::ch_uint<32>>` (cf::cpu::core::payload::keys<T, 32>
 //     风格,见 ip/cpu/arch/riscv/payload_riscv.h + ip/cpu/core/payload_common.h)。
 //     跨类型 operator() 在 CppHDL 0.x (build/_deps/install/include/cpp-hdl/)
-//     下未确认 semantic 兼容,Phase B (defer to 2026-12-01 per HANDOFF.md
-//     §1 D1-B) 落地 MMUPluginChmem 后应统一 key 类型为 ch_uint<8> 再
+//     下未确认 semantic 兼容,落地 MMUPluginChmem 后应统一 key 类型为 ch_uint<8> 再
 //     接线,避免 silent cast 风险
+//     ✅ **类型阻塞已解除 (2026-10-22 `chmem-cpu-keys-modality`)**: `cpu_keys` 的
+//     4 个 key 已改 mode-aware ⇒ `CPU_EXCEPTION_CODE` 的 cell 类型是
+//     `ch::core::ch_uint<8>` (CH_MEM) ⇒ **不再是 POD 常量**, 可直接读节点。
+//     ⏸ **剩余阻塞 = 无 CH_MEM 生产者**: CH_MEM 侧写 `CPU_EXCEPTION_CODE` 的
+//     是 `RiscvMMUPluginChmem::mmu_exit` 闭包, 归 `chmem-ptw-walk` (未立项);
+//     在那之前本闭包保持 no-op (bare path byte-identical) —— 接线归 C.1。
 //   - bare path byte-identical: mmufault_clear 恒 ch_bool(false), HazardPlugin
 //     RAW stall 不受影响 (Phase A.6 验证 [mmu] 59/59 + [cpu] 128/129 PASS
 //     维持,1 pre-existing fail: test_cpu_sim_real_tohost — cpu_sim CLI 路径
