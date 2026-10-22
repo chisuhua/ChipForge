@@ -13,7 +13,7 @@
 //                        (owner claim log) 也会 PASS 但行为应该 === Bare.
 //                        Step 2 GREEN 后 sel 表达式替换裸 pc_val 才进入 Sv32 plumbing.
 //
-// Post-Phase-B (Sprint 6-7+): Sv32 plumbing test 会被替换为:
+// Post-Phase-B (Sprint 2-3+): Sv32 plumbing test 会被替换为:
 //   "sv32 with planted identity page table → tohost=1, cycle count ≤ 1.5 × Bare"
 //   (D3 vendor build_sv32_pte.S + D4 sv32-baseline-matrix.csv)
 //
@@ -130,7 +130,7 @@ TEST_CASE("ibus_chmem_sv32_bare_baseline", "[cpu][chmem][ibus-sv32][mmu-chmem]")
 //   - stderr log "MMU hook enabled (mode=sv32) — plumbing-only no-op stub" 仍存在
 //     (v0.11.0 owner claim, 由 cpu_factory_chmem.h line 126-137 维持)
 //
-// Post-Phase-B RED→GREEN 转换路径 (Sprint 6-7+):
+// Post-Phase-B RED→GREEN 转换路径 (Sprint 2-3+):
 //   - mmu_chmem.h 注册 MMUPlugin_chmem → 发射 PADDR_VALID=true + PADDR cell
 //   - ibus_chmem.sv32 sel 表达式选 PADDR 分支 → 真翻译
 //   - planted identity page table 让 vaddr == paddr → 行为仍 byte-identical
@@ -145,7 +145,7 @@ TEST_CASE("ibus_chmem_sv32_plumbing_only", "[cpu][chmem][ibus-sv32][mmu-chmem]")
   REQUIRE(elf_bytes.size() >= 52);
 
   // Sv32 plumbing: enable_mmu=true, mmu_mode="sv32"
-  // v0.11.0 owner claim: mmu_chmem.h not implemented (Phase B in Sprint 6-7)
+  // v0.11.0 owner claim: mmu_chmem.h not implemented (Phase B in Sprint 2-3)
   // → only stderr log, NO MMU plugin registered, PADDR_VALID 永远 false
   auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(
       &ctx, nullptr, ch_uint<32>(kElfBase), true, elf_bytes,

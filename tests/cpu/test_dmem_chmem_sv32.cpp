@@ -14,7 +14,7 @@
 //   - Sv32 plumbing:  enable_mmu=true, mmu_mode=sv32 → 行为 === Bare
 //     (Phase B 未实装, PADDR_VALID 永远 false, sel 回退到 RESULT/vaddr)
 //
-// Post-Phase-B (Sprint 6-7+): 测试升级路径:
+// Post-Phase-B (Sprint 2-3+): 测试升级路径:
 //   - 修复 pre-existing baseline 退化 (dmem load/store 路径 CH_MEM 退化, root cause 待查)
 //   - 加入 build_sv32_pte.S (D3 vendor) + planted identity page table 真 sv32 e2e
 //   - sv32-baseline-matrix.csv (D4) 提供 cycle 比对阈值

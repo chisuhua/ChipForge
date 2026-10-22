@@ -119,17 +119,21 @@ class CpuFactoryChmem {
     // Phase 6d P1 plumbing-only no-op MMU hook: log only, no MMU plugin 注册, no translation.
     //
     // mmu-chmem-pipeline-integration (2026-10-16, Phase C4) — owner claim 更新:
-    // "owner TBD" 已分配到 change mmu-chmem-pipeline-integration (Phase B 解锁
-    // 推迟到 Sprint 6-7, 2026-12-01 ~ 2026-12-22 per objective-mmu-chmem-phase-b-e.md
-    // §8 Sprint 2-5 deferral + tasks.md Phase Schedule Table). Phase B 落地前
+    // "owner TBD" 已分配到 change mmu-chmem-pipeline-integration。Phase B 落地前
     // enable_mmu=true 仍是 plumbing-only no-op. "No silent degradation" 守护维持.
+    //
+    // 2026-10-22 排期更正（仅注释 + stderr 文本，**无行为变化**）: Phase B 解锁由
+    // Sprint 6-7 (2026-12-01) 提前到 Sprint 2-3 (2026-10-23 ~ 2026-11-06), ETA 2026-11-06
+    // —— 见 openspec/changes/mmu-chmem-phase-b-c-launch/tasks.md Phase B 段 + objective §8/§10。
+    // 另: Phase B 另有硬前置 change `chmem-mmu-keys-modality`（MMU payload key 模式化 +
+    // CH_MEM 生产者/消费者顺序契约），该 change 未 archive 前 Phase B 不可开工。
     if (enable_mmu.value_or(false)) {
       const std::string mode = mmu_mode.value_or("bare");
       std::fprintf(stderr,
           "MMU hook enabled (mode=%s) — plumbing-only no-op stub; "
           "mmu_chmem.h not implemented. NO translation occurs. "
           "sv32 CH_MEM owner assigned: change mmu-chmem-pipeline-integration "
-          "(Phase B in Sprint 6-7, ETA 2026-12-22; see objective-mmu-chmem-phase-b-e.md "
+          "(Phase B in Sprint 2-3, ETA 2026-11-06; see objective-mmu-chmem-phase-b-e.md "
           "§8 + tasks.md Phase B deferral). After Phase B lands, this log entry "
           "should be removed (commit pattern: change mmu-chmem-pipeline-integration "
           "Phase B archive). Pre-Phase-B: see verilator-mmu-bare-plumbing-e2e "

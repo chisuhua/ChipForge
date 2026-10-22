@@ -134,7 +134,7 @@ class IBusPlugin : public PluginBase {
     //   Bare 路径 0 额外 latency (D2-A 保护): PADDR_VALID=false (MMU 未注册) 时
     //     sel 回退到 MMU_VADDR (由 tlb_lookup_ifetch 节点 NORMAL phase 写 vaddr;
     //     当前 phase B 未注册 → 默认构造 ch_uint<32>(0) cell = 无害 placeholder)
-    //   Sv32 路径 (Phase B 落地后, Sprint 6-7): PADDR_VALID=true 时 sel 选 PADDR,
+    //   Sv32 路径 (Phase B 落地后, Sprint 2-3): PADDR_VALID=true 时 sel 选 PADDR,
     //     实现 vaddr → paddr 真翻译
     //   闭包外层 "tlb_lookup_ifetch" 节点不存在时 (Bare) → PADDR_VALID=false → 走 vaddr
     auto* tlb_n = pb.node_of_logic_stage("tlb_lookup_ifetch").get();
