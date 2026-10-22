@@ -115,17 +115,22 @@ graph TD
 
 | 阶段 | 起 | 止 | 周数 | Track | 交付 |
 |------|----|----|------|-------|------|
-| Sprint 1 (mfc-extract-fsm-h 启动) | 10-09 | 10-22 | 2.0 | A | rdd-builder P0-P3 + 真 radix-2 iterative advance_fsm 实装 + rv32um 8/8 中检 |
-| Sprint 2-5 (mmu-chmem Phase B-C) | 10-23 | 11-30 | 5.5 | B | Phase B `mmu_chmem.h` 单级 ch_mem TLB + Phase C `ibus_chmem.h`/`dmem_chmem.h` sv32 消费 |
-| Sprint 6-7 (mmu-chmem Phase D + BP 协议) | 12-01 | 12-22 | 3.0 | B+C | Phase D `mmu_exception_handler_chmem.h` + `bp-btb-coordination-3items` |
-| Sprint 7-8 (BTB 4K + GShare + Phase E) | 12-23 | 01-13 | 3.0 | C+B | BTB 4K + GShare 13-bit PHT + Phase E doc + archive |
-| Sprint 8 (DMIPS 验证 + 收官) | 01-14 | 01-24 | 1.5 | C+D | DMIPS ≥1.4 验证 + riscv-tests 48/48 + mmu-chmem archive |
+| Sprint 1 (mfc-extract-fsm-h 启动) | 10-09 | 10-22 | 2.0 | A | rdd-builder P0-P3 + 真 radix-2 iterative advance_fsm 实装 + rv32um 8/8 中检 ✅ 已 archive |
+| Sprint 2 早期 (框架热身 + 排期对齐) | 10-23 | 10-30 | 1.0 | B | `ctrl-link-chmem-reg-handle` 纯框架 1d (stateful halt 通道 A1/A2 — Phase C.5 物理前置, **同时是 CppHDL API 热身 session**) + 排期对齐 1d + `feat-phase-6d-rtl-verification` 收官 1d |
+| **Sprint 2-3 (mmu-chmem Phase B)** | **10-23** | **11-06** | **2.0** | B | Phase B 15d — `ip/mmu/plugins/MMUPlugin_chmem.h` (新) + `ip/cpu/plugins/mmu_chmem.h` (新) + `test_mmu_chmem_basic` 5 case + 集成回归。**2026-10-22 双审: 由 Sprint 6+ 提前; 估时 15d (非 10d — 原压缩版丢了 B.5 的 5d 集成回归)** |
+| **Sprint 3 后段 (Phase 3.5)** | **11-06** | **11-30** | **3.5** | B | R11.1 trap PC 重审 0.5d + bp-btb 收窄 2 项 1d + fetch-stall v0.2 protocol 3d。**由原 pre_flight #2/#3 重构而来 (owner 已 defer ⇒ 无人可交付; 且 fetch-stall v0.2 反向依赖 Phase B)** |
+| Sprint 4-5 (mmu-chmem Phase C + C.6) | 11-30 | 12-22 | 3.0 | B | Phase C wiring 5d (`mmu_exception_handler_chmem` / `cpu_factory_chmem` 注册 / `hazard_chmem` halt_when — **含 A4 mmufault 信号驱动**) + C.6 集成测试 3d |
+| Sprint 6 (mmu-chmem Phase D) | 12-22 | 01-13 | 3.0 | B | Phase D 验证 5d (`[mmu-verilator]` TEST_CASE 4 sv32 e2e flip + `[cpu-l1-mmu-demo]` TEST_CASE 7 + `sv32-baseline-matrix.csv`) |
+| Sprint 7 (Phase E 收官) | 01-13 | 01-24 | 1.0 | B | Phase E 文档 + archive (`mmu-chmem-phase-b-c-launch` + `mmu-chmem-pipeline-integration` 同步归档) + DMIPS ≥1.4 复验 + riscv-tests 48/48 |
 | **复盘** | **01-24** | **01-31** | **1.0** | — | v0.11.0 archive 或 v0.11.x hotfix 决策 |
+
+> **2026-10-22 双审调整说明**: ① 原 "Sprint 2-5 (Phase B-C)" 拆为 Sprint 2-3 (Phase B) / Sprint 3 后段 (Phase 3.5) / Sprint 4-5 (Phase C + C.6); ② Phase B 由 Sprint 6+ 提前到 Sprint 2-3 (根因 = 失败模式是 single-shot 派发方式而非日历位置, 由 Sprint 2 早期的 ctrl-link 热身 session 承接), 估时 10d → 15d; ③ 新增 Phase 3.5 slot 承载原 pre_flight 的 fetch-stall v0.2 + bp-btb 2 项 (原 owner wave5-bp-btb 已于 2026-10-19 S3 defer 到 v1.0.0 ⇒ 无人可交付); ④ **原 Sprint 7-8 的 BTB 4K / GShare 13-bit 已按 S3 决策移出 v0.11.0 窗口** (§8 表与 §10 候选此前未同步 S3, 2026-10-22 一并更正)。
 
 **关键检查点**:
 - **11-30 DMIPS 中检**:radix-2 跑通后 DMIPS 是否从 0.0351 上升到 ≥0.5(若 < 0.3 触发 R-RADIX-2 资源回收,转 focus 写测试不抢 BP)
-- **12-15 BTB 命中率初检**:BTB 4K 装好后 vs static baseline 命中率增量(若 < 5% 触发 R-BTB-1 砍分叉)
+- **11-06 Phase B 收口中检**:Phase B 15d 是否按 session 0/1/2 拆分推进;若 session 1 结束 `mmu_chmem.h` 仍未过编译 → 触发 R1 回退 (Phase B 后退到 Sprint 6-7, 本表 Sprint 2-3 行可整体后移)
 - **01-13 riscv-tests 48/48 中检**:是否全部 ELF PASS(若仍有 FAIL 触发 R-CHMEM-1 defer 到 v0.11.x)
+- ~~**12-15 BTB 命中率初检**~~:~~BTB 4K 装好后 vs static baseline 命中率增量~~ — **已按 2026-10-19 S3 决策移出 v0.11.0 窗口 (归 v1.0.0)**
 
 ## 9. 目标依赖与 Decision Gate
 
@@ -138,7 +143,8 @@ graph TD
 - **Go 条件** (全部满足):
   - [ ] [riscv-tests] 48/48
   - [ ] [mmu] 59/59 + [cpu-l1-mmu-demo] 7/7
-  - [ ] [mmu-verilator] 5/5
+  - [ ] [mmu-verilator] 4/4  <!-- 2026-10-22 更正: 原写 5/5 有误 — 现状 3/3 plumbing-only baseline + D.1 新增 TEST_CASE 4 (sv32 e2e flip) = 4/4, 与 mmu-chmem-phase-b-c-launch proposal §Acceptance 一致 -->
+  - [ ] [mmu][chmem] 5/5  <!-- 2026-10-22 新增: Phase B 的 test_mmu_chmem_basic (原 3 case → 5 case, 扩 Case 4 非恒等页表向量 + Case 5 Bare 隔离/satp 边界) -->
   - [ ] DMIPS/MHz ≥ 1.4
   - [ ] 4 architecture gates 0 error
   - [ ] `bash tools/run_chipforge_tests.sh --all` 全 PASS
@@ -159,16 +165,23 @@ graph TD
 - sub-task: 真 radix-2 iterative advance_fsm 实装(mul_div_fsm.h:475-500 重写)
 - sub-task: rv32um 8/8 中检 → dl 临时跑 `bash tools/run_chipforge_tests.sh --riscv-tests`
 
-**Sprint 2-5 (10-23 ~ 11-30, 5.5 周)**:
-- `phase-b-mmu-chmem-sv32` — mmu_chmem.h 单级 ch_mem TLB (10d)
-- `phase-c-ibus-dmem-sv32-consume` — IBus/DBus sv32 消费 (11d)
+**Sprint 2 早期 (10-23 ~ 10-30, 1 周)**:
+- `ctrl-link-chmem-reg-handle` — CtrlLink stateful halt 通道 (纯框架 1d; stateful halt 通道 A1/A2 + `OR_combined_halt_conds()` + `should_*()` 契约; **A4 已移出 scope 改挂 Phase C.5**)
+- 排期与归属对齐 (1d) — Phase B 窗口/工作量在 4 处文档对齐 + pre_flight 重归属 + planner-handoff 刷新
+- `feat-phase-6d-rtl-verification` 收官 (1d) — E1-E14 核验 + E14 文档 + fragment 转 done
+
+**Sprint 2-3 (10-23 ~ 11-06, 2 周)**:
+- `phase-b-mmu-chmem-sv32` — `ip/mmu/plugins/MMUPlugin_chmem.h` 单级 ch_mem TLB + `ip/cpu/plugins/mmu_chmem.h` (15d: B.0 key 复用确认 + B.2 + B.3 + B.4 单测 5 case + B.5 集成回归)
 - 协办:`feat-dhrystone-dmips-gate` — DMIPS 中检准备(11-30)
 
-**Sprint 6-8 (12-01 ~ 01-13, 8 周)**:
-- `bp-btb-coordination-3items` — pc_reg mux / stall / fetch stage 协议 (0.5d, Phase C 入口先决)
-- `btb-4k-entry-baseline` — BTB 4K-entry 实装 + 基础命中率初检 (Sprint 7 入口)
-- `gshare-13bit-pht-init` — GShare 13-bit PHT 初始化 (Sprint 7-8)
+**Sprint 3 后段 (11-06 ~ 11-30, 3.5 周)**:
+- `phase-3-5-fetch-stall-protocol` — R11.1 trap PC 重审 (0.5d) + bp-btb 收窄 2 项 (1d) + fetch-stall v0.2 protocol (3d); 挂载点 = C.4 入口条件
+
+**Sprint 4-6 (11-30 ~ 01-13, 6 周)**:
+- `phase-c-mmu-chmem-wiring` — C.1 / C.4 / C.5 (含 A4 mmufault 信号驱动) + C.6 集成测试
 - `phase-d-mmufault-clear-combinational` — mmufault_clear combinational network (5d)
+- `phase-e-mmu-chmem-archive` — 文档 + archive (2d)
+- ~~`btb-4k-entry-baseline`~~ / ~~`gshare-13bit-pht-init`~~ — **已按 2026-10-19 S3 决策移出 v0.11.0 窗口 (归 v1.0.0)**
 - `phase-e-mmu-chmem-archive` — 文档 + archive (2d)
 
 ## 11. 跟踪台账（append-only）
@@ -177,3 +190,4 @@ graph TD
 | sprint-2026-10 | sprint-review | objective 创建 (Phase A 已 commit) | — | initial |
 | sprint-2026-10-2 | objective-revision | R1-R5 5 处修订 + 17 周时间盒重排 | 12 周 → 17 周 | §8 R5 时间盒放宽 |
 | sprint-2026-10-3 | objective-revision | **S3 决策: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口** | §6/§9.2/§10 v0.11.0 行 + phase-4 PoC-6 + strategy §3 wave5 同步刷新; v0.11.0 archive 时间盒 2027-01-24 → 2026-12 中下旬 (mmu-chmem archive 后 ≤1 周) | DMIPS 1.43 已由 `f95b2d0` dhrystone harness 修复 (不靠 BP); strategy §10 多数派不含 BP; v1.0.0 已规划 BTB + CoreMark ≥2.3; rollback 不对称 (A 错低成本 hotfix, B 错级联推迟数月); oracle session `ses_ead89ad2` Q1=A + Q3 17 项动作; 实施: rdd-quick `quick-bp-v0110-defer-2026-10` |
+| sprint-2026-10-4 | objective-revision | **2026-10-22 双审后 Phase B 排期 + pre_flight 重构 + 4 处文档对齐** | ① Phase B 由 Sprint 6+ (12-01) **提前到 Sprint 2-3 (10-23 ~ 11-06)**, 估时 10d → **15d** (原 10d 压缩版整段丢失 B.5 的 5d 集成回归); ② 原 pre_flight #2 `fetch-stall-protocol-v0.2` + #3 `bp-btb-coordination-3items` **移出 pre_flight** → 合并为 **Phase 3.5 slot** (Sprint 3 后段 3.5d, 挂 C.4 入口条件); ③ §9.2 gate `[mmu-verilator]` 5/5 → **4/4** (原值有误: 3/3 baseline + D.1 新增 1 case) + 新增 `[mmu][chmem] 5/5`; ④ §8/§10 补同步 S3 决策 (BTB/GShare 此前未从 §8 表移除) | Phase B 失败根因是 **single-shot 派发方式**而非日历位置 (源 change tasks.md 2026-10-10 注记: "超出 deep agent single-shot 30-min timeout 能力") ⇒ Sprint 2 早期 `ctrl-link-chmem-reg-handle` (同一套 `ch_reg` + OR 网 API 的交互式热身 session) 承接; 12-01 起只剩 8 周要塞 B(15d)+C(5d)+C.6(3d)+D(5d)+E(2d) ≈ 30d + DMIPS 硬门禁, buffer ≈ 0; pre_flight #2 的 owner (wave5-bp-btb) 已于 2026-10-19 S3 defer 到 v1.0.0 ⇒ 无人可交付, 且 `fetch_stall_requirements_v0.11.0.md` §1.5 BLOCKER-B5 明写 fetch-stall v0.2 **反向依赖 Phase B** ⇒ 逻辑倒挂; 详见 `/home/ubuntu/.opencode/plan/20261022-v0110-mmu-chmem-execution-sequence.md` v2 + oracle `ses_e9f5187c6ffejPjGSWRoK8KbvG` + metis `ses_e9f514d2dffeBCCPWtly985O3q` |
