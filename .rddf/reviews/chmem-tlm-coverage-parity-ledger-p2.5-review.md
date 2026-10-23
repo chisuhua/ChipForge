@@ -1,7 +1,9 @@
 # P2.5 Review 报告 — chmem-tlm-coverage-parity-ledger
 
 > **change**: `chmem-tlm-coverage-parity-ledger`（TLM 退役 B0 剩余项：台账**内容**）
-> **分支**: `feature/chmem-tlm-coverage-parity-ledger`（base `913c20d`）
+> **分支**: ⚠️ **实施直接在 `main` 上完成**（builder 疏漏：B 合并后未建隔离分支）
+> —— 已补建 ref `feature/chmem-tlm-coverage-parity-ledger` 指向实施终态 `c1a9d08` 供追溯；
+> 4 个 commit 线性落在 main（无分叉、origin/main 未 push）⇒ 技术无害，但工作流惯例未遵守。
 > **审查时间**: 2026-10-24 · **审查方式**: AC 逐条机械复核 + 变异对照证据 + commit 卫生 + 变更面核对
 
 ## 1. 结论

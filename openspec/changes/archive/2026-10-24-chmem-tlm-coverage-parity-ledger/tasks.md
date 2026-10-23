@@ -48,7 +48,9 @@ status: in-planning
 - [x] AC10 5 个架构门禁全 PASS（另加 check_xlen_hygiene / check_tlm_freeze / check_coverage_parity_ledger ⇒ 8 项全绿）
 - [x] AC11 **0 生产代码改动**（`.h` / `.cpp` 改动数 = 0）
 
-### 实测留证（2026-10-24，branch `feature/chmem-tlm-coverage-parity-ledger`）
+### 实测留证（2026-10-24）
+
+> ⚠️ **分支事实**：本 change 的实施**直接在 `main` 上完成**（builder 疏漏：前序 change 合并后未建隔离分支）⇒ 4 个 commit 线性落在 main；已补建 ref `feature/chmem-tlm-coverage-parity-ledger` 指向终态供追溯。
 
 | 项 | 实测 |
 |---|---|
