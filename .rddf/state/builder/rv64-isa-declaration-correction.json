@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "rv64-isa-declaration-correction",
-  "current_phase": "phase-2.5",
+  "current_phase": "phase-3",
   "approval_status": "approved",
   "plan_quality_status": "approved",
   "p0_decision": {
@@ -93,10 +93,18 @@
       "event": "review-passed",
       "at": "2026-10-24T01:10:00Z",
       "note": "AC 10/10 通过; commit 卫生 8 批核对通过; 变更面无 plan 外意外改动; 6 项已知遗留已登记; 待 critic 第 4 轮 plan 复审结论"
+    },
+    {
+      "phase": "phase-3",
+      "event": "archived",
+      "at": "2026-10-24T01:25:00Z",
+      "note": "openspec archive 完成: change -> openspec/changes/archive/2026-10-24-rv64-isa-declaration-correction/; 6 requirements 落库 openspec/specs/cpu-isa-xlen-contract/spec.md; Purpose 占位已替换; validate --all 的 5 failed 均为 pre-existing"
     }
   ],
-  "archive_status": "pending",
+  "archive_status": "archived",
   "verifier_report_path": "",
-  "updated_at": "2026-10-24T01:10:00Z",
-  "review_report": ".rddf/reviews/rv64-isa-declaration-correction-p2.5-review.md"
+  "updated_at": "2026-10-24T01:25:00Z",
+  "review_report": ".rddf/reviews/rv64-isa-declaration-correction-p2.5-review.md",
+  "archive_path": "openspec/changes/archive/2026-10-24-rv64-isa-declaration-correction",
+  "spec_path": "openspec/specs/cpu-isa-xlen-contract/spec.md"
 }

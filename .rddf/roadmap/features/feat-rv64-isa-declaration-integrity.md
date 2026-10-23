@@ -48,7 +48,7 @@ phase_refs: [phase-4]
 
 ### phase-4（v0.11.0 窗口）— ADR-087 D1/D2/D7 落地
 
-- **Change 1 `rv64-isa-declaration-correction`（P0）**：
+- **Change 1 `rv64-isa-declaration-correction`（P0）**：✅ **已完成并归档**（`openspec/changes/archive/2026-10-24-rv64-isa-declaration-correction/`，2026-10-24；AC 10/10 通过；实施要点：`isa` 默认 `rv32im` + `xlen` 字段 + `cf::cpu::detail::validate_isa_xlen` 三层 fail-fast + 3 处模板入口编译期护栏 + 4 个死代码删除 + `check_xlen_hygiene.sh` 软门禁）
   - `CPUConfig::isa` 默认 `rv64gc` → `rv32im`；新增 `xlen` 字段（默认 32）
   - schema 加 `xlen` 属性（enum 32/64）；`isa` enum 三态标注（implemented / declared-reserved / unsupported）
   - 3 个 JSON 的 `isa` 改 `rv32im`；`cpu_embedded.json` 的 `rv32imac` → `rv32im`（A 扩展未实现）
