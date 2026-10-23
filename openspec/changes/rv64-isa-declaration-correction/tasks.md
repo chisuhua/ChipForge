@@ -21,19 +21,19 @@ status: in-planning
 
 ## Implementation
 
-- [ ] Task 1 基线快照（禁退化锚：TLM 快返 + `[cpu]` 129/461 + `[cpu-integration]` 96/95+1pre-existing + `[riscv-tests],[mmu]` 107 + `[chmem]` 89）
-- [ ] Task 2 新测试 `tests/cpu/test_cpu_factory_isa_xlen.cpp`（5 用例先红：默认值契约 / unsupported throw / implemented 冲突 throw / T↔xlen 交叉 throw / reserved 单发 warn；含 `using namespace cf::cpu;` + re-cmake 步骤）
-- [ ] Task 3 `cpu_factory.h`：`isa` 默认 `rv32im` + `xlen` 字段 + `cf::cpu::detail::validate_isa_xlen()`（**后置重开 namespace**）+ `build_cpu` 首行接线 → 新测试转绿
-- [ ] Task 4 **T64 实例化点迁移**（B1 用户裁决）：删 `test_cpu_factory.cpp` 的 `build_cpu_rv64` case；余下 2 处 T64 → T32；`test_branch_predictor_runtime_btb.cpp` 3 case → `uint32_t`；integration 侧 **7 处** `cfg.isa` → `rv32im` + `test_topology_builder.cpp:35` 残留清理 ⇒ `nm` 无 T64 残留、tests/ 无 reserved 残留
-- [ ] Task 5 schema：`xlen` 属性 + `isa` enum 收窄 `[rv32i,rv32im,rv32imac]`（rv64* 入 description）+ default `rv32im` + sweep 示例纠偏 + 核查 `:204` 条件约束
-- [ ] Task 6 JSON ×4 纠偏：`isa` → `rv32im`（含 cpu_embedded `rv32imac`→`rv32im`）+ 3 个 `mmu_mode` → `sv32`（schema `:204` 条件）+ Draft7 校验（过滤 `_comment` pre-existing 基线）+ `[mmu],[cpu-l1-mmu-demo]` 回归
-- [ ] Task 7 `tools/cpu_sim/main.cpp`：删 `cfg.isa="rv32i"` pin（**含注释，不得留字面量**）+ `load_config()` 补 `xlen` 解析 + 证实无 `--isa` flag + AC4 grep 自检 + `[cpu-integration]` 回归
-- [ ] Task 8 `int_alu.h:88` / `branch.h:111` + `branch.h` `build()` 闭包内 —— 模板入口 `static_assert(sizeof(T)==4)`（函数体首行，实例化点触发，**branch 两处**）+ 双 binary 全量 build
-- [ ] Task 9 变异对照：`branch.h` 护栏临时改 8 → 编译失败 → 还原（ADR-087 R4 证据；含 `grep -n` 预演防误伤既有 `is_unsigned` 断言）
-- [ ] Task 10 删 `ip/cpu/plugins/reg_file.cpp`（0 CMake 引用终次确认 + build + grep=0）
-- [ ] Task 11 缺口表 `rv64_readiness_gap.md` §2 状态列翻转（0.1–0.6 / 0.9 / 0.10 → ✅；0.7/0.8 已 ✅）+ `doc_link_check.sh` 实跑核验
-- [ ] Task 12 CI 软门禁 `tools/check_xlen_hygiene.sh`（warn-only，allowlist = 缺口表 §5 的 **9 处定义点 / 9 个真实文件**）+ `architecture-gates.yml` 接入（continue-on-error）+ `tools/README.md` 登记 + dry 探针自检（`XLEN_SCAN_ROOT` 指探针目录，**不 stash、不写 ip/**）
-- [ ] Task 13 全门禁收口：`run_chipforge_tests.sh --all`（timeout 1200；**`chipforge_tests` ctest entry 基线即红**（1 pre-existing FAIL）⇒ 机判口径 = 失败集合恰为 `{test_7stage_riscv.cpp:124}` + `ctest -E '^chipforge_tests$'` 3 条全绿）+ 6 门禁 + AC 逐条 grep 复核 + 计数终验 + `openspec change validate` 0 error + **分 5 批 commit（必须用 `git commit -- <paths>` 限定 pathspec，防 `git rm` 残留被夹带）**
+- [x] Task 1 基线快照（禁退化锚：TLM 全量 481/480+1pre-existing · `[cpu]` 129/461 · `[cpu-integration]` 96/95+1 · `[riscv-tests],[mmu],[cache]` 132 · chmem binary 130 / tag 89）
+- [x] Task 2 新测试 `tests/cpu/test_cpu_factory_isa_xlen.cpp`（5 用例先红：默认值契约 / unsupported throw / implemented 冲突 throw / T↔xlen 交叉 throw / reserved 单发 warn；含 `using namespace cf::cpu;` + re-cmake 步骤）—— 实测 **5 passed / 9 assertions**
+- [x] Task 3 `cpu_factory.h`：`isa` 默认 `rv32im` + `xlen` 字段 + `cf::cpu::detail::validate_isa_xlen()`（**后置重开 namespace detail**）+ `build_cpu` 首行接线 + `#include <iostream>` → 新测试转绿
+- [x] Task 4 **T64 实例化点迁移**（B1 用户裁决）：删 `test_cpu_factory.cpp` 的 `build_cpu_rv64` case；余下 2 处 T64 → T32；`test_branch_predictor_runtime_btb.cpp` 3 case → `uint32_t`；integration 侧 **7 处** `cfg.isa` → `rv32im` + `test_topology_builder.cpp:35` 残留清理 ⇒ `nm` 无 T64 残留、tests/ 无 reserved 残留（`[cpu]` 133 PASS）
+- [x] Task 5 schema：`xlen` 属性 + `isa` enum 收窄 `[rv32i,rv32im,rv32imac]`（rv64* 入 description）+ default `rv32im` + sweep 示例纠偏 + 核查 `:210` 条件约束
+- [x] Task 6 JSON ×4 纠偏：`isa` → `rv32im`（含 cpu_embedded `rv32imac`→`rv32im`）+ 3 个 `mmu_mode` → `sv32` + Draft7 校验 4×OK（`_comment` pre-existing 基线已登记）+ AC3 零命中 + `[mmu],[cpu-l1-mmu-demo]` 65 PASS
+- [x] Task 7 `tools/cpu_sim/main.cpp`：删 `cfg.isa="rv32i"` pin（含注释，AC4 grep = 0）+ `load_config()` 补 `xlen` 解析 + 证实无 `--isa` flag + `[cpu-integration]` 96/95+1 回归
+- [x] Task 8 `int_alu.h` `compute()` + `branch.h` `evaluate_branch()` **与** `branch.h` `build()` 闭包内 —— 3 处 `static_assert(sizeof(T)==4)`（函数体首行，实例化点触发）+ 双 binary 全量 build（TLM + CH_MEM 均 exit 0）
+- [x] Task 9 变异对照：`branch.h` 护栏临时改 8 → **编译失败**（`static assertion failed: RV32 TLM path assumes 32-bit XLEN`）→ 还原（计数 2）→ 编译恢复 —— ADR-087 R4 证据
+- [x] Task 10 删 `ip/cpu/plugins/reg_file.cpp`（0 CMake 引用 + 0 `#include` 命中；`git rm`；build OK；`[cpu]` 133 PASS；AC5 grep = 0）
+- [x] Task 11 缺口表 `rv64_readiness_gap.md` §2 状态列翻转（0.1–0.6 / 0.9 / 0.10 → ✅）+ §1 `cpu_sim` 行标注 + 行号口径 blockquote 更新 + `doc_link_check.sh` 0 broken
+- [x] Task 12 CI 软门禁 `tools/check_xlen_hygiene.sh`（warn-only，allowlist = 缺口表 §5 的 **9 处定义点 / 9 个文件**）+ `architecture-gates.yml` 接入（continue-on-error）+ `tools/README.md` 登记 + 变异自检（基线 warn=0 / 探针 warn=1 / STRICT exit 1）
+- [ ] Task 13 全门禁收口：`run_chipforge_tests.sh --all`（timeout 1200；**`chipforge_tests` ctest entry 基线即红**（1 pre-existing FAIL）⇒ 机判口径 = 失败集合恰为 `{test_7stage_riscv.cpp:124}` + `ctest -E '^chipforge_tests$'` 3 条全绿）+ 6 门禁 + AC 逐条 grep 复核 + 计数终验 + `openspec change validate` 0 error + **分 5 批 commit（`git commit -- <paths>` 限定 pathspec；批 4 不带 `git add`）**
 
 ## Acceptance
 
