@@ -42,7 +42,7 @@
 
 `ip/cpu/cpu_factory.h` 内 `namespace cf::cpu::detail { inline void validate_isa_xlen(const CPUConfig&, unsigned kernel_xlen); }`，`build_cpu()` 首行调用（`kernel_xlen = sizeof(T) * 8`）。`tools/cpu_sim/main.cpp` 的 `load_config()` 不重复实现校验（单一 SSOT 在 build_cpu 入口）；cpu_sim 仅删除 `cfg.isa = "rv32i"` pin（`:187-188`）与头注释 `:16`（:85 的 JSON 读取保持），并**补 `cfg.xlen` 解析**（schema 已声明 `xlen`，`load_config` 静默丢弃 = `cpu-pipeline-tick-fix` F1 同型 bug，critic SHOULD_FIX 5）。
 
-⚠️ **落点约束（critic B4）**：`namespace cf::cpu::detail` 的原块在 `cpu_factory.h:113` 闭合，**早于** `struct CPUConfig`（:124）的定义 ⇒ helper 无法放回原块，必须在 struct 之后**重开** `namespace cf { namespace cpu { namespace detail {` 并配对闭合，否则 `cf::cpu::detail::validate_isa_xlen` 不存在（落笔即编译失败）。
+⚠️ **落点约束（critic B4）**：`namespace cf::cpu::detail` 的原块在 `cpu_factory.h:113` 闭合，**早于** `struct CPUConfig`（:124）的定义 ⇒ helper 无法放回原块；但 `namespace cf { namespace cpu {` 已在 `:115-116` 重新打开（`:520-521` 才闭合）⇒ helper 落点只需**重开 `detail` 一层**（写 `namespace cf { namespace cpu { namespace detail {` 会产生 `cf::cpu::cf::cpu::detail` ⇒ 落笔即错，同名陷阱）。
 
 ## Decision 7 — T64 实例化点迁移（用户裁决：保留编译期护栏）
 

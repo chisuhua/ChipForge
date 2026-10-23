@@ -21,7 +21,7 @@ critic 对本 change 的 P1 产物给出 **REJECT：6 BLOCKER / 7 SHOULD_FIX / 6
 | B1 | 护栏 `static_assert(sizeof(T)==4)` 会打断 `chipforge_tests` 编译（`IntAlu<T64>`/`Branch<T64>` 今天已被实例化）→ AC2 与 AC9「0 退化」互斥 | **用户裁决：迁移 T64 调用点，保留编译期护栏**；删除 RV64 构建探测 case + 其余改 T32；`[cpu]` 计数随之调整 | Task 4 |
 | B2 | Task 5 改 `isa` 后 3 个 JSON 触发 schema `:204` 条件（`rv32* ⇒ mmu_mode const sv32`）而 `mmu_mode` 是 sv39/sv48 → 变 schema 非法 | 3 个 JSON 的 `mmu_mode` 同步纠偏为 `sv32`（32-bit XLEN 下只有 Sv32 合法，schema 约束本身是对的）；`_comment` 撞 `additionalProperties:false` 属 **pre-existing 基线**，登记不修 | Task 6 + design R8 |
 | B3 | hygiene 脚本 allowlist 2 条路径写错 → `warn=0` 不成立 | allowlist 改为缺口表 §5 实测的 **7 个真实文件**（9 处定义点分布在 7 文件） | Task 12 |
-| B4 | `validate_isa_xlen` 插在 `namespace cf::cpu::detail` 之外 → 落笔即编译失败 | 计划显式给出**重开 namespace** 的完整包裹代码（原 detail 块在 `:113` 闭合，早于 `CPUConfig` 定义，helper 必须后置重开） | Task 3 Step 2 |
+| B4 | `validate_isa_xlen` 插在 `namespace cf::cpu::detail` 之外 → 落笔即编译失败 | 计划显式给出包裹代码：helper 放在 struct 之后、**只重开 `detail` 一层**（`cf::cpu` 已由 `:115-116` 打开 ⇒ 再写 `namespace cf { namespace cpu {` 会得到 `cf::cpu::cf::cpu::detail`，同名陷阱） | Task 3 Step 2 |
 | B5 | 替换后的注释仍含 `isa="rv32i"` 字面量 → AC4 的 grep 自我否定 | 替换文本不含该字面量；AC4 grep 口径同步核对 | Task 7 + Task 13 |
 | B6 | Task 12 自检含 `git stash push` → 会抽走实施期改动 | 删除该行，自检改为 `/tmp/opencode` 纯 dry 探针 | Task 12 |
 | S1 | 新测试文件缺 `using namespace cf::cpu;` | 测试文件加 `using namespace cf::cpu;` | Task 2 |
@@ -225,7 +225,7 @@ Expected: **编译失败** — `CPUConfig` 无 `xlen` 字段（这是 TDD 红；
 
 - [ ] **Step 2: 后置重开 namespace 放校验 helper（唯一 SSOT，design D1/D6）**
 
-> `namespace cf::cpu::detail` 的原块在 `cpu_factory.h:113` 闭合（`}}}  // namespace cf::cpu::detail`），**早于** `struct CPUConfig`（:124）的定义 ⇒ helper 不能放回原块，必须在此处**重开** namespace，否则 `:cf::cpu::detail::validate_isa_xlen` 不存在（编译失败）。
+> `namespace cf::cpu::detail` 的原块在 `cpu_factory.h:113` 闭合（`}}}  // namespace cf::cpu::detail`），**早于** `struct CPUConfig`（:124）的定义 ⇒ helper 不能放回原块。但 `namespace cf { namespace cpu {` 在 `:115-116` **已重新打开**（直到 `:520-521` 才闭合）⇒ 此处**只需重开 `detail` 一层**；若再写 `namespace cf { namespace cpu {` 会产生 `cf::cpu::cf::cpu::detail` ⇒ 落笔即错（同名陷阱）。
 
 在 `struct CPUConfig { ... };`（:176 的 `};`）之后插入：
 
@@ -240,8 +240,6 @@ Expected: **编译失败** — `CPUConfig` 无 `xlen` 字段（这是 TDD 红；
 // kernel_xlen = sizeof(T)*8 (build_cpu 泛化入口的运行期兜底;
 // CpuFactory<uint64_t> 主防线是 int_alu.h/branch.h 的编译期 static_assert)
 // ----------------------------------------------------------------------------
-namespace cf {
-namespace cpu {
 namespace detail {
 
 inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen) {
@@ -280,9 +278,9 @@ inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen) {
 }
 
 }  // namespace detail
-}  // namespace cpu
-}  // namespace cf
 ```
+
+（`cf::cpu` 在 `:115-116` 已打开，故**只需**闭合 `detail` 一层；`cf` / `cpu` 由 `:520-521` 统一闭合）
 
 （若文件未 include `<iostream>` 需补：实测 `cpu_factory.h` 只 include 了 `<stdexcept>`/`<string>` 等，**没有 `<iostream>`** ⇒ 必须补 `#include <iostream>`，按字母序插在既有 include 区）
 
