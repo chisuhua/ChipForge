@@ -147,6 +147,13 @@ jobs:
           bash tools/check_tlm_freeze.sh
         continue-on-error: true
 
+      - name: Check coverage parity ledger (check_coverage_parity_ledger.sh, warn-level)
+        id: verify_coverage_parity_ledger
+        run: |
+          echo "=== Running check_coverage_parity_ledger.sh ==="
+          bash tools/check_coverage_parity_ledger.sh
+        continue-on-error: true
+
       - name: Run Doc link check (doc_link_check.sh)
         id: verify_doc_links
         run: |

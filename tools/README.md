@@ -14,6 +14,8 @@
 | `tools/doc_link_check.sh` | 文档相对路径交叉引用完整性 (防止 2026-06-13 发现的 42 个死链回归) | 0=全 PASS / 1=有断链 | (推荐) `architecture-gates.yml` step 4 |
 | `tools/check_xlen_hygiene.sh` | ADR-087 §D6 XLEN 假设 hygiene 软门禁 (新增 `kXlenBits` 定义点须登记 `ip/cpu/docs/rv64_readiness_gap.md` §5) | 0=PASS (含 warn) / 1=STRICT 模式下有未登记定义点 | ✅ `architecture-gates.yml` step 4 (**warn 级**, `continue-on-error: true`) |
 | `tools/check_tlm_freeze.sh` | ADR-088 §2 TLM-only 代码冻结门禁 (相对 baseline 新增的函数定义须登记 `.rddf/state/tlm-freeze-allowlist.txt`；检测面 = `ip/` 下非 `_chmem.h` 的 `.h` 减去 9 个双模共享文件) | 0=PASS / 1=有未登记的新增函数 | ✅ `architecture-gates.yml` step 5 (**warn 级**, `continue-on-error: true`) |
+| `tools/gen_coverage_parity_ledger.sh` | ADR-088 §4 覆盖平价台账生成器 (从两个 binary 的 `--list-tests` 差集生成条目骨架 + 重算闭合校验；数字不写死) | 0=闭合 OK / 1=口径不闭合 | (本地工具, CI 不调用) |
+| `tools/check_coverage_parity_ledger.sh` | ADR-088 §4 覆盖平价台账漂移检测 (新增 TLM-only case 未登记 / 标注缺失 / 批量退役红线 / 族求和口径误用) | 0=PASS / 1=有违规 | ✅ `architecture-gates.yml` step 6 (**warn 级**, `continue-on-error: true`) |
 
 ## 2. 构建/测试入口脚本
 
