@@ -2,12 +2,12 @@
   "schema_version": "scope-v1",
   "current_scope": {
     "category": "ip",
-    "target": "cpu",
-    "sub_target": null
+    "target": "mmu",
+    "sub_target": "plugins"
   },
-  "updated_at": "2026-10-19T04:40:00Z",
+  "updated_at": "2026-10-22T14:21:48Z",
   "updated_by": "user",
-  "session_id": "ses_ead8a87c1ffeLznm1JY9Gd8a0k",
+  "session_id": "ses_ebd10896effeIBebOAJUcXVV3E",
   "history": [
     {
       "from": "ip/cpu",
@@ -29,6 +29,13 @@
       "at": "2026-10-18T16:23:59Z",
       "by": "user",
       "trigger": "scope-matrix-proposal initial (2026-10-19)"
+    },
+    {
+      "from": "ip/cpu",
+      "to": "ip/mmu",
+      "at": "2026-10-22T14:21:48Z",
+      "by": "user",
+      "trigger": "user requested role=architect + scope=ip/mmu for chmem-ptw-walk architecture research"
     }
   ]
 }
