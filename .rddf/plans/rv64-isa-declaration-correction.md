@@ -700,8 +700,10 @@ Expected: 计数 `2` + 编译成功
 - [ ] **Step 1: 终次确认 0 引用（防止采纳期新引用）**
 
 Run: `grep -rn "reg_file.cpp" --include=CMakeLists.txt . | grep -v build || echo "0 CMake refs"`
-Run: `grep -rln 'ip/cpu/plugins/reg_file.cpp' ip/ src/ tests/ tools/ | grep -v "^ip/cpu/plugins/reg_file.cpp:" || echo "0 includes"`
+Run: `grep -rn '#include.*reg_file\.cpp' ip/ src/ tests/ tools/ | grep -v '^ip/cpu/plugins/reg_file.cpp:' || echo "0 includes"`
 Expected: 两处 0
+
+> ⚠️ 第 2 条必须用 **include 模式**（`#include.*reg_file\.cpp`）：若用路径子串匹配，会命中 **4 个文档提及**（`ip/cpu/docs/dse_architecture.md` / `implementation-plan/M4-integration.md` / `research/ooo_forward_compat_gap_analysis.md` / `rv64_readiness_gap.md`）与 ADR-087 ⇒ 期望值不再是 0（文档提及是预期的：缺口表 0.10 行正是登记该死代码）。
 
 - [ ] **Step 2: 删除与验证**
 
