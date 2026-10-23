@@ -41,7 +41,7 @@ CH_MEM 侧与 TLM 侧的**注册差距 = 10 处**（TLM 工厂 19 处 `register_
 | # | 缺口 | 实测证据 | 预估 | 建议 |
 |---|------|---------|------|------|
 | A1 | **MMU exception handler 未注册** | `ip/cpu/cpu_factory_chmem.h:342-349` 的注册块被 `#ifndef CF_PLUGIN_USE_CH_MEM` 包住；CH_MEM 变体 `ip/cpu/plugins/mmu_exception_handler_chmem.h`（118 行）**已存在** | 极小（删 `#ifndef` + 补 include + 回归异常路径） | 独立 change：`chmem-mmu-exception-handler-register` |
-| A2 | **MMU 流水线级未接线**（PTW + MMU 本体 + exception handler 三者同批） | ⚠️ 实测扩大：`cpu_factory_chmem.h:86` 自述 `enable_mmu=true` **不注册任何 MMU plugin**（"NO translation occurs"）⇒ MMU 在 CH_MEM 侧**仅单元级存在**（`[mmu-chmem-basic]` 直接构造，不走工厂）。PTW FSM（`mmu_ptw_chmem.h`）0 注册；exception handler 被 `#ifndef` 排除 | 大（MMU 本体接线 + PTW + 异常回传；依 ADR-088 §3 PTW 行「现在不接线」，实装归 `chmem-ptw-walk`） | **归 `mmu-chmem-phase-b-c-launch` / `chmem-ptw-walk` owner 裁决**（不新立 change） |
+| A2 | **MMU 流水线级未接线**（PTW + MMU 本体 + exception handler 三者同批） | ⚠️ 实测扩大：`cpu_factory_chmem.h:86` 自述 `enable_mmu=true` **不注册任何 MMU plugin**（"NO translation occurs"）⇒ MMU 在 CH_MEM 侧**仅单元级存在**（`[mmu-chmem-basic]` 直接构造，不走工厂）。PTW FSM（`mmu_ptw_chmem.h`）0 注册；exception handler 被 `#ifndef` 排除 | 大（MMU 本体接线 + PTW + 异常回传） | ✅ **owner 已定案（2026-10-24）：PTW walk 实装归 `chmem-ptw-walk`**（不新立 change；`mmu-chmem-phase-b-c-launch` 只保留 Phase C.5 的**异常回传前置**，两者按接口协调，无双 owner） |
 | ~~A3~~ → **A3'** | ~~isa/xlen 契约校验未接~~ → **CH_MEM 工厂无 config 入口** | ⚠️ 实测纠正：CH_MEM 工厂签名是散装 `std::optional` 参数（`cpu_factory_chmem.h:96-110`），**不接受 `CPUConfig`**（注释自述「不读 cfg, 不引 CpuConfig 依赖 NG1/NG2/NG3」）⇒ 原议题前提不成立 | **不立项**：ISA 契约覆盖面**限定为 TLM 侧 `CpuFactory`**（ADR-087 永久 spec 已补限定）；CH_MEM 侧约束走**编译期** `static_assert`（ADR-087 §D4，归 Change 2） | 见 §5 A3' 定案 |
 
 > A3 需先由 architect 明确：**CH_MEM 工厂的 `CPUConfig` 是否接受 `isa`**（当前 `:99` 不读）—— 若接受，契约校验可直接复用；若不接受（CH_MEM 固定 RV32IM），则应**显式拒绝** `isa != rv32im` 而不是静默忽略。
@@ -110,8 +110,8 @@ CH_MEM 侧与 TLM 侧的**注册差距 = 10 处**（TLM 工厂 19 处 `register_
 | 2 | `chmem-bp-btb-gshare` | `branch_predictor_chmem.h`（BTB/Bimodal/GShare）+ CH_MEM 工厂注册 | #1（验收依赖） | 大 |
 | 3 | `chmem-l1cache-本体` | L1CachePlugin CH_MEM 本体（当前只有 refill FSM）+ 工厂 `enable_cache=true` 解禁 | 无（可并行 #1） | 大 |
 | 4 | `chmem-dbus-lsu` | DBus / LSU 的 CH_MEM 通路（宽度语义对齐） | #3（命中判定依赖 Cache） | 中 |
-| 5 | `chmem-mmu-pipeline-integration` | MMU 流水线级接线（含 **exception handler 注册** + PTW 注册）—— **归 `mmu-chmem-phase-b-c-launch` / `chmem-ptw-walk` 的 owner 裁决**，不新立 | `chmem-ptw-walk`（PTW 实装） | 大 |
+| 5 | **`chmem-ptw-walk`**（未立项，**owner 已定案**） | PTW walk 实装（依 ADR-085/086 目标架构：`MMU_TLB`+`MMU_PTW` 拆分 / `FsmBase` 封装 / `PTWCache` / **代码落 `ip/mmu/plugins/`**）+ 流水线级注册 + exception handler 注册 | ADR-085/086 目标架构（已锁）· `mmu-chmem-phase-b-c-launch` 的 Phase C.5 异常回传前置 | 大 |
 | — | `chmem-tlm` 目录名治理（B0 剩余项 86） | `ip/{mmu,cpu}/tlm/` 双模共享文件迁 `core/` | 无 | 小 |
 
-> **owner 裁决待办**：PTW walk FSM 的实装归属需在 `mmu-chmem-phase-b-c-launch`（status: ready，10/33 tasks）的 P1 阶段确认 —— 归它 or 归未立项 `chmem-ptw-walk`，**避免双 owner**。
+> **owner 定案（2026-10-24，用户拍板）**：PTW walk 实装**归 `chmem-ptw-walk`**（不归 `mmu-chmem-phase-b-c-launch`）。后者（status: ready，10/33 tasks）**只保留 Phase C.5 的异常回传前置**（`CPU_EXCEPTION_CODE` 写入源 / `HazardPlugin` A4 信号驱动）—— 两项按**接口**协调（`chmem-ptw-walk` 消费 C.5 提供的异常信号），**无双 owner**。
 > **B2 → B1 的顺序约束**：本定案已完成 ⇒ B1 可按上表立项（不再有「按错误语义假设补实现」的风险）。
