@@ -6,10 +6,13 @@
 | [STATUS.md](../STATUS.md) | 当前状态（PARTIAL 骨架阶段，2026-06-29） |
 | [architecture.md](architecture.md) | 详细微架构（多级 TLB 数据流 + lib/tlm 分层 + Plugin 范式映射） |
 | [mmu-ptw-architecture.md](mmu-ptw-architecture.md) | **MMU_PTW 架构设计**（设计正文：背景 / 职责边界 / 决策索引 / 数据流与时序 / 替代方案 / 后果 / 实施清单 / 验证命令） |
+| [mmu-l0-l1-tlb-architecture.md](mmu-l0-l1-tlb-architecture.md) | **L0 / L1 TLB 架构设计**（两级 leaf 翻译缓存：L0 全相联 8 项 + L1 组相连 256×8，级联查询 + XOR interleave） |
 | [configuration.md](configuration.md) | 参数 Knobs 详表（对应 `configs/params_schema.json`） |
 | [integration.md](integration.md) | CPU/SoC 集成契约（MMUPlugin at_stage 示例） |
 | [adr/ADR-085-mmu-ptw-architecture.md](adr/ADR-085-mmu-ptw-architecture.md) | **ADR-085 伞索引**（MMU_PTW 架构决策组，登记 D01–D21） |
 | [adr/ADR-085-D01..D21](adr/) | **21 个子 ADR**（一决策一文件：`ADR-085-D01-mmu-tlb-ptw-split.md` … `ADR-085-D21-physical-mem-handle-ownership.md`） |
+| [adr/ADR-086-l0-l1-tlb-architecture.md](adr/ADR-086-l0-l1-tlb-architecture.md) | **ADR-086 伞索引**（L0 / L1 TLB 架构决策组，登记 D01–D12；ADR-085 的 CH_MEM 侧增量） |
+| [adr/ADR-086-D01..D12](adr/) | **12 个子 ADR**（一决策一文件：`ADR-086-D01-l0-l1-leaf-cache-split.md` … `ADR-086-D12-verification-criteria.md`） |
 
 ## 状态标签
 
@@ -51,7 +54,8 @@ ip/mmu/
 │   └── rrip_policy.h
 ├── test/                    # 预留
 └── docs/                    # 本目录
-    ├── architecture.md       # 既有微架构（部分内容被 ADR-085 细化）
+    ├── architecture.md       # 既有微架构（部分内容被 ADR-085/086 细化）
     ├── mmu-ptw-architecture.md  # ADR-085 组的设计正文
-    └── adr/                  # ADR-085 伞索引 + 21 个子 ADR（一决策一文件）
+    ├── mmu-l0-l1-tlb-architecture.md  # ADR-086 组的设计正文
+    └── adr/                  # ADR-085 / ADR-086 伞索引 + 33 个子 ADR（一决策一文件）
 ```

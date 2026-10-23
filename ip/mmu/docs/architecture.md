@@ -12,6 +12,13 @@
 > - **生效范围**：ADR-085 是 **CH_MEM 前向架构**（D18 明写 TLM 侧本期不动，除 D13 的共享 helper 抽取）。
 > - 本文档其余部分（§3 HDL 友好性、§5 工厂模式、§6 替换策略、§7 lib/tlm 分层）**仍然有效**。
 
+> **⚠️ [ADR-086](adr/ADR-086-l0-l1-tlb-architecture.md) 又一次细化了 TLB 结构（2026-10-23）** —— 设计正文见 [mmu-l0-l1-tlb-architecture.md](mmu-l0-l1-tlb-architecture.md)，决策拆为 **D01–D12 共 12 个子 ADR**：
+>
+> - **命名警示（重要）**：本文档 §1 与 §2 描述的 `L0 TLB` / `L1 TLB` 是 **TLM 侧 MultiLevelTLB 的"TLB 深度层"**（`L0 最快最小`），而 **ADR-086 的 `L0 TLB` / `L1 TLB` 是 CH_MEM 侧的两级"leaf 翻译缓存"**（L0 = 8 项全相联 / 4KiB 粒度；L1 = 256 set × 8 way 组相连 / 大页粒度）⇒ **同名不同义**。ADR-086 D11 决策 3 记录了处置（TLM 侧不动；CH_MEM 侧成员名用 `l0_tlb_` / `l1_tlb_`，**不得**复用 `MultiLevelTLB` 名）。
+> - **lookup 语义分叉**：TLM 侧 `MultiLevelTLB` = **并行**查所有层 + 取最深 hit（`openspec/specs/mmu-multi-level-coherence/spec.md` 的 MUST 条款）；ADR-086 的 CH_MEM 侧 = **串行级联** L0→L1→PTW。⇒ **不是违约，是后端分叉**。
+> - **live 配置与 ADR-086 不一致**：`soc/mmu_minimal.json:21-23` 的 `L0`/`L1` 是 **8 entries / assoc 8**（两级都全相联），不是 ADR-086 的 L1 组相连 256×8 ⇒ ADR-086 是**未实装的设计提案**。
+> - ADR-086 只做 **CH_MEM 侧**，TLM 侧不动 ⇒ 本文档 §3~§7 描述的 TLM 侧 lib/ 分层**仍然有效**。
+
 ## 1. 总体数据流
 
 ```
