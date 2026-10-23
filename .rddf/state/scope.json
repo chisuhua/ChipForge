@@ -2,13 +2,27 @@
   "schema_version": "scope-v1",
   "current_scope": {
     "category": "ip",
-    "target": "mmu",
-    "sub_target": "plugins"
+    "target": "cpu",
+    "sub_target": null
   },
-  "updated_at": "2026-10-22T14:21:48Z",
+  "updated_at": "2026-10-23T05:39:23Z",
   "updated_by": "user",
   "session_id": "ses_ebd10896effeIBebOAJUcXVV3E",
   "history": [
+    {
+      "from": "ip/mmu",
+      "to": "ip/cpu",
+      "at": "2026-10-23T05:39:23Z",
+      "by": "user",
+      "trigger": "user requested role=architect + scope=ip/cpu to audit RV64 architecture conformance"
+    },
+    {
+      "from": "ip/cpu",
+      "to": "ip/mmu",
+      "at": "2026-10-22T14:21:48Z",
+      "by": "user",
+      "trigger": "user requested role=architect + scope=ip/mmu for chmem-ptw-walk architecture research"
+    },
     {
       "from": "ip/cpu",
       "to": "ip/cpu",
@@ -29,13 +43,6 @@
       "at": "2026-10-18T16:23:59Z",
       "by": "user",
       "trigger": "scope-matrix-proposal initial (2026-10-19)"
-    },
-    {
-      "from": "ip/cpu",
-      "to": "ip/mmu",
-      "at": "2026-10-22T14:21:48Z",
-      "by": "user",
-      "trigger": "user requested role=architect + scope=ip/mmu for chmem-ptw-walk architecture research"
     }
   ]
 }
