@@ -141,7 +141,9 @@ struct CPUConfig {
   // 功能开关
   bool enable_pmp = true;
   bool enable_mmu = true;
-  std::string mmu_mode = "sv39";    // sv32/sv39/sv48
+  // ADR-087 §D2: XLEN=32 (isa 默认 rv32im) 下只有 Sv32 合法 => 默认 sv32
+  // (原 sv39 与 schema 自身 allOf 条件 `isa ∈ rv32* ⇒ mmu_mode const sv32` 矛盾)
+  std::string mmu_mode = "sv32";    // sv32/sv39/sv48
 
   // cpu-factory-satp-mapping (v0.10.2): Root page table PPN, 仅 enable_mmu=true 时有效.
   // Default 0 = Bare mode via ADR-049 Bare shortcut (MMUPlugin.cpp:65).

@@ -29,7 +29,7 @@ using cf::plugin::PipeBuilder;
 using cf::cpu::CPUConfig;
 using cf::cpu::TopologyBuilder;
 
-// 默认 CPUConfig (rv64gc, 5 级, 单线程)
+// 默认 CPUConfig (rv32im, 5 级, 单线程)
 static CPUConfig default_config() {
   CPUConfig cfg;
   cfg.isa = "rv32im";

@@ -53,7 +53,7 @@
         "mmu_mode": {
           "type": "string",
           "enum": ["sv32", "sv39", "sv48"],
-          "default": "sv39",
+          "default": "sv32",
           "description": "虚拟内存模式"
         },
         "branch_predictor": {
