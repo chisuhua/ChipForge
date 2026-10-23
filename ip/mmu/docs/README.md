@@ -4,9 +4,11 @@
 |------|------|
 | [README.md](../README.md) | IP 总览（模块定位/目录结构/接口设计/可插拔策略/配置参数） |
 | [STATUS.md](../STATUS.md) | 当前状态（PARTIAL 骨架阶段，2026-06-29） |
-| [architecture.md](architecture.md) | 详细微架构（多级 TLB 数据流 + lib/tlm 分层 + Plugin 范式映射） |
-| [mmu-ptw-architecture.md](mmu-ptw-architecture.md) | **MMU_PTW 架构设计**（设计正文：背景 / 职责边界 / 决策索引 / 数据流与时序 / 替代方案 / 后果 / 实施清单 / 验证命令） |
-| [mmu-l0-l1-tlb-architecture.md](mmu-l0-l1-tlb-architecture.md) | **L0 / L1 TLB 架构设计**（两级 leaf 翻译缓存：L0 全相联 8 项 + L1 组相连 256×8，级联查询 + XOR interleave） |
+| [architecture.md](architecture.md) | **MMU 总架构**（跨 **L0 TLB / L1 TLB / PTW** 三单元的数据流与时序 + 外部对接：satp CSR / fetch-stall protocol / 物理内存 / SoC JSON / TLB↔PTW 接口）|
+| [mmu-l0-tlb-architecture.md](mmu-l0-tlb-architecture.md) | **L0 TLB 架构**（8 项全相联 · 多粒度 · perms + `page_shift` · 1 拍快路径）|
+| [mmu-l1-tlb-architecture.md](mmu-l1-tlb-architecture.md) | **L1 TLB 架构**（256 set × 8 way 组相连 · XOR interleave（基准 16MiB）· 容量与节点预算）|
+| [mmu-ptw-architecture.md](mmu-ptw-architecture.md) | **MMU_PTW 架构**（ADR-085 设计正文：walk FSM / PTWCache 目录项缓存 / 编码判据 / superpage）|
+| [mmu-tlm-architecture.md](mmu-tlm-architecture.md) | **TLM 侧微架构**（MultiLevelTLB 编排 · lib/tlm 分层 · HDL 友好性 · 工厂模式 / 替换策略）|
 | [configuration.md](configuration.md) | 参数 Knobs 详表（对应 `configs/params_schema.json`） |
 | [integration.md](integration.md) | CPU/SoC 集成契约（MMUPlugin at_stage 示例） |
 | [adr/ADR-085-mmu-ptw-architecture.md](adr/ADR-085-mmu-ptw-architecture.md) | **ADR-085 伞索引**（MMU_PTW 架构决策组，登记 D01–D21） |
@@ -54,8 +56,10 @@ ip/mmu/
 │   └── rrip_policy.h
 ├── test/                    # 预留
 └── docs/                    # 本目录
-    ├── architecture.md       # 既有微架构（部分内容被 ADR-085/086 细化）
-    ├── mmu-ptw-architecture.md  # ADR-085 组的设计正文
-    ├── mmu-l0-l1-tlb-architecture.md  # ADR-086 组的设计正文
+    ├── architecture.md       # MMU 总架构（跨 L0/L1/PTW 数据流 + 外部对接）
+    ├── mmu-l0-tlb-architecture.md   # L0 TLB 架构（ADR-086 组）
+    ├── mmu-l1-tlb-architecture.md   # L1 TLB 架构（ADR-086 组）
+    ├── mmu-ptw-architecture.md      # MMU_PTW 架构（ADR-085 组）
+    ├── mmu-tlm-architecture.md      # TLM 侧微架构（MultiLevelTLB + lib/tlm 分层）
     └── adr/                  # ADR-085 / ADR-086 伞索引 + 33 个子 ADR（一决策一文件）
 ```

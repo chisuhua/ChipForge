@@ -4,7 +4,7 @@
 |------|-----|
 | 状态 | 📝 **设计提案**（CH_MEM 前向架构；实装未开始） |
 | 父 ADR | 无；**增量对象** = [ADR-085](ADR-085-mmu-ptw-architecture.md) |
-| 架构文档 | [mmu-l0-l1-tlb-architecture.md](../mmu-l0-l1-tlb-architecture.md) |
+| 架构文档 | [architecture.md](../architecture.md) |
 | 层级 | **IP 级** |
 | 决策编号 | `D11` |
 | 关联验证判据 | — |
@@ -49,10 +49,10 @@
 ⇒ **登记位置**：本组架构文档 §5「与现有架构的关系」显式列出该分叉。
 
 **决策 3 — 命名冲突的处置**：`L0 TLB` / `L1 TLB` 在本组内指 leaf 翻译缓存两级（D01）；而 `ip/mmu/lib/multi_level_tlb.h:25` 与 `soc/mmu_minimal.json:21-23` 的 `L0`/`L1` 指 **TLM 侧 TLB 深度层**（两套并存、语义不同）。
-⇒ 处置：① **TLM 侧不动**（用户已定）⇒ 不改 `multi_level_tlb.h` 注释与 `params_schema.json` 的 `levels[].name`；② 本组文档内一律写全「**L0 TLB**」「**L1 TLB**」并注明"leaf 翻译缓存"；③ **在 `ip/mmu/docs/architecture.md` 的 banner 加一行命名警示**（该文件 §1 的旧图正是 TLM 侧语义）。
+⇒ 处置：① **TLM 侧不动**（用户已定）⇒ 不改 `multi_level_tlb.h` 注释与 `params_schema.json` 的 `levels[].name`；② 本组文档内一律写全「**L0 TLB**」「**L1 TLB**」并注明"leaf 翻译缓存"；③ **在 [总架构文档](../architecture.md) §0/§5 与 [TLM 侧文档](../mmu-tlm-architecture.md) 顶部加命名警示**（2026-10-23 文档重组时已落地）；④ **文档职责重组**：`ip/mmu/docs/architecture.md` 改为**总架构文档**（跨 L0/L1/PTW 数据流 + 外部对接），原 TLM 侧内容外移到 `ip/mmu/docs/mmu-tlm-architecture.md`，L0/L1 各自成文。
 
 ## 交叉引用
 
-- 架构文档：[mmu-l0-l1-tlb-architecture.md](../mmu-l0-l1-tlb-architecture.md)
+- 架构文档：[architecture.md](../architecture.md)
 - 增量对象：[ADR-085](ADR-085-mmu-ptw-architecture.md)
 - 相关决策：[D01](ADR-086-D01-l0-l1-leaf-cache-split.md)、[D02](ADR-086-D02-cascaded-lookup-latency-tiers.md)、[D09](ADR-086-D09-coherence-and-invalidation.md)

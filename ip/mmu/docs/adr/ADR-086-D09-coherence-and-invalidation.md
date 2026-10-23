@@ -4,7 +4,7 @@
 |------|-----|
 | 状态 | 📝 **设计提案**（CH_MEM 前向架构；实装未开始） |
 | 父 ADR | 无；**增量对象** = [ADR-085](ADR-085-mmu-ptw-architecture.md)（D15 / D20） |
-| 架构文档 | [mmu-l0-l1-tlb-architecture.md](../mmu-l0-l1-tlb-architecture.md) |
+| 架构文档 | [architecture.md](../architecture.md) |
 | 层级 | **IP 级** |
 | 决策编号 | `D09` |
 | 关联验证判据 | U-L1-07、U-L1-08、U-L1-09 |
@@ -37,7 +37,7 @@
 
 ## 交叉引用
 
-- 架构文档：[mmu-l0-l1-tlb-architecture.md](../mmu-l0-l1-tlb-architecture.md)
+- 架构文档：[architecture.md](../architecture.md)
 - 增量对象：[ADR-085](ADR-085-mmu-ptw-architecture.md)（D15 只回填 TLB、D20 `satp` flush）
 - 相关决策：[D02](ADR-086-D02-cascaded-lookup-latency-tiers.md)、[D03](ADR-086-D03-l1-hit-backfill-l0.md)、[D08](ADR-086-D08-l0-organization.md)、[D11](ADR-086-D11-relation-to-adr085-and-spec.md)
 - 验证判据：见 [D12](ADR-086-D12-verification-criteria.md)

@@ -1,201 +1,273 @@
-# MMU 微架构
+# MMU 总架构 — L0 TLB / L1 TLB / PTW 三单元的数据流与外部对接
 
-> **⚠️ 部分内容已被 [ADR-085](adr/ADR-085-mmu-ptw-architecture.md) 细化（2026-10-22）**：
->
-> **新架构的设计正文见 [mmu-ptw-architecture.md](mmu-ptw-architecture.md)**；决策本身拆为 [ADR-085 伞索引](adr/ADR-085-mmu-ptw-architecture.md) 下的 **D01–D21 共 21 个子 ADR**（一决策一个文件）。
->
-> - §1 的 "MultiLevelTLB（L0 TLB 8/8 + L1 TLB 64/4 + PTW 3-cycle）" 分层 ⇒ ADR-085 改为 **MMU_TLB（缓存叶 PTE）+ MMU_PTW（缓存页目录项 + walk FSM）** 两单元。
-> - §2.2 的 "PTW 走 3 个 logical stage 接力" ⇒ ADR-085 D9 改为 **单 FSM + `cur_level` 寄存器**（状态集 `{IDLE,REQ,WAIT,DONE,FAULT}`，枚举值与既有 `PtWalkState` 一致）。
-> - §2.1 的 lookup 路径（`PTW_ACTIVE=1` 由 miss 触发）⇒ ADR-085 D12 明确 `PTW_ACTIVE` 必须**组合派生**（`sv_active && !paddr_valid`），不得用 FSM busy 状态。
-> - 权限 / 编码判定 ⇒ ADR-085 D13 裁决按 **RISC-V spec §5.3.2 翻译算法 step 3/4**（`reserved ⟺ V=1 && !R && W`；`leaf ⟺ R || X`）。**现存缺陷在 CH_MEM 侧**：`mmu_ptw_chmem.h:251` 的 `r && w` 会把**合法 RW 叶**判成页错误；TLM 侧 `lib/ptw.cpp:79` 的 `w && !r` **本来就正确**，不需改。
-> - 巨页（superpage）⇒ ADR-085 D14 要求 **PTW 拼接（sv32 shift=22）与 TLB entry 的 `page_shift` 两侧同补**；本文档 §1 图中按 4KiB 写死的 `paddr` 合成已不足。
-> - **生效范围**：ADR-085 是 **CH_MEM 前向架构**（D18 明写 TLM 侧本期不动，除 D13 的共享 helper 抽取）。
-> - 本文档其余部分（§3 HDL 友好性、§5 工厂模式、§6 替换策略、§7 lib/tlm 分层）**仍然有效**。
+| 字段 | 值 |
+|------|-----|
+| 状态 | 📝 **设计提案**（CH_MEM 前向架构）+ 🟡 TLM 侧已落地部分 |
+| 层级 | **IP 级**（随 `ip/mmu/` 存亡） |
+| 决策组 | [ADR-085](adr/ADR-085-mmu-ptw-architecture.md)（MMU_PTW，21 条子决策） + [ADR-086](adr/ADR-086-l0-l1-tlb-architecture.md)（L0/L1 TLB，12 条子决策）|
+| 平台前提 | **Sv39**（3 级页表：VPN[2]/VPN[1]/VPN[0] 各 9 bit + 12 bit 页内偏移）⇒ **需 64-bit XLEN**，见 §4 |
 
-> **⚠️ [ADR-086](adr/ADR-086-l0-l1-tlb-architecture.md) 又一次细化了 TLB 结构（2026-10-23）** —— 设计正文见 [mmu-l0-l1-tlb-architecture.md](mmu-l0-l1-tlb-architecture.md)，决策拆为 **D01–D12 共 12 个子 ADR**：
->
-> - **命名警示（重要）**：本文档 §1 与 §2 描述的 `L0 TLB` / `L1 TLB` 是 **TLM 侧 MultiLevelTLB 的"TLB 深度层"**（`L0 最快最小`），而 **ADR-086 的 `L0 TLB` / `L1 TLB` 是 CH_MEM 侧的两级"leaf 翻译缓存"**（L0 = 8 项全相联 / 4KiB 粒度；L1 = 256 set × 8 way 组相连 / 大页粒度）⇒ **同名不同义**。ADR-086 D11 决策 3 记录了处置（TLM 侧不动；CH_MEM 侧成员名用 `l0_tlb_` / `l1_tlb_`，**不得**复用 `MultiLevelTLB` 名）。
-> - **lookup 语义分叉**：TLM 侧 `MultiLevelTLB` = **并行**查所有层 + 取最深 hit（`openspec/specs/mmu-multi-level-coherence/spec.md` 的 MUST 条款）；ADR-086 的 CH_MEM 侧 = **串行级联** L0→L1→PTW。⇒ **不是违约，是后端分叉**。
-> - **live 配置与 ADR-086 不一致**：`soc/mmu_minimal.json:21-23` 的 `L0`/`L1` 是 **8 entries / assoc 8**（两级都全相联），不是 ADR-086 的 L1 组相连 256×8 ⇒ ADR-086 是**未实装的设计提案**。
-> - ADR-086 只做 **CH_MEM 侧**，TLM 侧不动 ⇒ 本文档 §3~§7 描述的 TLM 侧 lib/ 分层**仍然有效**。
+> **本文档 = 总架构**：只讲**跨 L0 / L1 / PTW 的数据流**、**三单元的职责边界**、**与外部的接口契约**。
+> **各单元内部结构**在子文档里（见 §0）；**决策**在 2 个 ADR 决策组里（33 条子 ADR）。
 
-## 1. 总体数据流
+---
 
-```
-vPC ───► [IBusPlugin] ──fetch stage──► 写 pl::PC ──► MMUPlugin::tlb_lookup_ifetch
-                                                          │
-                                                          ▼
-                                              ┌────────────────────┐
-                                              │ MultiLevelTLB      │
-                                              │ ┌──────────────┐   │
-                                              │ │ L0 TLB (8/8) │   │ hit 1-cycle
-                                              │ │ ~1 cycle     │◄──┤
-                                              │ └──────────────┘   │
-                                              │ ┌──────────────┐   │ miss → trigger PTW
-                                              │ │ L1 TLB (64/4)│   │
-                                              │ │ ~2 cycles    │   │
-                                              │ └──────────────┘   │
-                                              │ ┌──────────────┐   │
-                                              │ │ PTW (3-cycle)│   │ Sv39 3-level walk
-                                              │ │ Sv39: L0/L1/L2│   │
-                                              │ └──────────────┘   │
-                                              └────────────────────┘
-                                                          │
-                                                          ▼
-                                              写 pl::PADDR (hit) / PTW_ACTIVE=0
-                                                          │
-                                                          ▼
-                                                     IBusPlugin 读 pl::PADDR
-                                                     ┌──────────────────┐
-                                                     │  L1I Cache       │
-                                                     └──────────────────┘
-```
+## 0. 阅读路径
 
-类似地，LSU 数据通路走 `tlb_lookup_loadstore` 阶段。
+| 想知道 | 去哪 |
+|--------|------|
+| MMU 总体怎么跑、数据流怎么走 | **本文档 §1–§3** |
+| L0 TLB 内部结构（8 项全相联、多粒度、比较器） | [mmu-l0-tlb-architecture.md](mmu-l0-tlb-architecture.md) |
+| L1 TLB 内部结构（256 set × 8 way、组相连、XOR interleave、容量） | [mmu-l1-tlb-architecture.md](mmu-l1-tlb-architecture.md) |
+| PTW walk FSM / 目录项缓存 / 编码判据 | [mmu-ptw-architecture.md](mmu-ptw-architecture.md)（ADR-085） |
+| TLM 侧（MultiLevelTLB 编排、lib/tlm 分层、HDL 友好性） | [mmu-tlm-architecture.md](mmu-tlm-architecture.md) |
+| 某条决策的完整论证与替代方案 | `adr/ADR-085-D01..D21` / `adr/ADR-086-D01..D12` |
 
-## 2. 多级 TLB 编排（MultiLevelTLB 协议）
+---
 
-详见 [../docs/architecture §3] + 配套 spec `mmu-tlb-coherence-protocol/spec.md`。
-
-### 2.1 Lookup 路径
-```
-MMUPlugin::at_stage("tlb_lookup_ifetch"):
-  result = multi_tlb_->lookup(vpc, asid)
-  if result.hit:
-    写 pl::PADDR = result.paddr
-    清 pl::PTW_ACTIVE
-  else:
-    写 pl::PTW_ACTIVE = 1
-    写 pl::PTW_VADDR = vpc
-    写 pl::PTW_ASID = asid
-    (下游 CtrlLink halt_when 触发 stall)
-```
-
-### 2.2 PTW 路径（logical stage 接力）
-```
-at_stage("ptw_l0"): 读 L0 PTE → 写 pl::PTW_L0_RAW
-at_stage("ptw_l1"): 读 L1 PTE → 写 pl::PTW_L1_RAW
-at_stage("ptw_l2"): 读 L2 PTE → 写 pl::PADDR + 清 PTW_ACTIVE + multi_tlb_->refill_from_ptw()
-```
-
-**重要**：当前 `pb.run()` 是**单次遍历所有 `at_stage` 回调**（无 cycle 精度，Phase 0 framework 限制）。3 个 ptw_l0/l1/l2 是**逻辑阶段拆分**，为 Phase 6 cycle-scheduling 框架升级预留结构。详见 [docs/methodology/plugin-style-design-methodology-v1.md §B3-D4.2]。
-
-## 3. HDL 友好性约束（Phase 5 CppHDL 转换准备）
-
-### 3.1 硬约束（编译期 / 静态检查）
-
-| 约束 | 验证手段 |
-|------|---------|
-| ENTRIES % WAYS == 0 | `static_assert` |
-| ENTRIES > 0 && WAYS > 0 | `static_assert` |
-| `TLB<>` 模板自身不定义新 virtual | 基类 `TLBBase` 是唯一 virtual 入口 |
-| 全 `std::array`，无 `std::vector`（在 TLB 模板内） | 代码审查 + `tools/verify_hdl_friendly.sh` |
-| 无 `std::optional` / `std::variant` | grep 0 匹配 |
-| 无动态分配（new/malloc） | grep 0 匹配 |
-
-### 3.2 软约束（lib/ 严格，tlm/ 宽松）
-
-| 层 | `virtual` 允许 | `std::optional` 允许 | 动态分配 | std::vector |
-|----|--------------|---------------------|---------|-----------|
-| `lib/TLBBase` | ✓ (多态基类) | ✗ | ✗ | ✗ |
-| `lib/TLB<>` 模板 | ✗ (HDL 1:1) | ✗ | ✗ | ✗ (用 std::array) |
-| `lib/MultiLevelTLB` | ✗ (直接持 TLB 实例) | ✗ | ✗ (构造时一次性 resize, 运行期不增删) | ✓ (构造时一次性 resize 持 N 个 TLB unique_ptr, 运行期容量不变) |
-| `lib/PTW` 接口 | ✓ (Strategy 模式) | ✗ | ✗ | ✗ |
-| `tlm/MMUPlugin` | ✓ (PluginBase) | ✓ (lib 内部) | ✓ (Plugin 持成员) | ✓ |
-
-### 3.3 Phase 5 1:1 映射路径
+## 1. 三单元与职责边界
 
 ```
-lib/TLB<ENTRIES, WAYS, TAG_BITS, ASID_BITS, PORTS>
-            ↓ (Phase 5 CppHDL codegen)
-        ch::Component
-            ↓
-        Verilog (Verilator 仿真 / 综合)
+                     ┌────────────────────────────────────────────────┐
+   vaddr ──────────►│  L0 TLB  ·  8 项全相联 · 1 拍 · 多粒度         │──hit──► paddr
+                     │  热点页快路径（全 VPN 直比 / 掩码比，见子文档）   │
+                     └───────────────┬────────────────────────────────┘
+                                     │ miss（同拍 PTW_ACTIVE=1）
+                                     ▼
+                     ┌────────────────────────────────────────────────┐
+                     │  L1 TLB  ·  256 set × 8 way 组相连 · 2 拍     │──hit──► paddr
+                     │  容量扩展 + 大页翻译（per-way page_shift 掩码）   │  （并回填 L0）
+                     │  XOR interleave（基准 16MiB）                  │
+                     └───────────────┬────────────────────────────────┘
+                                     │ miss
+                                     ▼
+                     ┌────────────────────────────────────────────────┐
+                     │  PTW  ·  多周期 walk FSM（ADR-085）            │──► paddr
+                     │  编码/权限判据（D13）+ superpage 拼接（D14）      │    （按粒度回填 L0/L1）
+                     │  可选 PTWCache：缓存**页目录项**（非 leaf）       │
+                     └───────────────┬────────────────────────────────┘
+                                     │ 读物理内存（绕过翻译）
+                                     ▼
+                          物理内存（DMemPlugin 的 ch_mem）
 ```
 
-> **Phase 5 HDL 1:1 映射验证推迟到 `mmu-tlb-ptw-impl` 之后**（forward-looking claim，骨架阶段通过 `tools/verify_hdl_friendly.sh` 静态检查 + `static_assert` 锁死硬约束）。
+| 单元 | 缓存/产出什么 | 组织 | 命中延迟 | 详细文档 |
+|------|--------------|------|:--------:|---------|
+| **L0 TLB** | **leaf 翻译**（`{paddr, perms, page_shift}`）| 8 项**全相联** | 1 拍 | [L0 文档](mmu-l0-tlb-architecture.md) |
+| **L1 TLB** | **leaf 翻译**（多粒度）| 256 set × 8 way **组相连** | 2 拍 | [L1 文档](mmu-l1-tlb-architecture.md) |
+| **PTW** | walk 结果（leaf 翻译）+ 可选**页目录项**缓存 | 5 态 FSM（ADR-085 D09）| 4~6 拍 | [PTW 文档](mmu-ptw-architecture.md) |
 
-## 4. GPU/CPU 兼容性策略
+**职责边界（规范性）**：
 
-| 维度 | 典型 CPU (RISC-V) | 典型 GPU | 配置化字段 |
-|------|-------------------|---------|-----------|
-| `topology` | split_id | unified | `params.topology` |
-| `asid_bits` | 9 (sv39) | 12-16 (VMID) | `params.asid_bits` |
-| `num_lookup_ports` | 1-2 (in-order/OoO) | 4-8 (multi-warp) | `levels[].num_lookup_ports` |
-| `supported_page_sizes` | [4KB, 2MB, 1GB] | [4KB, 64KB, 2MB, 1GB] | `params.supported_page_sizes` |
-| `ptw_max_inflight` | 1-2 | 4-8 (prefetch) | `params.ptw_max_inflight` |
-| `ptw_strategy` | on-demand | prefetch-heavy | (推迟) |
+- **L0 与 L1 存同一种东西**（leaf 翻译）⇒ 差别只在**容量 / 组织 / 延迟** ⇒ L0 miss ⇒ 向 L1 发请求（D02 级联）。
+- **PTWCache 存的是页目录项**，与 L0/L1 **不重叠**（ADR-085 D04）⇒ 三个缓存各自解决不同问题：L0 省**延迟**、L1 省**延迟 + 支持大页**、PTWCache 省**访存次数**。
+- **`PADDR` 只能由 TLB 查表产生**（ADR-085 D15）⇒ PTW 不直接写 `PADDR`，只回填 TLB entry。
+- **PTW 读物理内存时绕过翻译**（ADR-085 D16）⇒ 防递归。
 
-**切换零代码改动** —— 只改 JSON config，lib/ 算法层完全不感知 CPU vs GPU。
+---
 
-## 5. 工厂模式（TLBFactory）
+## 2. 跨 L0 / L1 / PTW 的数据流与时序
 
-```
-JSON config (entries × ways × asid_bits × ports)
-            ↓
-TLBFactory::create(TLBLevelConfig)
-            ↓
-模板特化选择 (if-else 链, 4-7 组典型组合)
-            ↓
-TLB<ENTRIES, WAYS, TAG_BITS, ASID_BITS, PORTS> 实例
-            ↓
-std::unique_ptr<TLBBase> (多态容器, MultiLevelTLB 持有)
-```
+### 2.1 路径 A — L0 命中（1 拍）
 
-**注意**："配置化"是**编译期枚举式** —— `TLBFactory` 在 `tlb_factory.cpp` 的 `if-else` 链显式实例化典型组合，新增组合需修改工厂 + 重编译，**不**是运行时无限制配置。
+| 拍 | 动作 | `PTW_ACTIVE` | `hold` |
+|----|------|:-------------:|:-----:|
+| T | L0 8 路比较 ⇒ 命中 ⇒ `paddr = (pfn << page_shift) \| (vaddr & mask)` ⇒ 写 `PADDR` / `PADDR_VALID=1` | 0 | 0 |
 
-## 6. 替换策略接口（policies/）
+### 2.2 路径 B — L0 miss → L1 命中（2 拍）
 
-```cpp
-template <std::size_t ENTRIES, std::size_t WAYS>
-class TLBReplacementPolicy {
- public:
-  virtual ~TLBReplacementPolicy() = default;
-  virtual void on_access(uint32_t set, uint32_t way) = 0;
-  virtual uint32_t select_victim(uint32_t set) = 0;
-  virtual void on_insert(uint32_t set, uint32_t way) = 0;
-  virtual std::string name() const = 0;
-  static std::unique_ptr<TLBReplacementPolicy> create(const std::string& name);
-};
-```
+| 拍 | 动作 | `PTW_ACTIVE` | `hold` |
+|----|------|:-------------:|:-----:|
+| T | L0 miss ⇒ **`PTW_ACTIVE=1`（同拍，protocol AC-FS-9）** ⇒ 向 L1 发请求 | **1** | 1 |
+| T+1 | L1 组相连比较（per-way 掩码）⇒ 命中 ⇒ 产出 `paddr`（大页拼接）⇒ 按粒度回填 L0 | 1 | 1 |
+| T+2 | `PADDR_VALID=1`，`PTW_ACTIVE=0` ⇒ 释放 | 0 | 0 |
 
-4 种实现：None / FIFO / LRU / RRIP。namespace 隔离：`cf::ip::mmu::policies::` 与 `cf::ip::cache::policies::` 独立。
+### 2.3 路径 C — 双 miss → PTW（4~6 拍）
 
-## 7. lib/ vs tlm/ 分层（核心架构决策）
+| 拍 | 动作 |
+|----|------|
+| T | L0 miss ⇒ `PTW_ACTIVE=1` ⇒ L1 查询 |
+| T+1 | L1 miss ⇒ 交 PTW walk（ADR-085 §4.2 的 `REQ`/`WAIT`/`DONE` 序列） |
+| T+2 ~ T+5 | walk 进行中（`PTW_ACTIVE` 全程 1） |
+| T+6 | `DONE` ⇒ 结果**按粒度**回填（4KiB → L0；2MiB → L1）⇒ `PADDR_VALID=1` |
 
-### 7.1 为什么需要双层
+### 2.4 跨级回填与失效
 
-| 关注点 | lib/ | tlm/ |
-|--------|------|------|
-| HDL 1:1 友好 | ✅ 直接映射 `ch::Component` | ❌ Plugin 框架不直接转 HDL |
-| 单元测试 | ✅ 无 PipeBuilder 依赖 | ❌ 需启动 PipeBuilder |
-| 编译期类型检查 | ✅ 模板特化 | ⚠️ 动态多态 |
-| 业务集成 | ⚠️ 仅纯 C++ API | ✅ `at_stage()` 声明式集成 |
+| 事件 | 动作 | 决策 |
+|------|------|------|
+| L1 命中 | 回填 L0（多粒度 L0 ⇒ 大页 entry 也能回填） | ADR-086 D03 |
+| PTW 成功 | 按粒度回填 L0 或 L1 | ADR-086 D09 |
+| L1 evict | **反向失效** L0 同 `(vaddr, asid)` 副本 | ADR-086 D09 |
+| `satp` 变更 | **两级 flush-all**（`satp_changed` 影子寄存器比较） | ADR-085 D20 + ADR-086 D09 |
+| `sfence.vma` | 精确失效（推迟到 CSR 批次） | ADR-086 D09 |
 
-### 7.2 依赖方向
+### 2.5 hit latency 分档
 
-```
-tlm/MMUPlugin ──include──> lib/{TLB, MultiLevelTLB, PTW, TLBFactory}
-lib/*.h       ──include──> cf::plugin/uint_t.h (位宽 typedef)
-lib/*.h       ──不 include──> cf::plugin/{plugin_base, pipe_builder, payload, ...}
-```
+| 路径 | 延迟 | 占比影响 |
+|------|:----:|---------|
+| L0 命中 | **1 拍** | 绝大多数访问（热点页） |
+| L1 命中 | **2 拍** | 中等命中率（容量扩展 / 大页） |
+| PTW 命中 | **4~6 拍** | 冷启动 |
 
-**`lib/*.h` 0 引用 `cf::plugin::*` 框架符号**（除位宽 typedef），通过 `tools/verify_hdl_friendly.sh` 静态检查。
+⇒ **L0 够大**是这套结构的关键：L0 每多 1 项 ⇒ 1 拍路径的命中率线性提升；L1 命中虽只多 1 拍，但**不回填 L0 就永远 2 拍**（ADR-086 D03）。
 
-### 7.3 与项目其他 IP 的关系
+---
 
-| 参照 | 关系 |
+## 3. 外部对接
+
+### 3.1 CSR `satp`（Sv39 编码）
+
+| 字段 | 位域 | 说明 |
+|------|------|------|
+| `MODE` | `satp[63:60]` | `0000` = Bare；`1000` = Sv39 |
+| `ASID` | `satp[59:44]` | 16 bit（Sv39）；本期位宽预留 |
+| `PPN` | `satp[43:0]` | 根页表基址 PPN（44 bit） |
+
+⇒ **`pt_base` 不设独立寄存器**，取 `satp` 的组合派生视图（ADR-085 D08）⇒ 避免"模式改了但根表地址没改"的静默错误翻译。
+⇒ `satp` 变更 ⇒ 两级 TLB flush-all（§2.4）。
+
+### 3.2 fetch-stall protocol（取指冻结）
+
+| 契约 | 内容 | 归属 |
+|------|------|------|
+| `PTW_ACTIVE` | **组合派生** = `sv_active && !paddr_valid`（不是 FSM busy 状态） | ADR-085 D12 |
+| miss 检出拍 | `PTW_ACTIVE` **同拍**为 1（AC-FS-9）⇒ **L0 miss 即置位** | ADR-086 D02 |
+| 窗口 | protocol **AC-FS-15 ②**（按取指事实定义，含 FAULT 拍） | ADR-085 D12 |
+| 结构反回归 | protocol **AC-FS-16 ①**（`PTW_ACTIVE` 写语句的 RHS token 白名单 W1） | ADR-085 D12 |
+
+⚠ **协议必须升 rev.15**（ADR-085 D13）：AC-FS-15 ② 当前把 `V=1 && R=1 && W=1` 钉为"权威坏 PTE"并注"以代码为准"⇒ **protocol 正在把 bug 变成验收判据**。
+
+### 3.3 物理内存（PTW 的读端口）
+
+- PTW 读的是**物理地址** ⇒ 读端口**绕过 MMU 翻译**（防递归，ADR-085 D16）。
+- CH_MEM 侧需要 `DMemPlugin` 暴露 `ch_mem& mem()`（当前 `mem_` 是 private 且惰性创建，MMU 的 `("fetch", EARLY)` 拿不到句柄）。
+- **所有权**：归 `DMemPlugin`（创建者）；MMU 只持**非拥有引用**，句柄在 `setup()` 阶段取（ADR-085 D21）。
+
+### 3.4 TLB ↔ PTW 接口
+
+| 方向 | 字段 |
 |------|------|
-| `ip/cpu/core/` | 框架无关算法层（与 `ip/mmu/lib/` 同层） |
-| `ip/cpu/plugins/` | ISA 无关 Plugin 层（与 `ip/mmu/tlm/` 同层） |
-| `ip/cpu/arch/riscv/` | ISA 特定 adapter（与 `ip/cpu/plugins/mmu.h::RiscvMMUPlugin` 同层） |
-| `ip/cache/policies/` | 替换策略抽象（与 `ip/mmu/policies/` 同构） |
-| `ip/cache/plugins/L1CachePlugin.h` | Plugin-style 业务 IP 先例（同构） |
+| 请求（TLB → PTW）| `vaddr`(XLEN) / `asid` / `access_type`(2b: load/store/ifetch) |
+| 响应（PTW → TLB）| `paddr`(XLEN) / `perms`(4b) / `fault_code`(8b: 0 / 12 / 13 / 15) |
 
-## 8. 实施里程碑
+⇒ 同拍发起、无握手延迟；PTW 忙时请求**丢弃**（不排队），下拍重试（ADR-086 D01 / ADR-085 D11）。
 
-| 阶段 | 内容 | change |
-|------|------|--------|
-| **mmu-ip-skeleton** (本 change) | 目录骨架 + lib/ 接口 + tlm/ Plugin 入口 + policies/ 策略 + Config schema + 5 测试文件 | 2026-06-29 |
-| **mmu-tlb-ptw-impl** (下一 change) | TLB lookup/insert 算法 + PTW Sv32/Sv39/Sv48 解码 + MMUPlugin at_stage 闭包实装 + CtrlLink halt_when PTW stall | (待) |
-| Phase 5+ | CppHDL 转换 + rtl/ 目录填充 | (Phase 5+) |
+### 3.5 SoC JSON 配置
+
+| 配置项 | 默认 | 说明 |
+|--------|------|------|
+| `params.asid_bits` | 9 | Sv39 的 ASID 位宽（本期只预留） |
+| `params.sv_mode` | `Sv39` | 目标模式（见 §4） |
+| `params.supported_page_sizes` | `[4096, 2097152]` | 4KiB + 2MiB（**本期不含 1GiB**） |
+| `params.l1.sets` / `.ways` / `.epl` | 16 / 4 / 8 | L1 组织（本期 P0；目标 256/8/8） |
+| `params.l0.entries` | 8 | L0 全相联项数 |
+| `params.levels[]` | 保留 | **TLM 侧** MultiLevelTLB 的层级配置（CH_MEM 侧不消费） |
+
+### 3.6 与其它 IP 的边界
+
+| 外部 | 边界 |
+|------|------|
+| **L1Cache** | 消费 `PADDR` / `PADDR_VALID`；MMU 不感知 cache（VIPT 安全条件见 ADR-044） |
+| **CPU（fetch）** | `IBusPlugin` 的 `pc_reg` ⇒ `("fetch", EARLY)` 闭包 ⇒ MMU；MMU ⇒ `PADDR` / `PTW_ACTIVE` |
+| **CPU（LSU）** | `("loadstore", NORMAL)` 闭包 ⇒ MMU 的 loadstore 端口 |
+| **Trap** | `EXCEPTION_CODE` cell 的消费侧**推迟**到 trap 批次（ADR-085 D19.1 的 L2） |
+
+---
+
+## 4. 平台前提 —— Sv39 ⇒ **需 64-bit XLEN**（⚠ 当前全仓是 32-bit）
+
+**目标模式**：Sv39，39 位有效虚拟地址 = `VPN[2]`(9) + `VPN[1]`(9) + `VPN[0]`(9) + 页内偏移(12)
+
+| 位域 | 宽度 | 含义 |
+|------|-----:|------|
+| `vaddr[38:30]` | 9 | **顶级**页目录索引（`VPN[2]`，根表） |
+| `vaddr[29:21]` | 9 | **中间**页目录索引（`VPN[1]`） |
+| `vaddr[20:12]` | 9 | **页表**索引（`VPN[0]`，叶表） |
+| `vaddr[11:0]` | 12 | 页内偏移（4 KiB 页） |
+
+**页大小**（Sv39）：
+
+| 粒度 | 叶 PTE 所在级 | `page_shift` | VA 跨度 |
+|------|---------------|-------------:|--------:|
+| **4 KiB** | `VPN[0]`（叶表） | 12 | `vaddr[11:0]` |
+| **2 MiB** | `VPN[1]`（中间表） | 21 | `vaddr[20:0]` |
+| 1 GiB | `VPN[2]`（根表） | 30 | `vaddr[29:0]` —— **本期不考虑** |
+
+**⚠ 前置条件（当前不满足）**：Sv39 定义在 **RV64** 上；**全仓当前是 32-bit**：
+
+| 位置 | 现状 |
+|------|------|
+| `ip/mmu/plugins/MMUPlugin_chmem.h:81` | `kXlenBits = 32` |
+| `ip/cpu/plugins/mmu_ptw_chmem.h:151` | `kXlenBits = 32` |
+| `ip/cpu/plugins/dmem_chmem.h:34` / `ibus_chmem.h:36` | `kXlenBits = 32` |
+| `ip/cpu/cpu_factory_chmem.h:63` | `kXlenBits = 32`（注释 `// RV32 PoC`） |
+
+⇒ **平台升级到 RV64 是本架构的前置条件**，影响面：地址位宽（`kXlenBits` 5 处）、`satp` 编码（Sv39 64-bit 布局）、PTW 的 3 级 VPN 提取、`paddr` 宽度（Sv39 PPN 44 bit）、`TLBEntry` 的 `TAG_BITS`（27）/ `pfn`（44）。
+⇒ 该升级**不属本组范围**，登记为 §7 的 **R1**（最高等级）。
+
+---
+
+## 5. 与既有架构的关系
+
+| 既有物 | 关系 |
+|--------|------|
+| **ADR-085**（MMU_PTW 架构） | 本组的上游决策组（21 条子 ADR）—— 定义 PTW 侧；**不回改**，ADR-086 的 delta 见 [D11](adr/ADR-086-D11-relation-to-adr085-and-spec.md) |
+| **ADR-086**（L0/L1 TLB 架构） | 本组定义 L0/L1（12 条子 ADR）—— **只做 CH_MEM 侧** |
+| **TLM 侧 `MultiLevelTLB`** | ⚠ **语义分叉**：TLM = **并行**查所有层 + 取最深 hit（`openspec/specs/mmu-multi-level-coherence/spec.md` 的 MUST 条款）；CH_MEM = **串行级联**。spec 约束的是 TLM 侧 C++ 类 ⇒ **不是违约，是后端分叉**。CH_MEM 侧成员名用 `l0_tlb_` / `l1_tlb_`，**不得**复用 `MultiLevelTLB` |
+| **`ip/mmu/docs/architecture.md`（本文件）** | 2026-10-23 重组：原 TLM 侧内容外移到 [mmu-tlm-architecture.md](mmu-tlm-architecture.md) |
+| **ADR-040 v2.0** | §10.5 payload key 必须 mode-aware；`array_store` 双缓冲 |
+| **ADR-046** | 多周期 FSM 豁免（PTW walk） |
+| **ADR-083** | Plugin-style SSOT ⇒ CH_MEM 新文件落 `ip/mmu/plugins/`（不放 `tlm/`） |
+| **ADR-049** | MMU PADDR 契约 + MemoryInterface —— D15「`PADDR` 只由查表产生」是其在 CH_MEM 侧的落地 |
+| **ADR-076**（规划中） | ASID vs 全局 TLB 冲刷 —— 与 `satp` flush-all 的粗粒度限制主题相邻 |
+
+---
+
+## 6. 决策路由索引
+
+| 决策组 | 编号 | 主题 | 归属文档 |
+|--------|------|------|---------|
+| [ADR-085](adr/ADR-085-mmu-ptw-architecture.md) | D01–D21 | PTW walk FSM / 目录项缓存 / 编码判据 / superpage / 失效 / 验证 | [mmu-ptw-architecture.md](mmu-ptw-architecture.md) |
+| [ADR-086](adr/ADR-086-l0-l1-tlb-architecture.md) | D01 | 两级 leaf 缓存的职责划分 | 本文档 §1 |
+| | D02 | 级联 lookup 与 latency 分档 | 本文档 §2 |
+| | D03 | L1 命中回填 L0 | 本文档 §2.4 |
+| | D04–D07 | L1 组织参数 / set index / 粒度与掩码比较 / entry 字段 | [L1 文档](mmu-l1-tlb-architecture.md) |
+| | D08 | L0 组织 | [L0 文档](mmu-l0-tlb-architecture.md) |
+| | D09 | 跨级一致性与失效 | 本文档 §2.4 |
+| | D10 | 容量与节点预算 | [L1 文档](mmu-l1-tlb-architecture.md) |
+| | D11 | 与 ADR-085 / openspec spec 的关系 | 本文档 §5 |
+| | D12 | 验证判据 | [L0](mmu-l0-tlb-architecture.md) + [L1](mmu-l1-tlb-architecture.md) |
+
+---
+
+## 7. 风险登记（跨单元）
+
+| ID | 风险 | 等级 | 缓解 |
+|----|------|:----:|------|
+| **R1** | **平台前提不满足**：Sv39 需 64-bit XLEN，而全仓是 32-bit（5 处 `kXlenBits = 32`）⇒ 架构实现前必须先做 RV64 升级 | **高** | 登记为**前置条件**；本组不擅自扩到 RV64；实现 change 必须先有 RV64 基础 |
+| **R2** | **`PTW_ACTIVE` 置位点前移**：从"TLB miss"变成"L0 miss" ⇒ protocol 的窗口定义需重述（虽判据口径不变） | 中 | ADR-086 D02 已定义分档；protocol 升 rev.15 时一并核对 AC-FS-15 ② |
+| **R3** | **三个缓存的一致性面**（L0 / L1 / PTWCache）⇒ 逐出/失效遗漏 ⇒ 陈旧命中 | 中 | §2.4 的 4 条路径 + `U-L1-07/08` 判据 + 变异对照 ⑤/⑥ |
+| **R4** | **L1 命中比 L0 慢 1 拍** ⇒ 若不回填 L0，L1 容量收益被延迟抵消 | 中 | ADR-086 D03（回填）+ §2.5 的分档 |
+| **R5** | **PTW 侧尚未实装**（`PTW_ACTIVE` / `EXCEPTION_CODE` 恒 0）⇒ 双 miss 路径难端到端验证 | 中 | 先做 L0/L1 命中路径（桩驱动 PTE），PTW 随 ADR-085 的 change 落地 |
+| **R6** | **命名冲突**：`L0`/`L1` 在 TLM 侧是"深度层"、在 ADR-086 是"leaf 缓存级" | 低 | 本文档 §0 的路径表 + [TLM 文档](mmu-tlm-architecture.md) 顶部的警示 + CH_MEM 侧成员名 `l0_tlb_`/`l1_tlb_` |
+| **R7** | **L1 节点数**（目标 256×8 ⇒ ~1.6~4.9 万 `ch_reg`）⇒ CH_MEM 全量测试时长上升（基线 833 s/轮） | 中 | ADR-086 D10：本期 P0 = 16×4×8 = 512 entry；entry 打包成 1 个 `ch_uint<64>`（节点 ÷3） |
+
+---
+
+## 8. 验证命令
+
+```bash
+# 架构门禁（5 个）
+bash tools/verify_adr.sh
+bash tools/verify_plugin_decision.sh
+bash tools/check_plugin_portability.sh
+bash tools/doc_link_check.sh
+bash tools/roadmap-r9-check.sh
+
+# 回归
+./build/bin/chipforge_tests "[mmu]"                            # TLM
+./build/bin/chipforge_tests_chmem "[mmu-chmem-basic]"          # CH_MEM
+bash tools/run_chipforge_tests.sh --all                        # 全量（CH_MEM ~833s/轮）
+```
+
+各单元的结构性检查命令见 [L0 文档](mmu-l0-tlb-architecture.md) / [L1 文档](mmu-l1-tlb-architecture.md) / [PTW 文档](mmu-ptw-architecture.md) 的验证命令段。

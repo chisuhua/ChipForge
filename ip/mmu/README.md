@@ -73,7 +73,7 @@ ip/mmu/tlm/    # Plugin 框架集成, 依赖 cf::plugin::*
                 # 持 lib/ 算法为成员, at_stage 闭包内调用
 ```
 
-> **为什么这样切分**：`cf::plugin::PluginBase` 包含 `tick() = delete`、`at_stage()` 调度、`Payload<T>` 类型擦除等，这些都不是 HDL 1:1 映射对象。`lib/` 与 Plugin 框架解耦，保证 TLB/PTW 算法可独立测试、Phase 5 CppHDL 转换零阻力。详见 [docs/architecture.md §7](docs/architecture.md)。
+> **为什么这样切分**：`cf::plugin::PluginBase` 包含 `tick() = delete`、`at_stage()` 调度、`Payload<T>` 类型擦除等，这些都不是 HDL 1:1 映射对象。`lib/` 与 Plugin 框架解耦，保证 TLB/PTW 算法可独立测试、Phase 5 CppHDL 转换零阻力。详见 [docs/mmu-tlm-architecture.md §7](docs/mmu-tlm-architecture.md)。
 
 ## 4. 接口设计
 
@@ -143,7 +143,11 @@ vaddr → MMUPlugin::at_stage("tlb_lookup_loadstore") → 写 pl::PADDR → DBus
 - `tests/mmu/test_mmu_plugin.cpp` —— 启动 PipeBuilder 验证 at_stage 集成 (5 tests)
 
 ## 8. 相关文档
-- [docs/architecture.md](docs/architecture.md) — 详细微架构 / lib/tlm 分层 / Plugin 范式映射
+- [docs/architecture.md](docs/architecture.md) — **MMU 总架构**（跨 L0 TLB / L1 TLB / PTW 的数据流 + 外部对接）
+- [docs/mmu-l0-tlb-architecture.md](docs/mmu-l0-tlb-architecture.md) — L0 TLB 架构（8 项全相联 + 多粒度）
+- [docs/mmu-l1-tlb-architecture.md](docs/mmu-l1-tlb-architecture.md) — L1 TLB 架构（256 set × 8 way 组相连）
+- [docs/mmu-ptw-architecture.md](docs/mmu-ptw-architecture.md) — MMU_PTW 架构（ADR-085）
+- [docs/mmu-tlm-architecture.md](docs/mmu-tlm-architecture.md) — TLM 侧微架构 / lib-tlm 分层 / Plugin 范式映射
 - [docs/configuration.md](docs/configuration.md) — Knobs 详表
 - [docs/integration.md](docs/integration.md) — CPU/SoC 集成契约
 - [docs/methodology/plugin-style-design-methodology-v1.md](../../docs/methodology/plugin-style-design-methodology-v1.md) — D4 范式方法学
