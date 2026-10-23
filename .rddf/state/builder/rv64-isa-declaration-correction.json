@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "rv64-isa-declaration-correction",
-  "current_phase": "phase-2",
+  "current_phase": "phase-2.5",
   "approval_status": "approved",
   "plan_quality_status": "approved",
   "p0_decision": {
@@ -51,7 +51,10 @@
     ],
     "cross_repo_pending": [],
     "deps_analysis": {
-      "candidates": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "candidates": [
+        "rv64-isa-declaration-correction",
+        "chmem-tlm-backend-freeze"
+      ],
       "report": ".rddf/state/.deps-output.md",
       "ai_result": ".rddf/state/.deps-ai-result.json",
       "file_conflicts": [],
@@ -59,12 +62,15 @@
         "chmem-tlm-backend-freeze 依赖本 change：① ADR-088 §5 待办实体是本 change 的 Task 8 护栏；② B 的冻结门禁 baseline 快照必须晚于本 change（否则 ip/cpu/cpu_factory.h 新增的 validate_isa_xlen 被判假阳性）"
       ],
       "incoming_soft_deps": [],
-      "recommended_order": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"]
+      "recommended_order": [
+        "rv64-isa-declaration-correction",
+        "chmem-tlm-backend-freeze"
+      ]
     }
   },
   "worktree_path": "",
   "branch": "feature/rv64-isa-declaration-correction",
-  "execution_status": "pending-critic-final-review",
+  "execution_status": "completed",
   "review_status": "pending",
   "retry_count": 0,
   "max_retries": 3,
@@ -75,9 +81,15 @@
       "event": "approved",
       "at": "2026-10-23T05:50:00Z",
       "note": "case-1 approve；proposal.md + specs/cpu-isa-xlen-contract/spec.md 已生成，openspec validate 0 error"
+    },
+    {
+      "phase": "phase-2",
+      "event": "executed",
+      "at": "2026-10-23T09:55:00Z",
+      "note": "13 Task 全部完成; 6 批 commit (0ae4826..749ed2c + 台账批); 失败集合恰为 1 个 pre-existing (test_7stage_riscv.cpp:124); 6 门禁全绿; [cpu] 133 / chmem binary 130 / 485=484+1"
     }
   ],
   "archive_status": "pending",
   "verifier_report_path": "",
-  "updated_at": "2026-10-23T05:50:00Z"
+  "updated_at": "2026-10-23T09:55:00Z"
 }
