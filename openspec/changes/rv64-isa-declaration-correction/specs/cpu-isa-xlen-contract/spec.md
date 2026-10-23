@@ -4,22 +4,32 @@
 
 ### Requirement: cpu-isa-xlen-contract
 
-`CPUConfig::isa` 与 `CPUConfig::xlen` 必须构成可校验契约：默认 `isa == "rv32im"`、`xlen == 32`；`isa` 含 rv64 且 `xlen != 64` 时必须在配置装载/工厂实例化路径**运行时 fail-fast**（抛异常或返回错误，禁止静默降级）；`isa` 三态语义（implemented / declared-reserved / unsupported）在 schema 中显式标注，declared-reserved 取值必须 emit 一次 warning。
+`CPUConfig::isa` 与 `CPUConfig::xlen` 必须构成可校验契约（ADR-087 §D1 三态 + §D2 映射；语义分解见本 change design.md Decision 1）：默认 `isa == "rv32im"`、`xlen == 32`；unsupported 取值在配置装载/工厂实例化路径**运行时 fail-fast**；implemented 态与 `xlen` 一致性冲突 fail-fast；`build_cpu<T>` 交叉校验 `xlen != sizeof(T)*8` 时 fail-fast；declared-reserved 取值（含 `rv64i/rv64gc`）被接受但必须 emit 一次显式 warning（禁止静默）。
 
-#### Scenario: 声明与实现一致（implemented 态）
+#### Scenario: 声明与实现一致（implemented 态默认值）
 
-- **WHEN** 使用 `CPUConfig{}` 默认构造（或装载 `isa="rv32im"` 的 JSON）
-- **THEN** `isa == "rv32im"` 且 `xlen == 32`，配置装载与 `build_cpu()` 正常完成，无 warning 无异常
+- **WHEN** 使用 `CPUConfig{}` 默认构造（或装载 `isa="rv32im"` 的 JSON，未显式设置 xlen）
+- **THEN** `isa == "rv32im"` 且 `xlen == 32`，`build_cpu()` 正常完成，无 warning 无异常
 
-#### Scenario: isa/xlen 不一致 fail-fast
+#### Scenario: unsupported 取值 fail-fast
 
-- **WHEN** 装载 `isa` 含 "rv64" 且 `xlen == 32` 的配置
-- **THEN** `load_config()` / `CpuFactory::build_cpu()` 抛异常或返回错误，错误信息指出 isa↔xlen 不一致（不静默、不降级）
+- **WHEN** 装载 `isa="rv128i"`（schema enum 与 reserved 全集之外）
+- **THEN** `load_config()` / `CpuFactory::build_cpu()` 抛 `std::invalid_argument`，错误信息指出 unsupported isa（不静默、不降级）
+
+#### Scenario: implemented 态一致性冲突 fail-fast
+
+- **WHEN** 显式装载 `isa="rv32im"`（implemented）且 `xlen=64`
+- **THEN** `CpuFactory::build_cpu()` 抛 `std::invalid_argument`（implemented ⇒ xlen 必须 32）
+
+#### Scenario: 模板 T 与 xlen 交叉校验 fail-fast
+
+- **WHEN** `xlen=64`（如 reserved 值派生态）且 `CpuFactory<uint32_t>::build_cpu()` 被调用
+- **THEN** `build_cpu()` 抛 `std::invalid_argument`（运行时层兜底；`CpuFactory<uint64_t>` 编译层面由 int_alu/branch `static_assert` 拒绝，见下一条 Requirement）
 
 #### Scenario: declared-reserved 不静默
 
-- **WHEN** 装载 `isa="rv64gc"`（declared-reserved 态）
-- **THEN** 配置被接受但 emit 一次显式 warning，不重复刷屏
+- **WHEN** 装载 `isa="rv32imac"`（或运行时直接构造）并在 CpuFactory<uint32_t> 下 build
+- **THEN** 配置被接受、build 正常完成，且 emit 恰好一次 warning（`std::cerr` 单行，含 isa 值与 ADR-087 §D1 指引），不 throw、不重复刷屏
 
 ### Requirement: cpu-isa-compile-time-template-guard
 

@@ -45,7 +45,7 @@ adr:
 ### In Scope（10 项）
 
 1. `ip/cpu/cpu_factory.h` —— `CPUConfig::isa` 默认 `rv64gc` → `rv32im`；新增 `std::uint8_t xlen = 32;`；新增 `isa → xlen` 映射 + **运行时 fail-fast** 一致性检查（`isa` 为运行期 `std::string`（`:127`，值来自 JSON 装载），编译期校验不成立；fail 落点在 `load_config()`/`build_cpu()`，形态与 D1 `unsupported` 同）
-2. `ip/cpu/configs/cpu_params_schema.json` —— 新增 `xlen` 属性（enum 32/64）；`isa` enum 三态标注（implemented / declared-reserved / unsupported）；default `rv32im`
+2. `ip/cpu/configs/cpu_params_schema.json` —— 新增 `xlen` 属性（enum 32/64）；`isa` enum 收窄至 `["rv32i","rv32im","rv32imac"]`，`rv64i`/`rv64gc` 从 enum 移到 description（**declared-reserved 值文档化**；运行时 reserved-warn 语义不变，机器校验层只覆盖可生效取值）；default `rv32im`
 3. `ip/cpu/configs/{cpu_default,cpu_deep_pipeline,cpu_superscalar}.json` —— `isa` → `rv32im`
 4. `ip/cpu/configs/cpu_embedded.json` —— `rv32imac` → `rv32im`（A 扩展未实现）
 5. `tools/cpu_sim/main.cpp` —— 移除 `isa="rv32i"` 显式 pin（`:16` 注释 + `:188` 赋值），改为跟随 config
@@ -53,7 +53,8 @@ adr:
 7. **D4 提前落地**（TLM 侧护栏，与 TLM 退役决策正交）—— `ip/cpu/arch/riscv/int_alu.h` / `branch.h` 模板运算入口函数体首行加 `static_assert(sizeof(T) == 4, "RV32 TLM path assumes 32-bit XLEN; RV64 requires the phase-5 block gate see ADR-087 G3")`；**必须放模板入口内**（实例化点触发），不得放文件作用域（否则 include 即误伤）；`mul.h` / `mul_div_fsm.h` 归 Change 2（phase-5）
 8. `ip/cpu/docs/rv64_readiness_gap.md` —— 入 `ip/cpu/docs/README.md` 索引
 9. `docs/architecture/adr.md` —— ADR-087 注册（architect 阶段已落地，见 §Impact）
-10. CI 软门禁 —— "新增 XLEN 假设必须登记缺口表" 提示（warn 级）
+10. CI 软门禁 —— "新增 XLEN 假设必须登记缺口表" 提示（warn 级；新脚本 `tools/check_xlen_hygiene.sh`，以缺口表 §5 的 9 处定义点为 allowlist，出现新硬编码假设 → warn 输出 `文件:行`）
+11. **连带纠偏**（design D4）：`tools/dse/sweep_config.example.json:8` 的 sweep grid `["rv32i","rv64i"]` → `["rv32i","rv32im"]`（DSE 示例不再诱导 reserved 值）。**测试零改动**：test_7stage/test_10stage 的 6 处 `isa="rv64gc"` 与 test_3stage 的 `rv32imac` 按 ADR-087 §D1 落 declared-reserved warn 路径，行为零变化（design.md Decision 1）
 
 ### Out of Scope
 
@@ -129,6 +130,7 @@ isa 含 "rv32" ⇒ xlen = 32
 | `tools/cpu_sim/main.cpp` | 改 | 移除 pin；行为改为跟随 config |
 | `ip/cpu/plugins/reg_file.cpp` | **删** | 81 行死代码；无 CMake 引用（实测 `grep -rn "reg_file" --include=CMakeLists.txt` = 0） |
 | `ip/cpu/arch/riscv/int_alu.h` / `branch.h` | 改 | 模板入口 `static_assert(sizeof(T)==4)`；0 断言语义变化、纯护栏 |
+| `tools/dse/sweep_config.example.json` | 改 | sweep grid `rv64i` → `rv32im`（design D4 连带纠偏） |
 | `ip/cpu/docs/rv64_readiness_gap.md` | 改 | §2 状态列更新 |
 | `ip/cpu/docs/README.md` | 改 | 缺口表入索引（已落地） |
 | `docs/architecture/adr.md` | 改 | ADR-087 注册（已落地） |
@@ -142,7 +144,7 @@ isa 含 "rv32" ⇒ xlen = 32
 
 ## Acceptance
 
-- [ ] `CPUConfig{}` 默认 `isa == "rv32im"` 且 `xlen == 32`；`isa` 含 rv64 且 `xlen == 32` ⇒ **运行时 fail-fast**（配置装载/工厂实例化抛异常或返回错误，非静默）
+- [ ] 三层 fail-fast 语义生效（design.md Decision 1，ADR-087 §D1 为准）：① 默认 `CPUConfig{}` `isa == "rv32im"` 且 `xlen == 32`（不 throw 不 warn）；② `isa="rv128i"`（unsupported）⇒ **throw**；③ implemented 态冲突（`isa="rv32im"` + `xlen=64`）⇒ **throw**；④ `build_cpu<T>` 中 `xlen != sizeof(T)*8` ⇒ **throw**；⑤ declared-reserved（`rv32imac`）⇒ **接受 + 一次 warning**（std::cerr，非静默）
 - [ ] `CpuFactory<uint64_t>` 实例化**编译失败**（`int_alu.h`/`branch.h` 守卫生效；变异对照：把 `branch.h` 断言临时改 `8` 应仍失败 `[cpu]` 编译 —— 证明守卫在实例化点生效）
 - [ ] `grep -rn '"rv64' ip/cpu/configs/ soc/` 返回 **0**；schema 中 `rv64i` / `rv64gc` 不再是默认值（可保留于 enum 的 reserved 态）
 - [ ] `tools/cpu_sim` 不再出现 `isa="rv32i"` 硬编码；`--isa` 参数（若存在）行为与 config 一致
