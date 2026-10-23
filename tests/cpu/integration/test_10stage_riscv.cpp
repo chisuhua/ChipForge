@@ -34,7 +34,7 @@ using T = std::uint32_t;
 TEST_CASE("build_10stage_deep", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_deep";
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 10;
   cfg.mul_latency = 5;  // 5 级子流水 (M5.14)
   cfg.branch_predictor = "tournament";  // 10-stage 推荐 tournament
@@ -101,7 +101,7 @@ TEST_CASE("10stage_topology_from_config", "[cpu-integration]") {
 TEST_CASE("10stage_mul_latency_5", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_mul5";
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 10;
   cfg.mul_latency = 5;  // 触发 mul_s1..mul_s4 substage (M5.14)
   cfg.branch_predictor = "tournament";
@@ -117,7 +117,7 @@ TEST_CASE("10stage_mul_latency_5", "[cpu-integration]") {
 TEST_CASE("EnableMMU10StageDeepPipeline", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_10stage_mmu";
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 10;
   cfg.mul_latency = 5;
   cfg.branch_predictor = "tournament";

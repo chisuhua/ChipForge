@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -124,7 +125,13 @@ namespace cpu {
 struct CPUConfig {
   // 基本信息
   std::string name = "RiscvCpu";
-  std::string isa = "rv64gc";       // rv32i/rv32im/rv32imac/rv64i/rv64gc
+  // ADR-087 §D1: 三态语义 implemented=rv32i/rv32im, declared-reserved=rv32imac/rv64i/rv64gc
+  // 之外的取值 = unsupported (validate_isa_xlen fail-fast)。默认 = 实际实现水平。
+  std::string isa = "rv32im";
+  // ADR-087 §D2: XLEN 数据字段 (默认 32)。与 isa 的关联校验见
+  // cf::cpu::detail::validate_isa_xlen。xlen 与 ISA 扩展字母正交
+  // (rv32imac 的 A/C 与 xlen 无关)。
+  std::uint8_t xlen = 32;
   std::uint8_t pipeline_stages = 5; // 1-12, 默认 5 级
   std::uint32_t clock_freq_mhz = 100;
 
@@ -174,6 +181,55 @@ struct CPUConfig {
   enum class MulImpl : std::uint8_t { LEGACY = 0, FSM = 1 };
   MulImpl mul_impl = MulImpl::LEGACY;
 };
+
+// ----------------------------------------------------------------------------
+// ADR-087 §D1/D2 — isa/xlen 契约校验 (rv64-isa-declaration-correction)
+// 唯一入口: build_cpu() 首行调用; 三层语义 (design.md Decision 1):
+//   ① unsupported isa 值 ⇒ throw
+//   ② implemented (rv32i/rv32im) 与 xlen=32 冲突 ⇒ throw
+//   ③ build_cpu<T> 交叉校验 xlen != sizeof(T)*8 ⇒ throw
+//   ④ declared-reserved (rv32imac/rv64i/rv64gc) ⇒ 接受 + 一次 cerr warning
+// kernel_xlen = sizeof(T)*8 (build_cpu 泛化入口的运行期兜底;
+// CpuFactory<uint64_t> 主防线是 int_alu.h/branch.h 的编译期 static_assert)
+// ----------------------------------------------------------------------------
+namespace detail {
+
+inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen) {
+  const std::string& isa = config.isa;
+  if (isa == "rv32i" || isa == "rv32im") {
+    if (config.xlen != 32) {
+      throw std::invalid_argument(
+          "CpuFactory: isa=\"" + isa + "\" (implemented) requires xlen=32, got " +
+          std::to_string(config.xlen) + " (ADR-087 §D1)");
+    }
+    if (kernel_xlen != 32) {
+      throw std::invalid_argument(
+          "CpuFactory: xlen=32 (rv32i/rv32im) but kernel T is " +
+          std::to_string(kernel_xlen) +
+          "-bit; instantiate CpuFactory<uint32_t> (ADR-087 §D1)");
+    }
+    return;
+  }
+  if (isa == "rv32imac" || isa == "rv64i" || isa == "rv64gc") {
+    std::cerr << "[declared-reserved] isa=\"" << isa
+              << "\" 未实现（预案 v1.x），配置被接受但不参与 dispatch（ADR-087 "
+                 "§D1）"
+              << std::endl;
+    if (kernel_xlen != config.xlen) {
+      throw std::invalid_argument(
+          "CpuFactory: xlen=" + std::to_string(config.xlen) +
+          " mismatch with kernel T (" + std::to_string(kernel_xlen) +
+          "-bit); instantiate CpuFactory<uint32_t> (ADR-087 §D1)");
+    }
+    return;
+  }
+  throw std::invalid_argument(
+      "CpuFactory: unsupported isa=\"" + isa +
+      "\"; implemented=rv32i/rv32im, declared-reserved=rv32imac/rv64i/rv64gc "
+      "(ADR-087 §D1)");
+}
+
+}  // namespace detail
 
 // ----------------------------------------------------------------------------
 // TopologyBuilder<N_STAGES> —— 编译期流水线拓扑展开器 (M5-DSE M5.10)
@@ -318,6 +374,7 @@ class CpuFactory {
       cf::cpu::PicolibcHostMemory* mem = nullptr) {
     // ADR-048: reset canonical ordering counters at each build_cpu entry
     cf::cpu::detail::reset_canonical_counters();
+    cf::cpu::detail::validate_isa_xlen(config, sizeof(T) * 8);  // ADR-087 §D1/D2
     auto pb = std::make_unique<cf::plugin::PipeBuilder>();
 
     // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 必须在 register_early_plugins 之前注册,

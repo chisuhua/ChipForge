@@ -31,7 +31,7 @@ using T = std::uint32_t;
 TEST_CASE("build_3stage", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_3stage";
-  cfg.isa = "rv32imac";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 3;
   cfg.clock_freq_mhz = 50;
   cfg.enable_mmu = false;

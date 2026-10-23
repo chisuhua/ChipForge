@@ -32,7 +32,7 @@ using cf::cpu::TopologyBuilder;
 // 默认 CPUConfig (rv64gc, 5 级, 单线程)
 static CPUConfig default_config() {
   CPUConfig cfg;
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 5;
   cfg.enable_mmu = true;
   cfg.mmu_mode = "sv39";

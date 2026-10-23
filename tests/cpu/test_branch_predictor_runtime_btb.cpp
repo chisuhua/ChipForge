@@ -22,10 +22,10 @@ TEST_CASE("btb_runtime_16", "[cpu]") {
   cfg.branch_predictor = "gshare";
   cfg.btb_entries = 16;
   // 直接以 cfg.btb_entries 作为 ctor 实参 (BTB_SIZE 已移至运行时)
-  auto bp = std::make_unique<BranchPredictorPlugin<std::uint64_t>>(cfg.btb_entries);
+  auto bp = std::make_unique<BranchPredictorPlugin<std::uint32_t>>(cfg.btb_entries);
   REQUIRE(bp != nullptr);
   // 工厂入口: build_cpu 内部也按 cfg.btb_entries 实例化
-  auto pb = CpuFactory<std::uint64_t>::build_cpu(cfg);
+  auto pb = CpuFactory<std::uint32_t>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
 }
 
@@ -33,9 +33,9 @@ TEST_CASE("btb_runtime_64", "[cpu]") {
   CPUConfig cfg;
   cfg.branch_predictor = "gshare";
   cfg.btb_entries = 64;
-  auto bp = std::make_unique<BranchPredictorPlugin<std::uint64_t>>(cfg.btb_entries);
+  auto bp = std::make_unique<BranchPredictorPlugin<std::uint32_t>>(cfg.btb_entries);
   REQUIRE(bp != nullptr);
-  auto pb = CpuFactory<std::uint64_t>::build_cpu(cfg);
+  auto pb = CpuFactory<std::uint32_t>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
 }
 
@@ -43,9 +43,9 @@ TEST_CASE("btb_runtime_256", "[cpu]") {
   CPUConfig cfg;
   cfg.branch_predictor = "gshare";
   cfg.btb_entries = 256;
-  auto bp = std::make_unique<BranchPredictorPlugin<std::uint64_t>>(cfg.btb_entries);
+  auto bp = std::make_unique<BranchPredictorPlugin<std::uint32_t>>(cfg.btb_entries);
   REQUIRE(bp != nullptr);
-  auto pb = CpuFactory<std::uint64_t>::build_cpu(cfg);
+  auto pb = CpuFactory<std::uint32_t>::build_cpu(cfg);
   REQUIRE(pb != nullptr);
 }
 

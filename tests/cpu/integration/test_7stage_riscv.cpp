@@ -35,7 +35,7 @@ using T = std::uint32_t;
 TEST_CASE("build_7stage_superscalar", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_7stage_superscalar";
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 7;
   cfg.dispatch_width = 2;
   cfg.n_lanes = 2;
@@ -68,7 +68,7 @@ TEST_CASE("build_7stage_superscalar", "[cpu-integration]") {
 TEST_CASE("EnableMMU7StageCommitRetire", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_7stage_mmu";
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 7;
   cfg.dispatch_width = 2;
   cfg.n_lanes = 2;
@@ -136,7 +136,7 @@ TEST_CASE("7stage_topology_from_config", "[cpu-integration]") {
 TEST_CASE("7stage_dispatch_width_2", "[cpu-integration]") {
   CPUConfig cfg;
   cfg.name = "RiscvCpu_7stage_dw2";
-  cfg.isa = "rv64gc";
+  cfg.isa = "rv32im";
   cfg.pipeline_stages = 7;
   cfg.dispatch_width = 2;  // 触发 lane 派发
   cfg.n_lanes = 2;
