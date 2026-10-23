@@ -47,6 +47,11 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 
 ## 跨阶段拆分
 
+### B1 承载力拆解（2026-10-24 实测盘点）
+
+规划输入：[`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/tlm-retirement-b1-capacity-plan.md)
+（CH_MEM 工厂 9 处注册 vs TLM 19 处 ⇒ **10 处注册差距**；分三类：**接线缺失** 3 项 / **实现缺失** 4 项 / **架构决策** 4 项；6 个待 architect 决策问题见该文件 §5）
+
 ### phase-4（v0.11.0 窗口）— B0 冻结 + 安全子集清理（零删除风险）
 
 - **B0 冻结**：ADR 声明 TLM 进入 maintenance-only —— 只修 launch-gate 阻塞 bug，**新 feature 一律只写 CH_MEM 版**。落地为 CI 门禁脚本：新增 `ip/**/plugins/*.h`（非 `_chmem.h`）中的 feature 函数即 fail（bugfix 白名单豁免）
