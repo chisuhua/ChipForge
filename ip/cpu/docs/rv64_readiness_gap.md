@@ -45,9 +45,9 @@
 | `ip/cpu/docs/multi_isa_architecture.md:930-931` | `cpu_default.json` = 5 级 RV32IM_Zicsr / `cpu_superscalar.json` = 7 级 RV64IMAFD | 与 JSON 实际内容矛盾（两者都写 `rv64gc`） | ⚪ 文档自相矛盾 |
 | `ip/cpu/docs/multi_isa_architecture.md:734,1204` | `isa` 是「唯一权威字段 (字符串, factory dispatch)」 | **无 dispatch 实现** | 🔴 虚假声明 |
 | `ip/cpu/docs/dse_architecture.md:126,231,251` | DSE 方案以 `isa` 为可探索维度 | 无 dispatch；`rv64*` 属规划态 | 🟡 表述含混 |
-| `tools/cpu_sim/main.cpp:16,188` | 显式 `cfg.isa = "rv32i"` | 注释自认「修复既有 `CpuFactory<uint32_t>` vs config.isa="rv64gc" 不一致」 | ✅ 代码自证 |
+| `tools/cpu_sim/main.cpp:16,188` | 显式 `cfg.isa = "rv32i"` | 注释自认「修复既有 `CpuFactory<uint32_t>` vs config.isa="rv64gc" 不一致」 | ✅ 代码自证 → **已修复**（rv64-isa-declaration-correction：pin 移除，声明跟随 config） |
 
-> **⚠️ 行号口径**：本节及 §2–§7 的 file:line 引用**审查基线 commit `3775224`**。2026-10-23 的声明纠偏（§2 的 0.7 / 0.8 两项）已使部分行号漂移 —— **判断某项是否已修复时以 §2 的「状态」列为准，不以行号为准**。
+> **⚠️ 行号口径**：本节及 §2–§7 的 file:line 引用**审查基线 commit `3775224`**。2026-10-23 的声明纠偏（§2 的 0.7 / 0.8 两项）与 **rv64-isa-declaration-correction**（§2 的 0.1–0.6 / 0.9 / 0.10 八项：schema enum 收窄 + `xlen` 属性、4 个 JSON `isa`/`mmu_mode` 纠偏、`cpu_sim` 去 pin、`reg_file.cpp` 删除、`CPUConfig::isa` 默认值与三态 fail-fast）已使部分行号漂移 —— **判断某项是否已修复时以 §2 的「状态」列为准，不以行号为准**。
 >
 > **反例说明**：`ip/cpu/docs/blueprint.md:469`（「支持 RV32I/M/A/C/F/D + Linux」）**不是虚假声明** —— 该行位于 §8.1「VexRiscv 简介」，描述的是上游 VexRiscv 项目的能力，与 ChipForge 实现无关。审查初稿曾误判此项，此处更正。
 
@@ -59,16 +59,16 @@
 
 | # | 缺口 | 位置 | 归属 | 状态 |
 |---|------|------|------|------|
-| 0.1 | `isa` 字段无三态语义（implemented / declared-reserved / unsupported） | `ip/cpu/cpu_factory.h:127` | builder | ⬜ |
-| 0.2 | `isa` 不参与 dispatch，`T` 由调用方决定（默认 `uint32_t`） | `ip/cpu/cpu_factory.h:310` | builder | ⬜ |
-| 0.3 | schema 缺 `xlen` 属性（32/64） | `ip/cpu/configs/cpu_params_schema.json:18-23` | builder | ⬜ |
-| 0.4 | 3 个 JSON 默认 `rv64gc` | `ip/cpu/configs/cpu_default.json:5` / `cpu_deep_pipeline.json:5` / `cpu_superscalar.json:5` | builder | ⬜ |
-| 0.5 | `cpu_embedded.json` 宣称 `rv32imac`（A 扩展缺失） | `ip/cpu/configs/cpu_embedded.json:5` | builder | ⬜ |
-| 0.6 | integration-guide 第四种 isa 取值 | `soc/docs/integration-guide.md:17` | builder | ⬜ |
+| 0.1 | `isa` 字段无三态语义（implemented / declared-reserved / unsupported） | `ip/cpu/cpu_factory.h:127` | builder | ✅ 三态语义 + 三层 fail-fast（`cf::cpu::detail::validate_isa_xlen`，ADR-087 §D1） |
+| 0.2 | `isa` 不参与 dispatch，`T` 由调用方决定（默认 `uint32_t`） | `ip/cpu/cpu_factory.h:310` | builder | ✅ 契约化（dispatch 留 phase-5）：`isa`→契约校验已落地；`isa → T` 真 dispatch 属 ADR-087 Change 2 |
+| 0.3 | schema 缺 `xlen` 属性（32/64） | `ip/cpu/configs/cpu_params_schema.json:18-23` | builder | ✅ `xlen` 属性（enum 32/64，default 32）+ `isa` enum 收窄 `[rv32i,rv32im,rv32imac]` |
+| 0.4 | 3 个 JSON 默认 `rv64gc` | `ip/cpu/configs/cpu_default.json:5` / `cpu_deep_pipeline.json:5` / `cpu_superscalar.json:5` | builder | ✅ `isa` → `rv32im`；`mmu_mode` → `sv32`（XLEN=32 下只有 Sv32 合法，满足 schema `:210` 条件约束） |
+| 0.5 | `cpu_embedded.json` 宣称 `rv32imac`（A 扩展缺失） | `ip/cpu/configs/cpu_embedded.json:5` | builder | ✅ `rv32imac` → `rv32im`（A 扩展零实现） |
+| 0.6 | integration-guide 第四种 isa 取值 | `soc/docs/integration-guide.md:17` | builder | ✅ 已修（architect 批 `11225a3`：`rv64imac` → `rv32im`），此处追认 |
 | 0.7 | README / blueprint / status / DSE 文档宣称 RV64GC 或「isa 已有 dispatch」 | `ip/cpu/README.md:13,56` / `ip/cpu/docs/blueprint.md:92,156,455` / `ip/cpu/docs/status.md:109` / `ip/cpu/docs/multi_isa_architecture.md:734,1204` / `ip/cpu/docs/dse_architecture.md:126,231,251` | **architect（文档部分，已在 ADR-087 落地 ✅）** | ✅ |
 | 0.8 | `multi_isa_architecture.md` 目录树与 `isa` 权威性表述 | `ip/cpu/docs/multi_isa_architecture.md:928-933` | **architect（文档部分，已在 ADR-087 落地 ✅）** | ✅ |
-| 0.9 | `tools/cpu_sim` 靠 pin `rv32i` 打补丁 | `tools/cpu_sim/main.cpp:16,87,188` | builder | ⬜ |
-| 0.10 | `ip/cpu/plugins/reg_file.cpp` 显式实例化 `RegFilePlugin<uint64_t>` 却用 `keys_rv32::*`（**死代码**，一旦进 CMakeLists 即破坏 RV64） | `ip/cpu/plugins/reg_file.cpp:34,47,52,58,69,72` | builder | ⬜ |
+| 0.9 | `tools/cpu_sim` 靠 pin `rv32i` 打补丁 | `tools/cpu_sim/main.cpp:16,87,188` | builder | ✅ pin 已移除（声明跟随 config）+ `load_config()` 补 `xlen` 解析（不再静默丢弃 schema 声明字段） |
+| 0.10 | `ip/cpu/plugins/reg_file.cpp` 显式实例化 `RegFilePlugin<uint64_t>` 却用 `keys_rv32::*`（**死代码**，一旦进 CMakeLists 即破坏 RV64） | `ip/cpu/plugins/reg_file.cpp`（**已删除**，0 includer） | builder | ✅ 文件已删除（`git rm`；实测 0 CMake 引用 + 0 `#include` 命中） |
 
 ---
 

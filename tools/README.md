@@ -12,6 +12,7 @@
 | `tools/verify_plugin_decision.sh` | D4 Plugin-style 业务代码静态检查 (无 tick/无状态机/uint_t<N>) | 0=PASS / 1=❌ D4 违规 | ✅ `architecture-gates.yml` step 2 (PR 阻塞) |
 | `tools/check_plugin_portability.sh` | ADR-040 移植性约束 (Tier-1: 早返/ch_mem 渗透/pb.run/array_store) | 0=PASS / 1=❌ 移植性违规 | ✅ `architecture-gates.yml` step 3 (PR 阻塞) |
 | `tools/doc_link_check.sh` | 文档相对路径交叉引用完整性 (防止 2026-06-13 发现的 42 个死链回归) | 0=全 PASS / 1=有断链 | (推荐) `architecture-gates.yml` step 4 |
+| `tools/check_xlen_hygiene.sh` | ADR-087 §D6 XLEN 假设 hygiene 软门禁 (新增 `kXlenBits` 定义点须登记 `ip/cpu/docs/rv64_readiness_gap.md` §5) | 0=PASS (含 warn) / 1=STRICT 模式下有未登记定义点 | ✅ `architecture-gates.yml` step 4 (**warn 级**, `continue-on-error: true`) |
 
 ## 2. 构建/测试入口脚本
 

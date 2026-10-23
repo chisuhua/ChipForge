@@ -133,6 +133,13 @@ jobs:
           bash tools/check_plugin_portability.sh
         continue-on-error: false
 
+      - name: Check XLEN hygiene (check_xlen_hygiene.sh, warn-only per ADR-087 D6)
+        id: verify_xlen_hygiene
+        run: |
+          echo "=== Running check_xlen_hygiene.sh ==="
+          bash tools/check_xlen_hygiene.sh
+        continue-on-error: true
+
       - name: Run Doc link check (doc_link_check.sh)
         id: verify_doc_links
         run: |
