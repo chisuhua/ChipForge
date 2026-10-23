@@ -14,7 +14,7 @@
 #### Scenario: unsupported 取值 fail-fast
 
 - **WHEN** 装载 `isa="rv128i"`（schema enum 与 reserved 全集之外）
-- **THEN** `load_config()` / `CpuFactory::build_cpu()` 抛 `std::invalid_argument`，错误信息指出 unsupported isa（不静默、不降级）
+- **THEN** `CpuFactory::build_cpu()` 抛 `std::invalid_argument`，错误信息指出 unsupported isa（不静默、不降级）；`tools/cpu_sim` 经 `build_cpu()` 间接同效（校验 SSOT 在 build_cpu 入口）
 
 #### Scenario: implemented 态一致性冲突 fail-fast
 
@@ -33,7 +33,9 @@
 
 ### Requirement: cpu-isa-compile-time-template-guard
 
-在 TLM 语义层模板入口（`ip/cpu/arch/riscv/int_alu.h` / `branch.h`）对 `sizeof(T) == 4` 加编译期护栏：`CpuFactory<uint64_t>` 实例化必须编译失败；护栏必须位于模板运算入口函数体内（实例化点触发），不得放文件作用域。
+在 TLM 语义层模板入口（`ip/cpu/arch/riscv/int_alu.h` / `branch.h`）对 `sizeof(T) == 4` 加编译期护栏：`CpuFactory<uint64_t>` 实例化必须编译失败；护栏必须位于模板运算入口函数体内（实例化点触发），不得放文件作用域。`branch.h` 需覆盖**两处**（静态入口 `evaluate_branch` + `build()` 闭包内的真实分支判定），否则真实 BLT/BGE 路径不受护栏覆盖。
+
+**前置条件（不可省略）**：现存 T64 实例化点必须先迁移（`tests/cpu/test_cpu_factory.cpp` 删 `build_cpu_rv64` case + 余下改 T32；`tests/cpu/test_branch_predictor_runtime_btb.cpp` 3 case 改 `uint32_t`），否则「`CpuFactory<uint64_t>` 编译失败」与「既有测试 0 退化」互斥（`nm -C` 实测 `RiscvIntAluPlugin<unsigned long>` / `RiscvBranchPlugin<unsigned long>` 今天已被实例化）。
 
 #### Scenario: RV64 实例化在编译期被拒绝
 
@@ -43,25 +45,35 @@
 #### Scenario: RV32 路径零影响
 
 - **WHEN** 既有全部 RV32 测试（T=uint32_t）编译与运行
-- **THEN** 守卫恒通过，`[cpu]` / `[cpu-integration]` / `[riscv-tests]` / `[chmem]` / `[mmu]` 0 退化
+- **THEN** 守卫恒通过；`[cpu]` / `[cpu-integration]` / `[riscv-tests]` / `[mmu]` / `chipforge_tests_chmem` 0 退化（T64 迁移导致的 `[cpu]` 计数变化 129 → 133 属预期，已在 AC9 校准）
 
 ### Requirement: cpu-isa-declaration-surface-correction
 
-集成声明面不得声称未实现的 ISA 能力：`ip/cpu/configs/*.json` 与 `soc/docs/integration-guide.md` 的 `isa` 示例值回正确实现水平（`rv32im`），`grep -rn '"rv64' ip/cpu/configs/ soc/` 返回 0；schema `rv64i`/`rv64gc` 仅保留于 declared-reserved 态且非默认值。
+集成声明面不得声称未实现的 ISA 能力：`ip/cpu/configs/*.json` 与 `soc/docs/integration-guide.md` 的 `isa` 示例值回正确实现水平（`rv32im`），`grep -rn '"rv64' ip/cpu/configs/ soc/` 返回 0；schema `isa` enum 只含 `rv32i`/`rv32im`/`rv32imac`（`rv64i`/`rv64gc` 以 **description 文本**保留为 declared-reserved 文档化，**不再是 enum 项**），default `rv32im`。同时 3 个 JSON 的 `mmu_mode` 归位 `sv32`（XLEN=32 下只有 Sv32 合法，满足 schema `:204` 条件约束 `isa ∈ {rv32i,rv32im,rv32imac} ⇒ mmu_mode const "sv32"`）。
 
 #### Scenario: 配置与文档无虚假声明
 
 - **WHEN** 执行 `grep -rn '"rv64' ip/cpu/configs/ soc/` 与 schema default 检查
-- **THEN** 返回 0 条 `isa` 实际配置值含 rv64；schema default 为 `rv32im`；reserved 枚举项保留但标注态别
+- **THEN** 返回 0 条 `isa` 实际配置值含 rv64；schema default 为 `rv32im`；schema enum 不含 `rv64*`（reserved 值仅在 description 文本中）
+
+#### Scenario: 配置满足 schema 条件约束
+
+- **WHEN** 用 Draft7 validator 校验 4 个配置 JSON（`isa` 已纠偏为 `rv32im`）
+- **THEN** 除 pre-existing 基线（顶层 `_comment` 撞 `additionalProperties: false`）外**无新增**违规；`mmu_mode` 为 `sv32`（或不存在），不触发 `:204` 条件分支
 
 ### Requirement: cpu-isa-cpusim-pin-removal
 
-`tools/cpu_sim/main.cpp` 不得再用 `isa="rv32i"` 硬编码覆盖配置；行为改为跟随 config；既有 5 个 cpu_sim CLI e2e 用例（exec_cmd 约定）0 退化。
+`tools/cpu_sim/main.cpp` 不得再用 `isa="rv32i"` 硬编码覆盖配置（**含注释**）；行为改为跟随 config；`load_config()` 必须解析 schema 已声明的 `xlen`（不得静默丢弃）；既有 5 个 cpu_sim CLI e2e 用例（exec_cmd 约定）0 退化。
 
 #### Scenario: cpu_sim 跟随配置语义
 
 - **WHEN** 运行 5 个 cpu_sim e2e 用例（`test_cpu_sim_real_tohost` + 4 个 `{3,5,7,10}stage_add_elf_end_to_end`）
 - **THEN** 全部 PASS 且 `grep -n 'isa="rv32i"' tools/cpu_sim/main.cpp` 返回 0
+
+#### Scenario: cpu_sim 解析 xlen
+
+- **WHEN** 装载含 `"xlen": 32` 的 JSON 到 `CPUConfig`
+- **THEN** `cfg.xlen == 32`（`load_config()` 显式解析，不依赖结构体默认值）
 
 ### Requirement: cpu-isa-deadcode-regfile-removal
 
@@ -83,5 +95,5 @@
 
 #### Scenario: CI 软门禁可执行
 
-- **WHEN** 人为在未登记缺口表的情况下新增一处 XLEN 硬编码假设并跑门禁脚本
-- **THEN** 门禁输出 warn（文件:行 + 提示登记缺口表），不阻塞 CI
+- **WHEN** 人为在未登记缺口表的情况下新增一处 XLEN 硬编码假设（`kXlenBits =` 定义点）并跑门禁脚本
+- **THEN** 门禁输出 warn（`文件:行` + 提示登记缺口表 §5），不阻塞 CI；基线态（allowlist = 缺口表 §5 的 9 处定义点 / 7 个文件）输出 `warn=0`
