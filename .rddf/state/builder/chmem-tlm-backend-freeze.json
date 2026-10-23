@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "chmem-tlm-backend-freeze",
-  "current_phase": "phase-2",
+  "current_phase": "phase-2.5",
   "approval_status": "approved",
   "plan_quality_status": "pending",
   "p0_decision": {
@@ -72,7 +72,7 @@
   "worktree_path": "",
   "branch": "feature/chmem-tlm-backend-freeze",
   "execution_status": "in-progress",
-  "review_status": "pending",
+  "review_status": "passed",
   "retry_count": 0,
   "max_retries": 3,
   "retry_history": [],
@@ -88,9 +88,16 @@
       "event": "executed",
       "at": "2026-10-24T00:50:00Z",
       "note": "Task 1-8 完成: 三件套 + 门禁脚本 (三态实测) + CI 接入 + 4 死代码删除 (双 binary build OK, 回归一致) + ADR-088 (5 项必填) + ADR-083 v1.1 + 注册表; Task 9 全量回归进行中; 实施中发现并修正 5 处 plan 口径缺陷 (详见 plan 实施实测留证)"
+    },
+    {
+      "phase": "phase-2.5",
+      "event": "review-passed",
+      "at": "2026-10-24T01:05:00Z",
+      "note": "AC 11/11 通过; 5 批 commit 卫生核对通过; 变更面无 plan 外意外改动; 8 项已知遗留已登记"
     }
   ],
   "archive_status": "pending",
   "verifier_report_path": "",
-  "updated_at": "2026-10-24T00:50:00Z"
+  "updated_at": "2026-10-24T01:05:00Z",
+  "review_report": ".rddf/reviews/chmem-tlm-backend-freeze-p2.5-review.md"
 }
