@@ -48,6 +48,7 @@ status: in-planning
 - [x] AC8 6 个门禁全 PASS（verify_adr / verify_plugin_decision / check_plugin_portability / doc_link_check / roadmap-r9-check / check_xlen_hygiene）
 - [x] AC9 0 退化（实测基线口径）：`[cpu]` **137** · `[cpu-integration]` 96 cases / 95 PASS / 1 pre-existing FAIL（不新增）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `[cpu-configs]` 13/13 · chmem binary 130（`[chmem]` tag 89）全 PASS
 - [x] AC10 `openspec change validate` 0 error
+      - ⚠️ **归档后原命令不可复现**（`Change ... not found`）⇒ post-archive 等价校验：`openspec validate cpu-isa-xlen-contract`（期望 `is valid`，exit 0）
 
 ### 实测留证（2026-10-23，HEAD `749ed2c` 之后的实施结果）
 

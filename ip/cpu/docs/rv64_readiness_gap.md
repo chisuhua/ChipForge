@@ -32,13 +32,13 @@
 
 | 声明位置 | 宣称 | 实际 | 判定 |
 |----------|------|------|------|
-| `ip/cpu/README.md:13` | 「支持 RV32I/RV64GC 指令集」 | RV32IM + Zicsr(subset) | 🔴 虚假声明 |
-| `ip/cpu/README.md:56` | `isa` 默认 `"rv64gc"` | 同上 | 🔴 虚假默认 |
-| `ip/cpu/cpu_factory.h:127` | `CPUConfig::isa = "rv64gc"` | 同上；且 `isa` **完全不参与 dispatch** | 🔴 虚假默认 + 死字段 |
-| `ip/cpu/configs/cpu_default.json:5` / `cpu_deep_pipeline.json:5` / `cpu_superscalar.json:5` | `"isa": "rv64gc"` | 同上 | 🔴 虚假声明 |
-| `ip/cpu/configs/cpu_embedded.json:5` | `"isa": "rv32imac"` | RV32IM（C/A 缺失） | 🟡 部分虚假 |
-| `ip/cpu/configs/cpu_params_schema.json:18-23` | enum 含 rv64i/rv64gc、default rv64gc | 无 `xlen` 属性；`:204` 的 sv32 约束无代码消费 | 🔴 虚假声明 |
-| `soc/docs/integration-guide.md:17` | `"isa": "rv64imac"` | 第四种取值，**连 schema enum 都不在** | 🔴 虚假声明 |
+| `ip/cpu/README.md:13` | 「支持 RV32I/RV64GC 指令集」 | RV32IM + Zicsr(subset) | ✅ 已纠偏（architect 批 `11225a3`） |
+| `ip/cpu/README.md:56` | `isa` 默认 `"rv64gc"` | 同上 | ✅ 已纠偏（architect 批 `11225a3`） |
+| `ip/cpu/cpu_factory.h:130` | `CPUConfig::isa = "rv64gc"` | 同上；且 `isa` **完全不参与 dispatch** | ✅ 已纠偏（默认 `rv32im` + 三层 fail-fast 契约；dispatch 留 phase-5） |
+| `ip/cpu/configs/cpu_default.json:5` / `cpu_deep_pipeline.json:5` / `cpu_superscalar.json:5` | `"isa": "rv64gc"` | 同上 | ✅ 已纠偏（`rv32im` + `mmu_mode: sv32`） |
+| `ip/cpu/configs/cpu_embedded.json:5` | `"isa": "rv32imac"` | RV32IM（C/A 缺失） | ✅ 已纠偏（`rv32im`） |
+| `ip/cpu/configs/cpu_params_schema.json:18-23` | enum 含 rv64i/rv64gc、default rv64gc | 无 `xlen` 属性；`:210` 的 sv32 约束无代码消费 | ✅ 已纠偏（enum 收窄 3 值 + `xlen` 属性 + default `rv32im`；`:210` 约束**已有代码消费** = `validate_isa_xlen`） |
+| `soc/docs/integration-guide.md:17` | `"isa": "rv64imac"` | 第四种取值，**连 schema enum 都不在** | ✅ 已纠偏（`rv32im`，architect 批 `11225a3`） |
 | `ip/cpu/docs/blueprint.md:92,156` | 「RV32I/RV64I 整数运算」 | RV32 语义 | 🟡 表述含混 |
 | `ip/cpu/docs/blueprint.md:455` | 「RegFilePlugin 多 xlen (32/64) → 模板参数化, 编译期选」（风险登记表） | 模板化成立，但 ISA 语义层未参数化 ⇒ 切 XLEN=64 会静默算错 | 🟡 缓解措施不完整 |
 | `ip/cpu/docs/status.md:109` | 「已有 (5 级 RV64GC)」 | RV32IM | 🔴 虚假声明 |
@@ -47,7 +47,7 @@
 | `ip/cpu/docs/dse_architecture.md:126,231,251` | DSE 方案以 `isa` 为可探索维度 | 无 dispatch；`rv64*` 属规划态 | 🟡 表述含混 |
 | `tools/cpu_sim/main.cpp:16,188` | 显式 `cfg.isa = "rv32i"` | 注释自认「修复既有 `CpuFactory<uint32_t>` vs config.isa="rv64gc" 不一致」 | ✅ 代码自证 → **已修复**（rv64-isa-declaration-correction：pin 移除，声明跟随 config） |
 
-> **⚠️ 行号口径**：本节及 §2–§7 的 file:line 引用**审查基线 commit `3775224`**。2026-10-23 的声明纠偏（§2 的 0.7 / 0.8 两项）与 **rv64-isa-declaration-correction**（§2 的 0.1–0.6 / 0.9 / 0.10 八项：schema enum 收窄 + `xlen` 属性、4 个 JSON `isa`/`mmu_mode` 纠偏、`cpu_sim` 去 pin、`reg_file.cpp` 删除、`CPUConfig::isa` 默认值与三态 fail-fast）已使部分行号漂移 —— **判断某项是否已修复时以 §2 的「状态」列为准，不以行号为准**。
+> **⚠️ 行号口径**：本节及 §2–§7 的 file:line 引用**审查基线 commit `3775224`**。2026-10-23 的声明纠偏（§2 的 0.7 / 0.8 两项）与 **rv64-isa-declaration-correction**（§2 的 0.1–0.6 / 0.9 / 0.10 八项：schema enum 收窄 + `xlen` 属性、4 个 JSON `isa`/`mmu_mode` 纠偏、`cpu_sim` 去 pin、`reg_file.cpp` 删除、`CPUConfig::isa` 默认值与三态 fail-fast）已使部分行号漂移 —— **判断某项是否已修复时以 §2 的「状态」列为准，不以行号为准**；§1 判定列已同步标注 ✅。
 >
 > **反例说明**：`ip/cpu/docs/blueprint.md:469`（「支持 RV32I/M/A/C/F/D + Linux」）**不是虚假声明** —— 该行位于 §8.1「VexRiscv 简介」，描述的是上游 VexRiscv 项目的能力，与 ChipForge 实现无关。审查初稿曾误判此项，此处更正。
 

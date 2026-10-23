@@ -7,7 +7,7 @@ Defines the verifiable contract between `CPUConfig::isa` and `CPUConfig::xlen` f
 
 ### Requirement: cpu-isa-xlen-contract
 
-`CPUConfig::isa` 与 `CPUConfig::xlen` 必须构成可校验契约（ADR-087 §D1 三态 + §D2 映射）：默认 `isa == "rv32im"`、`xlen == 32`；unsupported 取值在配置装载/工厂实例化路径**运行时 fail-fast**；implemented 态与 `xlen` 一致性冲突 fail-fast；`build_cpu<T>` 交叉校验 `xlen != sizeof(T)*8` 时 fail-fast；declared-reserved 取值（含 `rv64i/rv64gc`）被接受但必须 emit 一次显式 warning（禁止静默）。
+`CPUConfig::isa` 与 `CPUConfig::xlen` 必须构成可校验契约（ADR-087 §D1 三态 + §D2 映射；**适用范围 = TLM 侧 `cf::cpu::CpuFactory`** —— CH_MEM 侧 `CpuFactoryChmem` 不接受 `isa`（`ip/cpu/cpu_factory_chmem.h:99`），其契约由 B1 承载力阶段另行定义）：默认 `isa == "rv32im"`、`xlen == 32`；unsupported 取值在配置装载/工厂实例化路径**运行时 fail-fast**；implemented 态与 `xlen` 一致性冲突 fail-fast；`build_cpu<T>` 交叉校验 `xlen != sizeof(T)*8` 时 fail-fast；declared-reserved 取值（含 `rv64i/rv64gc`）被接受但必须 emit 一次显式 warning（禁止静默）。
 
 #### Scenario: 声明与实现一致（implemented 态默认值）
 
@@ -48,7 +48,7 @@ Defines the verifiable contract between `CPUConfig::isa` and `CPUConfig::xlen` f
 #### Scenario: RV32 路径零影响
 
 - **WHEN** 既有全部 RV32 测试（T=uint32_t）编译与运行
-- **THEN** 守卫恒通过；`[cpu]` / `[cpu-integration]` / `[riscv-tests]` / `[mmu]` / `chipforge_tests_chmem` 0 退化（T64 迁移导致的 `[cpu]` 计数变化 129 → 133 属预期，已在 AC9 校准）
+- **THEN** 守卫恒通过；`[cpu]` / `[cpu-integration]` / `[riscv-tests]` / `[mmu]` / `chipforge_tests_chmem` 0 退化（T64 迁移 + 测试完备性补全导致的 `[cpu]` 计数变化 129 → **137** 属预期，已在 AC9 校准）
 
 ### Requirement: cpu-isa-declaration-surface-correction
 

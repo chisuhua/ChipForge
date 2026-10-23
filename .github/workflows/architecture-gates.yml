@@ -1,4 +1,4 @@
-name: Architecture Gates (ADR / D4 / Portability / Doc Links)
+name: Architecture Gates (ADR / D4 / Portability / XLEN hygiene / TLM freeze / Coverage ledger / Doc Links)
 
 # 本 workflow 是 PR 强制门禁: 4 个架构验证脚本任一失败 → exit 1 → 阻止 PR merge
 # 引用文档: docs/architecture/adr.md ADR-043

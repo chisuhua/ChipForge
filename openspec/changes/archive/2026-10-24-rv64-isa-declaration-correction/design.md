@@ -57,7 +57,7 @@ ADR-087 AC2 要求 `CpuFactory<uint64_t>` **编译失败**；critic 实测（`nm
 | `test_branch_predictor_runtime_btb.cpp` 3 case | `uint64_t` → `uint32_t` | BTB 与 XLEN 无关，**保留 BTB 覆盖**（不删测试） |
 | integration 侧 7 处 `cfg.isa` | `rv64gc`/`rv32imac` → `rv32im` | 仓库内不留 reserved 值；reserved 语义由新增专用测试覆盖 |
 
-计数影响：`[cpu]` 129 → 128（删 1 case）+ 5（新用例）= **133**（非退化，AC9 已按此校准）。RV64 真实路径归 ADR-087 Change 2（phase-5）。
+计数影响：`[cpu]` 129 → 128（删 1 case）+ 5（契约用例）+ 4（测试完备性补全）= **137**（非退化，AC9 已按此校准）。RV64 真实路径归 ADR-087 Change 2（phase-5）。
 
 ## Risks（继承 proposal R1–R6 + 实施新增）
 

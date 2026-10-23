@@ -166,16 +166,16 @@ isa 含 "rv32" ⇒ xlen = 32
 
 ## Acceptance
 
-- [ ] 三层 fail-fast 语义生效（design.md Decision 1，ADR-087 §D1 为准）：① 默认 `CPUConfig{}` `isa == "rv32im"` 且 `xlen == 32`（不 throw 不 warn）；② `isa="rv128i"`（unsupported）⇒ **throw**；③ implemented 态冲突（`isa="rv32im"` + `xlen=64`）⇒ **throw**；④ `build_cpu<T>` 中 `xlen != sizeof(T)*8` ⇒ **throw**；⑤ declared-reserved（`rv32imac`）⇒ **接受 + 一次 warning**（std::cerr，非静默）
-- [ ] `CpuFactory<uint64_t>` 实例化**编译失败**（`int_alu.h`/`branch.h` 守卫生效）；**前置条件**：现存 T64 实例化点已按 In Scope item 12 迁移（`grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>" tests/` = 0）⇒ 否则 AC2 与 0 退化互斥；变异对照：把 `branch.h` 断言临时改 `8` 应使 `[cpu]` 编译失败 —— 证明守卫在实例化点生效
-- [ ] `grep -rn '"rv64' ip/cpu/configs/ soc/ tools/dse/sweep_config.example.json` 返回 **0**；schema `isa` enum 只含 `rv32i`/`rv32im`/`rv32imac`、default `rv32im`；`rv64i`/`rv64gc` 仅以 **description 文本**形式保留（declared-reserved 文档化，非 enum 项）
-- [ ] `tools/cpu_sim` 不再出现 `isa="rv32i"` 硬编码（`grep -n 'isa="rv32i"' tools/cpu_sim/main.cpp` = 0，含注释）；`--isa` 参数（若存在）行为与 config 一致；`load_config()` 已解析 `xlen`
-- [ ] `ip/cpu/plugins/reg_file.cpp` 不存在；`grep -rn "RegFilePlugin<std::uint64_t>" ip/` 返回 0
-- [ ] `ip/cpu/docs/rv64_readiness_gap.md` §2 的 0.1–0.10 状态列全部更新为 ✅（0.7 / 0.8 保持 ✅）
-- [ ] CI 软门禁上线："新增 XLEN 假设必须登记缺口表"（warn 级，不阻塞；`tools/check_xlen_hygiene.sh` 基线 `warn=0`）
-- [ ] 6 个门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical · `check_xlen_hygiene.sh` warn=0
-- [ ] 0 退化（**HEAD `9b45fac` 实测基线口径**）：`[cpu]` **137**（129 − 1 删 `build_cpu_rv64` + 5 契约用例 + 4 完备性补全用例）· `[cpu-integration]` **96 cases / 95 PASS / 1 FAIL**（唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124` node_count `9 == 17`，**pre-existing**，口径 = **不新增失败**；TLM binary 全量 493 = 492 + 1）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `[cache]` 25/25 · `[cpu-configs]` 13/13（175 assertions）· `chipforge_tests_chmem` binary **130**（其中 `[chmem]` tag 89/89）全 PASS
-- [ ] `openspec change validate rv64-isa-declaration-correction` 0 error（change 已由 rdd-builder P0 立项创建）
+- [x] 三层 fail-fast 语义生效（design.md Decision 1，ADR-087 §D1 为准）：① 默认 `CPUConfig{}` `isa == "rv32im"` 且 `xlen == 32`（不 throw 不 warn）；② `isa="rv128i"`（unsupported）⇒ **throw**；③ implemented 态冲突（`isa="rv32im"` + `xlen=64`）⇒ **throw**；④ `build_cpu<T>` 中 `xlen != sizeof(T)*8` ⇒ **throw**；⑤ declared-reserved（`rv32imac`）⇒ **接受 + 一次 warning**（std::cerr，非静默）
+- [x] `CpuFactory<uint64_t>` 实例化**编译失败**（`int_alu.h`/`branch.h` 守卫生效）；**前置条件**：现存 T64 实例化点已按 In Scope item 12 迁移（`grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>" tests/` = 0）⇒ 否则 AC2 与 0 退化互斥；变异对照：把 `branch.h` 断言临时改 `8` 应使 `[cpu]` 编译失败 —— 证明守卫在实例化点生效
+- [x] `grep -rn '"rv64' ip/cpu/configs/ soc/ tools/dse/sweep_config.example.json` 返回 **0**；schema `isa` enum 只含 `rv32i`/`rv32im`/`rv32imac`、default `rv32im`；`rv64i`/`rv64gc` 仅以 **description 文本**形式保留（declared-reserved 文档化，非 enum 项）
+- [x] `tools/cpu_sim` 不再出现 `isa="rv32i"` 硬编码（`grep -n 'isa="rv32i"' tools/cpu_sim/main.cpp` = 0，含注释）；`--isa` 参数（若存在）行为与 config 一致；`load_config()` 已解析 `xlen`
+- [x] `ip/cpu/plugins/reg_file.cpp` 不存在；`grep -rn "RegFilePlugin<std::uint64_t>" ip/` 返回 0
+- [x] `ip/cpu/docs/rv64_readiness_gap.md` §2 的 0.1–0.10 状态列全部更新为 ✅（0.7 / 0.8 保持 ✅）
+- [x] CI 软门禁上线："新增 XLEN 假设必须登记缺口表"（warn 级，不阻塞；`tools/check_xlen_hygiene.sh` 基线 `warn=0`）
+- [x] 6 个门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical · `check_xlen_hygiene.sh` warn=0
+- [x] 0 退化（**HEAD `9b45fac` 实测基线口径**）：`[cpu]` **137**（129 − 1 删 `build_cpu_rv64` + 5 契约用例 + 4 完备性补全用例）· `[cpu-integration]` **96 cases / 95 PASS / 1 FAIL**（唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124` node_count `9 == 17`，**pre-existing**，口径 = **不新增失败**；TLM binary 全量 493 = 492 + 1）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `[cache]` 25/25 · `[cpu-configs]` 13/13（175 assertions）· `chipforge_tests_chmem` binary **130**（其中 `[chmem]` tag 89/89）全 PASS
+- [x] `openspec change validate rv64-isa-declaration-correction` 0 error（change 已由 rdd-builder P0 立项创建）
 
 ## References
 

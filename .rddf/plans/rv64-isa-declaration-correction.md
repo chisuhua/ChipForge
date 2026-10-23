@@ -858,7 +858,7 @@ Expected: `warn=0` + `warn-only confirmed` + `(ip/ clean)`（**仓库 `ip/` 未�
 
 ---
 
-### Task 13: 全门禁收口 + AC 终验
+### Task 13: 全门禁收口 + AC 终验（实测分 **6 批** commit，非 4 批）
 
 
 **Files:**
@@ -915,7 +915,7 @@ Expected: 7 条全符合
 Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2` → 期望 `137 test cases`（129 − 1 + 5 + 4）
 Run: `./build/bin/chipforge_tests "[cpu-integration]" 2>&1 | tail -3` → 期望 `96 | 95 passed | 1 failed`（1 failed = pre-existing）
 Run: `./build/bin/chipforge_tests "[riscv-tests],[mmu],[cache]" 2>&1 | tail -2` → 期望 `132 test cases` 全 PASS（48 + 59 + 25）
-Run: `./build/bin/chipforge_tests_chmem --list-tests 2>&1 | tail -1` → 期望 `130 test cases`
+Run: `./build/bin/chipforge_tests_chmem --list-tests 2>&1 | tail -2` → 期望 `130 test cases`（**注意**：`tail -1` 取到的是空行 ⇒ 用 `tail -2`）
 
 - [ ] **Step 5: `openspec change validate`**
 
