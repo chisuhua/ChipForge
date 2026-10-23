@@ -1,5 +1,17 @@
 # MMU 微架构
 
+> **⚠️ 部分内容已被 [ADR-085](adr/ADR-085-mmu-ptw-architecture.md) 细化（2026-10-22）**：
+>
+> **新架构的设计正文见 [mmu-ptw-architecture.md](mmu-ptw-architecture.md)**；决策本身拆为 [ADR-085 伞索引](adr/ADR-085-mmu-ptw-architecture.md) 下的 **D01–D21 共 21 个子 ADR**（一决策一个文件）。
+>
+> - §1 的 "MultiLevelTLB（L0 TLB 8/8 + L1 TLB 64/4 + PTW 3-cycle）" 分层 ⇒ ADR-085 改为 **MMU_TLB（缓存叶 PTE）+ MMU_PTW（缓存页目录项 + walk FSM）** 两单元。
+> - §2.2 的 "PTW 走 3 个 logical stage 接力" ⇒ ADR-085 D9 改为 **单 FSM + `cur_level` 寄存器**（状态集 `{IDLE,REQ,WAIT,DONE,FAULT}`，枚举值与既有 `PtWalkState` 一致）。
+> - §2.1 的 lookup 路径（`PTW_ACTIVE=1` 由 miss 触发）⇒ ADR-085 D12 明确 `PTW_ACTIVE` 必须**组合派生**（`sv_active && !paddr_valid`），不得用 FSM busy 状态。
+> - 权限 / 编码判定 ⇒ ADR-085 D13 裁决按 **RISC-V spec §5.3.2 翻译算法 step 3/4**（`reserved ⟺ V=1 && !R && W`；`leaf ⟺ R || X`）。**现存缺陷在 CH_MEM 侧**：`mmu_ptw_chmem.h:251` 的 `r && w` 会把**合法 RW 叶**判成页错误；TLM 侧 `lib/ptw.cpp:79` 的 `w && !r` **本来就正确**，不需改。
+> - 巨页（superpage）⇒ ADR-085 D14 要求 **PTW 拼接（sv32 shift=22）与 TLB entry 的 `page_shift` 两侧同补**；本文档 §1 图中按 4KiB 写死的 `paddr` 合成已不足。
+> - **生效范围**：ADR-085 是 **CH_MEM 前向架构**（D18 明写 TLM 侧本期不动，除 D13 的共享 helper 抽取）。
+> - 本文档其余部分（§3 HDL 友好性、§5 工厂模式、§6 替换策略、§7 lib/tlm 分层）**仍然有效**。
+
 ## 1. 总体数据流
 
 ```
