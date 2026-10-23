@@ -42,6 +42,18 @@
 | B-5 | Task 3 Step 5 的「2 个 FAIL」实为 **7**，且 `:56` 不可能 FAIL（reserved 路径只 warn） | **实编译验证**（不是照抄推理）：注入 helper + 接线后实跑 ⇒ 实测 **7 个本 change FAIL**（`test_cpu_factory.cpp:28/43/66/88` + `test_branch_predictor_runtime_btb.cpp:20/32/42`）+ 1 pre-existing；`embedded_config` 实测 **PASS** ⇒ Expected 表按实测重写（含「勿误改成 throw」警示） | Task 3 Step 5 |
 | 附注 | `nm` pattern `BranchPredictorPlugin<unsigned long>` 匹配不到真实符号（该模板有 5 个实参，demangle 后是 `..., 16ul, 16ul, ...`）⇒ 假阴性 | 三条 pattern 去掉结尾 `>` | Task 4 Step 6 |
 
+### 实施后追加：测试完备性补全（2026-10-24）
+
+用户要求「检查验证结果的测试是否完备」⇒ 按「变更点 → 覆盖」逐项对照，发现 **3 个覆盖缺口**（详见 Task 14）：
+
+| 缺口 | 为什么原计划漏了 | 补全 |
+|------|----------------|------|
+| implemented 态 `kernel_xlen != 32` 分支 | 经 `build_cpu` **编译期不可达**（护栏拦下 T=uint64）⇒ 以为"无覆盖需求" | helper 是 inline ⇒ 直调 + 显式传 kernel_xlen（3 用例） |
+| cpu_sim `xlen` 解析 | spec R4 写了 Scenario，但 plan Task 7 只做了实现、没派测试 | e2e（xlen=64 失败 vs xlen=32 成功，对照组设计） |
+| schema enum 收窄 / `xlen` 属性 / 4 份 JSON 声明值 | plan Task 5/6 的验证是**人工 python 脚本**（跑一次即过），不是回归测试 | `[cpu-configs]` 4 用例（nlohmann 读 schema + 4 份 JSON） |
+
+**3 个变异对照全部被抓住**（变异 A/B/C 见 Task 14 Step 5）⇒ 新测试有真实检验力，非"跑通即算"。
+
 ### builder 自检（第 2 轮，代码块「逐字跑一次」，已随实施验证）
 
 | 自检 | 方法 | 结果 |
@@ -79,8 +91,9 @@ critic 对本 change 的 P1 产物给出 **REJECT：6 BLOCKER / 7 SHOULD_FIX / 6
 
 | 口径 | 实测值 | 备注 |
 |------|--------|------|
-| **TLM binary 全量（无 filter）** | **481 cases / 480 PASS / 1 FAIL**（67,135 assertions） | 唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124`（node_count `9 == 17`），**pre-existing（HEAD 即红）**；口径 = **不新增失败** |
-| `[cpu]` | **129 cases / 461 assertions PASS** | 本 change 后 = 129 − 1（删 `build_cpu_rv64`）+ 5（新用例）= **133**（时序：Task 3 后 = 134 → Task 4 删 case 后 = 133） |
+| **TLM binary 全量（无 filter）** | 基线 **481 cases / 480 PASS / 1 FAIL**（67,135 assertions）→ **实施后 493 cases / 492 PASS / 1 FAIL**（67,193 assertions） | 唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124`（node_count `9 == 17`），**pre-existing（HEAD 即红）**；口径 = **不新增失败** |
+| `[cpu]` | 基线 **129 cases / 461 assertions** → **实施后 137 cases / 480 assertions PASS** | = 129 − 1（删 `build_cpu_rv64`）+ 5（契约用例）+ 4（完备性补全：3 helper 直调 + 1 cpu_sim e2e）= **137**（时序：Task 3 后 = 138 → Task 4 删 case 后 = 137） |
+| `[cpu-configs]` | 实施后 **13 cases / 175 assertions PASS** | 基线 9 cases + 4（完备性补全：schema enum/default/xlen 属性/条件约束/4 份 JSON 声明值） |
 | `[cpu-integration]` | **96 cases / 95 PASS / 1 FAIL** | 唯一失败同上（pre-existing） |
 | `[riscv-tests]` | 48/48 PASS | — |
 | `[mmu]` | 59/59 PASS | — |
@@ -370,7 +383,7 @@ Expected（**本步必然有 7 个 FAIL + 1 个 pre-existing FAIL，属 Task 4 �
 | `tests/cpu/integration/test_7stage_riscv.cpp:124` | **FAIL（pre-existing）** | 基线即红，与本 change 无关 | — |
 
 `[riscv-tests]` 48 PASS。
-**计数时序**：`[cpu],[cpu-integration],[riscv-tests]` 合计 **230 cases = 222 passed + 8 failed**（7 本 change + 1 pre-existing）；Task 3 后 `[cpu]` = 129 + 5（新用例）= **134**；Task 4 删 `build_cpu_rv64` case 后 = **133**（终验口径）。
+**计数时序**：`[cpu],[cpu-integration],[riscv-tests]` 合计 **230 cases = 222 passed + 8 failed**（7 本 change + 1 pre-existing）；Task 3 后 `[cpu]` = 129 + 9（5 契约 + 4 补全）= **138**；Task 4 删 `build_cpu_rv64` case 后 = **137**（终验口径）。
 
 - [ ] **Step 6: Defer commit**
 
@@ -452,10 +465,10 @@ Expected: `AC-clean: 0 (no reserved value in tests/)`
 
 > ⚠️ **必须排除 `test_cpu_factory_isa_xlen.cpp`**：该文件按 AC1 第 4/5 用例**必须**含 `isa="rv64gc"` / `isa="rv32imac"` 两种 reserved 输入（否则 AC1 只剩 3 个用例，与声明矛盾）⇒ 残留判据 = **除该专用测试外** tests/ 无 reserved 值。
 
-- [ ] **Step 7: 回归（口径：`[cpu]` = 129 − 1 + 5 = **133**）**
+- [ ] **Step 7: 回归（口径：`[cpu]` = 129 − 1 + 5 + 4 = **137**）**
 
 Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -3`
-Expected: `All tests passed (… assertions in 133 test cases)`
+Expected: `All tests passed (… assertions in 137 test cases)`
 
 - [ ] **Step 8: Defer commit**
 
@@ -655,7 +668,7 @@ Expected: 两 binary 均编译成功（**若意外失败** ⇒ 说明 CH_MEM 侧
 - [ ] **Step 4: 回归**
 
 Run: `./build/bin/chipforge_tests "[cpu],[cpu-integration]" 2>&1 | tail -4`
-Expected: `[cpu]` 133 PASS；`[cpu-integration]` 96 / 95 PASS + 1 pre-existing FAIL
+Expected: `[cpu]` 137 PASS；`[cpu-integration]` 96 / 95 PASS + 1 pre-existing FAIL
 
 - [ ] **Step 5: Defer commit**
 
@@ -708,7 +721,7 @@ Expected: 两处 0
 - [ ] **Step 2: 删除与验证**
 
 Run: `git rm ip/cpu/plugins/reg_file.cpp && cmake --build build -j$(nproc) 2>&1 | tail -2 && ./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2`
-Expected: build 成功 + `[cpu]` 133 PASS
+Expected: build 成功 + `[cpu]` 137 PASS
 
 > 注：`git rm` 会把删除**留在 index**（未提交）。这正是 Task 13 Step 6 必须用 `git commit -- <paths>` 的原因（否则删除会被第 1 批夹带）。
 
@@ -847,6 +860,7 @@ Expected: `warn=0` + `warn-only confirmed` + `(ip/ clean)`（**仓库 `ip/` 未�
 
 ### Task 13: 全门禁收口 + AC 终验
 
+
 **Files:**
 - Test: 全部门禁（终验表落在 change tasks.md）
 
@@ -898,7 +912,7 @@ Expected: 7 条全符合
 
 - [ ] **Step 4: 计数终验（与基线快照表对照）**
 
-Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2` → 期望 `133 test cases`（129 − 1 + 5）
+Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2` → 期望 `137 test cases`（129 − 1 + 5 + 4）
 Run: `./build/bin/chipforge_tests "[cpu-integration]" 2>&1 | tail -3` → 期望 `96 | 95 passed | 1 failed`（1 failed = pre-existing）
 Run: `./build/bin/chipforge_tests "[riscv-tests],[mmu],[cache]" 2>&1 | tail -2` → 期望 `132 test cases` 全 PASS（48 + 59 + 25）
 Run: `./build/bin/chipforge_tests_chmem --list-tests 2>&1 | tail -1` → 期望 `130 test cases`
@@ -921,3 +935,50 @@ git commit -m "chore(cpu): 删除 reg_file.cpp 死代码 (uint64_t 显式实例�
 git add tools/check_xlen_hygiene.sh tools/README.md .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md && git commit -m "ci: XLEN 假设 hygiene 软门禁 + 缺口表状态列翻转" -- tools/check_xlen_hygiene.sh tools/README.md .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md
 ```
 （message 按当次实际改动行数调整；**每批只含本类文件**，不混批；`-- <paths>` 保证 index 里其他内容不会被夹带）
+
+### Task 14: 测试完备性补全（实施后追加，2026-10-24）
+
+> 触发：用户要求「检查验证结果的测试是否完备」。按「变更点 → 覆盖」逐项对照，发现 **3 个覆盖缺口**，本 Task 补齐并做变异对照自证。
+
+| # | 缺口 | 补全方式 | 文件 |
+|---|------|---------|------|
+| 1 | **implemented 态 `kernel_xlen != 32` 分支无覆盖** —— 该分支经 `build_cpu` **不可达**（T=uint64 实例化已被编译期护栏拦下，ADR-087 AC2） | `validate_isa_xlen` 是 `cf::cpu::detail` 下的 **inline**（非 static）⇒ 可直调并显式传 `kernel_xlen` ⇒ 3 个直调用例（kernel 冲突 throw / kernel 一致不 throw / reserved 直调 warn+throw） | `tests/cpu/test_cpu_factory_isa_xlen.cpp`（+3 用例） |
+| 2 | **cpu_sim 的 `xlen` 解析无测试**（spec R4 有 Scenario 但无实现） | e2e：临时 config 写 `xlen=64` + `isa=rv32im` ⇒ cpu_sim 非 0 退出（build_cpu 抛）；**对照** `xlen=32` ⇒ 退出 0。有效性来自**两组行为差异**（若 xlen 未解析，两组行为完全相同 ⇒ 用例 FAIL） | `tests/cpu/test_cpu_sim_xlen_parse.cpp`（新建，1 用例） |
+| 3 | **schema 的 `isa` enum 收窄 / `xlen` 属性 / 4 份 JSON 声明值无断言** | `[cpu-configs]` 4 用例：isa enum 恰 3 值且不含 rv64* + default rv32im + description 仍含 rv64i；xlen 属性（integer / enum{32,64} / default 32）；`params.allOf` 的 isa⇒mmu_mode const sv32 条件约束仍在；4 份 JSON 的 isa=rv32im + mmu_mode=sv32 | `tests/cpu/schema/test_cpu_isa_xlen_schema.cpp`（新建，4 用例） |
+
+- [ ] **Step 1: 补 3 个 helper 直调用例**（缺口 1）—— 见 `tests/cpu/test_cpu_factory_isa_xlen.cpp` 末尾 3 个 `TEST_CASE`
+- [ ] **Step 2: 新建 cpu_sim xlen 解析 e2e**（缺口 2）—— 见 `tests/cpu/test_cpu_sim_xlen_parse.cpp`
+
+> ⚠️ 实现要点（踩过的坑）：`popen` 命令串尾部若为 `echo __EXIT__$?`，**shell 自身退出码恒为 0**（echo 的）⇒ `pclose` 的 `WEXITSTATUS` 拿不到被测命令的码 ⇒ **必须从输出里解析 `__EXIT__N`**。
+> 另：`build_cpu_impl` 会把 `std::invalid_argument` 收敛成 `PluginError::BuildFailed`（无 message 通道）⇒ 断言用通用标记 `FAIL: build_cpu` + 对照组，**不依赖具体消息文本**。
+
+- [ ] **Step 3: 新建 schema/JSON 声明值测试**（缺口 3）—— 见 `tests/cpu/schema/test_cpu_isa_xlen_schema.cpp`
+
+> ⚠️ 实现要点：schema 的条件约束在 **`properties.params.allOf`**（不是顶层 `allOf`）⇒ 遍历路径别写错。
+
+- [ ] **Step 4: re-cmake + build + 跑测**
+
+Run: `cmake -S . -B build >/dev/null && cmake --build build -j$(nproc) && ./build/bin/chipforge_tests "[isa-xlen]" 2>&1 | tail -2 && ./build/bin/chipforge_tests "[cpu-configs]" 2>&1 | tail -2`
+Expected: `[isa-xlen]` **9 cases / 20 assertions PASS**；`[cpu-configs]` **13 cases / 175 assertions PASS**
+
+- [ ] **Step 5: 变异对照自证（3 个变异，各须被抓住）**
+
+| 变异 | 操作 | 期望（实测留证） |
+|------|------|-----------------|
+| A | 注释掉 `tools/cpu_sim/main.cpp` 的 `cfg.xlen = p.value("xlen", cfg.xlen);` | `[isa-xlen]` e2e 用例 FAIL（`test_cpu_sim_xlen_parse.cpp:98` FAILED） |
+| B | `ip/cpu/configs/cpu_default.json:5` 的 isa 改回 `rv64gc` | `[cpu-configs]` FAIL（`test_cpu_isa_xlen_schema.cpp:123` FAILED） |
+| C | `ip/cpu/cpu_factory.h` 的 `if (kernel_xlen != 32)` 改 `if (false)` | `[isa-xlen]` 直调用例 FAIL（`test_cpu_factory_isa_xlen.cpp:85` FAILED） |
+
+每个变异做完必须**还原并复跑**（三态全绿）
+
+- [ ] **Step 6: 全量回归 + 计数口径更新**
+
+Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2` → **137 cases / 480 assertions**
+Run: `./build/bin/chipforge_tests 2>&1 | tail -2` → **493 cases / 492 passed / 1 failed**（1 = pre-existing）
+Run: `./build/bin/chipforge_tests "[cpu-integration]" 2>&1 | grep "test cases:"` → 96 / 95 / 1（pre-existing 不变）
+Run: `./build/bin/chipforge_tests_chmem --list-tests 2>&1 | grep "test cases"` → **130**（新测试是 TLM-only，不进 chmem binary）
+
+- [ ] **Step 7: 同步所有计数口径**（plan 基线快照表 / Task 3 Step 5 时序注 / Task 4 Step 7 / Task 10 Step 2 / Task 13 Step 4 + proposal AC9 + tasks.md AC9 与实测留证表）
+- [ ] **Step 8: Defer commit**
+
+---

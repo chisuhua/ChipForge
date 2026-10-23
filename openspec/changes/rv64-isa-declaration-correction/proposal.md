@@ -174,7 +174,7 @@ isa 含 "rv32" ⇒ xlen = 32
 - [ ] `ip/cpu/docs/rv64_readiness_gap.md` §2 的 0.1–0.10 状态列全部更新为 ✅（0.7 / 0.8 保持 ✅）
 - [ ] CI 软门禁上线："新增 XLEN 假设必须登记缺口表"（warn 级，不阻塞；`tools/check_xlen_hygiene.sh` 基线 `warn=0`）
 - [ ] 6 个门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical · `check_xlen_hygiene.sh` warn=0
-- [ ] 0 退化（**HEAD `9b45fac` 实测基线口径**）：`[cpu]` **133**（129 − 1 删 `build_cpu_rv64` + 5 新用例）· `[cpu-integration]` **96 cases / 95 PASS / 1 FAIL**（唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124` node_count `9 == 17`，**pre-existing**，口径 = **不新增失败**；TLM binary 全量 481 = 480 + 1）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `[cache]` 25/25 · `chipforge_tests_chmem` binary **130**（其中 `[chmem]` tag 89/89）全 PASS
+- [ ] 0 退化（**HEAD `9b45fac` 实测基线口径**）：`[cpu]` **137**（129 − 1 删 `build_cpu_rv64` + 5 契约用例 + 4 完备性补全用例）· `[cpu-integration]` **96 cases / 95 PASS / 1 FAIL**（唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124` node_count `9 == 17`，**pre-existing**，口径 = **不新增失败**；TLM binary 全量 493 = 492 + 1）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `[cache]` 25/25 · `[cpu-configs]` 13/13（175 assertions）· `chipforge_tests_chmem` binary **130**（其中 `[chmem]` tag 89/89）全 PASS
 - [ ] `openspec change validate rv64-isa-declaration-correction` 0 error（change 已由 rdd-builder P0 立项创建）
 
 ## References
