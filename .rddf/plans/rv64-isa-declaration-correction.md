@@ -31,7 +31,18 @@
 | S-6 | 分批 commit 机制自破（`git rm` 残留 index ⇒ 第 1 批夹带删除 + 第 3 批 pathspec 失效） | 全部改用 `git commit -- <paths>` 限定 pathspec，并拆成 5 批 | Task 13 Step 6 |
 | N-1~N-4 | 134/133 时序读感、缺口表 §1 行过期、`tools/README.md` 未登记、sweep 示例无 AC 覆盖 | 分别：加时序注 / Task 11 Step 1b 补 §1 标注 / Task 12 Step 4b 登记 / Task 13 Step 3 grep 范围补 sweep 示例 | 见各 Task |
 
-### builder 自检（代码块「逐字跑一次」，commit `9b45fac` 之后）
+### 第 3 轮 critic 终审（session `ses_e97f8b25affe6Pc37MJ0YVnNdm`，REJECT：5 BLOCKER）
+
+| 编号 | critic 指控 | 本计划处置 | 落点 |
+|------|------------|-----------|------|
+| B-1 | 新测试文件**必然**含 `isa="rv64gc"` / `isa="rv32imac"`（AC1 第 4/5 用例的输入）⇒ 「tests/ 无 reserved 残留」机判永不可达 | 残留 grep **排除** `test_cpu_factory_isa_xlen.cpp`（专用 reserved 语义测试）；AC1 的 5 用例一个不删 | Task 4 Step 6 / Task 13 Step 3 |
+| B-2 | Task 9 Step 4 的 `grep -c "static_assert(sizeof(T) == 4)"` 恒 0（落笔行尾是 `,` 不是 `)`）⇒ `&&` 断链 ⇒ 编译恢复验证被静默跳过 | pattern 去掉 `)` | Task 9 Step 4 |
+| B-3 | Task 13 Step 6 批 4 对已 `git rm` 的路径做 `git add` ⇒ exit 128 ⇒ **该批永不产生**（删除一直留在 index） | 批 4 去掉 `git add`，直接 `git commit -- <path>`；告警文字的「第 3 批」更正为「第 4 批」 | Task 13 Step 6 |
+| B-4 | Task 6 Step 1 往 `cpu_embedded.json` 写**行内 `//` 注释** ⇒ `json.load` / nlohmann 解析崩 ⇒ `test_schema_m5_19.cpp:37` + `test_3stage_riscv.cpp:126` 新增失败 | 注释移出 ```json 围栏（改为围栏外说明句） | Task 6 Step 1 |
+| B-5 | Task 3 Step 5 的「2 个 FAIL」实为 **7**，且 `:56` 不可能 FAIL（reserved 路径只 warn） | **实编译验证**（不是照抄推理）：注入 helper + 接线后实跑 ⇒ 实测 **7 个本 change FAIL**（`test_cpu_factory.cpp:28/43/66/88` + `test_branch_predictor_runtime_btb.cpp:20/32/42`）+ 1 pre-existing；`embedded_config` 实测 **PASS** ⇒ Expected 表按实测重写（含「勿误改成 throw」警示） | Task 3 Step 5 |
+| 附注 | `nm` pattern `BranchPredictorPlugin<unsigned long>` 匹配不到真实符号（该模板有 5 个实参，demangle 后是 `..., 16ul, 16ul, ...`）⇒ 假阴性 | 三条 pattern 去掉结尾 `>` | Task 4 Step 6 |
+
+### builder 自检（第 2 轮，代码块「逐字跑一次」，已随实施验证）
 
 | 自检 | 方法 | 结果 |
 |------|------|------|
@@ -346,16 +357,20 @@ Expected: **5 passed**（“单发”用例失败 ⇒ 检查 cerr 只输出一�
 - [ ] **Step 5: 回归既有 family（逗号 = OR，单 tag 写法在 catch2 里是 AND，多 positional 会假绿）**
 
 Run: `./build/bin/chipforge_tests "[cpu],[cpu-integration],[riscv-tests]" 2>&1 | tail -4`
-Expected（**本步必然有 2 个 FAIL，属 Task 4 未做的已知中间态**）：
+Expected（**本步必然有 7 个 FAIL + 1 个 pre-existing FAIL，属 Task 4 未做的已知中间态** —— **实测值**，2026-10-23 于 `feature/rv64-isa-declaration-correction` 上跑出）：
 
 | 用例 | 状态 | 原因 | 收敛点 |
 |------|------|------|--------|
-| `tests/cpu/test_cpu_factory.cpp:28` `REQUIRE(cfg.isa == "rv64gc")` | **FAIL** | Task 3 已把默认改成 `rv32im` | Task 4 Step 2 |
-| `tests/cpu/test_cpu_factory.cpp:79` / `:93`（T64 构建）+ `:56`（`isa="rv32imac"`） | **FAIL** | `validate_isa_xlen` 交叉校验（`xlen=32` vs T=64）⇒ throw | Task 4 Step 2 |
-| 其余 `[cpu]` / `[riscv-tests]` | PASS | — | — |
+| `tests/cpu/test_cpu_factory.cpp:28`（`default_config`） | **FAIL** | Task 3 已把默认改成 `rv32im`，断言仍是 `rv64gc` | Task 4 Step 2 |
+| `tests/cpu/test_cpu_factory.cpp:43`（`build_cpu_rv64`） | **FAIL** | `rv64gc` + T64 ⇒ `kernel_xlen(64) != xlen(32)` ⇒ throw | Task 4 Step 1（删 case） |
+| `tests/cpu/test_cpu_factory.cpp:66`（`default_json_config`） | **FAIL** | `rv64gc` + T64 ⇒ 同上 | Task 4 Step 2 |
+| `tests/cpu/test_cpu_factory.cpp:88`（`build_cpu_registers_11_real_plugins`） | **FAIL** | T64 + 默认 `rv32im`（implemented）⇒ `kernel_xlen(64) != 32` ⇒ throw | Task 4 Step 2 |
+| `tests/cpu/test_branch_predictor_runtime_btb.cpp:20/32/42`（3 case） | **FAIL ×3** | 同上（`CpuFactory<std::uint64_t>::build_cpu` + 默认 config） | Task 4 Step 3 |
+| `tests/cpu/test_cpu_factory.cpp:53`（`embedded_config`，`isa="rv32imac"`） | **PASS** | declared-reserved 分支：`kernel_xlen(32) == config.xlen(32)` ⇒ **只 warn 不 throw**（design D1 的 reserved 宽容语义）⇒ **不要误改成 throw** | — |
+| `tests/cpu/integration/test_7stage_riscv.cpp:124` | **FAIL（pre-existing）** | 基线即红，与本 change 无关 | — |
 
-`[cpu-integration]` 96 cases / 95 PASS / 1 pre-existing FAIL；`[riscv-tests]` 48 PASS。
-**计数时序**：Task 3 后 `[cpu]` = 129 + 5（新用例）= **134**；Task 4 删 `build_cpu_rv64` 后 = **133**（终验口径）。
+`[riscv-tests]` 48 PASS。
+**计数时序**：`[cpu],[cpu-integration],[riscv-tests]` 合计 **230 cases = 222 passed + 8 failed**（7 本 change + 1 pre-existing）；Task 3 后 `[cpu]` = 129 + 5（新用例）= **134**；Task 4 删 `build_cpu_rv64` case 后 = **133**（终验口径）。
 
 - [ ] **Step 6: Defer commit**
 
@@ -424,14 +439,18 @@ Expected: 编译成功（此刻护栏尚未加，T64 已全部迁走 ⇒ 仍应�
 
 - [ ] **Step 6: 验证迁移结果（`nm` 应无 T64 实例化）**
 
-Run: `for f in $(find build/tests/CMakeFiles -name '*.o'); do nm -C "$f" 2>/dev/null | grep -q "RiscvIntAluPlugin<unsigned long>\|RiscvBranchPlugin<unsigned long>\|BranchPredictorPlugin<unsigned long>" && echo "T64 残留: $f"; done; echo "scan done"`
+Run: `for f in $(find build/tests/CMakeFiles -name '*.o'); do nm -C "$f" 2>/dev/null | grep -q "RiscvIntAluPlugin<unsigned long\|RiscvBranchPlugin<unsigned long\|BranchPredictorPlugin<unsigned long" && echo "T64 残留: $f"; done; echo "scan done"`
 Expected: 仅 `scan done`（**无 T64 残留输出**；三条 pattern 覆盖 IntAlu / Branch / BranchPredictor 三个会被新护栏拦到的模板）
+
+> ⚠️ pattern **不带结尾 `>`**：`BranchPredictorPlugin` 有 5 个模板实参，demangle 后是 `BranchPredictorPlugin<unsigned long, 16ul, 16ul, (unsigned char)8, 1ul>` ⇒ 带 `>` 的 pattern **匹配不到真实符号**（假阴性 ⇒ 残留漏检）。`RiscvIntAluPlugin` / `RiscvBranchPlugin` 只有一个模板实参，带不带 `>` 都能命中。
 
 Run: `grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>\|BranchPredictorPlugin<std::uint64_t>" tests/ || echo "AC-clean: 0"`
 Expected: `AC-clean: 0`
 
-Run: `grep -rn 'isa = "rv64\|isa = "rv32imac' tests/ || echo "AC-clean: 0 (no reserved value in tests/)"`
-Expected: `AC-clean: 0 (no reserved value in tests/)`（残留清零的机判口径，Task 13 复用）
+Run: `grep -rn 'isa = "rv64\|isa = "rv32imac' tests/ --include='*.cpp' | grep -v 'test_cpu_factory_isa_xlen.cpp' || echo "AC-clean: 0 (no reserved value in tests/)"`
+Expected: `AC-clean: 0 (no reserved value in tests/)`
+
+> ⚠️ **必须排除 `test_cpu_factory_isa_xlen.cpp`**：该文件按 AC1 第 4/5 用例**必须**含 `isa="rv64gc"` / `isa="rv32imac"` 两种 reserved 输入（否则 AC1 只剩 3 个用例，与声明矛盾）⇒ 残留判据 = **除该专用测试外** tests/ 无 reserved 值。
 
 - [ ] **Step 7: 回归（口径：`[cpu]` = 129 − 1 + 5 = **133**）**
 
@@ -498,10 +517,13 @@ Expected: **恰好 3 命中**（`cpu_default.json:5` / `cpu_deep_pipeline.json:5
 ```json
     "isa": "rv32im",
 ```
-`cpu_embedded.json`:
+`cpu_embedded.json`（**注释写在围栏外，不要写进行内 `//`** —— 行内注释会让 `json.load` / `nlohmann::json::parse` 直接崩 ⇒ `tests/cpu/schema/test_schema_m5_19.cpp:37` 与 `tests/cpu/integration/test_3stage_riscv.cpp:126`（`--config cpu_embedded.json`）会新增失败）：
+
 ```json
-    "isa": "rv32im",   // 原 rv32imac: A 扩展零实现, 起 declared-reserved 误导 (ADR-087 §D1)
+    "isa": "rv32im",
 ```
+
+> 原值 `rv32imac` 的理由（A 扩展零实现，起 declared-reserved 误导，ADR-087 §D1）—— **写在上面的围栏外说明句里**，不写进 JSON。
 
 - [ ] **Step 2: 3 个文件 `mmu_mode` 改写（XLEN=32 ⇒ 只有 Sv32 合法；与 schema `:204` 条件自洽）**
 
@@ -661,8 +683,10 @@ Expected: **编译失败**，错误含 `static assertion failed` + “RV32 TLM p
 
 - [ ] **Step 4: 还原并确认编译恢复**
 
-Run: `sed -i 's/static_assert(sizeof(T) == 8/static_assert(sizeof(T) == 4/' ip/cpu/arch/riscv/branch.h && grep -c "static_assert(sizeof(T) == 4)" ip/cpu/arch/riscv/branch.h && cmake --build build -j$(nproc) 2>&1 | tail -2`
+Run: `sed -i 's/static_assert(sizeof(T) == 8/static_assert(sizeof(T) == 4/' ip/cpu/arch/riscv/branch.h && grep -c "static_assert(sizeof(T) == 4" ip/cpu/arch/riscv/branch.h && cmake --build build -j$(nproc) 2>&1 | tail -2`
 Expected: 计数 `2` + 编译成功
+
+> ⚠️ pattern **不带结尾 `)`**：护栏落笔形态是 `static_assert(sizeof(T) == 4,`（行尾是 `,`，message 换行）⇒ 带 `)` 的 pattern 恒匹配 0 行，且 `&&` 链会**在 `cmake --build` 之前断链** ⇒ 「还原后编译恢复」这一步被静默跳过。
 
 - [ ] **Step 5: Defer commit**
 
@@ -866,7 +890,7 @@ grep -rn "RegFilePlugin<std::uint64_t>" ip/                             || echo 
 grep -n 'std::string isa = "rv32im"' ip/cpu/cpu_factory.h                || echo "AC1-a OK"      # 期望命中
 grep -n "xlen = 32" ip/cpu/cpu_factory.h                                || echo "AC1-b OK"      # 期望命中
 grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>\|BranchPredictorPlugin<std::uint64_t>" tests/ || echo "AC2 OK: 0"     # 期望 0（T64 已迁走）
-grep -rn 'isa = "rv64\|isa = "rv32imac' tests/                          || echo "AC-residual OK: 0"  # 期望 0（tests/ 无 reserved 残留）
+grep -rn 'isa = "rv64\|isa = "rv32imac' tests/ --include='*.cpp' | grep -v 'test_cpu_factory_isa_xlen.cpp' || echo "AC-residual OK: 0"  # 期望 0（排除 reserved 语义专用测试）
 ```
 Expected: 7 条全符合
 
@@ -884,13 +908,14 @@ Expected: valid（0 error）
 
 - [ ] **Step 6: 分批 commit（按 4 类改动拆，不做单 mega-commit）**
 
-> ⚠️ **必须用 `git commit -- <paths>` 限定 pathspec**：Task 10 的 `git rm` 会把删除**留在 index**，裸 `git commit` 提交整个 index ⇒ 第 1 批会夹带 `reg_file.cpp` 删除（违反本步纪律），且第 3 批对已删除路径的 `git add` 会因 pathspec 不匹配而失败（`&&` 短路 ⇒ 批次丢失）。
+> ⚠️ **必须用 `git commit -- <paths>` 限定 pathspec**：Task 10 的 `git rm` 会把删除**留在 index**，裸 `git commit` 提交整个 index ⇒ 第 1 批会夹带 `reg_file.cpp` 删除（违反本步纪律）。
+> ⚠️ **批 4 不能带 `git add`**：该路径已被 `git rm` 删除 ⇒ `git add <已删除路径>` 返回 `fatal: pathspec ... did not match any files`（exit 128）⇒ `&&` 短路 ⇒ **该批永不产生**。正确写法是直接 `git commit -m "..." -- <path>`（pathspec 形式的 commit 会把已 staged 的删除一并提交）。
 
 ```bash
 git add tests/ ip/cpu/cpu_factory.h && git commit -m "feat(cpu): isa/xlen 三层 fail-fast 契约 + T64 实例化点迁移 (ADR-087 Change 1)" -- tests/ ip/cpu/cpu_factory.h
 git add ip/cpu/configs/ tools/dse/sweep_config.example.json && git commit -m "fix(cpu): 声明面纠偏 — isa enum 收窄 + mmu_mode 归位 sv32" -- ip/cpu/configs/ tools/dse/sweep_config.example.json
 git add ip/cpu/arch/riscv/ tools/cpu_sim/main.cpp && git commit -m "feat(cpu): TLM 模板入口 XLEN 编译期护栏 + cpu_sim 去 pin" -- ip/cpu/arch/riscv/ tools/cpu_sim/main.cpp
-git add ip/cpu/plugins/reg_file.cpp && git commit -m "chore(cpu): 删除 reg_file.cpp 死代码 (uint64_t 显式实例化 + keys_rv32 混用)" -- ip/cpu/plugins/reg_file.cpp
+git commit -m "chore(cpu): 删除 reg_file.cpp 死代码 (uint64_t 显式实例化 + keys_rv32 混用)" -- ip/cpu/plugins/reg_file.cpp
 git add tools/check_xlen_hygiene.sh tools/README.md .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md && git commit -m "ci: XLEN 假设 hygiene 软门禁 + 缺口表状态列翻转" -- tools/check_xlen_hygiene.sh tools/README.md .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md
 ```
 （message 按当次实际改动行数调整；**每批只含本类文件**，不混批；`-- <paths>` 保证 index 里其他内容不会被夹带）
