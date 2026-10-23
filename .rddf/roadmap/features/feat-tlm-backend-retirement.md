@@ -80,11 +80,11 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 
 ## 验收标准
 
-- [ ] **B0**：冻结门禁脚本落地（CI 可执行，TLM-only 文件新增 feature 函数即 fail）
-- [ ] **B0**：4 个死代码文件删除，双 binary 编译 + 全量测试 0 退化
-- [ ] **B0**：ADR-088 Proposed（含冻结条款 + 语义裁决表 + 覆盖平价台账格式 + 删除判据）
-- [ ] **B0**：`ip/mmu/tlm/` + `ip/cpu/tlm/` 目录名误导消除（双模共享文件迁 `core/`，CH_MEM 编译 0 退化）
-- [ ] **B0**：覆盖平价台账建立 —— 451 个 TLM 独占 case 三态标注 100% 覆盖，无批量"显式退役"
+- [x] **B0**：冻结门禁脚本落地（CI 可执行，TLM-only 文件新增 feature 函数即 fail）✅ 由 change `chmem-tlm-backend-freeze` 交付（`tools/check_tlm_freeze.sh`，2026-10-24 归档；检测面 = `ip/` 下非 `_chmem.h` 的 `.h` 减 9 个双模共享文件 = 31 个候选）
+- [x] **B0**：4 个死代码文件删除，双 binary 编译 + 全量测试 0 退化 ✅ 同上 change（TLM-only 业务文件 **48 → 44** 实测）
+- [x] **B0**：ADR-088 Proposed（含冻结条款 + 语义裁决表 + 覆盖平价台账格式 + 删除判据）✅ 同上 change（`docs/architecture/adr/ADR-088-tlm-backend-retirement.md`；ADR-083 同步升 v1.1 补 §2.5 冻结条款 + §5.4 退役时间线）
+- [ ] **B0**：`ip/mmu/tlm/` + `ip/cpu/tlm/` 目录名误导消除（双模共享文件迁 `core/`，CH_MEM 编译 0 退化）—— ⏸ **未纳入 B0 change 的 In Scope**（目录重命名影响 include 路径，属独立 change；**建议归 B1**；`mmu_exception_handler.h` 经实测为 TLM-only 不迁）
+- [ ] **B0**：覆盖平价台账建立 —— 451 个 TLM 独占 case 三态标注 100% 覆盖，无批量"显式退役" —— ⏸ **B0 只交付格式**（ADR-088 §4 三态标注 + 509≠451 口径注记）；**内容**由姊妹提案 `chmem-tlm-coverage-parity-ledger`（P1）交付
 - [ ] **B1**：Dhrystone 在 `cpu_verilator_sim` 跑通 + 新基线 CSV 入库（**B3 的硬前置**）
 - [ ] **B1**：CH_MEM 侧 LSU 全宽度 + MMU PTW walk FSM + MMU exception handler 注册 + BP CH_MEM 版 全部落地
 - [ ] **B2**：ADR-088 §语义裁决表 5 个子系统逐条表态，M 扩展 cycle 裁决明确
