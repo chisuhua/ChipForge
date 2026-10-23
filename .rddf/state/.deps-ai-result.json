@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-10-23T09:15:00Z",
+  "generated_by": "rdd-builder P1.5 (builder 直做语义分析 + 文件交集机械精算，证据见 reason 的 file:line)",
+  "fallback": false,
+  "ai_deps": [
+    {
+      "from": "chmem-tlm-backend-freeze",
+      "to": "rv64-isa-declaration-correction",
+      "kind": "soft",
+      "reason": "ADR-088 五项必填之第 5 项要求登记『ADR-087 v1.1 待办：TLM 侧 static_assert 随 TLM 退役消失 ⇒ 须切 CH_MEM 侧 CI grep 门禁』——该待办的实体是 A 的 Task 8 护栏 (ip/cpu/arch/riscv/int_alu.h:88 / branch.h:111+闭包)。A 未落地时 B 记录的是未验证前提 ⇒ B 的 ADR-088 起草应在 A 之后。"
+    },
+    {
+      "from": "chmem-tlm-backend-freeze",
+      "to": "rv64-isa-declaration-correction",
+      "kind": "soft",
+      "reason": "冻结门禁 baseline 快照时序：B 的 tools/check_tlm_freeze.sh 检测『ip/**/plugins/*.h + ip/**/arch/**/*.h 中非 _chmem.h 文件的新增函数定义』。A 会在 TLM-only 文件 ip/cpu/cpu_factory.h 中新增 inline validate_isa_xlen() ⇒ 若 B 的 baseline 快照早于 A 落地，该函数会被判为『未登记新增函数』⇒ 假阳性。故 B 的 baseline 必须在 A 合并后采集（或白名单显式登记该函数）。"
+    }
+  ],
+  "conflicts": [
+    {
+      "between": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "file": ".github/workflows/architecture-gates.yml",
+      "kind": "hard",
+      "reason": "两者均在同一 workflow 追加一个 step（A: check_xlen_hygiene.sh；B: check_tlm_freeze.sh）⇒ 同一 hunk 邻近 ⇒ 必须顺序执行，不可并行。"
+    }
+  ],
+  "not_conflicts": [
+    {
+      "file": "ip/cpu/cpu_factory.h",
+      "between": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "reason": "B 的 proposal 仅在 prose 中提及该文件（TLM-only 分类讨论），B 实际不改它 ⇒ 非文件冲突，但构成上面的『冻结门禁假阳性』语义耦合。"
+    },
+    {
+      "file": "docs/architecture/adr.md",
+      "between": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "reason": "仅 B 修改（注册 ADR-088）；A 的 ADR-087 注册已在 architect 批 (commit 11225a3) 落地，A 不再动该文件。"
+    },
+    {
+      "file": "tools/cpu_sim",
+      "between": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "reason": "A 修改 tools/cpu_sim/main.cpp（去 pin + 解析 xlen）；B 明确把 tools/cpu_sim 列入 Out of Scope（B3 才迁）⇒ 非冲突。"
+    }
+  ],
+  "suggestions": [
+    {
+      "change": "chmem-tlm-backend-freeze",
+      "action": "reorder",
+      "reason": "建议在 A（rv64-isa-declaration-correction）完成并合并之后再启动：① .github/workflows/architecture-gates.yml 文件冲突要求顺序执行；② ADR-088 §5 待办依赖 A 的护栏实装；③ 冻结门禁 baseline 需晚于 A 的 validate_isa_xlen 落点。"
+    },
+    {
+      "change": "chmem-tlm-backend-freeze",
+      "action": "merge",
+      "parent_feature": "feat-tlm-backend-retirement",
+      "reason": "粒度合理（B0 阶段：冻结门禁 + 4 死代码 + ADR-088 起草），不需拆分；其 B1/B2/B3 各自独立立项，不要提前并入。"
+    },
+    {
+      "change": "rv64-isa-declaration-correction",
+      "action": "merge",
+      "parent_feature": "feat-rv64-isa-declaration-integrity",
+      "reason": "粒度合理（ADR-087 Change 1：契约 + 护栏 + 死代码清除，13 Task 单 change 可控）；mul.h/mul_div_fsm.h 护栏已显式归 Change 2，未越界。"
+    }
+  ],
+  "notes": "ADR 轴：A 引用 ADR-087/083，B 引用 ADR-083/040/046/087/088 ⇒ 共享 ADR-083（A 引用、B 修订 v1.1）但 A 当前不再修改 ADR-083（architect 批已落地）⇒ 无实际耦合。接口轴：A 新增 CPUConfig::xlen 与 cf::cpu::detail::validate_isa_xlen，B 不消费 ⇒ 无接口依赖。"
+}

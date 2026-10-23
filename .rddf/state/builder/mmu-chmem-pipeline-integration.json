@@ -1,0 +1,99 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "mmu-chmem-pipeline-integration",
+  "current_phase": "phase-2",
+  "approval_status": "approved",
+  "approval_method": "ADR-0049-auto-decision",
+  "approval_decided_at": "2026-10-16T12:30:00Z",
+  "approval_rationale": "advisory=complex + LLM=complex + AC=9 + proposal.md ready + depends_on all resolved (cpu-pipeline-mmufault-handler + phase-6d-prerequisites) → case 1 approve; user 2026-10-16 implicit approve via 切换到 builder + 进入 P0",
+  "llm_preflight_reasoning": {
+    "complexity_assessment": "complex",
+    "complexity_agreement_with_advisory": "yes",
+    "concerns": [
+      "跨 6+ 模块影响 (ip/mmu/ + ip/cpu/ + ip/cache/ + tests/×4)",
+      "public interface 扩展 (MMUPlugin csr_write_satp 注入 + mmu_chmem.h 新契约)",
+      "165 个 tasks 跨多个 sprint 窗口 (Sprint 2-5 + Sprint 6-7 + Sprint 7-8)",
+      "HARD pause 触发 per spec §5.2"
+    ],
+    "data_sources": {
+      "primary_improvement_md": null,
+      "primary_improvement_fallback_reason": "本 change 通过 Oracle 2026-10-07 决议 + HANDOFF.md 164 行 + tasks.md 581 行 + research 543 行完成等同 5 段 improvement 的功能;走 FALLBACK 路径读 proposal.md",
+      "secondary_planner_handoff": {
+        "recommended_route": "complex",
+        "awaiting_builder": ["mfc-extract-fsm-h"],
+        "awaiting_builder_conflict": "mmu-chmem-pipeline-integration 不在 awaiting_builder 但在 features_active — historical snapshot 漂移,非路由冲突"
+      },
+      "fallback_proposal_md": {
+        "path": "openspec/changes/mmu-chmem-pipeline-integration/proposal.md",
+        "lines": 208,
+        "status": "ready",
+        "frontmatter": "initiative=wave5-isa-coverage-and-bp, priority=P1, version_target=v0.11.0",
+        "depends_on": ["cpu-pipeline-mmufault-handler (archived)", "phase-6d-prerequisites (archived)"],
+        "depends_on_status": "all resolved"
+      },
+      "always_adr": {
+        "touched": ["ADR-040 v2.0", "ADR-046", "ADR-049", "ADR-083"],
+        "portability_check": "12/12 PASS"
+      }
+    }
+  },
+  "plan_quality_status": "passed",
+  "plan_path": ".rddf/plans/mmu-chmem-pipeline-integration.md",
+  "plan_lines": 544,
+  "plan_tasks": 24,
+  "plan_steps": 43,
+  "plan_passed_at": "2026-10-16T12:50:00Z",
+  "execution_mode_decision": {
+    "mode": "worktree",
+    "reason": "files=12>2 AND tasks=5>3",
+    "decided_at": "2026-10-16T12:55:45Z",
+    "decided_by": "phase-1.5-deps-analyzer",
+    "worktree_branch_planned": "feature/mmu-chmem-pipeline-integration"
+  },
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [],
+    "cross_repo_pending": [],
+    "plan_internal_dependencies_expressed": true,
+    "plan_internal_deps_phase_table_location": ".rddf/plans/mmu-chmem-pipeline-integration.md §File Structure (tasks.md → Phase 聚合映射)"
+  },
+  "worktree_path": "",
+  "branch": "openspec/mmu-chmem-pipeline-integration",
+  "branch_head_commit": "",
+  "main_head_commit": "f1e63c1",
+  "execution_status": "phase_2_consolidated_baseline_done_2026-10-17",
+  "review_status": "pending",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "at": "2026-10-17T00:00:00Z",
+      "trigger": "Phase B+ deferred to Sprint 2-5 (2026-10-23 ~) per objective-mmu-chmem-phase-b-e.md review_by=2027-01-06 + tasks.md Phase Schedule Table; worktree .rddf/wt/mmu-chmem-pipeline-integration + branch openspec/mmu-chmem-pipeline-integration removed 2026-10-17 by user (worktree fully merged to main, 0 commits diff); follow-up change mmu-chmem-phase-b-c-launch opened 2026-10-17 as placeholder (status=placeholder) anchoring Sprint 2-5 ownership; C.2/C.3 skeleton+sel 表达已落 (commit 9373808+5b9f74a) -> tasks.md [x] 同步 29 项; pre_flight 4 项 (R11.1 重审 / fetch-stall-protocol-v0.2 / bp-btb-coordination-3items / CtrlLink API gap FP-4) 在 follow-up change pre_flight 段跟进"
+    }
+  ],
+  "phase_started_at": "2026-10-16T12:30:00Z",
+  "phase_started_from": "rdd-builder",
+  "phase_transitions": [
+    {"from": "phase-0", "to": "phase-1", "at": "2026-10-16T12:30:00Z", "trigger": "P0 approval Option 1 case 1 (auto-decision per ADR-0049)"},
+    {"from": "phase-1", "to": "phase-1.5", "at": "2026-10-16T12:50:00Z", "trigger": "P1 plan gen complete; 6 phase / 24 task / 43 step"},
+    {"from": "phase-1.5", "to": "phase-2", "at": "2026-10-16T12:55:45Z", "trigger": "P1.5 deps + execution_mode complete via phase1_5_deps.sh; worktree mode (files=12>2); 0 blockers / 0 manual_deps"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T13:00:00Z", "trigger": "P2 worktree physical create via manual git worktree add (skill script path temporarily disabled); commit 230bd36 on main + new branch openspec/mmu-chmem-pipeline-integration at HEAD 230bd36"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T14:07:00Z", "trigger": "Phase 0 Task 0.1 5-step verification complete in worktree; 4 gates PASS; [mmu] 59/59 + [riscv-tests] 48/48 + [cpu] 129/129 + [cpu-integration] 95/96 (+1 known infra) + [verilator] SIGTERM known flaky"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T14:35:00Z", "trigger": "Phase 1.1 protocol spec drafted; fetch_stall_protocol_v0.11.0.md 290 lines in worktree .rddf/protocols/ (untracked draft, owner handoff); decision: NOT create fetch_stall_chmem.h real file to avoid dead-code + 8→9 plugin cross-phase conflict + substage API unverified risk"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T14:40:00Z", "trigger": "Phase 1.1 protocol spec doc log committed (main 7dc9f25 + worktree merged)"}
+  ,{"from": "phase-2", "to": "phase-2", "at": "2026-10-16T15:05:00Z", "trigger": "Phase 2 Task 2.3 (C4 owner 真空修复) landed: production-code-fix c71c9e7 + plan-log 253bd83 on main, merged into worktree branch b046205; ip/cpu/cpu_factory_chmem.h:117-126 fprintf 'Real sv32 CH_MEM owner TBD' → 'sv32 CH_MEM owner assigned: change mmu-chmem-pipeline-integration (Phase B Sprint 6-7, ETA 2026-12-22; ...)'; regression 0 退化 (mmu 59/59 + cpu-l1-mmu-demo 6/6 + cpu 129/129 + 4 gate PASS)"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T15:30:00Z", "trigger": "Phase 2 Task 2.4 (C5 wiring comment update) landed: docs-only commit 992dbf5 on worktree branch + main fast-forwarded; ip/cpu/plugins/hazard_chmem.h:151-153 加 18 行 mmu-chmem-pipeline-integration 追踪段 (intent + 2 blockers + 解锁条件 + 解锁 1-line OR-merge 范例); 0 line logic code change"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T17:30:00Z", "trigger": "Phase 2 Task 2.1 (C2 ibus_chmem sv32 消费) Step 1-3 landed: feat(cpu) commit 9373808 + docs(plan) commit b8d860f on worktree branch; ibus_chmem.h:119-163 fetch_instr 加 sv32 sel 表达式 select(PADDR_VALID, PADDR, MMU_VADDR); cpu_factory_chmem.h:69 1 char fix ip::cpu::HazardPlugin → ::ip::cpu::HazardPlugin (namespace conflict 修复, ibus_chmem.h 引入 cf::ip::mmu::payload 后污染 cf::cpu:: 作用域); 新增 tests/cpu/test_ibus_chmem_sv32.cpp (240 LOC, 2 case); [ibus-sv32] 2/2 PASS (976 assertions); 4 arch gate (33+8+12+0) PASS; 0 退化引入"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T17:35:00Z", "trigger": "Phase 2 Task 2.1 (C2) 实施过程发现 pre-existing baseline 退化: chipforge_tests_chmem [chmem_vendored_elf_tohost1] 18 ELF FAIL (lb/lbu/ld_st/lh/lhu/lw/sb/sh/sw/st_ld + 8 rv32um), A/B test 验证 HEAD 992dbf5 clean 同样 18 fail, 与本 Task 2.1 commit 无关; 推测根因: Phase 2.4 C5 wiring commit 992dbf5 后或其他近期 commit 引入 CH_MEM elaboration 退化; 影响: Phase D verification baseline 对比需先 fix 此退化; 跟进: feat-mmu-chmem-integration Sprint 6-7 启动 Phase B 时同步深查 root cause"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T21:00:00Z", "trigger": "Phase 2 Task 2.2 (C3 dmem_chmem sv32 消费) Step 1-3 landed: feat(cpu) commit 5b9f74a on main + merged into worktree; ip/cpu/plugins/dmem_chmem.h:95-204 mem_access 加 sv32 sel 表达式 select(PADDR_VALID, PADDR, RESULT); 新增 tests/cpu/test_dmem_chmem_sv32.cpp (240 LOC, 2 case, 选 add.elf 而非 lb/lw/sw 避免 main HEAD b8d860f pre-existing baseline 退化污染); [dmem-sv32] 2/2 PASS (972 assertions); [ibus-sv32] 2/2 PASS (976 assertions, 无退化); 4 arch gate PASS; 0 退化引入"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T21:15:00Z", "trigger": "Phase 1.1 fetch_stall protocol spec 经 critic 审稿 REJECT + 5 BLOCKERS + 7 SHOULD_FIXS 后撤回, 降级为 requirements doc v0.1 (commit f3419b4); BLOCKERS: B1 declare_substage 不产生调度顺序 / B2 CH_MEM register_ctrl_link 不冻结 pc_reg / B3 Payload Keys ch_bool 直写违 ADR-040 / B4 Bare path 公式与 D4 决议矛盾 / B5 ptw_active 无 ch_bool 信号源; 替代文件: .rddf/protocols/fetch_stall_requirements_v0.11.0.md (270+ 行); wave5-bp-btb owner Sprint 6-7 启动期必须先解决 5 BLOCKER 才能起草 v0.2 protocol"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T21:30:00Z", "trigger": "Phase 2 整体 checklist log landed: docs(plan) commit efcb796; Task 2.1 (C2) Step 1-3 ✅ + Step 4 defer; Task 2.2 (C3) Step 1-3 ✅ + Step 4 defer; Task 2.3 (C4) ✅; Task 2.4 (C5) ✅; Task 2.5 (C6) defer to Phase 3; Phase 1.1 protocol 撤回 + requirements doc 替代"},
+    {"from": "phase-2", "to": "phase-2", "at": "2026-10-16T22:00:00Z", "trigger": "pre-existing baseline 退化 (chipforge_tests_chmem 18 ELF FAIL load/store + rv32um) ROOT CAUSE 确认 (explore subagent ses_ebaf74d5affen9LHbSE16oBc8K): 不是代码回归, 是 pre-existing 架构限制 (CppHDL Simulator sequential mem-read + ChipForge 5-stage combinational datapath 无 dmem 补偿); 早 Oracle 确认于 docs/lessons/phase-6d7-load-store-replay-stall.md (2026-10-10); Phase D baseline 对比无影响 (不在本 change scope); 修复 owner: feat-phase-6d-rtl-verification (Phase 6d.7)"}
+  ],
+  "archive_status": "pending",
+  "verifier_report_path": ".rddf/state/.verifier-report.json",
+  "updated_at": "2026-10-17T00:00:00Z"
+}

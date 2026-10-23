@@ -1,0 +1,40 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "scope-state-show-and-read-hint",
+  "current_phase": "phase-3-archive",
+  "approval_status": "archived",
+  "plan_quality_status": "pending",
+  "execution_mode_decision": {},
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [
+      "scope-matrix-proposal"
+    ],
+    "cross_repo_pending": []
+  },
+  "worktree_path": "",
+  "branch": "",
+  "execution_status": "completed",
+  "review_status": "merge",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "phase": "phase-0",
+      "decision": "auto-approve (case 1)",
+      "llm_assessment": "simple",
+      "agreement": "yes"
+    },
+    {
+      "phase": "phase-3-archive",
+      "at": "2026-10-18T17:00:25Z",
+      "outcome": "completed"
+    }
+  ],
+  "archive_status": "archived",
+  "verifier_report_path": ".rddf/state/.verifier-report.json",
+  "updated_at": "2026-10-18T17:00:25Z"
+}

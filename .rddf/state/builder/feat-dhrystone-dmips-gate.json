@@ -1,0 +1,26 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "feat-dhrystone-dmips-gate",
+  "current_phase": "phase-2.5",
+  "approval_status": "pending",
+  "plan_quality_status": "pending",
+  "execution_mode_decision": {},
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [],
+    "cross_repo_pending": []
+  },
+  "worktree_path": "",
+  "branch": "",
+  "execution_status": "pending",
+  "review_status": "merge",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [],
+  "archive_status": "pending",
+  "verifier_report_path": ".rddf/state/.verifier-report.json",
+  "updated_at": "2026-10-15T16:45:44.296219+00:00"
+}

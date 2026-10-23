@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "chmem-tlm-backend-freeze",
-  "current_phase": "phase-1",
+  "current_phase": "phase-1.5",
   "approval_status": "approved",
   "plan_quality_status": "pending",
   "p0_decision": {
@@ -22,7 +22,18 @@
       "CI 盲区：测试不进 CI（Oracle 2026-10-06），冻结门禁与后续 TLM 退役均无自动回归保护"
     ]
   },
-  "execution_mode_decision": {},
+  "execution_mode_decision": {
+    "decided_at": "2026-10-23T09:20:00Z",
+    "decided_by": "rdd-builder P1.5 (auto-decision, ADR-0024)",
+    "mode": "in-place-branch",
+    "branch": "feature/chmem-tlm-backend-freeze",
+    "rationale": [
+      "与 A 同款：单 change 可控（B0：冻结门禁 + 4 死代码 + ADR-088 起草）",
+      "复用现有 build/ ⇒ 冻结门禁脚本的 baseline 快照可基于当前 HEAD 采集",
+      "必须在 A（rv64-isa-declaration-correction）合并之后启动（见 deps_status）"
+    ],
+    "user_confirmation_required_at": "phase-2 (HARD pause)"
+  },
   "deps_status": {
     "blockers": [],
     "manual_deps": [
@@ -30,7 +41,20 @@
       "ADR-088 需 architect 参与 §语义裁决表的正式表态（留 B2，B0 只填表头与已知分歧）",
       "ADR-087 v1.1（TLM 侧 static_assert 随 TLM 删除消失 ⇒ 需切 CH_MEM 侧 CI grep 门禁）—— 登记为 ADR-088 第 5 项待办"
     ],
-    "cross_repo_pending": []
+    "cross_repo_pending": [],
+    "deps_analysis": {
+      "candidates": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "report": ".rddf/state/.deps-output.md",
+      "ai_result": ".rddf/state/.deps-ai-result.json",
+      "file_conflicts": [
+        ".github/workflows/architecture-gates.yml —— 两者各追加一个 step ⇒ 同一 hunk 邻近 ⇒ 必须顺序执行"
+      ],
+      "incoming_soft_deps": [
+        "rv64-isa-declaration-correction：① ADR-088 §5 待办实体 = A 的 Task 8 护栏 ⇒ A 未落地时 B 记录未验证前提；② 冻结门禁 baseline 快照必须晚于 A（否则 ip/cpu/cpu_factory.h 新增的 validate_isa_xlen 被判『未登记新增函数』假阳性）"
+      ],
+      "outgoing_soft_deps": [],
+      "recommended_order": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"]
+    }
   },
   "worktree_path": "",
   "branch": "",

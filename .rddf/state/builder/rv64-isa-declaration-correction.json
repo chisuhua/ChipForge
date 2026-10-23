@@ -3,9 +3,9 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "rv64-isa-declaration-correction",
-  "current_phase": "phase-1",
+  "current_phase": "phase-1.5",
   "approval_status": "approved",
-  "plan_quality_status": "pending",
+  "plan_quality_status": "approved",
   "p0_decision": {
     "case": 1,
     "route": "full-p1-p3",
@@ -21,14 +21,38 @@
       "cpu_sim CLI 行为变化（5 个 e2e 用例 exec_cmd 约定回归）"
     ]
   },
-  "execution_mode_decision": {},
+  "execution_mode_decision": {
+    "decided_at": "2026-10-23T09:20:00Z",
+    "decided_by": "rdd-builder P1.5 (auto-decision, ADR-0024 lightweight vs worktree)",
+    "mode": "in-place-branch",
+    "branch": "feature/rv64-isa-declaration-correction",
+    "rationale": [
+      "复用现有 build/ → TDD 红绿循环最快（plan 有 3 处 build + 1 处变异对照编译；CH_MEM target 需重编）",
+      "变更面收敛：13 Task / 12 文件，单模块 ip/cpu + tests/ + tools/ + .github/，不跨模块 API",
+      "feature branch 隔离 ⇒ main 工作区不受污染，保留 worktree 的主要收益",
+      "worktree 代价已实测推导：_deps_install_dir = ${CMAKE_BINARY_DIR}/_deps/install（CMakeLists.txt:81）⇒ worktree 内是全新 build 目录 ⇒ CppTLM/CppHDL 需重编（仓内 symlink 本地源，无网络，但数分钟）；收益仅为更强工作区隔离"
+    ],
+    "fallback_if_needed": "用户要求强隔离时切 worktree 模式（opencode worktree_create + 该 worktree 内 cmake configure）",
+    "user_confirmation_required_at": "phase-2 (HARD pause)"
+  },
   "deps_status": {
     "blockers": [],
     "manual_deps": [
       "feat-rv64-isa-declaration-integrity (roadmap Change 1 owner)",
       "feat-tlm-backend-retirement (Gate 1 前置 G1.5，软依赖)"
     ],
-    "cross_repo_pending": []
+    "cross_repo_pending": [],
+    "deps_analysis": {
+      "candidates": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "report": ".rddf/state/.deps-output.md",
+      "ai_result": ".rddf/state/.deps-ai-result.json",
+      "file_conflicts": [],
+      "outgoing_soft_deps": [
+        "chmem-tlm-backend-freeze 依赖本 change：① ADR-088 §5 待办实体是本 change 的 Task 8 护栏；② B 的冻结门禁 baseline 快照必须晚于本 change（否则 ip/cpu/cpu_factory.h 新增的 validate_isa_xlen 被判假阳性）"
+      ],
+      "incoming_soft_deps": [],
+      "recommended_order": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"]
+    }
   },
   "worktree_path": "",
   "branch": "",

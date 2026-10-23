@@ -1,0 +1,84 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "mmu-chmem-phase-b-c-launch",
+  "current_phase": "phase-1",
+  "approval_status": "approved",
+  "approval_method": "ADR-0049-auto-decision",
+  "approval_decided_at": "2026-10-18T13:00:00Z",
+  "approval_rationale": "advisory=complex + LLM=complex + AC=9 (2 Requirements + 7 Scenarios in spec.md) + proposal.md ready + depends_on all resolved (mmu-chmem-pipeline-integration Phase 2 done 2026-10-17, csr-chmem-writeback-complete archived 2026-10-15) → case 1 approve per ADR-0049; user 2026-10-18 explicit approve via 选 F2 (改 status + 补 P0 入口) in 4-option question. 4 prerequisite (R11.1 重审 / fetch-stall-protocol-v0.2 / bp-btb-coordination-3items / CtrlLink API gap FP-4) 由 Sprint 2-5 启动期 pre_flight 处理, P0 阶段不阻塞 (P1.5 阶段 check)",
+  "llm_preflight_reasoning": {
+    "complexity_assessment": "complex",
+    "complexity_agreement_with_advisory": "yes",
+    "concerns": [
+      "跨 6+ 模块影响 (ip/mmu/ + ip/cpu/ + tests/×4)",
+      "public interface 扩展 (MMUPlugin_chmem.h + RiscvMMUPlugin_chmem.h 新契约)",
+      "≈ 27 tasks 跨 Sprint 2-5 (2026-10-23 ~ 2026-11-30, 5.5 周) + Sprint 6-7 (12-01 ~ 12-22, 3.0 周)",
+      "4 项 prerequisite (R11.1 / fetch-stall-v0.2 / bp-btb / CtrlLink gap) 在 pre_flight 必做",
+      "pre-existing baseline 退化 (18 ELF FAIL) 已知不阻塞, 属 feat-phase-6d-rtl-verification (Phase 6d.7 owner)"
+    ],
+    "data_sources": {
+      "primary_improvement_md": null,
+      "primary_improvement_fallback_reason": "本 change 由 mmu-chmem-pipeline-integration Phase 2 done (commit 271c379) 拆分出的 follow-up, 走 FALLBACK 路径读 proposal.md (208 行) + spec.md (53 行) + tasks.md (65 行) 完成等同 5 段 improvement 的功能",
+      "secondary_planner_handoff": {
+        "recommended_route": "complex",
+        "awaiting_builder": ["mmu-chmem-phase-b-c-launch"],
+        "awaiting_builder_conflict": "mmu-chmem-pipeline-integration 仍在 current_phase=phase-2, 移交不冲突 (H1 决策 A1.A 延后 archive)"
+      },
+      "fallback_proposal_md": {
+        "path": "openspec/changes/mmu-chmem-phase-b-c-launch/proposal.md",
+        "lines": 208,
+        "status": "ready",
+        "frontmatter": "initiative=wave5-isa-coverage-and-bp, priority=P1, version_target=v0.11.0, status=ready (2026-10-18 修订 from placeholder)",
+        "depends_on": ["mmu-chmem-pipeline-integration (Phase 2 done)", "csr-chmem-writeback-complete (archived)"],
+        "depends_on_status": "all resolved"
+      },
+      "always_adr": {
+        "touched": ["ADR-040 v2.0", "ADR-046", "ADR-049", "ADR-083", "ADR-0049"],
+        "portability_check": "12/12 PASS"
+      }
+    }
+  },
+  "plan_quality_status": "pending",
+  "plan_path": ".rddf/plans/mmu-chmem-phase-b-c-launch.md",
+  "plan_lines": 0,
+  "plan_steps": 0,
+  "plan_tasks": 27,
+  "plan_passed_at": null,
+  "execution_mode_decision": {},
+  "deps_status": {
+    "blockers": [
+      "Sprint 2-5 启动期 pre_flight 必做: R11.1 trap PC 跳转可行性重审",
+      "Sprint 2-5 启动期 pre_flight 必做: fetch-stall-protocol-v0.2 起草 (解 critic 5 BLOCKERS)",
+      "Sprint 2-5 启动期 pre_flight 必做: bp-btb-coordination-3items 协商 (pc_reg mux / stall / fetch stage 协议)",
+      "Sprint 2-5 启动期 pre_flight 必做: CtrlLink API gap (FP-4) 解锁 (hazard_chmem.h:152-154 admitted)"
+    ],
+    "manual_deps": [],
+    "cross_repo_pending": [],
+    "plan_internal_dependencies_expressed": true,
+    "plan_internal_deps_phase_table_location": ".rddf/plans/mmu-chmem-phase-b-c-launch.md §File Structure (tasks.md → Phase 聚合映射)",
+    "deps_status_note": "4 项 prerequisite 是 plan_internal (mmu-chmem follow-up scope 内) 而非 cross-change blocker, 走 P1.5 pre_flight 段处理, 不阻塞 P0 approval / P1 plan gen"
+  },
+  "worktree_path": "",
+  "branch": "",
+  "execution_status": "p0_approved_pending_p1_plan_gen",
+  "review_status": "pending",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [],
+  "phase_started_at": "2026-10-18T13:00:00Z",
+  "phase_started_from": "rdd-builder",
+  "phase_transitions": [
+    {
+      "from": "phase-0",
+      "to": "phase-1",
+      "at": "2026-10-18T13:00:00Z",
+      "trigger": "P0 approval Option 1 case 1 (auto-decision per ADR-0049); user 2026-10-18 explicit approve via 选 F2 (改 status 为 ready + 补 P0 入口) in 4-option question"
+    }
+  ],
+  "archive_status": "pending",
+  "verifier_report_path": ".rddf/state/.verifier-report.json",
+  "updated_at": "2026-10-18T13:00:00Z"
+}
