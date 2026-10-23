@@ -660,7 +660,9 @@ class CpuFactory {
       }
     }
     if (cfg.ext_zicsr)  csr = arch::riscv::RiscvCsrPlugin<T>::create(cfg);
-    if (cfg.ext_f || cfg.ext_d) fpu = arch::riscv::RiscvFpuPlugin<T>::create(cfg);
+    // FPU (F/D) 扩展点: Phase 5+ 推迟, 当前**无** RiscvFpuPlugin 实现
+    // (ip/cpu/arch/riscv/fpu.h 已作为 0-includer 死代码删除, 见 ADR-088 §3)
+    // if (cfg.ext_f || cfg.ext_d) fpu = arch::riscv::RiscvFpuPlugin<T>::create(cfg);
 
     // ===== 阶段 3: 注册 (顺序 = EARLY → NORMAL → LATE) =====
 
@@ -899,7 +901,7 @@ def compute_pareto(results, maximize, minimize):
 | 跨 ISA (非 RISC-V) | `payload_common.h:115,117` 静态断言卡 XLEN=32/64 | ARM/MIPS 需新 plugin + 放宽断言 |
 | L2/L3 cache | `ip/memory/` 仅 README | IBusPlugin/DBusPlugin 接受 latency 但无真实 cache |
 | 真实 MMU/PMP | MMUPlugin 是空 stub | 字段保留 |
-| FPU (F/D) | RiscvFpuPlugin 是空 stub | 字段保留 |
+| FPU (F/D) | 无实现（`RiscvFpuPlugin` 死代码已删，Phase 5+ 推迟） | 字段保留 |
 | 多核 / SMT | Phase 6+ | 单核 CPU 即可 DSE |
 | RTL_ONLY / COMPARE | `cf::plugin::ImplMode` 枚举未在 PipeBuilder 实现 | TLM 模式即可 DSE |
 
