@@ -43,7 +43,7 @@ ADR-083（Plugin-style 单一 source of truth）要求"同一份业务 Plugin �
 
 ## 范围
 
-**In Scope:**
+**In Scope**:
 
 1. `ip/cpu/cpu_factory.h` —— `CPUConfig::isa` 默认 `rv64gc` → `rv32im`；新增 `std::uint8_t xlen = 32;`；新增 `isa → xlen` 映射 + **运行时 fail-fast** 一致性检查（`isa` 为运行期 `std::string`（`:127`，值来自 JSON 装载），编译期校验不成立；fail 落点在 `load_config()`/`build_cpu()`，形态与 D1 `unsupported` 同）
 2. `ip/cpu/configs/cpu_params_schema.json` —— 新增 `xlen` 属性（enum 32/64）；`isa` enum 三态标注（implemented / declared-reserved / unsupported）；default `rv32im`
@@ -56,7 +56,7 @@ ADR-083（Plugin-style 单一 source of truth）要求"同一份业务 Plugin �
 9. `docs/architecture/adr.md` —— ADR-087 注册（已完成，见 §Impact）
 10. CI 软门禁 —— "新增 XLEN 假设必须登记缺口表" 提示（warn 级）
 
-**Out of Scope:**
+**Out of Scope**:
 
 - **不做 `isa → T` 真 dispatch**（留 phase-5，与 `feat-tlm-backend-retirement` B1 合并做 —— 否则要先定 XLEN 单一来源，见 ADR-087 §D3）
 - **不做任何 RV64 语义实现**（XLEN 参数化 / 128-bit 乘积 / 64 拍除法 / LD-SD / W 指令 / CSR 64-bit / `misa`-MXL —— 全部属 ADR-087 G1–G9 准入清单，当前 0/9 满足）
