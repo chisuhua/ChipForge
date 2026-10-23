@@ -70,3 +70,38 @@ TEST_CASE("declared-reserved accepted with single warning", "[cpu][isa-xlen]") {
   REQUIRE(cap.str().find("[declared-reserved]") ==
           cap.str().rfind("[declared-reserved]"));
 }
+
+// ---------------------------------------------------------------------------
+// helper 直调用例 (补全覆盖)
+// 背景: `kernel_xlen != 32` 这条 implemented 分支经 build_cpu 无法到达 ——
+//   T=uint64_t 的实例化已被 int_alu.h/branch.h 的编译期 static_assert 拦下
+//   (ADR-087 AC2) ⇒ 该分支在 build_cpu 路径上是「编译期不可达」的防御代码。
+//   validate_isa_xlen 是 cf::cpu::detail 下的 inline 函数（非 static）⇒ 可直调，
+//   用显式 kernel_xlen 参数覆盖该分支。
+// ---------------------------------------------------------------------------
+TEST_CASE("validate_isa_xlen rejects kernel T mismatch (direct call)",
+          "[cpu][isa-xlen]") {
+  CPUConfig cfg;  // isa=rv32im (implemented), xlen=32 —— 与 config 自洽
+  REQUIRE_THROWS_AS(cf::cpu::detail::validate_isa_xlen(cfg, 64),
+                    std::invalid_argument);
+  REQUIRE_NOTHROW(cf::cpu::detail::validate_isa_xlen(cfg, 32));
+}
+
+TEST_CASE("validate_isa_xlen reserved path direct call", "[cpu][isa-xlen]") {
+  CerrCapture cap;
+  CPUConfig cfg;
+  cfg.isa = "rv64gc";  // declared-reserved
+  cfg.xlen = 64;       // 与 kernel_xlen 一致 ⇒ 只 warn 不 throw
+  REQUIRE_NOTHROW(cf::cpu::detail::validate_isa_xlen(cfg, 64));
+  REQUIRE(cap.str().find("[declared-reserved]") != std::string::npos);
+  // kernel_xlen 与 xlen 不一致 ⇒ throw
+  REQUIRE_THROWS_AS(cf::cpu::detail::validate_isa_xlen(cfg, 32),
+                    std::invalid_argument);
+}
+
+TEST_CASE("validate_isa_xlen unsupported isa direct call", "[cpu][isa-xlen]") {
+  CPUConfig cfg;
+  cfg.isa = "rv128i";
+  REQUIRE_THROWS_AS(cf::cpu::detail::validate_isa_xlen(cfg, 32),
+                    std::invalid_argument);
+}
