@@ -40,7 +40,11 @@ adr:
 | 链接依赖 | `chipforge_tests_chmem`（`tests/CMakeLists.txt:183`）与 `cpu_verilator_sim`（`tools/verilator_runner/CMakeLists.txt:47`）**仍链接 `libcpptlm_core.a`** ⇒ 删 TLM 代码 ≠ 立刻脱 CppTLM |
 | 双后端编译开关 | `CF_PLUGIN_USE_CH_MEM` 是 **per-target 编译定义**（`tests/CMakeLists.txt:166` + `tools/verilator_runner/CMakeLists.txt:35`），无全局 `option()` |
 
-> **草案数字纠正（实测，2026-10-23）**：improvement 草案记「44 文件 / 5,331 行 TLM-only」与「10 个双模共享文件」。实测 `ip/cpu/cpu_factory_chmem.h:54-56` 把 `ip/cpu/plugins/mmu_exception_handler.h` 包在 `#ifndef CF_PLUGIN_USE_CH_MEM` 内 ⇒ CH_MEM 模式**根本不编译**它（其 includer 仅 TLM 工厂 `ip/cpu/cpu_factory.h:48` 与 TLM-only 测试 `tests/cpu/test_mmu_exception_handler.cpp:21`）⇒ 它是 **TLM-only**，不是双模共享。故：双模共享 = **9 个**，TLM-only = **45 文件 / 5,400 行**。本 proposal 与 AC 采用纠正后数字；草案原文保留作为历史。
+> **草案数字纠正（实测，2026-10-23）**：improvement 草案记「44 文件 / 5,331 行 TLM-only」与「10 个双模共享文件」。实测 `ip/cpu/cpu_factory_chmem.h:54-56` 把 `ip/cpu/plugins/mmu_exception_handler.h` 包在 `#ifndef CF_PLUGIN_USE_CH_MEM` 内 ⇒ CH_MEM 模式**根本不编译**它（其 includer 仅 TLM 工厂 `ip/cpu/cpu_factory.h:48` 与 TLM-only 测试 `tests/cpu/test_mmu_exception_handler.cpp:21`）⇒ 它是 **TLM-only**，不是双模共享。故：双模共享 = **9 个**。
+>
+> **第二处纠正（实施期实测，2026-10-24）**：草案记「TLM-only = 45 文件 / 5,400 行」，本次**实测口径**为 —— `find ip -name '*.h' -o -name '*.cpp' | grep -v '_chmem\.' | sort -u` = **53** ⇒ 减 9 个双模共享 = **44**（删 4 个死代码前 = **48**）。⇒ **AC9 采用实测值 48 → 44**（草案的 45 → 41 与 44 → 40 均未实测，作历史保留）。
+>
+> 本 proposal 与 AC 采用纠正后数字；草案原文保留作为历史。
 
 ## What Changes
 
@@ -54,7 +58,7 @@ adr:
 
 ### Out of Scope（9 项）
 
-- ❌ **不删任何 TLM-only 业务代码**（45 → 41 只删 4 个死代码；其余归 B3，由 Gate 3 放行）
+- ❌ **不删任何 TLM-only 业务代码**（**48 → 44**（实测口径，见 §Why 的「数字纠正」）只删 4 个死代码；其余归 B3，由 Gate 3 放行）
 - ❌ 不删 `src/cf_plugin/bridge/`（8 文件 / 727 行；`openspec/specs/mmu-cpptlm-bridge/` + `openspec/specs/bridge-tick-pattern-rationale/` 两个 spec 的退役归 B3）
 - ❌ 不删 `tools/cpu_sim`
 - ❌ 不删「目录名带 `tlm/` 但双模共享」的 9 个文件
@@ -124,7 +128,7 @@ adr:
 - [ ] ADR-088 §语义裁决表 5 个子系统**全部有表头与已知分歧记录**（正式表态留 B2，但不得留空）
 - [ ] ADR-083 出 v1.1 修订，含「冻结条款 + 退役时间线」一节
 - [ ] ADR-087 §D4 护栏形态随 TLM 退役切换的问题，已在 ADR-088 中登记为待办（需 architect 出 ADR-087 v1.1）
-- [ ] TLM-only 业务文件数 **45 → 41**（实测口径：`ip/` 下非 `_chmem.h` 的 TLM-only 文件 include 闭包清点；**修正草案的 44 → 40**，依据见 §Why 的「草案数字纠正」）
+- [ ] TLM-only 业务文件数 **48 → 44**（**实测口径**：`find ip -name '*.h' -o -name '*.cpp' | grep -v '_chmem\.'` = 53 ⇒ 减 9 个双模共享 = 44，删 4 死代码前为 48；**再修正草案的 45 → 41 与 44 → 40** —— 草案数字未实测）
 - [ ] 5 个架构门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical
 - [ ] 覆盖平价台账格式已在 ADR-088 中定义，且姊妹提案 `chmem-tlm-coverage-parity-ledger` 已立项（内容交付可后置，**格式**不得后置）
 

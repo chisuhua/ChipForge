@@ -24,26 +24,43 @@ status: in-planning
 
 ## Implementation
 
-- [ ] Task 1 基线快照 + 前置条件核实（A 已合并 / 双 binary 计数 / 4 死代码 0-includer 复核）
-- [ ] Task 2 固化判定口径三件套：`.rddf/state/tlm-freeze-base.txt`（固定 sha 锚点）+ `tlm-shared-files.txt`（9 条共享清单）+ `tlm-freeze-allowlist.txt`（`文件:行 | 原因 | CH_MEM 是否需同步`）
-- [ ] Task 3 冻结门禁脚本 `tools/check_tlm_freeze.sh`（检测面 + baseline 差集 + 白名单校验 + 共享排除 + >5 条复审提示；baseline 缺失 ⇒ 跳过 exit 0）
-- [ ] Task 4 门禁变异对照自证（新增函数 ⇒ exit 1 + 报 `文件:行`；登记白名单 ⇒ 0；还原后复跑 0）
-- [ ] Task 5 CI 接入（`architecture-gates.yml` step，warn 级 `continue-on-error: true`）+ `tools/README.md` 登记 + yaml 校验
-- [ ] Task 6 删除 4 个死代码（`ip/cpu/plugins/exception.h` / `plugins/fpu.h` / `arch/riscv/fpu.h` / `ip/cache/plugins/cache_keys.h`）+ 双 binary build + 0 退化 + 门禁复跑
-- [ ] Task 7 起草 ADR-088（§2 冻结条款 3 小节 / §3 语义裁决表 5 子系统表头+已知分歧填满、正式表态留 B2 / §4 台账三态格式 + 509≠451 口径注记 / §5 B3 删除判据（闭包反查，禁路径名推断）/ §6 ADR-087 v1.1 待办**显式登记行** / §7–§9 影响与验证记录）
-- [ ] Task 8 ADR-083 v1.1（§2.5 冻结条款 + §5.4 退役时间线 + 头部版本标记）+ `docs/architecture/adr.md` 注册 ADR-088 + 修订历史 1.6 行 + `verify_adr` / `doc_link_check` 自检
-- [ ] Task 9 全门禁收口：7 门禁（6 架构 + 冻结门禁）+ AC 逐条机械复核 + 双 binary 全量回归 0 退化 + `openspec change validate` + **分 3 批 commit**（批 2 的已删路径**不带 `git add`**）
+- [x] Task 1 基线快照 + 前置条件核实（A 已合并 / 双 binary 计数 / 4 死代码 0-includer 复核）
+- [x] Task 2 固化判定口径三件套：`.rddf/state/tlm-freeze-base.txt`（固定 sha 锚点）+ `tlm-shared-files.txt`（9 条共享清单）+ `tlm-freeze-allowlist.txt`（`文件:行 | 原因 | CH_MEM 是否需同步`）
+- [x] Task 3 冻结门禁脚本 `tools/check_tlm_freeze.sh`（检测面 + baseline 差集 + 白名单校验 + 共享排除 + >5 条复审提示；baseline 缺失 ⇒ 跳过 exit 0）
+- [x] Task 4 门禁变异对照自证（新增函数 ⇒ exit 1 + 报 `文件:行`；登记白名单 ⇒ 0；还原后复跑 0）
+- [x] Task 5 CI 接入（`architecture-gates.yml` step，warn 级 `continue-on-error: true`）+ `tools/README.md` 登记 + yaml 校验
+- [x] Task 6 删除 4 个死代码（`ip/cpu/plugins/exception.h` / `plugins/fpu.h` / `arch/riscv/fpu.h` / `ip/cache/plugins/cache_keys.h`）+ 双 binary build + 0 退化 + 门禁复跑
+- [x] Task 7 起草 ADR-088（§2 冻结条款 3 小节 / §3 语义裁决表 5 子系统表头+已知分歧填满、正式表态留 B2 / §4 台账三态格式 + 509≠451 口径注记 / §5 B3 删除判据（闭包反查，禁路径名推断）/ §6 ADR-087 v1.1 待办**显式登记行** / §7–§9 影响与验证记录）
+- [x] Task 8 ADR-083 v1.1（§2.5 冻结条款 + §5.4 退役时间线 + 头部版本标记）+ `docs/architecture/adr.md` 注册 ADR-088 + 修订历史 1.6 行 + `verify_adr` / `doc_link_check` 自检
+- [x] Task 9 全门禁收口：7 门禁（6 架构 + 冻结门禁）+ AC 逐条机械复核 + 双 binary 全量回归 0 退化 + `openspec change validate` + **分 3 批 commit**（批 2 的已删路径**不带 `git add`**）
 
 ## Acceptance
 
-- [ ] AC1 `tools/check_tlm_freeze.sh` 存在且可执行；**人为在任一 TLM-only 文件新增一个函数 → 脚本返回非 0 并报出 `文件:行`**
-- [ ] AC2 冻结门禁已接入 `.github/workflows/architecture-gates.yml`（**CI 层 warn 级** = `continue-on-error: true`；**脚本层对违规仍返回非 0**）；CI 日志可见其输出
-- [ ] AC3 4 个死代码文件已删除；`grep -rn "#include.*\(exception\|fpu\|cache_keys\)\.h" ip/ src/ tests/ tools/` 返回 0 includer 命中
-- [ ] AC4 双 binary 编译通过（`chipforge_tests` + `chipforge_tests_chmem`）；全量测试 0 退化（TLM entry 仍恰 1 个 pre-existing FAIL：`test_7stage_riscv.cpp:124`）
-- [ ] AC5 `docs/architecture/adr/ADR-088-tlm-backend-retirement.md` 存在，含 **5 项必填内容各 ≥1 节**（尤其第 5 项 ADR-087 v1.1 待办的显式登记行）；已注册进 `docs/architecture/adr.md`
-- [ ] AC6 ADR-088 §语义裁决表 5 个子系统**全部有表头与已知分歧记录**（正式表态留 B2，但不得留空）
-- [ ] AC7 ADR-083 出 v1.1 修订，含「冻结条款 + 退役时间线」一节（§2.5 + §5.4）
-- [ ] AC8 ADR-087 §D4 护栏形态随 TLM 退役切换的问题，已在 ADR-088 中登记为待办（需 architect 出 ADR-087 v1.1）
-- [ ] AC9 TLM-only 业务文件数从 **45 → 41**（实测口径：`ip/` 下非 `_chmem.h` 的 TLM-only 文件 include 闭包清点；**修正草案的 44 → 40**，依据见 proposal §Why 的「草案数字纠正」）
-- [ ] AC10 5 个架构门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical
-- [ ] AC11 覆盖平价台账格式已在 ADR-088 中定义（三态标注 + 必填字段 + 509≠451 口径注记），且姊妹提案 `chmem-tlm-coverage-parity-ledger` 已立项（内容交付可后置，**格式**不得后置）
+- [x] AC1 `tools/check_tlm_freeze.sh` 存在且可执行；**人为在任一 TLM-only 文件新增一个函数 → 脚本返回非 0 并报出 `文件:行`**
+- [x] AC2 冻结门禁已接入 `.github/workflows/architecture-gates.yml`（**CI 层 warn 级** = `continue-on-error: true`；**脚本层对违规仍返回非 0**）；CI 日志可见其输出
+- [x] AC3 4 个死代码文件已删除；**完整路径**口径 `grep -rn "include.*\"ip/cpu/plugins/exception\.h\"" ip/ src/ tests/ tools/ bundles/ include/` 返回 0 命中（⚠️ basename 口径会撞框架的 `cf/plugin/plugin_exception.h` ⇒ 假阳性 8）
+- [x] AC4 双 binary 编译通过（`chipforge_tests` + `chipforge_tests_chmem`）；全量测试 0 退化（TLM entry 仍恰 1 个 pre-existing FAIL：`test_7stage_riscv.cpp:124`）
+- [x] AC5 `docs/architecture/adr/ADR-088-tlm-backend-retirement.md` 存在，含 **5 项必填内容各 ≥1 节**（尤其第 5 项 ADR-087 v1.1 待办的显式登记行）；已注册进 `docs/architecture/adr.md`
+- [x] AC6 ADR-088 §语义裁决表 5 个子系统**全部有表头与已知分歧记录**（正式表态留 B2，但不得留空）
+- [x] AC7 ADR-083 出 v1.1 修订，含「冻结条款 + 退役时间线」一节（§2.5 + §5.4）
+- [x] AC8 ADR-087 §D4 护栏形态随 TLM 退役切换的问题，已在 ADR-088 中登记为待办（需 architect 出 ADR-087 v1.1）
+- [x] AC9 TLM-only 业务文件数 **48 → 44**（**实测口径**：`(find ip -name '*.h' -o -name '*.cpp' | grep -v '_chmem\.' | sort -u)` = 53 ⇒ 减 9 个双模共享 = **44**（删 4 死代码前 **48**）；**再修正草案的 45 → 41 与 44 → 40** —— 草案数字未实测，本 change 以 include 闭包实测值为准）
+- [x] AC10 5 个架构门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical
+- [x] AC11 覆盖平价台账格式已在 ADR-088 中定义（三态标注 + 必填字段 + 509≠451 口径注记），且姊妹提案 `chmem-tlm-coverage-parity-ledger` 已立项（内容交付可后置，**格式**不得后置）
+
+### 实测留证（2026-10-24，branch `feature/chmem-tlm-backend-freeze`）
+
+| 项 | 实测 |
+|---|---|
+| 门禁基线 | `violations=0 allowlist=0 candidates=31 base=a9f0d97432` + exit 0 |
+| 门禁变异 | `branch.h` 追加函数 ⇒ `VIOLATION: ... branch.h:142` + 签名 + 登记提示 + `violations=1` + **exit 1** |
+| 白名单豁免 | 登记该行 ⇒ `violations=0 allowlist=1` + exit 0 |
+| 还原 | `git checkout --` + 按登记文本删白名单 ⇒ `grep -vc '^#'` = 0 + `violations=0` |
+| 死代码 0 includer | 4 文件**完整路径**口径 = 0（⚠️ basename 口径撞框架 `cf/plugin/plugin_exception.h` ⇒ 假阳性 8；类名口径的 6 处命中全是文档提及） |
+| 双 binary build | `chipforge_tests` ✅ + `chipforge_tests_chmem` ✅（exit 0） |
+| 全量回归 | `run_chipforge_tests.sh --all`：4 entry = 3 PASS + `chipforge_tests` Failed（**恰 1 个 pre-existing** `test_7stage_riscv.cpp:124`）；chmem entry 591.47s；总 655.51s；TLM 493 = 492 + 1；`[cpu]` 137；chmem binary 130 |
+| 门禁复跑（删文件后） | `violations=0`，candidates 35 → **31**（4 个死代码退出检测面） |
+| 7 门禁 | verify_adr ✅ · verify_plugin_decision 8/8 ✅ · check_plugin_portability 13/13 ✅ · doc_link_check 0 broken ✅ · roadmap-r9-check 11 fragments ✅ · check_xlen_hygiene warn=0 ✅ · **check_tlm_freeze violations=0** ✅ |
+| ADR-088 5 项必填 | `### 2/3/4/5/6` 各 1 节；「留 B2」标记 6 处；ADR-087 待办登记 5 处；共享清单 9 条 |
+| ADR-083 v1.1 | §2.5 冻结条款 ✅ + §5.4 退役时间线 ✅ + 头部 v1.1 标记 ✅；`adr.md` 注册 1 行 + 修订历史 1.6 行 |
+| TLM-only 业务文件数 | **48 → 44**（实测口径，见 AC9） |

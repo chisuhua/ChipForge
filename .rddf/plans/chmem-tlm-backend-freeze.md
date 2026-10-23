@@ -45,6 +45,18 @@
 
 ---
 
+### 实施实测留证（2026-10-24，builder 执行中发现并已修正的 5 处）
+
+| # | 发现 | 影响 | 处置 |
+|---|------|------|------|
+| 1 | **检测面定义过窄**：草案的「`ip/**/plugins/*.h` + `ip/**/arch/**/*.h`」实测只有 **18** 个候选 ⇒ 漏掉 `ip/mmu/{tlm,lib,policies}` 与 `ip/cache/policies` 的 TLM-only 面 | 冻结门禁管不住 `ip/mmu/tlm/MMUPlugin.h` 等 | 扩为 `ip/**/*.h`（非 `_chmem.h`）⇒ **44 − 9 共享 = 35** 候选（删 4 死代码后 **31**） |
+| 2 | **白名单还原命令失效**：plan 原本用函数名做 `sed` pattern，但登记行写的是**原因文本** ⇒ 删不掉 ⇒ 白名单残留会**错误豁免**后续判定 | 门禁可能被静默绕过 | 还原改为 `git checkout -- <file>` + 按**登记文本**删条目 + 复核 `grep -vc '^#'` = 0（plan Task 4 Step 3 已修正） |
+| 3 | **yaml 校验读到错 job**：workflow 有 2 个 job（`toolchain-sanity` 8 steps + `architecture-gates` N steps）⇒ `list(d['jobs'].keys())[0]` 读的是前者 | 自检命令误报 | plan Task 5 Step 2 改为显式指定 `d['jobs']['architecture-gates']`（实测 10 steps） |
+| 4 | **ADR 章节自检口径错**：ADR-088 的必填章节是**三级标题** `### N.` ⇒ plan 的 `grep "^## N"` 恒 0 | 自检恒失败 | plan Task 7 Step 5 改为 `grep -c "^### N\."`（实测 5 行全 1） |
+| 5 | **死代码 includer 假阳性**：plan 的 basename 口径（`grep "#include.*exception\.h"`）撞上框架的 `cf/plugin/plugin_exception.h` ⇒ 报 8 命中 | 误判死代码有引用 | 改**完整相对路径**口径 ⇒ 4 文件真实命中 **0**；类名口径的 6 处命中经查全是**文档提及**（`ip/cpu/docs/{dse_architecture,implementation-plan/README}.md`）⇒ 同步把 `dse_architecture.md` 中引用已删 `RiscvFpuPlugin` 的伪代码改为「Phase 5+ 推迟，当前无实现」注释 |
+
+> 5 处全部是「照抄即挂」类问题 ⇒ 再次验证「代码块/命令必须逐字实跑一次」这条纪律的价值（与 A 的 change 同源）。
+
 ### Task 1: 基线快照 + 前置条件核实
 
 **Files:**
@@ -281,8 +293,10 @@ s=open(p).read()
 s=re.sub(r'\n// MUTATION: 冻结门禁自检用临时函数\nstatic int tlm_freeze_probe_fn\(int x\) \{ return x \+ 1; \}\n', '\n', s)
 open(p,'w').write(s)
 EOF
-sed -i '/tlm_freeze_probe_fn/d' .rddf/state/tlm-freeze-allowlist.txt && git diff --stat ip/cpu/arch/riscv/branch.h`
-Expected: `branch.h` 无 diff（还原干净）
+git checkout -- ip/cpu/arch/riscv/branch.h && sed -i '/门禁自检临时探针/d' .rddf/state/tlm-freeze-allowlist.txt && git diff --stat ip/cpu/arch/riscv/branch.h && grep -vc '^#' .rddf/state/tlm-freeze-allowlist.txt`
+Expected: `branch.h` 无 diff（还原干净）+ 白名单非注释行数 = 0
+
+> ⚠️ **还原命令的坑**（builder 实测踩到）：白名单登记行写的是**原因文本**（如「门禁自检临时探针」）而**不是**函数名 ⇒ 用函数名做 `sed` pattern **删不掉** ⇒ 白名单残留会让后续判定被错误豁免。还原一律用 `git checkout -- <file>`（文件）+ 按**登记行文本**删白名单条目，并复核 `grep -vc '^#'` = 0。
 
 - [ ] **Step 4: 还原后复跑**
 
@@ -312,8 +326,10 @@ Expected: `violations=0` + exit 0
 
 - [ ] **Step 2: yaml 语法校验**
 
-Run: `python3 -c "import yaml; d=yaml.safe_load(open('.github/workflows/architecture-gates.yml')); print('yaml ok, steps:', len(d['jobs'][list(d['jobs'].keys())[0]]['steps']))"`
-Expected: `yaml ok, steps: 9`（原 8 + 本次 1）
+Run: `python3 -c "import yaml; d=yaml.safe_load(open('.github/workflows/architecture-gates.yml')); j=d['jobs']['architecture-gates']; print('yaml ok, steps:', len(j['steps'])); print([s.get('name','') for s in j['steps'] if 'freeze' in s.get('name','')])"`
+Expected: `yaml ok, steps: 10`（原 9 + 本次 1）+ 列表含 `Check TLM freeze (check_tlm_freeze.sh, warn-level per ADR-088 §2)`
+
+> ⚠️ 该 workflow 有 **2 个 job**（`toolchain-sanity` 8 steps + `architecture-gates` N steps）⇒ 校验命令必须**指定 job 名**（`d['jobs']['architecture-gates']`），否则读到的是第一个 job 的 step 数。
 
 - [ ] **Step 3: `tools/README.md` 登记**
 
@@ -388,8 +404,8 @@ Expected: `violations=0` + exit 0
 
 - [ ] **Step 5: 自检 — 5 项必填逐条落地**
 
-Run: `for k in "## 2" "## 3" "## 4" "## 5" "## 6"; do echo -n "$k: "; grep -c "^$k" docs/architecture/adr/ADR-088-tlm-backend-retirement.md; done`
-Expected: 5 行全 ≥1
+Run: `for k in 2 3 4 5 6; do echo -n "### $k: "; grep -c "^### $k\." docs/architecture/adr/ADR-088-tlm-backend-retirement.md; done`
+Expected: 5 行全 ≥1（章节为**三级标题** `### N. 标题` ⇒ 匹配 `^### N\.`，不是 `^## N`）
 
 Run: `grep -c "留 B2" docs/architecture/adr/ADR-088-tlm-backend-retirement.md` → 期望 ≥5（5 个子系统的正式表态留空标记）
 Run: `grep -c "rv64-isa-declaration-correction\|ADR-087" docs/architecture/adr/ADR-088-tlm-backend-retirement.md` → 期望 ≥2（§6 待办登记）
@@ -488,7 +504,9 @@ Expected: valid（0 error）
 - [ ] **Step 5: 分批 commit（3 批，`git commit -- <paths>` 限定 pathspec）**
 
 ```bash
-git add tools/check_tlm_freeze.sh .rddf/state/tlm-freeze-base.txt .rddf/state/tlm-shared-files.txt .rddf/state/tlm-freeze-allowlist.txt .github/workflows/architecture-gates.yml tools/README.md && git commit -m "ci: TLM-only 代码冻结门禁 + 判定口径三件套 (ADR-088 §2)" -- tools/check_tlm_freeze.sh .github/workflows/architecture-gates.yml tools/README.md
+git add tools/check_tlm_freeze.sh .github/workflows/architecture-gates.yml tools/README.md
+git add -f .rddf/state/tlm-freeze-base.txt .rddf/state/tlm-shared-files.txt .rddf/state/tlm-freeze-allowlist.txt
+git commit -m "ci: TLM-only 代码冻结门禁 + 判定口径三件套 (ADR-088 §2)" -- tools/check_tlm_freeze.sh .github/workflows/architecture-gates.yml tools/README.md .rddf/state/tlm-freeze-base.txt .rddf/state/tlm-shared-files.txt .rddf/state/tlm-freeze-allowlist.txt
 git add ip/cpu/plugins/exception.h ip/cpu/plugins/fpu.h ip/cpu/arch/riscv/fpu.h ip/cache/plugins/cache_keys.h && git commit -m "chore: 删除 4 个 0-includer 死代码文件 (TLM 退役 B0 前置)" -- ip/cpu/plugins/exception.h ip/cpu/plugins/fpu.h ip/cpu/arch/riscv/fpu.h ip/cache/plugins/cache_keys.h
 git add docs/architecture/adr/ADR-088-tlm-backend-retirement.md docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md docs/architecture/adr.md openspec/changes/chmem-tlm-backend-freeze/ && git commit -m "docs: ADR-088 治理锚 (5 项必填) + ADR-083 v1.1 冻结条款与退役时间线" -- docs/architecture/adr/ADR-088-tlm-backend-retirement.md docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md docs/architecture/adr.md
 ```
