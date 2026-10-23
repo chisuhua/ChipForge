@@ -1,0 +1,58 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "chmem-tlm-coverage-parity-ledger",
+  "current_phase": "phase-1",
+  "approval_status": "approved",
+  "plan_quality_status": "pending",
+  "p0_decision": {
+    "case": 1,
+    "route": "full-p1-p3",
+    "decided_at": "2026-10-24T01:20:00Z",
+    "decided_by": "auto-decision (ADR-0049) + user '继续实施剩余任务内容'",
+    "llm_assessment": "complex",
+    "planner_advisory": "complex",
+    "agreement": "yes",
+    "ac_count": 12,
+    "concerns": [
+      "463 条逐条标注的工作量与失真风险 (R1/R2) => 缓解: 半自动骨架 + 按族多数派默认 + 高风险族抽查",
+      "计数随其他 change 漂移 (R4) => 闭合校验在脚本内重算, 台账标注基线 commit",
+      "两套状态词并存 (ADR-088 三态 vs 草案措辞) => 裁决: ADR-088 §4 为权威, 台账内含映射表",
+      "0 生产代码改动约束: 台账生成/校验只能用 --list-tests 差集, 不得改测试"
+    ]
+  },
+  "execution_mode_decision": {},
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [
+      "chmem-tlm-backend-freeze (B0, 已归档 2026-10-24 => ADR-088 §4 格式已就位)"
+    ],
+    "cross_repo_pending": [],
+    "deps_analysis": {
+      "candidates": [
+        "rv64-isa-declaration-correction",
+        "chmem-tlm-backend-freeze"
+      ],
+      "note": "前置已满足: B0 已归档并交付格式; A 已归档并交付 ADR-087 语义"
+    }
+  },
+  "worktree_path": "",
+  "branch": "",
+  "execution_status": "pending",
+  "review_status": "pending",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "phase": "phase-0",
+      "event": "approved",
+      "at": "2026-10-24T01:20:00Z",
+      "note": "case-1 approve; proposal.md + specs/tlm-coverage-parity-ledger/spec.md 已生成; 数字纠正: TLM 独占 451->463 (A 新增 13 删 1), TLM 总 481->493"
+    }
+  ],
+  "archive_status": "pending",
+  "verifier_report_path": "",
+  "updated_at": "2026-10-24T01:20:00Z"
+}
