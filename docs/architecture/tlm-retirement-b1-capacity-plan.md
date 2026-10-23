@@ -113,5 +113,10 @@ CH_MEM 侧与 TLM 侧的**注册差距 = 10 处**（TLM 工厂 19 处 `register_
 | 5 | **`chmem-ptw-walk`**（未立项，**owner 已定案**） | PTW walk 实装（依 ADR-085/086 目标架构：`MMU_TLB`+`MMU_PTW` 拆分 / `FsmBase` 封装 / `PTWCache` / **代码落 `ip/mmu/plugins/`**）+ 流水线级注册 + exception handler 注册 | ADR-085/086 目标架构（已锁）· `mmu-chmem-phase-b-c-launch` 的 Phase C.5 异常回传前置 | 大 |
 | — | `chmem-tlm` 目录名治理（B0 剩余项 86） | `ip/{mmu,cpu}/tlm/` 双模共享文件迁 `core/` | 无 | 小 |
 
-> **owner 定案（2026-10-24，用户拍板）**：PTW walk 实装**归 `chmem-ptw-walk`**（不归 `mmu-chmem-phase-b-c-launch`）。后者（status: ready，10/33 tasks）**只保留 Phase C.5 的异常回传前置**（`CPU_EXCEPTION_CODE` 写入源 / `HazardPlugin` A4 信号驱动）—— 两项按**接口**协调（`chmem-ptw-walk` 消费 C.5 提供的异常信号），**无双 owner**。
+> **owner 定案（2026-10-24，用户拍板）**：边界**依 `mmu-chmem-phase-b-c-launch/tasks.md:125` 既有划分**（该 change 早在 2026-10-22 已把 PTW walk 主体 defer 到 `chmem-ptw-walk`）——
+> ① **PTW walk 主体**（B.2'/B.3'/B.3''/B.3'''/B.4'）归 **`chmem-ptw-walk`**（未立项，估 6.5d）；
+> ② **Phase C 全部保留**在 `mmu-chmem-phase-b-c-launch`（C.1 异常 handler wiring / C.4 `MMUPluginChmem` 注册 / C.5 hazard halt_when / C.6 集成测试，status: ready，10/33）；
+> ③ **依赖方向**：C.4 先（注册载体）→ B.3''（walk 接入）⇒ 两项按**接口**协调，**无双 owner**。
+>
+> **立项待办**（属 planner/builder）：`chmem-ptw-walk` 需正式立项（当前仅存在于 `phase-b-c-launch/tasks.md` 的 defer 列表）；其 tasks 骨架可直接从该 defer 列表迁移。
 > **B2 → B1 的顺序约束**：本定案已完成 ⇒ B1 可按上表立项（不再有「按错误语义假设补实现」的风险）。
