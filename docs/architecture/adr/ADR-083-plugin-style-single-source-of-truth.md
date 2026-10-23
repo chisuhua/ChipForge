@@ -2,9 +2,9 @@
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | ✅ Accepted (2026-10-08) |
-| 来源 | overview.md / AGENTS.md 文档漂移修正 + Plugin-style 范式固化 |
-| 关联 ADR | **ADR-037**（Plugin 作为设计范式，v2.0 Phase 6c M5 落地）/ **ADR-040 v2.0**（TLM→HDL 移植性约束，CH_MEM 是新正道）/ ADR-025（Plugin 基类无 tick）/ ADR-046（多周期 FSM 豁免） |
+| 状态 | ✅ Accepted (2026-10-08) · **v1.1 (2026-10-24)** —— 补 §2.5 冻结条款 + §5.4 退役时间线（详见 [ADR-088](ADR-088-tlm-backend-retirement.md)） |
+| 来源 | overview.md / AGENTS.md 文档漂移修正 + Plugin-style 范式固化（v1.1: TLM 后端退役 B0 阶段） |
+| 关联 ADR | **ADR-037**（Plugin 作为设计范式，v2.0 Phase 6c M5 落地）/ **ADR-040 v2.0**（TLM→HDL 移植性约束，CH_MEM 是新正道）/ ADR-025（Plugin 基类无 tick）/ ADR-046（多周期 FSM 豁免）/ **ADR-088**（TLM 后端退役：冻结契约与语义裁决锚） |
 | 关联文档 | `docs/architecture/overview.md` §1 架构总览 / `AGENTS.md` 顶部简介 / `docs/methodology/plugin-style-design-methodology-v1.md` v2 双模方法学 |
 
 ---
@@ -135,6 +135,17 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 2. CH_MEM 模式编译时 `uint_t<N>` 解析为 `ch::core::ch_uint<N>`，可被 `pb.elaborate(ctx)` 发射
 3. CI grep 静态检查（`check_plugin_portability.sh` Check 2/7）可机械验证
 
+### 2.5 冻结条款（v1.1 补充，2026-10-24）
+
+本 ADR §2.3 已把 CppTLM 定位为 legacy 仿真内核，但**未规定「此后还能不能长 TLM-only 业务代码」**。v1.1 补此条款：
+
+- **TLM-only 业务代码进入冻结** —— `ip/` 下非 `_chmem.h` 的 `.h` 文件（减去 9 个双模共享文件）中的**新增函数定义**必须登记 `.rddf/state/tlm-freeze-allowlist.txt`（格式 `<文件:行> | <原因> | <CH_MEM 是否需同步>`），否则 `tools/check_tlm_freeze.sh` 返回非 0（CI 层 warn 级，不阻塞 PR）。
+- **冻结期内的合法动作**：存量函数体的 bugfix（不新增函数定义）；双模共享文件的常规维护；为 B2 语义裁决做对照实验（须登记白名单）。
+- **解冻条件**：仅 B3 删除完成，或由**新 ADR** 显式解冻（不得由实施者自行解除）。
+- 完整条款、检测面口径、9 个双模共享清单与 B3 删除判据见 **[ADR-088](ADR-088-tlm-backend-retirement.md)**。
+
+> 本节不改变 §2.4 的双文件分离约束。
+
 ## 3. 架构总览（修正后）
 
 ```
@@ -224,6 +235,20 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 - `tools/verify_adr.sh` → ADR-083 注册（路径检查 `docs/architecture/adr/ADR-083-*.md` 存在）
 - `tools/verify_plugin_decision.sh` → D4 Plugin-style 强制（已有，无变化）
 - `tools/check_plugin_portability.sh` → ADR-040 v2.0 双文件分离 + Check 5/8（已有，无变化）
+- `tools/check_tlm_freeze.sh` → **v1.1 新增**：TLM-only 代码冻结门禁（见 §2.5 / ADR-088 §2；CI warn 级）
+
+### 5.4 退役时间线（v1.1 补充，2026-10-24）
+
+CppTLM legacy 角色的**终态**分 4 阶段推进（路线图载体 `.rddf/roadmap/features/feat-tlm-backend-retirement.md`）：
+
+| 阶段 | 内容 | 门禁 | 落地 change |
+|------|------|------|------------|
+| **B0 冻结** | 冻结门禁上线 + 死代码清理 + ADR-088 治理锚 | G1（Gate 1） | `chmem-tlm-backend-freeze` ✅ 2026-10-24 |
+| **B1 承载力** | 补齐 CH_MEM 侧缺失能力（BP / LSU / DBus / L1Cache 本体 / MMU TLB 策略等） | G2 | 待立项 |
+| **B2 语义裁决** | 5 个子系统的正式表态（ADR-088 §3 的「留 B2」列） | G2 | 待立项 |
+| **B3 删除** | 按 ADR-088 §5 的删除判据清空 TLM-only 业务代码面 | G3（Gate 3） | 待立项 |
+
+**硬约束**（贯穿全程）：删除判据只能走 **CH_MEM binary 包含闭包反查**，禁止按目录名 / 文件名推断（ADR-088 §5.2）。
 
 ## 6. 验证记录
 
