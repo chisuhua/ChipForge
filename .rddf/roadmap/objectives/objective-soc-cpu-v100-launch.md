@@ -11,6 +11,8 @@ priority: P0
 manual_deps:
   - objective-soc-cpu-v0110-launch
   - feat-bp-btb-gshare
+  - feat-tlm-backend-retirement
+manual_deps_note: PoC-6 CoreMark ≥1.9 性能数字的测量载体必须已收敛到 CH_MEM 单后端（依赖 B1.1 冻结 + B1.5 台账，见 objective-ip-cpu-tlm-backend-retirement）；TLM 双后端未收敛前 PoC-6 数字不可信
 supersedes: null
 theme: v1.0.0 launch gate — Wave 5 S/U + RV32A + BTB 收官 (PoC-4/5/6/7/14)
 ---

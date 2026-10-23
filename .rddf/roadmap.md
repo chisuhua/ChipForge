@@ -27,18 +27,24 @@
 - `phase-5` — v1.0.0+ Wave 6 产品化
 
 ### Features
-- `feat-bp-btb-gshare` — 分支预测 BTB + GShare + RAS (PoC-6 CoreMark ≥1.9) (refs: phase-4)
-- `feat-dhrystone-dmips-gate` — Dhrystone DMIPS/MHz ≥1.4 硬门禁 (mfc Phase G) (refs: phase-4)
+- `feat-bp-btb-gshare` — 分支预测 BTB + GShare + RAS (PoC-6 CoreMark ≥1.9) — defer → v1.0.0 (2026-10-19 决策) (refs: phase-4, phase-5)
+- `feat-dhrystone-dmips-gate` — Dhrystone DMIPS/MHz ≥1.4 硬门禁 (mfc Phase G) — ✅ archived 2026-10-15 (refs: phase-4)
 - `feat-mfc-multi-cycle-fsm` — MUL/DIV FSM 化 + ADR-082 negotiate 集成 (refs: phase-2, phase-4)
 - `feat-mmu-chmem-integration` — CH_MEM MMU/PTW pipeline 集成 (v0.11.0 owner) (refs: phase-4)
-- `feat-phase-6d-rtl-verification` — Phase 6d 5-stage Pipeline CH_MEM + Verilator + MMU/PTW FSM (refs: phase-4)
+- `feat-phase-6d-rtl-verification` — Phase 6d 5-stage Pipeline CH_MEM + Verilator + MMU/PTW FSM (跨 cpu/mmu/cache) (refs: phase-4)
 - `feat-rv32um-m-extension` — RV32UM M 扩展真实 radix-2 覆盖 (rv32um 8/8) (refs: phase-4)
-
-### Objectives
-- `objective-soc-cpu-v0110-launch` — v0.11.0 launch gate — Wave 5 收官 (P0)
-- `objective-ip-mmu-mmu-chmem-phase-b-e` — mmu-chmem Phase B-E CH_MEM 集成实施 (P0)
-- `objective-soc-cpu-v100-launch` — v1.0.0 launch gate — Wave 5 S/U + RV32A + BTB 收官 (P0) (refs: objective-soc-cpu-v0110-launch, feat-bp-btb-gshare)
-- `objective-soc-cpu-v120-launch` — v1.2.0 launch gate — 4-way RRIP + PMP + Debug + Spike lockstep 验证基建版 (P0) (refs: objective-soc-cpu-v100-launch)
-- `objective-soc-cpu-v130-launch` — v1.3.0 launch gate — Linux-on-FPGA + chip-selector 商业化 + ADR-080 HARD (P0) (refs: objective-soc-cpu-v120-launch)
+- `feat-rv64-isa-declaration-integrity` — RV64 ISA 声明真实性 + XLEN 就绪度门禁 (ADR-087 实施) (refs: phase-4)
+- `feat-tlm-backend-retirement` — TLM 后端退役 — CH_MEM 单后端收敛 (冻结 → 承载力 → 语义裁决 → 删除) (refs: phase-4, phase-5)
 
 <!-- AUTO-SPRINT -->
+
+### Objectives
+
+<!-- 手工维护段：放在 AUTO-SPRINT 之后，避免被 `rddf roadmap --update-agent-md` / refresh 的 AUTO-INDEX 生成区吞掉（AUTO-INDEX 与 AUTO-SPRINT 之间的内容由生成器重写）。根因修复（生成器应保留手工段）归 governance follow-up。 -->
+
+- `objective-ip-cpu-tlm-backend-retirement` — TLM 后端退役编排 (B0 冻结 → B1 承载力 → B2 语义裁决 → B3 删除) (refs: phase-4, phase-5)
+- `objective-ip-mmu-mmu-chmem-phase-b-e` — MMU CH_MEM Phase B–E (TLB/PTW depth) (refs: phase-4)
+- `objective-soc-cpu-v0110-launch` — v0.11.0 launch gate (mfc + mmu-chmem 收官) (refs: phase-4)
+- `objective-soc-cpu-v100-launch` — v1.0.0 launch gate (Wave 5 S/U + RV32A + BTB) (refs: phase-5)
+- `objective-soc-cpu-v120-launch` — v1.2.0 验证基建版 (refs: phase-5)
+- `objective-soc-cpu-v130-launch` — v1.3.0 产品化版 (refs: phase-5)
