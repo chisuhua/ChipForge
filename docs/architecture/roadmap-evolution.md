@@ -41,7 +41,7 @@
 │  ├─ v0.11.0:  rv32um 8/8 + mfc Phase H archive + mmu-verilator 5/5 真 sv32 + DMIPS/MHz ≥1.4 + BTB 4K-entry（基础）+ ADR-082 negotiate 完整集成 │
 │  ├─ v1.0.0:   S/U mode + RV32A + BTB/GShare/RAS + PLIC/CLINT + FreeRTOS demo                                              │
 │  ├─ v1.2.0:   4-way RRIP + PMP + Debug（gdbstub）+ Spike lockstep + Linux-sim SOFT                                          │
-│  └─ v1.3.0:   Linux-on-FPGA + chip-selector CLI（ADR-079）+ ADR-080 双模对拍硬门禁                                          │
+│  └─ v1.3.0:   Linux-on-FPGA + chip-selector CLI（ADR-079）+ ADR-080 后端间对拍硬门禁                                          │
 └────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -305,7 +305,7 @@ Spike ISS ─────────┘
 
 ## 7. v1.3.0 架构目标（2029 Q1，产品化版）
 
-**核心**: Linux-on-FPGA 端到端 + chip-selector CLI 商业化工具 + ADR-080 双模对拍硬门禁
+**核心**: Linux-on-FPGA 端到端 + chip-selector CLI 商业化工具 + ADR-080 **后端间**对拍硬门禁（范围见 §7.3 注）
 
 ### 7.1 chip-selector CLI（PoC-11，商业化核心，ADR-079）
 
@@ -342,11 +342,13 @@ OpenSBI → Linux → Shell 实际跑在 FPGA
 FMAX ≥ 100 MHz
 ```
 
-### 7.3 ADR-080 转硬门禁（TLM↔CH_MEM 双模对拍）
+### 7.3 ADR-080 转硬门禁（**后端间**对拍：CppHDL Simulator ↔ Verilator）
+
+> ⚠️ **范围重定义（2026-10-24，ADR-088 §7）**：原标题为「TLM↔CH_MEM 双模对拍」，与 TLM 退役（B3 在更早窗口完成 ⇒ 对拍对象届时已不存在）**计划冲突**；依 ADR-040 §10.1（已 Accepted，双后端所指已翻转为 CH_MEM 的两个仿真后端）重定义对拍对象。**硬门禁性质不变，只换对象。**
 
 - v1.2.0 试点 → v1.3.0 强制
-- chip-selector 产出必须 TLM ↔ CH_MEM byte-equal
-- PoC-11 验证: 8 配置 TLM <10min + IPC 偏差 ≤15%
+- chip-selector 产出必须 **CppHDL Simulator ↔ 生成 Verilog 的 Verilator 仿真 byte-equal**
+- PoC-11 验证: 8 配置 TLM <10min + IPC 偏差 ≤15%（**注**：TLM 退役前该 PoC 仍以 TLM 为参照；退役后参照改为 Simulator ↔ Verilator）
 
 ---
 

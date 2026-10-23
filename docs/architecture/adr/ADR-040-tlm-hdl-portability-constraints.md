@@ -7,7 +7,7 @@
 | v2.0 决策 | **CH_MEM 是新正道**（翻转 v1.0 "ch 渗透禁令"）：<br>① 业务代码在 `-DCF_PLUGIN_USE_CH_MEM` 下必须用 `ch_uint/ch_reg/ch_bool/ch_mem`（elaboration 正道）<br>② 引入 `CF_PLUGIN_USE_FSM_EXEMPT` 豁免机制（ADR-046）<br>③ 新增 Tier-1 Check 5: at_stage 回调内禁运行期 if(ch_bool)（ch_bool explicit operator bool 上下文转换）<br>④ `tools/check_plugin_portability.sh` v2.0 重订（5 项检查） |
 | v3.0 决策 | **Verilator 成为 CH_MEM 路径的第二仿真后端 ⇒ 移植性约束从"单后端语义"扩展为"双后端语义必须一致"**：<br>① 生成 Verilog 与 CppHDL Simulator 的**同拍语义**成为硬要求（§10.1）<br>② 后端语义差异**必须显式契约化**（上游 `mem-read-timing` R3/R4 先例，§10.2）<br>③ 弃用算子治理：`ch_bool::operator\|\|` → `operator\|`（上游 deprecation，§10.3）<br>④ 回归锚形态翻转：跨后端回归锚 SHALL **锁住对齐**而非**钉死漂移**（§10.4）<br>⑤ **payload key 模态约束**：key 的 value type SHALL 用 `cf::plugin::uint_t<N>`，SHALL NOT 用裸 `bool`/`uintN_t` —— 否则 CH_MEM 下 cell 只能装常量 ⇒ 信号退化为 elaboration 期常量（§10.5）<br>⑥ **生产者/消费者顺序契约**：同 stage 内 EARLY(生产者) 必先于 NORMAL(消费者)，SHALL NOT 依赖 plugin 注册顺序（§10.6） |
 | 实现 commit | **25e2672 / 9a03bb2 / 918e577 / baa504b / 3e8ada2 / a38a1e4 / 19d4f5d / edad878 / b68996a** (2026-09-17, M1-M5 8+1 commit 全部推送)<br>v3.0: Phase 6d.5 Verilator 后端 + 上游 `c27543d` / `5b37b7d` / `eccf58f` / `cba0571`（2026-10-21） |
-| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免）、ADR-080（TLM↔CH_MEM 双模对拍协议，v1.3.0 转硬门禁） |
+| 关联 ADR | ADR-025（Plugin 基类无 tick）、ADR-037（Plugin 作为设计范式）、ADR-046（多周期 FSM 豁免）、ADR-080（**后端间**对拍协议 —— 原「TLM↔CH_MEM 双模对拍」，**范围已由 ADR-088 §7 重定义为「CppHDL Simulator ↔ Verilog/Verilator」**，v1.3.0 转硬门禁） |
 
 ---
 
@@ -524,7 +524,7 @@ CH_MEM 数据通路全组合（`cpu_factory_chmem.h:431-435` 无 stage 寄存器
 
 - **不改 v2.0 的任何约束**（三级模型 / `array_store` / FSM 豁免 / Tier-1 Check 1-5）
 - **不改 TLM 模式语义**
-- **不引入新的 CI 门禁**（跨后端 parity 的硬门禁归 ADR-080，v1.3.0 窗口）—— 本次新增的 Check 13 是 **WARN-only**，不阻塞 CI
+- **不引入新的 CI 门禁**（跨后端 parity 的硬门禁归 ADR-080（**范围见 ADR-088 §7**），v1.3.0 窗口）—— 本次新增的 Check 13 是 **WARN-only**，不阻塞 CI
 - **不清业务侧 deprecated 算子**（另立 change）
 - **不修 CSR / CPU 侧 payload key**（姊妹 change `chmem-cpu-keys-modality`，挂 Phase C.1 入口）
 

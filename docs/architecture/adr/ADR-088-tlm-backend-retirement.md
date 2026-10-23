@@ -1,9 +1,10 @@
 # ADR-088: TLM 后端退役 — 冻结契约与语义裁决锚（TLM Backend Retirement: Freeze Contract & Semantic Adjudication Anchor）
 
-> **Status**: 🚧 Proposed（2026-10-24，`chmem-tlm-backend-freeze` B0 阶段产出）
+> **Status**: ✅ **Accepted（v1.1，2026-10-24）** —— B0（`chmem-tlm-backend-freeze`，已归档）立冻结契约与治理锚；**B2 语义裁决已完成**（§3 五行正式表态 + §6.1 ADR-080 范围重定义 + §5.2 BP 专项前置）
+> **版本历史**: v1.0（2026-10-24，B0，🚧 Proposed）→ **v1.1（2026-10-24，B2 裁决完成，✅ Accepted）**
 > **类别**: 架构治理 / 后端退役
 > **关联 ADR**: ADR-040 v3.0（TLM→HDL 移植性约束，§10.1 双后端语义必须一致 / §10.2 差异必须显式契约化）· ADR-083（Plugin-style 单一 source of truth，§2.3 CppTLM=legacy / §4.3 拒绝「TLM 模式作为长期模式」）· ADR-046（多周期协议引擎豁免）· ADR-087（ISA 声明真实性，§D4 护栏形态随 TLM 退役切换）
-> **关联变更**: `chmem-tlm-backend-freeze`（B0：冻结门禁 + 死代码清理 + 本 ADR）；B1 承载力 / B2 语义裁决 / B3 删除各自独立立项
+> **关联变更**: `chmem-tlm-backend-freeze`（B0，已归档：冻结门禁 + 死代码清理 + 本 ADR）· `chmem-tlm-coverage-parity-ledger`（台账**内容**，已归档）· **B2 语义裁决（本 v1.1）** · B1 承载力 / B3 删除各自独立立项
 > **路线图载体**: `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B0–B3 编排）· `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G1/G2/G3 门禁）
 > **姊妹提案**: `chmem-tlm-coverage-parity-ledger`（P1，交付台账**内容**；本 ADR 只定义**格式**）
 
@@ -33,7 +34,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 |--------|--------|-----------|---------|
 | M 扩展 | `ip/cpu/arch/riscv/mul_div_fsm.h`（424 行，radix-2：MUL=1c / MULH=3c / DIV=33c） | `ip/cpu/arch/riscv/int_alu_chmem.h`（19 层 select 树，组合式 1 拍） | **cycle 不同构**（差 ~286c ⇒ 原「±5% / +50c」判据不适用） |
 | CSR | `ip/cpu/arch/riscv/csr.h`（43 行，**纯 stub**，`setup`/`build` 全空） | `ip/cpu/plugins/csr_chmem.h`（566 行，Zicsr + trap） | TLM 侧**无实装可保留** |
-| MMU PTW | `ip/mmu/lib/ptw.{h,cpp}`（149+197 行，完整 walk） | `ip/mmu/plugins/MMUPlugin_chmem.h`（**无 PTW**，miss ⇒ 回退 vaddr） | 语义不等价（回退 vaddr 与 Bare 路径同构） |
+| MMU PTW | `ip/mmu/lib/ptw.{h,cpp}`（149+197 行，完整 walk） | `ip/mmu/plugins/MMUPlugin_chmem.h`（**无 PTW**，miss ⇒ 回退 vaddr）；且 CH_MEM 工厂 `enable_mmu=true` 为 **plumbing-only no-op**（不注册任何 MMU plugin）⇒ MMU 在 CH_MEM 侧**仅单元级存在、流水线级未接线** | 语义不等价（回退 vaddr 与 Bare 路径同构）**+ 接线缺口（流水线级）** |
 | BP（BTB/Bimodal/GShare） | `ip/cpu/plugins/branch_predictor.h`（319 行） | **完全缺失**（无 `branch_predictor_chmem.h`；CH_MEM binary 符号数 = 0） | 功能缺失 |
 | MMU exception handler | `ip/cpu/plugins/mmu_exception_handler.h`（69 行，**TLM-only**） | `ip/cpu/plugins/mmu_exception_handler_chmem.h`（118 行，**存在但未注册**） | `cpu_factory_chmem.h:342-349` 被 `#ifndef CF_PLUGIN_USE_CH_MEM` 包裹 ⇒ CH_MEM 下不注册 |
 
@@ -41,7 +42,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 
 | 约束 | 事实 |
 |------|------|
-| 测试覆盖 | TLM binary 493 case vs CH_MEM binary 130 case；**TLM 独占 361**（`[cpu-integration]` 96 / `[riscv-tests]` 48 / `[framework]` 94 / `[soc]` 20 / `[bundles]` 9 等**无 CH_MEM 替代**） |
+| 测试覆盖 | TLM binary 493 case vs CH_MEM binary 130 case；共有 30 ⇒ **TLM 独占 463**（闭合 463+30=493）。族分布实测：`[cpu]` 137 / `[cpu-integration]` 96 / `[framework]` 94 / `[mmu]` 59 / `[riscv-tests]` 48 / `[cache]` 25 / `[soc]` 20 等 —— **逐条三态标注见 [`tlm-coverage-parity-ledger.md`](../tlm-coverage-parity-ledger.md)**（v1.0 的 361 为早期估算，已按实测纠正） |
 | 性能硬门禁载体 | **Dhrystone DMIPS/MHz ≥1.4**（`tests/cpu/integration/test_dhrystone.cpp` 硬绑 `CpuFactory<uint32_t>`）与 **CoreMark/MHz ≥1.9**（PoC-6，被测对象 `ip/cpu/plugins/branch_predictor.h`）**100% 在 TLM** |
 | CI 盲区 | 测试**不进 CI**（Oracle 2026-10-06 决策：`.github/workflows/architecture-gates.yml` 只跑架构门禁脚本）⇒ 删 361 case 后**无自动回归发现机制** |
 | 链接依赖 | `chipforge_tests_chmem`（`tests/CMakeLists.txt:183`）与 `cpu_verilator_sim`（`tools/verilator_runner/CMakeLists.txt:47`）**仍链接 `libcpptlm_core.a`** ⇒ 删 TLM 代码 ≠ 立刻脱 CppTLM |
@@ -87,15 +88,17 @@ ADR-083（Accepted 2026-10-08）已定性：
 
 ### 3. 逐子系统语义裁决表
 
-> **B0 只填表头与已知分歧；正式表态留 B2**（`feat-tlm-backend-retirement` 的 B2 阶段，由 architect 主持）。
+> **B2 正式表态已完成（2026-10-24，architect 主持）** —— 下表「B2 正式表态」列即裁决结论。
+> **裁决原则**（依 ADR-040 §10.1/§10.2）：**CH_MEM 是唯一保留后端 ⇒ 语义规范由 CH_MEM 侧定义**；TLM 侧仅作历史参考，**除非 CH_MEM 侧存在正确性缺陷**（而非形态差异）。
+> 五行结论速览：**M 扩展 = CH_MEM 组合式为规范**（功能 + cycle 均是）· **CSR = CH_MEM 为规范**（TLM 无实装可保留）· **MMU PTW = 现在不接线，回退 vaddr 表态为已知临时降级，接线归 `chmem-ptw-walk`** · **BP = CH_MEM-only 且必须做，不适用「不做」出口** · **MMU exception handler = 必须注册，与 MMU 流水线接线同批**。
 
 | 子系统 | TLM 侧实现 | CH_MEM 侧实现 | 已知分歧 | B2 正式表态 |
 |--------|-----------|---------------|---------|-----------|
-| M 扩展 | `ip/cpu/arch/riscv/mul_div_fsm.h`（424 行，radix-2，MUL=1c/MULH=3c/DIV=33c） | `ip/cpu/arch/riscv/int_alu_chmem.h`（19 层 select 树，组合式 1 拍；MULH 高位抽取等 RV32-only 语义） | **cycle 不同构**（差 ~286c）；原「±5% / +50c」判据不适用（判据本身失效，非 pass/fail） | *（留 B2）* |
-| CSR | `ip/cpu/arch/riscv/csr.h`（43 行，**纯 stub**：`setup`/`build` 全空） | `ip/cpu/plugins/csr_chmem.h`（566 行，Zicsr + trap，真实实现） | TLM 侧**无实装可保留** ⇒ B2 方向应为「CH_MEM 为规范」 | *（留 B2）* |
-| MMU PTW | `ip/mmu/lib/ptw.{h,cpp}`（149+197 行，完整 walk） | `ip/mmu/plugins/MMUPlugin_chmem.h`（**无 PTW**；`PtWalkFsmPlugin` 存在但未注册；miss ⇒ 回退 vaddr） | PTW 未落地前 CH_MEM 表现为**回退 vaddr**（与 Bare 路径同构）⇒ 语义不等价 | *（留 B2）* |
-| BP（BTB/Bimodal/GShare） | `ip/cpu/plugins/branch_predictor.h`（319 行）+ `.cpp`（23 行） | **完全缺失**（无 `branch_predictor_chmem.h`；CH_MEM binary 符号数 = 0） | 功能缺失；且是 **CoreMark PoC-6 的被测对象** ⇒ B3 前不可删 | *（留 B2）* |
-| MMU exception handler | `ip/cpu/plugins/mmu_exception_handler.h`（69 行，**TLM-only**：`cpu_factory_chmem.h:54-56` 的 `#ifndef` 包裹） | `ip/cpu/plugins/mmu_exception_handler_chmem.h`（118 行，**存在但未注册**） | CH_MEM 侧实现存在却未接线 ⇒ 是「接线缺口」而非「能力缺口」 | *（留 B2）* |
+| M 扩展 | `ip/cpu/arch/riscv/mul_div_fsm.h`（424 行，radix-2，MUL=1c/MULH=3c/DIV=33c） | `ip/cpu/arch/riscv/int_alu_chmem.h`（19 层 select 树，组合式 1 拍；MULH 高位抽取等 RV32-only 语义） | **cycle 不同构**（差 ~286c）；原「±5% / +50c」判据不适用（判据本身失效，非 pass/fail） | ✅ **CH_MEM 组合式为规范（功能与 cycle 均是）**。理由：① 组合式经 `toVerilog` 即真实硬件语义（Verilator 1 拍 = 硬件真相），radix-2 是软件模拟的**时序近似**；② RISC-V spec 不规定除法延迟（只规定结果正确）⇒ cycle 不是规范语义；③ CH_MEM 工厂无 stage 寄存器/无 stall（`:329-340`），物理上无法直接接纳 33 拍 FSM。**降级项**：`chmem-mext-fsm-cycle-parity` 降为**可选演进**（非 v1.0.0 完成条件）；`soc/cpu/docs/dse/rv32um-baseline-matrix.csv` 的 cycle 基线**降为 TLM-only 历史基线**（须加表头注记，否则会被误当 parity 判据）。**回归锚**：`[chmem]` vendored ELF 47/47 + `[alu][semantics]` 288 assertions。 |
+| CSR | `ip/cpu/arch/riscv/csr.h`（43 行，**纯 stub**：`setup`/`build` 全空） | `ip/cpu/plugins/csr_chmem.h`（566 行，Zicsr + trap，真实实现） | TLM 侧**无实装可保留** | ✅ **CH_MEM 为规范**。实测**无任何测试依赖 TLM stub 语义**（`tests/` 下对 `arch/riscv/csr.h` 的引用只有 `test_cpu_factory.cpp:74` 注释 + `:87` 的 `REQUIRE(plugins.size() == 14)` 注册**计数**断言）；TLM 侧真正 CSR 写路径由 `RiscvMMUPlugin` 拥有（`ip/cpu/plugins/mmu.cpp:73,94`），与 stub 无关。**B3 附带动作**：删除 stub 时须同步改 `test_cpu_factory.cpp:87` 计数（14 → 13），并**建议改为按类型名断言关键插件存在**（消除脆弱计数）。 |
+| MMU PTW | `ip/mmu/lib/ptw.{h,cpp}`（149+197 行，完整 walk） | `ip/mmu/plugins/MMUPlugin_chmem.h`（**无 PTW**；`PtWalkFsmPlugin` 存在但未注册；miss ⇒ 回退 vaddr） | PTW 未落地前 CH_MEM 表现为**回退 vaddr**（与 Bare 路径同构）⇒ 语义不等价 | ⚠️ **现在不接线**；**正式表态：「回退 vaddr」= 已知临时降级（与 Bare 同构）**，**不是**规范语义。理由：① 目标是 ADR-085/086 **已锁定**的架构（`MMU_TLB`+`MMU_PTW` 拆分 D01 / `FsmBase` 封装 D10 / `PTWCache` D04 / **代码落 `ip/mmu/plugins/` 修 ADR-083 D18 违规**）；现有 `PtWalkFsmPlugin`（`ip/cpu/plugins/mmu_ptw_chmem.h:150`，sv32 2 级、裸 DSL、**位置违反 D18**、无 PTWCache）与已锁目标不符 ⇒ 现在接线**必然返工**；② 接线的三类耦合前置（页表内存访问时机 D16/D21 · 异常回传 A4/C.5 归 `mmu-chmem-phase-b-c-launch` · satp 写路径 D08/D20）**实装均未立项** ⇒ 时序倒挂。**归属**：实装归未立项 change **`chmem-ptw-walk`**（B1 item 3）；`cpu_factory_chmem.h` **保持 0 PTW 注册**直至该 change 立项。**台账条目 = `partial`**（差异性质 = 未落地降级，禁标「不做」）。 |
+| BP（BTB/Bimodal/GShare） | `ip/cpu/plugins/branch_predictor.h`（319 行）+ `.cpp`（23 行） | **完全缺失**（无 `branch_predictor_chmem.h`；CH_MEM binary 符号数 = 0） | 功能缺失；且是 **CoreMark PoC-6 的被测对象** ⇒ B3 前不可删 | ✅ **CH_MEM-only 且必须做；不适用 §5.2 判据 2 的「明确不做」出口**。理由：① CoreMark/MHz ≥1.9（PoC-6，v1.0.0 硬门禁）与 PoC-14 FPGA ≤10% 偏差是**已承诺的路线图门禁**，BP 判「不做」= 门禁**孤儿化**；② `feat-bp-btb-gshare` 已改绑 CH_MEM-only 并归 B1 第 5 项（2026-10-23）；③ **必须前置测量链路**：`branch_predictor_chmem.h` 做出来后，无 Verilator 侧 CoreMark harness 则无法验证 ≥1.9（cycle 通道已存在：`tools/verilator_runner/sim_main.cpp:98` 输出 `TOHOST=%u CYCLES=%u`；缺的是 ELF harness + score 换算 = B1 item 1）⇒ **BP 与 CoreMark harness 同批交付**。**B3 删除门禁追加双前置**（见 §5.2）。台账条目 = `not-covered`，归属 = B1 item 5（**禁标「不做」**）。 |
+| MMU exception handler | `ip/cpu/plugins/mmu_exception_handler.h`（69 行，**TLM-only**：`cpu_factory_chmem.h:54-56` 的 `#ifndef` 包裹） | `ip/cpu/plugins/mmu_exception_handler_chmem.h`（118 行，**存在但未注册**） | CH_MEM 侧实现存在却未接线 ⇒ 是「接线缺口」而非「能力缺口」 | ✅ **必须注册**（属**接线缺失**，非能力缺失）。理由：CH_MEM 变体（118 行）已存在，仅被 `ip/cpu/cpu_factory_chmem.h:342-349` 的 `#ifndef CF_PLUGIN_USE_CH_MEM` 排除。**归属**：与 MMU 流水线接线（`mmu-chmem-phase-b-c-launch` Phase C / `chmem-ptw-walk`）**同批**注册 —— 单独注册会得到「异常回传源（`CPU_EXCEPTION_CODE`）尚未被写入」的惰性骨架。**B3 前置**：该文件在 CH_MEM 侧注册生效后，TLM-only 版方可删。 |
 
 ### 4. 覆盖平价台账格式（B0 交付**格式**，不交付**内容**）
 
@@ -107,7 +110,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 | `partial` | 有实现但语义不等价，或无回归锚 | 同上 + **差异性质**（如「cycle 不同构」「接线缺口」）+ 计划动作（归 B1/B2/B3 哪一阶段） |
 | `not-covered` | CH_MEM 无对应实现 | 子系统、TLM 侧锚点、缺失原因、归属阶段（B1 承载力补齐 or 明确不做） |
 
-**口径注记（必须写进台账）**：13 族求和 = 509 ≠ 451 ⇒ **case 级差集以两个 binary 的 `--list-tests` 差集为唯一口径**（族内求和口径不可用）。
+**口径注记（必须写进台账）**：族计数求和（46 族，基线实测 **678**）≠ TLM 独占 case 数（**463**）—— 一个 case 可带多个 tag ⇒ **case 级差集以两个 binary 的 `--list-tests` 差集为唯一口径**（族内求和口径不可用）。台账实测闭合：TLM 独占 463 + 共有 30 = **493**（TLM 总数）；CH_MEM 独有 100 + 共有 30 = **130**（CH_MEM 总数）。
 
 **内容交付**：由姊妹提案 `chmem-tlm-coverage-parity-ledger`（P1）承担。**格式不得后置**（格式后置 ⇒ B3 无判据）。
 
@@ -134,6 +137,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 
 1. **按 CH_MEM binary 包含闭包反查** —— 候选文件必须**不可达**（或仅为 §5.1 清单内的共享文件，且后者**永不删除**）。**禁止**按目录名 / 文件名 / 「看起来像 TLM」推断。
 2. **覆盖平价达成** —— §4 台账中该子系统相关条目的状态已可接受（`covered` / 明确 `not-covered` 且归属「不做」）。
+   - ⚠️ **BP 专项前置（B2 added）**：BP 相关文件（`ip/cpu/plugins/branch_predictor.{h,cpp}`）**不适用「不做」出口**。删除前 MUST 同时满足：① `branch_predictor_chmem.h` 存在**且已被 CH_MEM 工厂注册**；② CoreMark harness 在 `cpu_verilator_sim --elf` 路径跑通并产出 `CoreMark/MHz` 实测值（依 §3 BP 行）。缺任一 ⇒ 不得删除。
 3. **语义裁决完成** —— §3 表中该子系统的 B2 正式表态已给出。
 4. **CI 有可回归的自动测试** —— 对应能力在 CH_MEM 侧有回归锚（当前测试不进 CI ⇒ B3 需先解决 CI 盲区或提供等价门禁）。
 5. **三道前置缺一不可** —— ①②③ 任一未满足 ⇒ 不得删除。
@@ -144,7 +148,26 @@ ADR-083（Accepted 2026-10-08）已定性：
 >
 > 该项需在 **ADR-087 v1.1** 中正式登记并给出切换判据（建议：CH_MEM 侧 `kXlenBits` 定义点收敛为单一来源后，删除 TLM 侧护栏；在此之前 TLM 侧护栏必须保留）。
 
-### 7. 影响
+### 7. ADR-080 范围重定义（B2 附带裁决，2026-10-24）
+
+**发现（计划冲突）**：`docs/architecture/roadmap-evolution.md`（版本节点图 + §7.3）计划在 **v1.3.0** 落地 ADR-080「TLM↔CH_MEM 双模对拍**硬门禁**」，而 TLM 退役（B3）计划在**更早窗口**（phase-4/5）完成 ⇒ **对拍对象届时已不存在**，两项计划自相矛盾。同时 **ADR-040 §10.1**（已 Accepted）已把「双后端」的所指从「TLM ↔ CH_MEM」翻转为「**CH_MEM 的两个仿真后端**（CppHDL Simulator ↔ Verilator）」⇒ ADR-080 的**范围必须随之重定义**，否则 roadmap 内部自相矛盾。
+
+**裁决**：ADR-080 的范围从「TLM ↔ CH_MEM 双模对拍」**重定义为「CppHDL Simulator ↔ 生成 Verilog 的 Verilator 仿真 —— 后端间对拍」**。变更的是对拍的**对象**，硬门禁的**性质**不变。
+
+| 维度 | 原计划 | 重定义后 |
+|------|--------|---------|
+| 对拍对象 | TLM 后端 ↔ CH_MEM 后端 | **CppHDL Simulator ↔ Verilator（生成 Verilog）** |
+| 依据 | ADR-040 v2.0「双模式」语义 | **ADR-040 §10.1**「双后端语义必须一致」（v3.0 已翻转所指）+ §10.2「差异必须显式契约化」 |
+| 与 TLM 退役的关系 | **冲突**（对象将被删除） | **无冲突**（对象是 CH_MEM 的两个仿真后端） |
+| 落地窗口 | v1.3.0 | 不变（v1.3.0），但**内容**改为后端间 parity |
+
+**须同步的文档**：`roadmap-evolution.md` §7.3 标题与正文 · ADR-040 头部「关联 ADR」行对 ADR-080 的描述 · `docs/architecture/adr.md`（若登记 ADR-080 规划条目）。
+
+**注**：ADR-080 本身**尚未起草**（其编号为规划占位 —— `docs/architecture/adr.md` 无注册行、`docs/architecture/adr/` 无文件）⇒ 本次裁决只**锁定范围**，起草时依本表。
+
+---
+
+### 8. 影响
 
 | 方面 | 影响 |
 |------|------|
@@ -153,9 +176,24 @@ ADR-083（Accepted 2026-10-08）已定性：
 | CI | 新增 1 个 warn 级 step（`check_tlm_freeze.sh`）；既有门禁 5 个不变 |
 | 工具 | 新增 `tools/check_tlm_freeze.sh` + 3 份状态文件（`.rddf/state/tlm-freeze-{base,allowlist}.txt` / `tlm-shared-files.txt`） |
 | 文档 | 新增本 ADR；ADR-083 升 v1.1（§2.5 冻结条款 + §5.4 退役时间线）；`docs/architecture/adr.md` 注册 |
+| B2（本 v1.1） | **无代码改动**（裁决 + 文档）；§3 五行正式表态 + §7 ADR-080 范围重定义 + §5.2 BP 专项前置；台账 4 条目按 §3 重标（CSR `covered` / M 扩展 `covered` / PTW `partial` / BP `not-covered`，归属 B1） |
 | 风险 | R1 门禁误伤 legit bugfix（只拦新增函数，不拦存量修改）· R2 ADR 范围膨胀（每项必填 ≥1 节，禁止 B2 表态）· R3 CI 维护负担（warn 级，豁免只增不减）· R4 死代码误判（0 includer + 双 binary build + 全量回归三重核）· R5 用户期望落差（B0 不删业务代码）· R6 baseline 漂移（固定 sha）· R7 函数识别误报（宁可多报）· R8 与 `rv64-isa-declaration-correction` 的顺序耦合（baseline 须晚于 A 合并） |
 
-### 8. 验证记录（2026-10-24，`chmem-tlm-backend-freeze` 实施实测）
+### 9. 验证记录（2026-10-24）
+
+#### 9.1 B2 语义裁决实测记录（2026-10-24，architect 主持）
+
+| 项 | 证据 / 结论 |
+|---|---|
+| `auto_insert_stage_regs()` 调用面 | 全仓（排除 `build/`）**0 命中** ⇒ ADR-040 §v2.0 新增 4 提及的「自动 stage 间 `ch_reg` 插入」API **存在但未启用** ⇒ CH_MEM 流水线当前**无 stage 寄存器**（§3 各裁决的形态前提） |
+| CH_MEM 工厂接口形态 | `cpu_factory_chmem.h:96-110` 签名 = **散装 `std::optional` 参数**（`enable_mmu` / `mmu_mode` / `enable_cache`），**不接受 `CPUConfig`**（注释自述「不读 cfg, 不引 CpuConfig 依赖 (NG1, NG2, NG3 显式声明)」）⇒ 「CH_MEM 是否接受 `isa`」这一问题的**前提不成立**：CH_MEM 工厂**根本没有 config 入口**（ISA 契约覆盖面归 B1 决策，见 [`tlm-retirement-b1-capacity-plan.md`](../tlm-retirement-b1-capacity-plan.md)） |
+| CH_MEM 工厂 MMU 现状 | `enable_mmu=true` 为 **plumbing-only no-op**（`cpu_factory_chmem.h:86` 自述「**不会**注册任何 MMU plugin」「NO translation occurs」）⇒ CH_MEM 侧 MMU 目前是**单元级存在**（`[mmu-chmem-basic]` 直接构造 `MMUPluginChmem`，**不走工厂**），**流水线级未接线** ⇒ 缺口范围大于「PTW 未注册」 |
+| `enable_cache=true` | **fail-fast throw**（`cpu_factory_chmem.h:88-92`，不静默退化）⇒ CH_MEM 侧 L1Cache 完全缺失，且行为已显式化（owner = `verilator-l1cache-e2e-coverage`） |
+| CSR stub 依赖面 | `tests/` 对 `RiscvCsrPlugin` / `arch/riscv/csr.h` 仅 2 处命中（`test_cpu_factory.cpp:74` 注释 / `:87` 计数断言），**无行为依赖** ⇒ §3 CSR 行裁决成立 |
+| BP 符号面 | CH_MEM binary `branch_predictor` 符号数 = **0** ⇒ 功能确实缺失；Verilator 侧 cycle 通道已存在（`tools/verilator_runner/sim_main.cpp:98` 输出 `TOHOST=%u CYCLES=%u`），缺 CoreMark harness |
+| ADR-080 存在性 | `docs/architecture/adr.md` 无注册行、`docs/architecture/adr/` 无文件 ⇒ 编号为**规划占位**（ADR-050~084 共 25 个同类占位）⇒ §7 裁决只锁范围 |
+
+#### 9.2 B0 实施实测（`chmem-tlm-backend-freeze`）
 
 | 项 | 命令 / 结果 |
 |---|---|
@@ -169,10 +207,12 @@ ADR-083（Accepted 2026-10-08）已定性：
 | 门禁复跑（删文件后） | `violations=0`，candidates 35 → **31**（4 个死代码退出检测面） |
 | 5 架构门禁 | verify_adr ✅ · verify_plugin_decision 8/8 ✅ · check_plugin_portability 13/13 ✅ · doc_link_check 0 broken ✅ · roadmap-r9-check 11 fragments ✅ |
 
-### 9. 相关文档
+### 10. 相关文档
 
 - ADR-040 v3.0（TLM→HDL 移植性约束）· ADR-083（Plugin-style 单一 source of truth）· ADR-046（FSM 豁免）· ADR-087（ISA 声明真实性）
 - `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B0–B3 编排 + 13 条验收）
 - `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G1/G2/G3 门禁）
+- [`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../tlm-retirement-b1-capacity-plan.md)（B1 承载力拆解 + 决策定案）
+- [`docs/architecture/tlm-coverage-parity-ledger.md`](../tlm-coverage-parity-ledger.md)（463 条覆盖平价台账，B0 姊妹提案交付）
 - `.rddf/improvements/chmem-tlm-backend-freeze.md`（B0 提案）· `.rddf/improvements/chmem-tlm-coverage-parity-ledger.md`（台账内容）
 - `openspec/changes/chmem-tlm-backend-freeze/`（本 change 的 proposal / design / plan / tasks）

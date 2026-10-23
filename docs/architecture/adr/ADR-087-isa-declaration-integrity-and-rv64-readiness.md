@@ -1,11 +1,12 @@
 # ADR-087: ISA 声明真实性与 RV64 就绪度门禁（ISA Declaration Integrity & RV64 Readiness Gate）
 
-> **Status**: 🚧 Proposed（设计提案 2026-10-23，RV64 架构符合性审查触发）
+> **Status**: ✅ **Accepted（v1.1，2026-10-24）** —— **拟批准触发条件已满足**：Change 1（`rv64-isa-declaration-correction`）已于 2026-10-24 归档（AC 10/10）
+> **版本历史**: v1.0（2026-10-23，🚧 Proposed）→ **v1.1（2026-10-24，Change 1 归档触发批准 + §D4 护栏切换登记，✅ Accepted）**
 > **类别**: IP 架构 / ISA 契约
 > **关联 ADR**: ADR-037 v2.0（Plugin 范式）· ADR-040 v2.0（TLM→HDL 移植性约束）· ADR-047（Result 范式）· ADR-048（注册规范序）· ADR-083（Plugin-style 单一 source of truth）· ADR-085 / ADR-086（MMU PTW / L0-L1 TLB 架构）
-> **关联变更**: 待立项（建议 3 个 change，见 §Implementation Plan）
+> **关联变更**: **Change 1 `rv64-isa-declaration-correction` ✅ 已实装并归档（2026-10-24）** · Change 2 `rv64-xlen-width-guardrails` ⏸ 待立项 · Change 3 `rv64-readiness-gap-tracker` ⏸ 待立项（部分已由 Change 1 附带完成，见下）
 > **缺口表 SSOT**: [`ip/cpu/docs/rv64_readiness_gap.md`](../../../ip/cpu/docs/rv64_readiness_gap.md)
-> **拟批准触发**: P0-1 声明纠偏 change archive 时同步批准
+> **拟批准触发**: P0-1 声明纠偏 change archive 时同步批准 → ✅ **已触发**（2026-10-24）
 
 ---
 
@@ -131,6 +132,18 @@ CH_MEM 后端全部 9 处定义点（缺口表 §5 的 3.1–3.8、3.10；其中
 
 **约束**：`static_assert` 必须带明确信息串，指明"RV64 语义未实现，见 ADR-087 §8 G3"。
 
+**§D4 护栏形态随 TLM 退役切换（v1.1 正式登记）**：
+
+| 项 | 规定 |
+|---|---|
+| 问题 | §D4 的 TLM 侧护栏（`ip/cpu/arch/riscv/int_alu.h` / `branch.h`，3 处 `static_assert(sizeof(T) == 4)`）**会随 TLM 文件删除而消失** ⇒ RV64 静默算错风险将**失去全部护栏** |
+| 切换条件 | **CH_MEM 侧 `kXlenBits` 定义点收敛为单一来源（= Change 2 落地）之后**，方可删除 TLM 侧护栏 |
+| 切换动作 | TLM 侧 `static_assert` 删除的**同批**，MUST 上线 **CH_MEM 侧 CI grep 门禁**：扫描 CH_MEM 侧 `kXlenBits` / `xlen` 硬编码是否重新长出来（形态对齐 ADR-088 §2 的冻结门禁） |
+| 在此之前 | **TLM 侧护栏必须保留**（即使 TLM 业务代码已冻结 —— 护栏属 §2.2「存量函数体的 bugfix」范畴，不触发冻结违规） |
+| 归属 | 本项由 ADR-088 §6 显式登记；B3 删除判据的**隐含前置**（ADR-088 §5.2 判据 4「CI 有可回归的自动测试」的姊妹项） |
+
+> **交叉引用**：ADR-088 §6「ADR-087 v1.1 待办登记」—— 本表即该待办的**正式落地**。
+
 ### D5 — RV64 实施准入清单（Gate）
 
 RV64 实施 change 的**准入条件**由缺口表 §8 的 G1–G9 定义，判定权归本 ADR，不归单个 code change。
@@ -207,7 +220,13 @@ RV64 缺口的唯一登记处为 [`ip/cpu/docs/rv64_readiness_gap.md`](../../../
 
 ## Implementation Plan
 
-### Change 1 — `rv64-isa-declaration-correction`（P0，声明纠偏）
+### Change 1 — `rv64-isa-declaration-correction`（P0，声明纠偏）— ✅ **已实装并归档（2026-10-24）**
+
+> **归档路径**: `openspec/changes/archive/2026-10-24-rv64-isa-declaration-correction/` · **永久 spec**: `openspec/specs/cpu-isa-xlen-contract/spec.md`
+> **AC**: 10/10 通过（含 3 处测试完备性补全：helper `kernel_xlen` 分支 / `cpu_sim` xlen e2e / schema+JSON 声明值；3 个变异对照全部被抓住）
+> **计数影响**: `[cpu]` 129 → **137**（删 1 case + 5 契约用例 + 4 测试完备性补全）
+> **post-archive 校验**: `openspec change validate rv64-isa-declaration-correction` 已不可复现（change 已归档）⇒ 等价命令 = `openspec validate cpu-isa-xlen-contract`（期望 `is valid`）
+> **§D4 提前落地项**: 1.9（`int_alu.h`）+ 1.10（`branch.h`）已随 Change 1 落地，3 处 `static_assert` 就位
 
 | # | 任务 | 归属 |
 |---|------|------|
@@ -219,8 +238,10 @@ RV64 缺口的唯一登记处为 [`ip/cpu/docs/rv64_readiness_gap.md`](../../../
 | 1.6 | `soc/docs/integration-guide.md` 的 `rv64imac` 纠正 | `soc/docs/integration-guide.md:17` |
 | 1.7 | `ip/cpu/plugins/reg_file.cpp`（死代码）删除或修正 `uint64_t` 显式实例化 | `ip/cpu/plugins/reg_file.cpp:34,47,52,58,69,72` |
 | 1.8 | `ip/cpu/docs/dse_architecture.md` 的 `isa` 表述 + 代码样例默认值标注 | `ip/cpu/docs/dse_architecture.md:126,231,251` |
-| 1.9 | `int_alu.h` 模板运算入口函数体首行加 `static_assert(sizeof(T) == 4, ...)`（实例化点触发，把窗口期静默错算变编译错；D4 提前落地，与 TLM 退役决策正交） | 缺口表 §4 的 2.1–2.2 载体 |
-| 1.10 | `branch.h` 同 1.9（BLT/BGE `int32_t` 符号比较的载体） | 缺口表 §4 的 2.3 载体 |
+| 1.9 ✅ | `int_alu.h` 模板运算入口函数体首行加 `static_assert(sizeof(T) == 4, ...)`（实例化点触发，把窗口期静默错算变编译错；D4 提前落地，与 TLM 退役决策正交） | 缺口表 §4 的 2.1–2.2 载体 |
+| 1.10 ✅ | `branch.h` 同 1.9（BLT/BGE `int32_t` 符号比较的载体） | 缺口表 §4 的 2.3 载体 |
+
+**Change 1 追加（实施期发现的测试完备性缺口，已补）**：`kernel_xlen` helper 分支（经 `build_cpu` 编译期不可达 ⇒ 直调 inline helper）· `cpu_sim` 的 `xlen` 解析 e2e（spec 有 Scenario 但无测试）· schema/JSON 声明值回归（原为一次性 python 脚本 ⇒ 转为 `[cpu-configs]` 回归测试）
 
 **验收**：`grep -rn '"rv64' ip/cpu/configs/ soc/` 返回 0；`CPUConfig{}` 默认 `isa == "rv32im"`；`CpuFactory<uint64_t>` 实例化**编译失败**（1.9/1.10 生效）；全部既有测试零退化。
 
@@ -256,7 +277,7 @@ RV64 缺口的唯一登记处为 [`ip/cpu/docs/rv64_readiness_gap.md`](../../../
 
 ### 动态验证
 
-- Change 1 落地后：`[cpu]` / `[cpu-integration]` / `[riscv-tests]` / `[chmem]` 全部零退化；新增编译期负向测试（`CpuFactory<uint64_t>` 实例化**必须编译失败**，1.9/1.10 守卫）
+- Change 1 落地后（✅ 实测 2026-10-24）：`[cpu]` **137/137**（480 assertions）· `[cpu-integration]` **96 = 95 + 1 pre-existing**（`test_7stage_riscv.cpp:124`）· `[riscv-tests],[mmu],[cache]` **132**（265 assertions）· `[isa-xlen]` 9（20 assertions）· `[cpu-configs]` 13（175 assertions）· CH_MEM binary **130** · TLM 全量 **493 = 492 + 1 pre-existing**；编译期负向验证：`g++ -fsyntax-only` 探针 **EXIT=1** + 2 条 `static assertion failed`（`branch.h:54` / `int_alu.h:90`）
 - Change 2 落地后：护栏扩展到 `mul.h` / `mul_div_fsm.h`；单一来源 grep 验收通过
 
 ---

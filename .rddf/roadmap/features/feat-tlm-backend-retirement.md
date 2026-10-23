@@ -90,17 +90,25 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 - [x] **B0**：ADR-088 Proposed（含冻结条款 + 语义裁决表 + 覆盖平价台账格式 + 删除判据）✅ 同上 change（`docs/architecture/adr/ADR-088-tlm-backend-retirement.md`；ADR-083 同步升 v1.1 补 §2.5 冻结条款 + §5.4 退役时间线）
 - [ ] **B0**：`ip/mmu/tlm/` + `ip/cpu/tlm/` 目录名误导消除（双模共享文件迁 `core/`，CH_MEM 编译 0 退化）—— ⏸ **未纳入 B0 change 的 In Scope**（目录重命名影响 include 路径，属独立 change；**建议归 B1**；`mmu_exception_handler.h` 经实测为 TLM-only 不迁）
 - [x] **B0**：覆盖平价台账建立 —— TLM 独占 case 三态标注 100% 覆盖，无批量"显式退役" ✅ **已完成**（内容由 change `chmem-tlm-coverage-parity-ledger` 交付，2026-10-24 归档；台账 = `docs/architecture/tlm-coverage-parity-ledger.md`，**463** 条（实测口径，草案 451 已因 A 的 13 增 1 删而修正）/ 46 族 / covered 154 · partial 292 · not-covered 17；格式由 ADR-088 §4 定稿）
-- [ ] **B1**：Dhrystone 在 `cpu_verilator_sim` 跑通 + 新基线 CSV 入库（**B3 的硬前置**）
+- [ ] **B1**：Dhrystone 在 `cpu_verilator_sim` 跑通 + 新基线 CSV 入库（**B3 的硬前置**）—— 建议 change `chmem-verilator-perf-harness`（**BP 验收的前置**）
+- [ ] **B1**：BP CH_MEM 版（`branch_predictor_chmem.h`）+ 工厂注册 —— 建议 change `chmem-bp-btb-gshare`（**必须与上一项同批**，否则 CoreMark ≥1.9 无法验证）
+- [ ] **B1**：L1Cache CH_MEM 本体 + `enable_cache=true` 解禁 —— 建议 change `chmem-l1cache-本体`（连带台账 4 条 `not-covered`）
+- [ ] **B1**：DBus / LSU CH_MEM 通路（宽度语义对齐）—— 建议 change `chmem-dbus-lsu`（依赖 L1Cache 本体）
+- [ ] **B1**：`ip/{mmu,cpu}/tlm/` 目录名治理（B0 剩余项；双模共享文件迁 `core/`）—— 小规模独立 change
+- [ ] **B1 决策定案**：6 个决策问题已由 architect 定案 ✅（2026-10-24）—— 详见 [`tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/tlm-retirement-b1-capacity-plan.md) §5（含 change 立项清单 + 顺序）
 - [ ] **B1**：CH_MEM 侧 LSU 全宽度 + MMU PTW walk FSM + MMU exception handler 注册 + BP CH_MEM 版 全部落地
-- [ ] **B2**：ADR-088 §语义裁决表 5 个子系统逐条表态，M 扩展 cycle 裁决明确
+- [x] **B2**：ADR-088 §语义裁决表 5 个子系统逐条表态，M 扩展 cycle 裁决明确 ✅ **已完成**（2026-10-24，architect 主持，ADR-088 升 **v1.1 Accepted**）：M 扩展 = CH_MEM 组合式为规范（功能+cycle）· CSR = CH_MEM 为规范 · MMU PTW = 现在不接线（回退 vaddr = 已知临时降级，归 `chmem-ptw-walk`）· BP = CH_MEM-only 且必须做（不适用「不做」出口）· MMU exception handler = 必须注册。附带裁决：**ADR-080 范围重定义**（→ 后端间对拍）
 - [ ] **B3**：CppTLM 链接依赖归零（`nm -C build/bin/chipforge_tests_chmem | grep -c cpptlm` = 0）
 - [ ] **B3**：TLM-only 业务文件归零（`find ip/ -name "*.h" -not -name "*_chmem.h"` 逐个确认无 TLM-only 残留）
+- [ ] **B3 前置（B2 added）**：BP 删除双前置 —— ① `branch_predictor_chmem.h` 存在**且已注册进 CH_MEM 工厂**；② CoreMark harness 在 `cpu_verilator_sim --elf` 跑通并产出 `CoreMark/MHz` 实测（缺一不得删，依 ADR-088 §5.2 BP 专项）
 - [ ] **B3**：全量 ctest 4 entries PASS + 5 个架构门禁脚本全 PASS
 - [ ] **B3**：`feat-dhrystone-dmips-gate` 的 DMIPS 判据改绑 Verilator 后端并**重测基线**（不删判据，废弃需显式 ADR）
 
 ## 关联
 
-- **ADR-083**（Plugin-style 单一 source of truth）— 本 feature 是其"CppTLM = legacy"定性的执行计划；建议 B0 阶段出 v1.1 修订补"冻结条款 + 退役时间线"
+- **ADR-088**（TLM 后端退役冻结契约与语义裁决锚，✅ v1.1 Accepted）— 本 feature 的**治理锚**：冻结条款（§2）· 5 子系统语义表态（§3）· 台账格式（§4）· B3 删除判据（§5）· ADR-080 范围重定义（§7）
+- **ADR-087**（ISA 声明真实性，✅ v1.1 Accepted）— §D4 护栏形态随 TLM 退役切换（切换条件 = Change 2 单一来源落地；在此之前 TLM 侧护栏必须保留）
+- **ADR-083**（Plugin-style 单一 source of truth）— 本 feature 是其"CppTLM = legacy"定性的执行计划；v1.1 已补"冻结条款 + 退役时间线"
 - **ADR-040 v2.0**（TLM→HDL 移植性约束）— "CH_MEM 是新正道"支持本方向；B3 完成后需 v3.0 移除 TLM 分支语义（远期）
 - **ADR-046**（多周期 FSM 豁免）— **强依赖**：B1 的 PTW walk FSM / L1Cache refill FSM / M 扩展 FSM 版全走此豁免，收敛决策反而提高其使用密度
 - **ADR-087**（ISA 声明真实性与 RV64 就绪度门禁，Proposed）— **正交互补但有交叉点**：其"假 RV64 就绪"证据全在 TLM 侧；TLM 删除后 D4 的 `static_assert` 护栏对象消失，护栏须改为 **CH_MEM 侧 CI grep 门禁 + G1–G9 准入清单**（详见 `feat-rv64-isa-declaration-integrity`）
