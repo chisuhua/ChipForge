@@ -2,7 +2,7 @@
   "name": "RiscvCpu_embedded",
   "type": "cpu",
   "params": {
-    "isa": "rv32imac",
+    "isa": "rv32im",
     "pipeline_stages": 3,
     "clock_freq_mhz": 50,
     "enable_pmp": true,

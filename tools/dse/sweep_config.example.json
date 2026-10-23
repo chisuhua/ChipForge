@@ -5,5 +5,5 @@
   "branch_predictor":    ["static", "gshare"],
   "ext_m":               [false, true],
   "mul_latency":         [1],
-  "isa":                 ["rv32i", "rv64i"]
+  "isa":                 ["rv32i", "rv32im"]
 }

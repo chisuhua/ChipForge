@@ -17,9 +17,15 @@
       "properties": {
         "isa": {
           "type": "string",
-          "enum": ["rv32i", "rv32im", "rv32imac", "rv64i", "rv64gc"],
-          "default": "rv64gc",
-          "description": "指令集架构"
+          "enum": ["rv32i", "rv32im", "rv32imac"],
+          "default": "rv32im",
+          "description": "指令集架构。implemented: rv32i/rv32im；declared-reserved: rv32imac, 以及规划值 rv64i/rv64gc（后者 schema 不收录, 运行时可接受并 emit warn, 不参与 dispatch, 见 ADR-087 §D1）；其余取值运行时 fail-fast。"
+        },
+        "xlen": {
+          "type": "integer",
+          "enum": [32, 64],
+          "default": 32,
+          "description": "XLEN 位宽 (ADR-087 §D2)。与 isa 的关联校验在 cf::cpu::detail::validate_isa_xlen（build_cpu 入口）。"
         },
         "pipeline_stages": {
           "type": "integer",

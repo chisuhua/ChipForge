@@ -2,7 +2,7 @@
   "name": "RiscvCpu_deep_pipeline",
   "type": "cpu",
   "params": {
-    "isa": "rv64gc",
+    "isa": "rv32im",
     "pipeline_stages": 10,
     "clock_freq_mhz": 500,
     "split_if_id": true,
@@ -16,7 +16,7 @@
     "ext_f": false,
     "ext_d": false,
     "enable_mmu": false,
-    "mmu_mode": "sv48",
+    "mmu_mode": "sv32",
     "enable_pmp": true,
     "icache_latency": 2,
     "dcache_latency": 2,

@@ -2,7 +2,7 @@
   "name": "RiscvCpu_superscalar",
   "type": "cpu",
   "params": {
-    "isa": "rv64gc",
+    "isa": "rv32im",
     "pipeline_stages": 7,
     "clock_freq_mhz": 200,
     "split_if_id": true,
@@ -14,7 +14,7 @@
     "mul_latency": 3,
     "ext_zicsr": true,
     "enable_mmu": false,
-    "mmu_mode": "sv39",
+    "mmu_mode": "sv32",
     "enable_pmp": true,
     "icache_latency": 1,
     "dcache_latency": 2,
