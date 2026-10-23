@@ -71,7 +71,7 @@
   "worktree_path": "",
   "branch": "feature/rv64-isa-declaration-correction",
   "execution_status": "completed",
-  "review_status": "pending",
+  "review_status": "passed",
   "retry_count": 0,
   "max_retries": 3,
   "retry_history": [],
@@ -87,9 +87,16 @@
       "event": "executed",
       "at": "2026-10-23T09:55:00Z",
       "note": "13 Task 全部完成; 6 批 commit (0ae4826..749ed2c + 台账批); 失败集合恰为 1 个 pre-existing (test_7stage_riscv.cpp:124); 6 门禁全绿; [cpu] 133 / chmem binary 130 / 485=484+1"
+    },
+    {
+      "phase": "phase-2.5",
+      "event": "review-passed",
+      "at": "2026-10-24T01:10:00Z",
+      "note": "AC 10/10 通过; commit 卫生 8 批核对通过; 变更面无 plan 外意外改动; 6 项已知遗留已登记; 待 critic 第 4 轮 plan 复审结论"
     }
   ],
   "archive_status": "pending",
   "verifier_report_path": "",
-  "updated_at": "2026-10-23T09:55:00Z"
+  "updated_at": "2026-10-24T01:10:00Z",
+  "review_report": ".rddf/reviews/rv64-isa-declaration-correction-p2.5-review.md"
 }
