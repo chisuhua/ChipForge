@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "rv64-isa-declaration-correction",
-  "current_phase": "phase-1.5",
+  "current_phase": "phase-2",
   "approval_status": "approved",
   "plan_quality_status": "approved",
   "p0_decision": {
@@ -33,7 +33,15 @@
       "worktree 代价已实测推导：_deps_install_dir = ${CMAKE_BINARY_DIR}/_deps/install（CMakeLists.txt:81）⇒ worktree 内是全新 build 目录 ⇒ CppTLM/CppHDL 需重编（仓内 symlink 本地源，无网络，但数分钟）；收益仅为更强工作区隔离"
     ],
     "fallback_if_needed": "用户要求强隔离时切 worktree 模式（opencode worktree_create + 该 worktree 内 cmake configure）",
-    "user_confirmation_required_at": "phase-2 (HARD pause)"
+    "user_confirmation_required_at": "phase-2 (HARD pause)",
+    "user_confirmed": {
+      "at": "2026-10-23T09:35:00Z",
+      "execution_mode": "in-place（用户确认）",
+      "commit_strategy": "按 plan Task 13 Step 6 的 5 批拆分（用户确认『按你推荐』）",
+      "implementation_start": "critic 第 3 轮终审通过后开始（用户确认）",
+      "branch_created": "feature/rv64-isa-declaration-correction",
+      "branch_base": "efab12b"
+    }
   },
   "deps_status": {
     "blockers": [],
@@ -55,8 +63,8 @@
     }
   },
   "worktree_path": "",
-  "branch": "",
-  "execution_status": "pending",
+  "branch": "feature/rv64-isa-declaration-correction",
+  "execution_status": "pending-critic-final-review",
   "review_status": "pending",
   "retry_count": 0,
   "max_retries": 3,
