@@ -1,0 +1,51 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "rv64-isa-declaration-correction",
+  "current_phase": "phase-1",
+  "approval_status": "approved",
+  "plan_quality_status": "pending",
+  "p0_decision": {
+    "case": 1,
+    "route": "full-p1-p3",
+    "decided_at": "2026-10-23T05:50:00Z",
+    "decided_by": "auto-decision (ADR-0049) + user explicit '开始 P0 立项'",
+    "llm_assessment": "complex",
+    "planner_advisory": "complex",
+    "agreement": "yes",
+    "ac_count": 10,
+    "concerns": [
+      "public config interface 扩展（CPUConfig::xlen + schema）",
+      "跨编译面：TLM static_assert 需双 binary 全量 build 验证（防误伤 chipforge_tests_chmem）",
+      "cpu_sim CLI 行为变化（5 个 e2e 用例 exec_cmd 约定回归）"
+    ]
+  },
+  "execution_mode_decision": {},
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [
+      "feat-rv64-isa-declaration-integrity (roadmap Change 1 owner)",
+      "feat-tlm-backend-retirement (Gate 1 前置 G1.5，软依赖)"
+    ],
+    "cross_repo_pending": []
+  },
+  "worktree_path": "",
+  "branch": "",
+  "execution_status": "pending",
+  "review_status": "pending",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "phase": "phase-0",
+      "event": "approved",
+      "at": "2026-10-23T05:50:00Z",
+      "note": "case-1 approve；proposal.md + specs/cpu-isa-xlen-contract/spec.md 已生成，openspec validate 0 error"
+    }
+  ],
+  "archive_status": "pending",
+  "verifier_report_path": "",
+  "updated_at": "2026-10-23T05:50:00Z"
+}

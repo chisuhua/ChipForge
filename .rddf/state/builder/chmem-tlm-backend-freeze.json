@@ -1,0 +1,53 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "chmem-tlm-backend-freeze",
+  "current_phase": "phase-1",
+  "approval_status": "approved",
+  "plan_quality_status": "pending",
+  "p0_decision": {
+    "case": 1,
+    "route": "full-p1-p3",
+    "decided_at": "2026-10-23T07:55:00Z",
+    "decided_by": "auto-decision (ADR-0049) + user explicit '并行推进投案 B 立项'",
+    "llm_assessment": "complex",
+    "planner_advisory": "complex",
+    "agreement": "yes",
+    "ac_count": 11,
+    "concerns": [
+      "ADR-088 起草范围膨胀风险（R2）—— 5 项必填各 ≥1 节，禁止在 B0 做 B2 正式表态",
+      "冻结门禁误伤 legit bugfix（R1）—— 检测口径须限定为『新增函数定义』，支持文件:行 粒度白名单",
+      "草案数字纠正：mmu_exception_handler.h 经 cpu_factory_chmem.h:54-56 的 #ifndef 包裹证明为 TLM-only ⇒ 双模共享 10→9、TLM-only 44→45 文件 / 5,400 行（AC 采用纠正值）",
+      "CI 盲区：测试不进 CI（Oracle 2026-10-06），冻结门禁与后续 TLM 退役均无自动回归保护"
+    ]
+  },
+  "execution_mode_decision": {},
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [
+      "feat-tlm-backend-retirement (B0 owner; B1/B2/B3 由同一 feature 的后续阶段承载)",
+      "ADR-088 需 architect 参与 §语义裁决表的正式表态（留 B2，B0 只填表头与已知分歧）",
+      "ADR-087 v1.1（TLM 侧 static_assert 随 TLM 删除消失 ⇒ 需切 CH_MEM 侧 CI grep 门禁）—— 登记为 ADR-088 第 5 项待办"
+    ],
+    "cross_repo_pending": []
+  },
+  "worktree_path": "",
+  "branch": "",
+  "execution_status": "pending",
+  "review_status": "pending",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "phase": "phase-0",
+      "event": "approved",
+      "at": "2026-10-23T07:55:00Z",
+      "note": "case-1 approve；proposal.md + specs/tlm-backend-freeze-contract/spec.md 已生成（AC 11 条，数字按实测纠正：45→41）"
+    }
+  ],
+  "archive_status": "pending",
+  "verifier_report_path": "",
+  "updated_at": "2026-10-23T07:55:00Z"
+}
