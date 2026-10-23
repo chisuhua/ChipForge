@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "chmem-tlm-coverage-parity-ledger",
-  "current_phase": "phase-1",
+  "current_phase": "phase-3",
   "approval_status": "approved",
   "plan_quality_status": "pending",
   "p0_decision": {
@@ -39,8 +39,8 @@
   },
   "worktree_path": "",
   "branch": "",
-  "execution_status": "pending",
-  "review_status": "pending",
+  "execution_status": "completed",
+  "review_status": "passed",
   "retry_count": 0,
   "max_retries": 3,
   "retry_history": [],
@@ -50,9 +50,30 @@
       "event": "approved",
       "at": "2026-10-24T01:20:00Z",
       "note": "case-1 approve; proposal.md + specs/tlm-coverage-parity-ledger/spec.md 已生成; 数字纠正: TLM 独占 451->463 (A 新增 13 删 1), TLM 总 481->493"
+    },
+    {
+      "phase": "phase-2",
+      "event": "executed",
+      "at": "2026-10-24T01:30:00Z",
+      "note": "8 Task + 12 AC 完成; 3 变异全被检出; 8 门禁全绿; 0 生产代码改动; 台账 463 条 / 46 族"
+    },
+    {
+      "phase": "phase-2.5",
+      "event": "review-passed",
+      "at": "2026-10-24T01:32:00Z",
+      "note": "AC 12/12; 6 项已知遗留已登记"
+    },
+    {
+      "phase": "phase-3",
+      "event": "archived",
+      "at": "2026-10-24T01:35:00Z",
+      "note": "openspec archive 完成; 4 requirements 落库 openspec/specs/tlm-coverage-parity-ledger/spec.md; Purpose 占位已替换"
     }
   ],
-  "archive_status": "pending",
+  "archive_status": "archived",
   "verifier_report_path": "",
-  "updated_at": "2026-10-24T01:20:00Z"
+  "updated_at": "2026-10-24T01:35:00Z",
+  "review_report": ".rddf/reviews/chmem-tlm-coverage-parity-ledger-p2.5-review.md",
+  "archive_path": "openspec/changes/archive/2026-10-24-chmem-tlm-coverage-parity-ledger",
+  "spec_path": "openspec/specs/tlm-coverage-parity-ledger/spec.md"
 }
