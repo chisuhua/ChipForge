@@ -127,7 +127,9 @@
 |----|------|------|------------|----------|
 | ADR-024 | Bundle 三层分层 | Bundle | Bundle + Protocol | Mapper 模板未实现 |
 
-### 2.3 Phase 1 提案决策（🚧）— 8 条
+### 2.3 Phase 1 提案决策（🚧）— 9 条
+
+> 口径说明：本节条数 = **🚧 状态**的条数；本节另含 1 条 ✅（ADR-045），不计入标题数字。
 
 | ID | 标题 | 类别 | 状态 | 备注 |
 |----|------|------|------|------|
@@ -140,6 +142,7 @@
 | ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
 | ADR-044 | L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 | IP 架构 | 🚧（设计方向已锁，实装推迟 mmu-tlb-ptw-impl 以后） | [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../../ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) |
 | ADR-045 | Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop | Plugin | ✅ Accepted (2026-09-15, plugin-framework-stall v0.1.3) | [`adr/ADR-045-plugin-ctrl-link-consumption.md`](adr/ADR-045-plugin-ctrl-link-consumption.md) |
+| ADR-085 | MMU_PTW 架构 — 伞索引（TLB/PTW 分层 + PTWCache 页目录项缓存 + 同拍串联命中判定 / `start_level` 选择；决策拆为 D01–D21 共 21 个子 ADR） | IP 架构 | 🚧（设计提案 2026-10-22；实装归未立项 change `chmem-ptw-walk`） | [`ip/mmu/docs/adr/ADR-085-mmu-ptw-architecture.md`](../../ip/mmu/docs/adr/ADR-085-mmu-ptw-architecture.md) |
 
 > ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 `.rddf/roadmap/archive/phase-1.5-stall-and-validate.md` §11。
 
@@ -159,10 +162,10 @@
 | 目录与组织 (J) | 2 | 0 | 1 | 3 |
 | 范式决策 (K) | 1 | 0 | 0 | 1 |
 | 可移植性约束 (L) | 1 | 0 | 0 | 1 |
-| IP 架构 (M) | 0 | 0 | 1 | 1 |
-| **合计** | **37** | **1** | **8** | **46** |
+| IP 架构 (M) | 0 | 0 | 2 | 2 |
+| **合计** | **37** | **1** | **9** | **47** |
 
-**实现率**：36/45 ≈ **80%**（含部分实现）
+**实现率**：37/47 ≈ **79%**（= `✅ / 合计`，含部分实现）
 
 ---
 
