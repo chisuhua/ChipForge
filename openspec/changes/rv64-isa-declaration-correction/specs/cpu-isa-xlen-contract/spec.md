@@ -96,4 +96,4 @@
 #### Scenario: CI 软门禁可执行
 
 - **WHEN** 人为在未登记缺口表的情况下新增一处 XLEN 硬编码假设（`kXlenBits =` 定义点）并跑门禁脚本
-- **THEN** 门禁输出 warn（`文件:行` + 提示登记缺口表 §5），不阻塞 CI；基线态（allowlist = 缺口表 §5 的 9 处定义点 / 7 个文件）输出 `warn=0`
+- **THEN** 门禁输出 warn（`文件:行` + 提示登记缺口表 §5），不阻塞 CI；基线态（allowlist = 缺口表 §5 的 9 处定义点 / **9 个文件**，实测 `grep -rnE "kXlenBits *=" --include='*.h' ip/` = 9 命中 9 文件）输出 `warn=0`

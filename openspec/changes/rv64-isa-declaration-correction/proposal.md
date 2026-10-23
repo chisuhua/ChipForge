@@ -53,10 +53,10 @@ adr:
 7. **D4 提前落地**（TLM 侧护栏，与 TLM 退役决策正交）—— `ip/cpu/arch/riscv/int_alu.h` / `branch.h` 模板运算入口函数体首行加 `static_assert(sizeof(T) == 4, "RV32 TLM path assumes 32-bit XLEN; RV64 requires the phase-5 block gate see ADR-087 G3")`；**必须放模板入口内**（实例化点触发），不得放文件作用域（否则 include 即误伤）；`branch.h` 需**两处**（静态入口 `evaluate_branch` + `build()` 闭包内的真实分支判定路径 —— 只护静态入口则真实 BLT/BGE 路径不受覆盖）；`mul.h` / `mul_div_fsm.h` 归 Change 2（phase-5）
 8. `ip/cpu/docs/rv64_readiness_gap.md` —— 入 `ip/cpu/docs/README.md` 索引
 9. `docs/architecture/adr.md` —— ADR-087 注册（architect 阶段已落地，见 §Impact）
-10. CI 软门禁 —— "新增 XLEN 假设必须登记缺口表" 提示（warn 级；新脚本 `tools/check_xlen_hygiene.sh`，以缺口表 §5 的 9 处定义点为 allowlist，出现新硬编码假设 → warn 输出 `文件:行`）
+10. CI 软门禁 —— "新增 XLEN 假设必须登记缺口表" 提示（warn 级；新脚本 `tools/check_xlen_hygiene.sh`，以缺口表 §5 的 **9 处定义点 / 9 个文件**为 allowlist —— 实测 `grep -rnE "kXlenBits *=" --include='*.h' ip/` = 9 命中 9 文件，含 §5 描述未点名 `kXlenBits` 的 3.5 `ibus_chmem.h` / 3.6 `dmem_chmem.h`；出现新硬编码假设 → warn 输出 `文件:行`）
 11. **连带纠偏**（design D4）：`tools/dse/sweep_config.example.json:8` 的 sweep grid `["rv32i","rv64i"]` → `["rv32i","rv32im"]`（DSE 示例不再诱导 reserved 值）
 12. **T64 实例化点迁移**（critic B1 + 用户裁决：保留编译期护栏）—— 实测 `RiscvIntAluPlugin<unsigned long>` / `RiscvBranchPlugin<unsigned long>` 今天已被 `tests/cpu/test_cpu_factory.cpp` 与 `tests/cpu/test_branch_predictor_runtime_btb.cpp` 实例化（`nm -C` 扫 `.o` 实证）⇒ 与 AC2「`CpuFactory<uint64_t>` 编译失败」互斥。处置：删除 RV64 构建探测 case `build_cpu_rv64`；其余 T64 调用点改 T32（保留 BTB 覆盖）；integration 侧 `cfg.isa` 值纠偏（`rv64gc`/`rv32imac` → `rv32im`，共 10 处）。**RV64 真实路径归 ADR-087 Change 2（phase-5）**
-13. **测试值纠偏**（设计后果，非缺陷修复）—— 既有 6 处 `cfg.isa = "rv64gc"`（test_7stage×3 / test_10stage×3）+ 1 处 `rv32imac`（test_3stage）原按 declared-reserved warn 路径「零改动」，现按 item 12 统一纠偏为 `rv32im` ⇒ 仓库内不再有 reserved 值残留（reserved 语义由新增专用测试覆盖）
+13. **测试值纠偏**（设计后果，非缺陷修复）—— 既有 `cfg.isa = "rv64gc"`（test_7stage×3 / test_10stage×3 / test_cpu_factory×2 / test_topology_builder×1）与 `rv32imac`（test_3stage×1 / test_cpu_factory×1）原按 declared-reserved warn 路径「零改动」，现按 item 12 统一纠偏为 `rv32im` ⇒ **配置/声明面与 tests/ 均无 reserved 值残留**（reserved 语义由新增专用测试覆盖）
 
 ### Out of Scope
 
@@ -80,7 +80,7 @@ adr:
 | `ip/cpu/arch/riscv/int_alu.h` | 改 | 模板入口加 `static_assert(sizeof(T)==4)`（D4 提前落地） |
 | `ip/cpu/arch/riscv/branch.h` | 改 | 同上，**两处**（静态入口 + `build()` 闭包内真实判定） |
 | `tools/dse/sweep_config.example.json` | 改 | sweep grid `rv64i` → `rv32im`（design D4 连带纠偏） |
-| `tools/check_xlen_hygiene.sh` | **新增** | CI 软门禁（warn-only；allowlist = 缺口表 §5 的 9 处定义点 / 7 个文件） |
+| `tools/check_xlen_hygiene.sh` | **新增** | CI 软门禁（warn-only；allowlist = 缺口表 §5 的 9 处定义点 / **9 个文件**） |
 | `.github/workflows/architecture-gates.yml` | 改 | 接入 hygiene 脚本（`continue-on-error: true`） |
 | `tests/cpu/test_cpu_factory.cpp` | 改 | 删 `build_cpu_rv64` case；余下 T64 → T32；`isa` 断言纠偏 |
 | `tests/cpu/test_branch_predictor_runtime_btb.cpp` | 改 | 3 个 case 的 `uint64_t` → `uint32_t`（保留 BTB 覆盖） |
@@ -168,13 +168,13 @@ isa 含 "rv32" ⇒ xlen = 32
 
 - [ ] 三层 fail-fast 语义生效（design.md Decision 1，ADR-087 §D1 为准）：① 默认 `CPUConfig{}` `isa == "rv32im"` 且 `xlen == 32`（不 throw 不 warn）；② `isa="rv128i"`（unsupported）⇒ **throw**；③ implemented 态冲突（`isa="rv32im"` + `xlen=64`）⇒ **throw**；④ `build_cpu<T>` 中 `xlen != sizeof(T)*8` ⇒ **throw**；⑤ declared-reserved（`rv32imac`）⇒ **接受 + 一次 warning**（std::cerr，非静默）
 - [ ] `CpuFactory<uint64_t>` 实例化**编译失败**（`int_alu.h`/`branch.h` 守卫生效）；**前置条件**：现存 T64 实例化点已按 In Scope item 12 迁移（`grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>" tests/` = 0）⇒ 否则 AC2 与 0 退化互斥；变异对照：把 `branch.h` 断言临时改 `8` 应使 `[cpu]` 编译失败 —— 证明守卫在实例化点生效
-- [ ] `grep -rn '"rv64' ip/cpu/configs/ soc/` 返回 **0**；schema `isa` enum 只含 `rv32i`/`rv32im`/`rv32imac`、default `rv32im`；`rv64i`/`rv64gc` 仅以 **description 文本**形式保留（declared-reserved 文档化，非 enum 项）
+- [ ] `grep -rn '"rv64' ip/cpu/configs/ soc/ tools/dse/sweep_config.example.json` 返回 **0**；schema `isa` enum 只含 `rv32i`/`rv32im`/`rv32imac`、default `rv32im`；`rv64i`/`rv64gc` 仅以 **description 文本**形式保留（declared-reserved 文档化，非 enum 项）
 - [ ] `tools/cpu_sim` 不再出现 `isa="rv32i"` 硬编码（`grep -n 'isa="rv32i"' tools/cpu_sim/main.cpp` = 0，含注释）；`--isa` 参数（若存在）行为与 config 一致；`load_config()` 已解析 `xlen`
 - [ ] `ip/cpu/plugins/reg_file.cpp` 不存在；`grep -rn "RegFilePlugin<std::uint64_t>" ip/` 返回 0
 - [ ] `ip/cpu/docs/rv64_readiness_gap.md` §2 的 0.1–0.10 状态列全部更新为 ✅（0.7 / 0.8 保持 ✅）
 - [ ] CI 软门禁上线："新增 XLEN 假设必须登记缺口表"（warn 级，不阻塞；`tools/check_xlen_hygiene.sh` 基线 `warn=0`）
 - [ ] 6 个门禁全 PASS：`verify_adr.sh` 0 fail · `verify_plugin_decision.sh` 8/8 · `check_plugin_portability.sh` 13/13 · `doc_link_check.sh` 0 broken · `roadmap-r9-check.sh` 0 critical · `check_xlen_hygiene.sh` warn=0
-- [ ] 0 退化（**HEAD `bcc88aa` 实测基线口径**）：`[cpu]` **133**（129 − 1 删 `build_cpu_rv64` + 5 新用例）· `[cpu-integration]` **96 cases / 95 PASS / 1 FAIL**（唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124` node_count `9 == 17`，**pre-existing**，口径 = 不新增失败）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `chipforge_tests_chmem` binary **130**（其中 `[chmem]` tag 89/89）全 PASS
+- [ ] 0 退化（**HEAD `9b45fac` 实测基线口径**）：`[cpu]` **133**（129 − 1 删 `build_cpu_rv64` + 5 新用例）· `[cpu-integration]` **96 cases / 95 PASS / 1 FAIL**（唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124` node_count `9 == 17`，**pre-existing**，口径 = **不新增失败**；TLM binary 全量 481 = 480 + 1）· `[riscv-tests]` 48/48 · `[mmu]` 59/59 · `[cache]` 25/25 · `chipforge_tests_chmem` binary **130**（其中 `[chmem]` tag 89/89）全 PASS
 - [ ] `openspec change validate rv64-isa-declaration-correction` 0 error（change 已由 rdd-builder P0 立项创建）
 
 ## References

@@ -14,13 +14,42 @@
 
 ## 修订记录（critic 审查后修订，2026-10-23）
 
+### 第 2 轮 critic 复审（session `ses_e98421060ffequMkI7v6JzOtpY`，REJECT：5 BLOCKER / 6 SHOULD_FIX / 4 NITS）
+
+| 编号 | critic 指控 | 本计划处置 | 落点 |
+|------|------------|-----------|------|
+| B-1 | hygiene allowlist 漏 2 个文件（`ibus_chmem.h` / `dmem_chmem.h`）⇒ 脚本基线 `warn=2`，AC8 永不可达 | allowlist 补至 **9 条**（实测 `kXlenBits =` = **9 命中 / 9 文件**；缺口表 §5 的 3.5/3.6 描述未点名 `kXlenBits` 但文件内确有定义点） | Task 12 Step 1 |
+| B-2 | Task 13 Step 1 期望「4 ctest entries 全 PASS」不可达（`chipforge_tests` 条目**基线即红**） | 改为「3 PASS + `chipforge_tests` Failed（失败集合恰为 `{test_7stage_riscv.cpp:124}`）」+ 机判口径 `ctest -E '^chipforge_tests$'` 3 条全绿 | Task 13 Step 1 |
+| B-3 | Task 1 Step 1 命令（无 filter）与期望（`[cpu]` 口径）不符 | 拆成 Step 1（无 filter → 481/480/1）+ Step 1b（`"[cpu]"` → 129/461） | Task 1 |
+| B-4 | Task 5 的 `grep '"rv64'` 期望 0 命中，但 3 个 JSON 归 Task 6 ⇒ 该时点不可达 | Task 5 期望改为「恰好 3 命中（Task 6 消除）」；0 命中断言移到 Task 6 Step 3 | Task 5 / Task 6 |
+| B-5 | Task 3 Step 3 接线代码块含不存在的符号 `reset_canonical_ordering_counters_placeholder`（全仓仅 plan 命中） | 删掉占位块，只留真实上下文两行 + 显式「不要写占位符号」告警 | Task 3 Step 3 |
+| S-1 | Task 3 Step 5 Expected 自相矛盾（129 / 134 并列）且该时点 `[cpu]` 必 FAIL | 改为「本步必然 2 处 FAIL（列明 file:line）+ 收敛到 Task 4」+ 计数时序注（134 → 133） | Task 3 Step 5 |
+| S-2 | proposal「共 10 处」与「7 处」冲突 | 统一为 **7 处**（integration 3 文件 9 行中 2 行是 `p["isa"]` 不动） | proposal item 13 |
+| S-3 | `tests/cpu/test_topology_builder.cpp:35` 残留 `rv64gc` 未覆盖 ⇒ 「无 reserved 残留」为假 | 纳入 Task 4 Step 4b + 增加 `tests/` 残留 grep（Task 4 Step 6 / Task 13 Step 3） | Task 4 / Task 13 |
+| S-4 | Task 12 变异探针零检验力（脚本扫仓库 `ip/`，探针在 `/tmp`） | 脚本加 `XLEN_SCAN_ROOT` 环境变量（默认 `ip`）+ 探针指向非 allowlist 文件 | Task 12 Step 1/4 |
+| S-5 | Task 13 的 AC2 grep 弱于 Task 4（漏 `BranchPredictorPlugin<std::uint64_t>`） | 两处统一同一 pattern + 新增 tests/ 残留 grep | Task 13 Step 3 |
+| S-6 | 分批 commit 机制自破（`git rm` 残留 index ⇒ 第 1 批夹带删除 + 第 3 批 pathspec 失效） | 全部改用 `git commit -- <paths>` 限定 pathspec，并拆成 5 批 | Task 13 Step 6 |
+| N-1~N-4 | 134/133 时序读感、缺口表 §1 行过期、`tools/README.md` 未登记、sweep 示例无 AC 覆盖 | 分别：加时序注 / Task 11 Step 1b 补 §1 标注 / Task 12 Step 4b 登记 / Task 13 Step 3 grep 范围补 sweep 示例 | 见各 Task |
+
+### builder 自检（代码块「逐字跑一次」，commit `9b45fac` 之后）
+
+| 自检 | 方法 | 结果 |
+|------|------|------|
+| hygiene 脚本三态 | 从 plan 抽出脚本原文（`sed -n '/^#!\/usr\/bin\/env bash$/,/^exit 0$/p'`）实跑 | 基线 `warn=0` ✓；探针 `warn=1`（恰 1 条）✓；`STRICT_XLEN_GATE=yes` → exit 1 ✓ |
+| **allowlist 匹配口径** | 探针跑 | 首次实跑暴露真 bug：全等比较在绝对路径探针模式下把 9 个已登记文件全误报（`warn=10`）⇒ 改为**路径后缀匹配**，探针改落非 allowlist 文件 |
+| `validate_isa_xlen` helper + 接线 | 把 plan 落笔形态注入 `cpu_factory.h` 副本，`g++ -std=c++23 -fsyntax-only` | **exit 0** ✓（含 `<iostream>` 补充 + 接线行） |
+| **落点错误复现** | 把 helper 误插在 `:113` 闭合与 `:115` 重开之间 | 实测报错 `‘CPUConfig’ does not name a type` + `‘validate_isa_xlen’ is not a member of ‘cf::cpu::detail’` ⇒ 落点必须落在 struct 之后（已写入 Task 3 Step 2 告警） |
+| 新测试文件（5 用例） | 从 plan 抽出代码块 + 遮蔽 header，`g++ -fsyntax-only` | **exit 0** ✓ |
+
+### 第 1 轮 critic 审查（session `ses_e9879fb37ffeBO2wBIropJMaDe`，REJECT：6 BLOCKER / 7 SHOULD_FIX / 6 NITS）
+
 critic 对本 change 的 P1 产物给出 **REJECT：6 BLOCKER / 7 SHOULD_FIX / 6 NITS**，本计划已逐条修复：
 
 | 编号 | critic 指控 | 本计划处置 | 落点 |
 |------|------------|-----------|------|
 | B1 | 护栏 `static_assert(sizeof(T)==4)` 会打断 `chipforge_tests` 编译（`IntAlu<T64>`/`Branch<T64>` 今天已被实例化）→ AC2 与 AC9「0 退化」互斥 | **用户裁决：迁移 T64 调用点，保留编译期护栏**；删除 RV64 构建探测 case + 其余改 T32；`[cpu]` 计数随之调整 | Task 4 |
 | B2 | Task 5 改 `isa` 后 3 个 JSON 触发 schema `:204` 条件（`rv32* ⇒ mmu_mode const sv32`）而 `mmu_mode` 是 sv39/sv48 → 变 schema 非法 | 3 个 JSON 的 `mmu_mode` 同步纠偏为 `sv32`（32-bit XLEN 下只有 Sv32 合法，schema 约束本身是对的）；`_comment` 撞 `additionalProperties:false` 属 **pre-existing 基线**，登记不修 | Task 6 + design R8 |
-| B3 | hygiene 脚本 allowlist 2 条路径写错 → `warn=0` 不成立 | allowlist 改为缺口表 §5 实测的 **7 个真实文件**（9 处定义点分布在 7 文件） | Task 12 |
+| B3 | hygiene 脚本 allowlist 2 条路径写错 → `warn=0` 不成立 | allowlist 改为缺口表 §5 + **实测 grep 复核**：`kXlenBits =` 共 **9 命中 / 9 个文件**（含 `ibus_chmem.h` / `dmem_chmem.h` —— 草案 §5 的 3.5/3.6 虽未在描述里点名 `kXlenBits`，文件内确有定义点），allowlist 补齐 9 条 | Task 12 |
 | B4 | `validate_isa_xlen` 插在 `namespace cf::cpu::detail` 之外 → 落笔即编译失败 | 计划显式给出包裹代码：helper 放在 struct 之后、**只重开 `detail` 一层**（`cf::cpu` 已由 `:115-116` 打开 ⇒ 再写 `namespace cf { namespace cpu {` 会得到 `cf::cpu::cf::cpu::detail`，同名陷阱） | Task 3 Step 2 |
 | B5 | 替换后的注释仍含 `isa="rv32i"` 字面量 → AC4 的 grep 自我否定 | 替换文本不含该字面量；AC4 grep 口径同步核对 | Task 7 + Task 13 |
 | B6 | Task 12 自检含 `git stash push` → 会抽走实施期改动 | 删除该行，自检改为 `/tmp/opencode` 纯 dry 探针 | Task 12 |
@@ -35,15 +64,19 @@ critic 对本 change 的 P1 产物给出 **REJECT：6 BLOCKER / 7 SHOULD_FIX / 6
 
 ---
 
-## 基线快照（HEAD `bcc88aa` 实测，2026-10-23）
+## 基线快照（HEAD `9b45fac` 实测，2026-10-23）
 
 | 口径 | 实测值 | 备注 |
 |------|--------|------|
-| `[cpu]` | **129 cases / 461 assertions PASS** | 本 change 后 = 129 − 1（删 `build_cpu_rv64`）+ 5（新用例）= **133** |
-| `[cpu-integration]` | **96 cases / 95 PASS / 1 FAIL** | 唯一失败 = `tests/cpu/integration/test_7stage_riscv.cpp:124 REQUIRE(pb->node_count() == 17)` → 展开 `9 == 17`，**pre-existing（HEAD 即红）**，与本 change 无关；口径 = **不新增失败**，该 FAIL 保持 1 个 |
+| **TLM binary 全量（无 filter）** | **481 cases / 480 PASS / 1 FAIL**（67,135 assertions） | 唯一 FAIL = `tests/cpu/integration/test_7stage_riscv.cpp:124`（node_count `9 == 17`），**pre-existing（HEAD 即红）**；口径 = **不新增失败** |
+| `[cpu]` | **129 cases / 461 assertions PASS** | 本 change 后 = 129 − 1（删 `build_cpu_rv64`）+ 5（新用例）= **133**（时序：Task 3 后 = 134 → Task 4 删 case 后 = 133） |
+| `[cpu-integration]` | **96 cases / 95 PASS / 1 FAIL** | 唯一失败同上（pre-existing） |
 | `[riscv-tests]` | 48/48 PASS | — |
 | `[mmu]` | 59/59 PASS | — |
+| `[cache]` | 25/25 PASS | — |
 | `chipforge_tests_chmem` | binary 总 **130 cases**；`[chmem]` tag **89** | 两个口径不可混用；`run_chipforge_tests.sh --all` 全量实测 **>120s 未完**（AGENTS.md 记载 833s），本 change 收口用 `timeout 1200` |
+| **ctest 条目** | **4 条**：`verify_plugin_decision` / `chipforge_tests` / `chipforge_tests_chmem` / `cpu_verilator_sim_add` | `chipforge_tests` 条目**基线即红**（含上述 1 个 pre-existing FAIL）⇒ 终验口径见 Task 13 Step 1 |
+| `kXlenBits` 定义点 | **9 命中 / 9 个文件** | 缺口表 §5 的 3.1/3.2/3.3/3.4/3.5/3.6/3.7/3.8/3.10 —— 3.5（`ibus_chmem.h`）/ 3.6（`dmem_chmem.h`）描述里未点名 `kXlenBits`，但文件内确有定义点 ⇒ hygiene allowlist 必须 9 条 |
 
 ---
 
@@ -82,10 +115,17 @@ critic 对本 change 的 P1 产物给出 **REJECT：6 BLOCKER / 7 SHOULD_FIX / 6
 **Files:**
 - Test: 无新文件（只跑既有基线）
 
-- [ ] **Step 1: 跑 TLM 快返基线**
+- [ ] **Step 1: 跑 TLM 全量基线（无 filter）**
 
 Run: `./build/bin/chipforge_tests 2>&1 | tail -3`
-Expected: `All tests passed (461 assertions in 129 test cases)`（`[cpu]` 口径见基线快照表）
+Expected: `test cases: 481 | 480 passed | 1 failed` + `assertions: 67135 | 67134 passed | 1 failed`（**1 failed = pre-existing** `test_7stage_riscv.cpp:124`，本 change 不修它）
+
+> 注：`All tests passed (461 assertions in 129 test cases)` 是 `"[cpu]"` **带 filter** 的输出口径，不是全量口径 —— 二者不可混用。
+
+- [ ] **Step 1b: 跑 `[cpu]` 过滤基线**
+
+Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -3`
+Expected: `All tests passed (461 assertions in 129 test cases)`
 
 - [ ] **Step 2: 跑 `[cpu-integration]` 基线并记录 pre-existing FAIL**
 
@@ -226,6 +266,8 @@ Expected: **编译失败** — `CPUConfig` 无 `xlen` 字段（这是 TDD 红；
 - [ ] **Step 2: 后置重开 namespace 放校验 helper（唯一 SSOT，design D1/D6）**
 
 > `namespace cf::cpu::detail` 的原块在 `cpu_factory.h:113` 闭合（`}}}  // namespace cf::cpu::detail`），**早于** `struct CPUConfig`（:124）的定义 ⇒ helper 不能放回原块。但 `namespace cf { namespace cpu {` 在 `:115-116` **已重新打开**（直到 `:520-521` 才闭合）⇒ 此处**只需重开 `detail` 一层**；若再写 `namespace cf { namespace cpu {` 会产生 `cf::cpu::cf::cpu::detail` ⇒ 落笔即错（同名陷阱）。
+>
+> ⚠️ **落点必须精确**：插在 **`struct CPUConfig { … };` 的 `};` 之后**（此时 `cf::cpu` 已打开 ⇒ `CPUConfig` 可见 + `detail` 解析为 `cf::cpu::detail`）。若误插在 `:113` 闭合与 `:115` 重开**之间**（全局命名空间）⇒ 报 `‘CPUConfig’ does not name a type` + `‘validate_isa_xlen’ is not a member of ‘cf::cpu::detail’; did you mean ‘detail::validate_isa_xlen’?`（**已实测复现**）。
 
 在 `struct CPUConfig { ... };`（:176 的 `};`）之后插入：
 
@@ -286,16 +328,15 @@ inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen) {
 
 - [ ] **Step 3: `build_cpu()` 首行接线（:320 `reset_canonical_counters();` 之后）**
 
+落笔形态（**只加这一行**，前一行是既有的 ADR-048 代码，不要改动）：
+
 ```cpp
     // ADR-048: reset canonical ordering counters at each build_cpu entry
-    cf::cpu::detail::reset_canonical_ordering_counters_placeholder();
-```
-
-> 落笔时**照抄实际代码**：紧接既有 `cf::cpu::detail::reset_canonical_counters();` 之后新增一行：
-
-```cpp
+    cf::cpu::detail::reset_canonical_counters();
     cf::cpu::detail::validate_isa_xlen(config, sizeof(T) * 8);  // ADR-087 §D1/D2
 ```
+
+> ⚠️ 不要写 `reset_canonical_ordering_counters_placeholder` 之类占位符号（全仓无此符号 ⇒ 编译失败）。真实符号是 `cf::cpu::detail::reset_canonical_counters`（定义 `ip/cpu/cpu_factory.h:60`，调用点 `:320`）。
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -305,7 +346,16 @@ Expected: **5 passed**（“单发”用例失败 ⇒ 检查 cerr 只输出一�
 - [ ] **Step 5: 回归既有 family（逗号 = OR，单 tag 写法在 catch2 里是 AND，多 positional 会假绿）**
 
 Run: `./build/bin/chipforge_tests "[cpu],[cpu-integration],[riscv-tests]" 2>&1 | tail -4`
-Expected: `[cpu]` 129 PASS（尚无新用例被计入？——新用例已存在 ⇒ 实为 **134**：129 + 5，本步断言口径见 Task 4 后统一校准）；`[cpu-integration]` 96 cases / 95 PASS / 1 pre-existing FAIL；`[riscv-tests]` 48 PASS。**若 `[cpu]` 出现失败** ⇒ 大概率是 Task 4 未做（`test_cpu_factory.cpp:28` 仍断言 `isa == "rv64gc"`）→ 先做 Task 4 再复跑
+Expected（**本步必然有 2 个 FAIL，属 Task 4 未做的已知中间态**）：
+
+| 用例 | 状态 | 原因 | 收敛点 |
+|------|------|------|--------|
+| `tests/cpu/test_cpu_factory.cpp:28` `REQUIRE(cfg.isa == "rv64gc")` | **FAIL** | Task 3 已把默认改成 `rv32im` | Task 4 Step 2 |
+| `tests/cpu/test_cpu_factory.cpp:79` / `:93`（T64 构建）+ `:56`（`isa="rv32imac"`） | **FAIL** | `validate_isa_xlen` 交叉校验（`xlen=32` vs T=64）⇒ throw | Task 4 Step 2 |
+| 其余 `[cpu]` / `[riscv-tests]` | PASS | — | — |
+
+`[cpu-integration]` 96 cases / 95 PASS / 1 pre-existing FAIL；`[riscv-tests]` 48 PASS。
+**计数时序**：Task 3 后 `[cpu]` = 129 + 5（新用例）= **134**；Task 4 删 `build_cpu_rv64` 后 = **133**（终验口径）。
 
 - [ ] **Step 6: Defer commit**
 
@@ -318,6 +368,7 @@ Expected: `[cpu]` 129 PASS（尚无新用例被计入？——新用例已存在
 **Files:**
 - Modify: `tests/cpu/test_cpu_factory.cpp`、`tests/cpu/test_branch_predictor_runtime_btb.cpp`
 - Modify: `tests/cpu/integration/test_7stage_riscv.cpp`、`test_10stage_riscv.cpp`、`test_3stage_riscv.cpp`
+- Modify: `tests/cpu/test_topology_builder.cpp`（残留 `rv64gc` 清理，见 Step 4b）
 
 - [ ] **Step 1: `test_cpu_factory.cpp` — 删 RV64 探测 case**
 
@@ -360,6 +411,12 @@ TEST_CASE("build_cpu_rv64", "[cpu]") {
 - `tests/cpu/integration/test_10stage_riscv.cpp`：`:37` / `:104` / `:120` 的 `cfg.isa = "rv64gc";` → `"rv32im"`（`:76` 的 `p["isa"]` 不动）
 - `tests/cpu/integration/test_3stage_riscv.cpp`：`:34` 的 `cfg.isa = "rv32imac";` → `"rv32im"`
 
+⇒ 上述 3 文件 `cfg.isa` 共 **9 行**，其中 2 行是 `cfg.isa = p["isa"];`（不动）⇒ **字面量待改 = 7 处**。
+
+- [ ] **Step 4b: `test_topology_builder.cpp` 残留清理**
+
+`:35` 的 `cfg.isa = "rv64gc";` → `"rv32im"`。该文件 4 个 `[cpu]` case 不调 `build_cpu`（只调 `TopologyBuilder<N>::expand`）⇒ 功能无碍，但**仓库内不留 reserved 值残留**（否则 proposal item 13 的声明为假）。
+
 - [ ] **Step 5: 重新生成构建系统 + 编译**
 
 Run: `cmake -S . -B build >/dev/null && cmake --build build -j$(nproc) 2>&1 | tail -4`
@@ -367,11 +424,14 @@ Expected: 编译成功（此刻护栏尚未加，T64 已全部迁走 ⇒ 仍应�
 
 - [ ] **Step 6: 验证迁移结果（`nm` 应无 T64 实例化）**
 
-Run: `for f in $(find build/tests/CMakeFiles -name '*.o'); do nm -C "$f" 2>/dev/null | grep -q "RiscvIntAluPlugin<unsigned long>\|RiscvBranchPlugin<unsigned long>" && echo "T64 残留: $f"; done; echo "scan done"`
-Expected: 仅 `scan done`（**无 T64 残留输出**）
+Run: `for f in $(find build/tests/CMakeFiles -name '*.o'); do nm -C "$f" 2>/dev/null | grep -q "RiscvIntAluPlugin<unsigned long>\|RiscvBranchPlugin<unsigned long>\|BranchPredictorPlugin<unsigned long>" && echo "T64 残留: $f"; done; echo "scan done"`
+Expected: 仅 `scan done`（**无 T64 残留输出**；三条 pattern 覆盖 IntAlu / Branch / BranchPredictor 三个会被新护栏拦到的模板）
 
 Run: `grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>\|BranchPredictorPlugin<std::uint64_t>" tests/ || echo "AC-clean: 0"`
 Expected: `AC-clean: 0`
+
+Run: `grep -rn 'isa = "rv64\|isa = "rv32imac' tests/ || echo "AC-clean: 0 (no reserved value in tests/)"`
+Expected: `AC-clean: 0 (no reserved value in tests/)`（残留清零的机判口径，Task 13 复用）
 
 - [ ] **Step 7: 回归（口径：`[cpu]` = 129 − 1 + 5 = **133**）**
 
@@ -415,13 +475,13 @@ Expected: 条件为 `isa ∈ {rv32i,rv32im,rv32imac} ⇒ mmu_mode const "sv32"` 
   "isa":                 ["rv32i", "rv32im"],
 ```
 
-- [ ] **Step 4: 验证 JSON 语法 + AC3 前半**
+- [ ] **Step 4: 验证 JSON 语法（**注意：此时 `ip/cpu/configs/` 仍有 3 处 `rv64`，那是 Task 6 的活**）**
 
 Run: `python3 -c "import json; json.load(open('ip/cpu/configs/cpu_params_schema.json')); json.load(open('tools/dse/sweep_config.example.json')); print('json ok')"`
 Expected: `json ok`
 
-Run: `grep -rn '"rv64' ip/cpu/configs/ || echo "AC-clean: 0 hits"`
-Expected: `AC-clean: 0 hits`（schema enum 收窄后此 grep 可机械化验证 = proposal AC3 前半）
+Run: `grep -rn '"rv64' ip/cpu/configs/`
+Expected: **恰好 3 命中**（`cpu_default.json:5` / `cpu_deep_pipeline.json:5` / `cpu_superscalar.json:5` 的 `"isa": "rv64gc"`）—— schema enum 收窄后 **schema 自身已 0 命中**（rv64* 只在 description 文本里，无前引号），3 个 JSON 由 **Task 6** 消除 ⇒ **0 命中的断言放在 Task 6 Step 3**（不要在本步断言 0）
 
 - [ ] **Step 5: Defer commit**
 
@@ -453,7 +513,7 @@ Expected: `AC-clean: 0 hits`（schema enum 收窄后此 grep 可机械化验证 
 
 > 行为影响说明：3 个 JSON 的 `enable_mmu` 均为 `false`（`cpu-pipeline-tick-fix` F2 的 Bare smoke 语义）⇒ MMU 路径 inert，`sv39/sv48 → sv32` 不改变运行行为；**仍必须回归** `[mmu]` / `[cpu-l1-mmu-demo]`（Task 6 Step 4）。
 
-- [ ] **Step 3: schema 有效性核验（过滤已知 pre-existing 基线）**
+- [ ] **Step 3: schema 有效性核验 + AC3 零命中（过滤已知 pre-existing 基线）**
 
 ```bash
 python3 - <<'EOF'
@@ -468,6 +528,9 @@ for f in ['cpu_default','cpu_deep_pipeline','cpu_superscalar','cpu_embedded']:
 EOF
 ```
 Expected: 4 行全 `OK`（**`_comment` 撞 `additionalProperties:false` 属 pre-existing 基线**，登记在 design.md R8，不在本 change 修）
+
+Run: `grep -rn '"rv64' ip/cpu/configs/ soc/ || echo "AC3-a-clean: 0 hits"`
+Expected: `AC3-a-clean: 0 hits`（**AC3 的零命中断言在本步**——Task 5 结束时仍有 3 命中）
 
 - [ ] **Step 4: 回归 MMU 相关 family（`mmu_mode` 改动的安全网）**
 
@@ -621,6 +684,8 @@ Expected: 两处 0
 Run: `git rm ip/cpu/plugins/reg_file.cpp && cmake --build build -j$(nproc) 2>&1 | tail -2 && ./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2`
 Expected: build 成功 + `[cpu]` 133 PASS
 
+> 注：`git rm` 会把删除**留在 index**（未提交）。这正是 Task 13 Step 6 必须用 `git commit -- <paths>` 的原因（否则删除会被第 1 批夹带）。
+
 Run: `grep -rn "RegFilePlugin<std::uint64_t>" ip/ || echo "AC-clean: 0"`
 Expected: `AC-clean: 0`（AC5 后半）
 
@@ -636,6 +701,10 @@ Expected: `AC-clean: 0`（AC5 后半）
 - [ ] **Step 1: 状态列 `⬜` → `✅ (rv64-isa-declaration-correction)`（8 行）**
 
 0.1（三态语义）/ 0.2（`isa` 装饰字段 → 契约校验，注解写 `✅ 契约化（dispatch 留 phase-5）`）/ 0.3（schema xlen）/ 0.4（3 JSON isa）/ 0.5（cpu_embedded）/ 0.6（integration-guide — **architect 批已修为 rv32im**，此处仅追认）/ 0.9（cpu_sim 去 pin）/ 0.10（reg_file.cpp 删除）。0.7 / 0.8 保持 ✅ 不动。
+
+- [ ] **Step 1b: 同步 §1 结论摘要中因本 change 失效的行**
+
+§1 表中 `tools/cpu_sim/main.cpp:16,188`「显式 `cfg.isa = "rv32i"` / ✅ 代码自证」一行在 Task 7 后过期 ⇒ 在该行判定列追加 `✅ 已修复（rv64-isa-declaration-correction）`；同理 `ip/cpu/cpu_factory.h:127` 与 3 个 JSON 的行追加「已纠偏」标注（**只加标注，不删历史行**——§1 是当时事实的快照）。
 
 - [ ] **Step 2: 行号口径核验（**不假设，实跑**）**
 
@@ -653,28 +722,34 @@ Expected: 0 broken（§2 的“行号口径” blockquote 已声明以状态列�
 - Modify: `.github/workflows/architecture-gates.yml`（portability 步骤后插一段，`continue-on-error: true`）
 - Test: 脚本自检（dry 探针，**不得 stash / 不得写进 `ip/`**）
 
-- [ ] **Step 1: 新脚本（全量内容；allowlist = 缺口表 §5 实测的 7 个真实文件 / 9 处定义点）**
+- [ ] **Step 1: 新脚本（全量内容；allowlist = 缺口表 §5 + 实测 grep 复核的 **9 个真实文件 / 9 处定义点**）**
 
 ```bash
 #!/usr/bin/env bash
 # tools/check_xlen_hygiene.sh — ADR-087 §D6 软门禁 (warn-only, rv64-isa-declaration-correction)
 # 新增 XLEN 硬编码假设必须登记 ip/cpu/docs/rv64_readiness_gap.md (缺口表 §5)。
-# allowlist = 缺口表 §5 登记的 9 处 kXlenBits 定义点（分布于 7 个文件）:
+# allowlist = 缺口表 §5 登记的 9 处 kXlenBits 定义点（分布于 9 个文件）:
 #   3.1 ip/cpu/plugins/reg_file_chmem.h
 #   3.2 ip/cpu/plugins/decode_chmem.h
 #   3.3 ip/cpu/arch/riscv/int_alu_chmem.h
 #   3.4 ip/cpu/plugins/branch_chmem.h
+#   3.5 ip/cpu/plugins/ibus_chmem.h        (缺口表 3.5 描述未点名 kXlenBits, 但文件内确有定义点)
+#   3.6 ip/cpu/plugins/dmem_chmem.h        (同上)
 #   3.7 ip/cpu/plugins/mmu_ptw_chmem.h
 #   3.8 ip/cpu/cpu_factory_chmem.h
 #   3.10 ip/mmu/plugins/MMUPlugin_chmem.h
 # 出现新定义点 → WARN (exit 0); STRICT_XLEN_GATE=yes 时升级 BLOCK (exit 1)。
+# XLEN_SCAN_ROOT: 扫描根目录（默认 ip），供变异自检把探针目录指进来。
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+SCAN_ROOT="${XLEN_SCAN_ROOT:-ip}"
 
 ALLOW="ip/cpu/plugins/reg_file_chmem.h
 ip/cpu/plugins/decode_chmem.h
 ip/cpu/arch/riscv/int_alu_chmem.h
 ip/cpu/plugins/branch_chmem.h
+ip/cpu/plugins/ibus_chmem.h
+ip/cpu/plugins/dmem_chmem.h
 ip/cpu/plugins/mmu_ptw_chmem.h
 ip/cpu/cpu_factory_chmem.h
 ip/mmu/plugins/MMUPlugin_chmem.h"
@@ -684,13 +759,20 @@ while IFS= read -r hit; do
   [ -z "$hit" ] && continue
   f="${hit%%:*}"
   case "$f" in *.h) ;; *) continue ;; esac
-  if ! grep -qx "$f" <<< "$ALLOW"; then
+  # allowlist 用「路径后缀」匹配（而非全等）：探针模式下扫描根是绝对路径，
+  # 全等比较会把 9 个已登记文件全部误报为 warn。
+  registered=0
+  while IFS= read -r a; do
+    [ -z "$a" ] && continue
+    case "$f" in *"$a") registered=1; break ;; esac
+  done <<< "$ALLOW"
+  if [ "$registered" -eq 0 ]; then
     echo "WARN: 未登记的 kXlenBits 定义点（须入缺口表 §5）: $hit"
     WARN=$((WARN + 1))
   fi
-done < <(grep -rnE "kXlenBits *=" --include='*.h' ip/ || true)
+done < <(grep -rnE "kXlenBits *=" --include='*.h' "$SCAN_ROOT" || true)
 
-echo "check_xlen_hygiene: warn=${WARN} (ADR-087 §D6, allowlist 口径见缺口表 §5)"
+echo "check_xlen_hygiene: warn=${WARN} (ADR-087 §D6, allowlist 口径见缺口表 §5, scan=${SCAN_ROOT})"
 if [ "$WARN" -gt 0 ] && [ "${STRICT_XLEN_GATE:-}" = "yes" ]; then
   echo "STRICT_XLEN_GATE=yes → BLOCK"
   exit 1
@@ -713,19 +795,25 @@ exit 0
 Run: `chmod +x tools/check_xlen_hygiene.sh && bash tools/check_xlen_hygiene.sh`
 Expected: `check_xlen_hygiene: warn=0`
 
-- [ ] **Step 4: 变异自检（dry 探针，**只读复制到 `/tmp/opencode`，不写 `ip/`、不 stash**）**
+- [ ] **Step 4: 变异自检（dry 探针，**只读复制到 `/tmp/opencode`，不写 `ip/`、不 stash**；用 `XLEN_SCAN_ROOT` 把探针目录指给脚本，否则探针永不被扫描 = 零检验力）**
+
+> 探针必须落在**非 allowlist 文件**上（如 `ip/cpu/plugins/branch_predictor.h`）：allowlist 内的文件即使新增定义点也不告警（按文件粒度登记）⇒ 探针放错文件 ⇒ 变异对照无检验力。
 
 Run:
 ```bash
 rm -rf /tmp/opencode/xlen_probe && mkdir -p /tmp/opencode/xlen_probe \
   && cp -r ip /tmp/opencode/xlen_probe/ip \
-  && printf '\nstatic constexpr std::size_t kXlenBits = 32;\n' >> /tmp/opencode/xlen_probe/ip/cpu/plugins/ibus_chmem.h \
-  && grep -rnE "kXlenBits *=" /tmp/opencode/xlen_probe/ip/cpu/plugins/ibus_chmem.h
+  && printf '\nstatic constexpr std::size_t kXlenBits = 32;\n' >> /tmp/opencode/xlen_probe/ip/cpu/plugins/branch_predictor.h \
+  && XLEN_SCAN_ROOT=/tmp/opencode/xlen_probe/ip bash tools/check_xlen_hygiene.sh
 ```
-Expected: 探针文件命中（证明 grep 口径有效）；**仓库 `ip/` 未被改动**（`git status --porcelain ip/` 应为空）
+Expected: **恰好 1 条** `WARN: 未登记的 kXlenBits 定义点`（指向探针路径）+ `warn=1`（**证明脚本能抓住未登记定义点**；若 `warn=9/10` ⇒ allowlist 匹配口径坏了，见脚本内「路径后缀匹配」注释）
 
 Run: `bash tools/check_xlen_hygiene.sh && echo "warn-only confirmed" && git status --porcelain ip/ && echo "(ip/ clean)"`
-Expected: `warn-only confirmed` + `(ip/ clean)`
+Expected: `warn=0` + `warn-only confirmed` + `(ip/ clean)`（**仓库 `ip/` 未被改动**）
+
+- [ ] **Step 4b: `tools/README.md` 登记新脚本**
+
+在该文件既有 gate 脚本清单（`tools/README.md:11-14` 登记 4 个架构门禁脚本）处追加 `check_xlen_hygiene.sh` 一行（说明：ADR-087 §D6 XLEN 假设 hygiene 软门禁，warn 级）。
 
 - [ ] **Step 5: Defer commit**
 
@@ -739,9 +827,24 @@ Expected: `warn-only confirmed` + `(ip/ clean)`
 - [ ] **Step 1: 双 binary 全量测试（CH_MEM 全量实测 >120s，用 timeout 上限）**
 
 Run: `timeout 1200 bash tools/run_chipforge_tests.sh --all 2>&1 | tail -8`
-Expected: 4 ctest entries 全 PASS
+Expected: **3 个 ctest entry PASS + 1 个 entry 因 1 个 pre-existing FAIL 而 Failed**
 
-- [ ] **Step 2: 5 架构门禁 + hygiene**
+| ctest entry | 基线态 | 本 change 后期望 |
+|---|---|---|
+| `verify_plugin_decision` | PASS | PASS |
+| `chipforge_tests` | **Failed**（含 1 个 pre-existing FAIL） | **Failed**（**且失败集合恰为 `{test_7stage_riscv.cpp:124}`**，不得新增失败） |
+| `chipforge_tests_chmem` | PASS | PASS |
+| `cpu_verilator_sim_add` | PASS | PASS |
+
+> ⚠️ 脚本 `--all` 路径 `ctest … ; exit $?` ⇒ 整体退出码非 0（**基线即如此**）。**不要把「退出码非 0」当成本 change 的失败**。机判口径：
+
+Run: `./build/bin/chipforge_tests 2>&1 | grep -A2 "FAILED:" | grep -c "test_7stage_riscv.cpp:124"`
+Expected: `1`（失败**仅**这一处）
+
+Run: `ctest --test-dir build -E '^chipforge_tests$' --output-on-failure 2>&1 | tail -5`
+Expected: `100% tests passed, 0 tests failed out of 3`（排除已知红的 TLM entry 后，其余 3 条全绿）
+
+- [ ] **Step 2: 6 架构门禁 + hygiene**
 
 Run:
 ```bash
@@ -754,23 +857,24 @@ bash tools/check_xlen_hygiene.sh | tail -1
 ```
 Expected: 6 项全绿（AC8；hygiene 必须 `warn=0`）
 
-- [ ] **Step 3: AC 逐条机械复核（grep 落证）**
+- [ ] **Step 3: AC 逐条机械复核（grep 落证；**AC2 的 pattern 与 Task 4 Step 6 保持一致**）**
 
 ```bash
-grep -rn '"rv64' ip/cpu/configs/ soc/                                   || echo "AC3-a OK: 0"   # 期望 0
+grep -rn '"rv64' ip/cpu/configs/ soc/ tools/dse/sweep_config.example.json || echo "AC3-a OK: 0"   # 期望 0
 grep -n 'isa="rv32i"' tools/cpu_sim/main.cpp                            || echo "AC4 OK: 0"     # 期望 0
 grep -rn "RegFilePlugin<std::uint64_t>" ip/                             || echo "AC5 OK: 0"     # 期望 0
 grep -n 'std::string isa = "rv32im"' ip/cpu/cpu_factory.h                || echo "AC1-a OK"      # 期望命中
 grep -n "xlen = 32" ip/cpu/cpu_factory.h                                || echo "AC1-b OK"      # 期望命中
-grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>" tests/                 || echo "AC2 OK: 0"     # 期望 0（T64 已迁走）
+grep -rn "uint64_t>::build_cpu\|CpuFactory<T64>\|BranchPredictorPlugin<std::uint64_t>" tests/ || echo "AC2 OK: 0"     # 期望 0（T64 已迁走）
+grep -rn 'isa = "rv64\|isa = "rv32imac' tests/                          || echo "AC-residual OK: 0"  # 期望 0（tests/ 无 reserved 残留）
 ```
-Expected: 6 条全符合
+Expected: 7 条全符合
 
 - [ ] **Step 4: 计数终验（与基线快照表对照）**
 
 Run: `./build/bin/chipforge_tests "[cpu]" 2>&1 | tail -2` → 期望 `133 test cases`（129 − 1 + 5）
 Run: `./build/bin/chipforge_tests "[cpu-integration]" 2>&1 | tail -3` → 期望 `96 | 95 passed | 1 failed`（1 failed = pre-existing）
-Run: `./build/bin/chipforge_tests "[riscv-tests],[mmu]" 2>&1 | tail -2` → 期望 `107 test cases` 全 PASS
+Run: `./build/bin/chipforge_tests "[riscv-tests],[mmu],[cache]" 2>&1 | tail -2` → 期望 `132 test cases` 全 PASS（48 + 59 + 25）
 Run: `./build/bin/chipforge_tests_chmem --list-tests 2>&1 | tail -1` → 期望 `130 test cases`
 
 - [ ] **Step 5: `openspec change validate`**
@@ -780,10 +884,13 @@ Expected: valid（0 error）
 
 - [ ] **Step 6: 分批 commit（按 4 类改动拆，不做单 mega-commit）**
 
+> ⚠️ **必须用 `git commit -- <paths>` 限定 pathspec**：Task 10 的 `git rm` 会把删除**留在 index**，裸 `git commit` 提交整个 index ⇒ 第 1 批会夹带 `reg_file.cpp` 删除（违反本步纪律），且第 3 批对已删除路径的 `git add` 会因 pathspec 不匹配而失败（`&&` 短路 ⇒ 批次丢失）。
+
 ```bash
-git add tests/ ip/cpu/cpu_factory.h && git commit -m "feat(cpu): isa/xlen 三层 fail-fast 契约 + T64 实例化点迁移 (ADR-087 Change 1)"
-git add ip/cpu/configs/ tools/dse/sweep_config.example.json && git commit -m "fix(cpu): 声明面纠偏 — isa enum 收窄 + mmu_mode 归位 sv32"
-git add ip/cpu/arch/riscv/ tools/cpu_sim/main.cpp ip/cpu/plugins/reg_file.cpp && git commit -m "feat(cpu): TLM 模板入口 XLEN 编译期护栏 + 死代码清除"
-git add tools/check_xlen_hygiene.sh .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md && git commit -m "ci: XLEN 假设 hygiene 软门禁 + 缺口表状态列翻转"
+git add tests/ ip/cpu/cpu_factory.h && git commit -m "feat(cpu): isa/xlen 三层 fail-fast 契约 + T64 实例化点迁移 (ADR-087 Change 1)" -- tests/ ip/cpu/cpu_factory.h
+git add ip/cpu/configs/ tools/dse/sweep_config.example.json && git commit -m "fix(cpu): 声明面纠偏 — isa enum 收窄 + mmu_mode 归位 sv32" -- ip/cpu/configs/ tools/dse/sweep_config.example.json
+git add ip/cpu/arch/riscv/ tools/cpu_sim/main.cpp && git commit -m "feat(cpu): TLM 模板入口 XLEN 编译期护栏 + cpu_sim 去 pin" -- ip/cpu/arch/riscv/ tools/cpu_sim/main.cpp
+git add ip/cpu/plugins/reg_file.cpp && git commit -m "chore(cpu): 删除 reg_file.cpp 死代码 (uint64_t 显式实例化 + keys_rv32 混用)" -- ip/cpu/plugins/reg_file.cpp
+git add tools/check_xlen_hygiene.sh tools/README.md .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md && git commit -m "ci: XLEN 假设 hygiene 软门禁 + 缺口表状态列翻转" -- tools/check_xlen_hygiene.sh tools/README.md .github/workflows/architecture-gates.yml ip/cpu/docs/rv64_readiness_gap.md
 ```
-（message 按当次实际改动行数调整；**每批只含本类文件**，不混批）
+（message 按当次实际改动行数调整；**每批只含本类文件**，不混批；`-- <paths>` 保证 index 里其他内容不会被夹带）
