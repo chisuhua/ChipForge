@@ -86,6 +86,10 @@ class RiscvIntAluPlugin : public cf::plugin::PluginBase {
 
   // 单元测试辅助: 直接执行 ALU 运算
   static T compute(OpCode op, T rs1, T rs2) {
+    // ADR-087 §D4 (Change 1 提前): RV32 TLM 语义 XLEN 预算 — 实例化点触发
+    static_assert(sizeof(T) == 4,
+                  "RV32 TLM path assumes 32-bit XLEN; RV64 requires the "
+                  "phase-5 block gate see ADR-087 G3");
     switch (op) {
       case OpCode::ADD:  return rs1 + rs2;
       case OpCode::SUB:  return rs1 - rs2;

@@ -50,6 +50,10 @@ class RiscvBranchPlugin : public cf::plugin::PluginBase {
     using Dp = cf::cpu::core::payload::DecodePayload;
 
     pb.at_stage("execute", cf::plugin::Phase::NORMAL, [&pb]() {
+      // ADR-087 §D4 (Change 1 提前): RV32 TLM 语义 XLEN 预算 — 实例化点触发
+      static_assert(sizeof(T) == 4,
+                    "RV32 TLM path assumes 32-bit XLEN; RV64 requires the "
+                    "phase-5 block gate see ADR-087 G3");
       auto* n = pb.node_of_logic_stage("execute").get();
       if (n) {
         T rs1_val = n->operator()(KeyType::RS1);
@@ -109,6 +113,10 @@ class RiscvBranchPlugin : public cf::plugin::PluginBase {
 
   // 单元测试辅助: 评估分支条件
   static bool evaluate_branch(std::uint8_t funct3, T rs1, T rs2) {
+    // ADR-087 §D4 (Change 1 提前): RV32 TLM 语义 XLEN 预算 — 实例化点触发
+    static_assert(sizeof(T) == 4,
+                  "RV32 TLM path assumes 32-bit XLEN; RV64 requires the "
+                  "phase-5 block gate see ADR-087 G3");
     switch (funct3) {
       case 0b000: return rs1 == rs2;
       case 0b001: return rs1 != rs2;

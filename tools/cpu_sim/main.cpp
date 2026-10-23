@@ -13,7 +13,8 @@
 //     原解释器直接读写 PicolibcHostMemory, 实际是绕过 Plugin CPU 的欺骗性 demo
 //   - 现在 pb->run() 跑真实 Plugin CPU pipeline: IBusPlugin read_word(mem) 真实取指,
 //     DBusPlugin read/write_word(mem) 真实访存, StageLinkPlugin 跨阶段传播 Payload
-//   - isa="rv32i" 显式 pin (修复既有 CpuFactory<uint32_t> vs config.isa="rv64gc" 不一致)
+//   - ISA 声明跟随 config (rv64-isa-declaration-correction; 校验 SSOT 见
+//     CpuFactory::build_cpu → cf::cpu::detail::validate_isa_xlen, ADR-087 §D1/D2)
 //
 // 约束:
 //   - 依赖 build/add.elf 由既有 RISC-V 工具链生成 (若不可用, tohost 仍 0 但不报错)
@@ -85,6 +86,8 @@ cf::cpu::CPUConfig load_config(const std::string& path) {
   if (j.contains("params")) {
     const auto& p = j["params"];
     cfg.isa = p.value("isa", cfg.isa);
+    // ADR-087 §D2: schema 已声明 xlen, 此处必须显式解析 (静默丢弃 = 同型 bug)
+    cfg.xlen = p.value("xlen", cfg.xlen);
     cfg.pipeline_stages =
         p.value("pipeline_stages", cfg.pipeline_stages);
     cfg.mul_latency = p.value("mul_latency", cfg.mul_latency);
@@ -181,11 +184,10 @@ int main(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // 5.2: 加载 JSON 配置
-  // cpu-pipeline-stubs-replace commit E: isa="rv32i" 显式 pin
-  // (修复既有 CpuFactory<uint32_t> vs config.isa="rv64gc" 不一致)
+  //  (ISA 声明 pin 已移除 — rv64-isa-declaration-correction; 校验 SSOT 在
+  //   CpuFactory::build_cpu → cf::cpu::detail::validate_isa_xlen, ADR-087 §D1/D2)
   // --------------------------------------------------------------------------
   cf::cpu::CPUConfig cfg = load_config(config_path);
-  cfg.isa = "rv32i";
 
   // --------------------------------------------------------------------------
   // 5.3: 加载 ELF 程序到 PicolibcHostMemory (M4.15 集成)
