@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "chmem-tlm-backend-freeze",
-  "current_phase": "phase-1.5",
+  "current_phase": "phase-2",
   "approval_status": "approved",
   "plan_quality_status": "pending",
   "p0_decision": {
@@ -32,7 +32,14 @@
       "复用现有 build/ ⇒ 冻结门禁脚本的 baseline 快照可基于当前 HEAD 采集",
       "必须在 A（rv64-isa-declaration-correction）合并之后启动（见 deps_status）"
     ],
-    "user_confirmation_required_at": "phase-2 (HARD pause)"
+    "user_confirmation_required_at": "phase-2 (HARD pause)",
+    "user_confirmed": {
+      "at": "2026-10-24T00:40:00Z",
+      "execution_mode": "in-place（用户确认）",
+      "implementation_start": "A 合并后立即开实施（用户确认）",
+      "branch_created": "feature/chmem-tlm-backend-freeze",
+      "branch_base": "a9f0d97"
+    }
   },
   "deps_status": {
     "blockers": [],
@@ -43,22 +50,28 @@
     ],
     "cross_repo_pending": [],
     "deps_analysis": {
-      "candidates": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"],
+      "candidates": [
+        "rv64-isa-declaration-correction",
+        "chmem-tlm-backend-freeze"
+      ],
       "report": ".rddf/state/.deps-output.md",
       "ai_result": ".rddf/state/.deps-ai-result.json",
       "file_conflicts": [
         ".github/workflows/architecture-gates.yml —— 两者各追加一个 step ⇒ 同一 hunk 邻近 ⇒ 必须顺序执行"
       ],
       "incoming_soft_deps": [
-        "rv64-isa-declaration-correction：① ADR-088 §5 待办实体 = A 的 Task 8 护栏 ⇒ A 未落地时 B 记录未验证前提；② 冻结门禁 baseline 快照必须晚于 A（否则 ip/cpu/cpu_factory.h 新增的 validate_isa_xlen 被判『未登记新增函数』假阳性）"
+        "rv64-isa-declaration-correction：① ADR-088 §5 待办实体 = A 的 Task 8 护栏 ⇒ A 未落地时 B 记录未验证前提；② 冻结门禁 baseline 快照必须晚于 A（否则 ip/cpu/cpu_factory.h 新增的 validate_isa_xlen 被判『未登记新增函数』假阳性） | 状态: A 已于 2026-10-24 合并进 main (a9f0d97) ⇒ B 的 baseline 锚点在 A 之后采集 ⇒ 无假阳性"
       ],
       "outgoing_soft_deps": [],
-      "recommended_order": ["rv64-isa-declaration-correction", "chmem-tlm-backend-freeze"]
+      "recommended_order": [
+        "rv64-isa-declaration-correction",
+        "chmem-tlm-backend-freeze"
+      ]
     }
   },
   "worktree_path": "",
-  "branch": "",
-  "execution_status": "pending",
+  "branch": "feature/chmem-tlm-backend-freeze",
+  "execution_status": "in-progress",
   "review_status": "pending",
   "retry_count": 0,
   "max_retries": 3,
@@ -69,9 +82,15 @@
       "event": "approved",
       "at": "2026-10-23T07:55:00Z",
       "note": "case-1 approve；proposal.md + specs/tlm-backend-freeze-contract/spec.md 已生成（AC 11 条，数字按实测纠正：45→41）"
+    },
+    {
+      "phase": "phase-2",
+      "event": "executed",
+      "at": "2026-10-24T00:50:00Z",
+      "note": "Task 1-8 完成: 三件套 + 门禁脚本 (三态实测) + CI 接入 + 4 死代码删除 (双 binary build OK, 回归一致) + ADR-088 (5 项必填) + ADR-083 v1.1 + 注册表; Task 9 全量回归进行中; 实施中发现并修正 5 处 plan 口径缺陷 (详见 plan 实施实测留证)"
     }
   ],
   "archive_status": "pending",
   "verifier_report_path": "",
-  "updated_at": "2026-10-23T07:55:00Z"
+  "updated_at": "2026-10-24T00:50:00Z"
 }
