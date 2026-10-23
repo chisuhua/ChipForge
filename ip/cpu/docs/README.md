@@ -4,6 +4,7 @@
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
+| [rv64_readiness_gap.md](rv64_readiness_gap.md) | **RV64 就绪度缺口表 (SSOT)** — 4 层缺口（声明/骨架/ISA 语义/CH_MEM）+ 全部 file:line 证据 + RV64 实施准入清单 G1–G9 | 🟡 Active (ADR-087 配套) |
 | [multi_isa_architecture.md](multi_isa_architecture.md) | 多 ISA 架构设计：三层分离（core/arch/tlm+rtl）、ExecContext 接口、Plugin 分类体系 | **Active** |
 | [dse_architecture.md](dse_architecture.md) | **DSE 实现方案 (v1.0, 2026-06-17)** — 流水线深度/分支预测/MUL 延迟/ISA 扩展等可探索维度的完整代码改动路径, 含实证校核 (哪些是真 stub / 哪些是文档超前) | 🟡 Accepted (待实施 M4-DSE / M5-DSE) |
 | [dse_architecture_v2_locks.md](dse_architecture_v2_locks.md) | **DSE v2.0 Phase 1 锁定决策 (2026-06-17, Oracle 评审通过)** — 仅 D.1-D.4 (~108 行 header churn)，防止 ~2000 行 Phase 5+ 重构 | 🟢 **Accepted for Phase 1** |

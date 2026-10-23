@@ -144,6 +144,7 @@
 | ADR-045 | Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop | Plugin | ✅ Accepted (2026-09-15, plugin-framework-stall v0.1.3) | [`adr/ADR-045-plugin-ctrl-link-consumption.md`](adr/ADR-045-plugin-ctrl-link-consumption.md) |
 | ADR-085 | MMU_PTW 架构 — 伞索引（TLB/PTW 分层 + PTWCache 页目录项缓存 + 同拍串联命中判定 / `start_level` 选择；决策拆为 D01–D21 共 21 个子 ADR） | IP 架构 | 🚧（设计提案 2026-10-22；实装归未立项 change `chmem-ptw-walk`） | [`ip/mmu/docs/adr/ADR-085-mmu-ptw-architecture.md`](../../ip/mmu/docs/adr/ADR-085-mmu-ptw-architecture.md) |
 | ADR-086 | MMU L0 / L1 TLB 架构 — 伞索引（两级 leaf 翻译缓存：L0 全相联 8 项 + L1 组相连 256 set × 8 way，级联查询 + XOR interleave；ADR-085 的 CH_MEM 侧增量） | IP 架构 | 🚧（设计提案 2026-10-23；实装归未立项 change `chmem-ptw-walk` 的后续增量） | [`ip/mmu/docs/adr/ADR-086-l0-l1-tlb-architecture.md`](../../ip/mmu/docs/adr/ADR-086-l0-l1-tlb-architecture.md) |
+| ADR-087 | ISA 声明真实性与 RV64 就绪度门禁（isa 三态语义 + isa→xlen 映射 + XLEN 单一来源 + 语义层编译期护栏 + RV64 准入 G1–G9） | IP 架构 | 🚧（设计提案 2026-10-23；缺口表 SSOT = `ip/cpu/docs/rv64_readiness_gap.md`；实装归 3 个待立项 change） | [`adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md`](adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md) |
 
 > ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 `.rddf/roadmap/archive/phase-1.5-stall-and-validate.md` §11。
 
@@ -1559,6 +1560,7 @@ Summary:
 | 2026-06-23 | 1.3 | **冲突修复**：ADR-040 → ADR-042（Plugin 推迟决策，消除 §3 重复编号）；ADR-041 → ADR-043（CI 强制门禁，消除与 openspec spec 强约束的"ADR-041=Bridge"冲突，移至 J 目录与组织）；Plugin (G) 6→7、目录 (J) 1→2、合计 40→42 |
 | 2026-06-23 | 1.3.1 | **组织修复**：§3 章节顺序 K/J → J/K（按字母序）；§2.1 主表新增 ADR-037 行（33→34 条）；§2.4 统计表新增 K 范式决策行（合计 42→43 条，Plugin 类别数 5→6 不变）；TOC J 锚点 2-条→3-条 同步 |
 | 2026-10-08 | 1.4 | **新增 ADR-083**：Plugin-style 作为硬件模块的单一 source of truth（CppHDL 设施后端 + CppTLM 降级为 bridge 依赖）；同步修订 `overview.md` / `AGENTS.md` / `background-and-goals.md` / `tech-selection.md` / `code-framework-mapping.md` 描述 Plugin-style + CppHDL 后端双模式架构 |
+| 2026-10-23 | 1.5 | **新增 ADR-087**：ISA 声明真实性与 RV64 就绪度门禁（RV64 架构符合性审查触发）—— 确认当前实现 = RV32IM + Zicsr(subset)、**不符合 RV64**，且路线图已将 RV64 推迟至 v1.x 之后；因此决策聚焦"声明纠偏 + 技术护栏 + 准入判据"而非实现 RV64。同步修订 `ip/cpu/README.md` / `ip/cpu/docs/{blueprint,status,multi_isa_architecture}.md` / `soc/docs/integration-guide.md` 中「RV64GC」虚假宣称；缺口表 SSOT = `ip/cpu/docs/rv64_readiness_gap.md` |
 
 ---
 

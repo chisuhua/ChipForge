@@ -123,7 +123,7 @@ static void register_early_plugins(cf::plugin::PipeBuilder& pb,
 
 | # | 维度 | 调谐点 | 现状 |
 |---|------|--------|------|
-| 1 | **ISA 子集** | `CPUConfig::isa ∈ {rv32i, rv32im, rv32imac, rv64i, rv64gc}` | 字符串字段,需要 CpuFactory 真实 dispatch |
+| 1 | **ISA 子集** | `CPUConfig::isa ∈ {rv32i, rv32im, rv32imac, rv64i, rv64gc}` | 字符串字段,需要 CpuFactory 真实 dispatch —— ⚠️ **当前仍无 dispatch**，且 `rv64*` 取值属未实现的规划态（实现覆盖 = RV32IM + Zicsr subset）；见 [ADR-087](../../../docs/architecture/adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md) 与 [`rv64_readiness_gap.md`](rv64_readiness_gap.md) |
 | 2 | **xlen (32/64)** | `CpuFactory<uint32_t>::build_cpu` vs `<uint64_t>` | 编译期模板 |
 | 3 | **流水线深度** (3/5/7/10) | `CPUConfig::pipeline_stages ∈ {3, 5, 7, 10}` | 字段存在但未生效 — 本方案修复; 范围由 `cpu_params_schema.json` enum 与 `TopologyBuilder::expand()` switch 联合约束 (Q5 决策) |
 | 4 | **分支预测器类型** | `CPUConfig::branch_predictor ∈ {static, bimodal, gshare, tournament}` | 字段存在但未生效 — 本方案修复 |
@@ -249,6 +249,8 @@ struct CPUConfig {
   // ===== 现有字段 (保持不变, 仅文档化默认值) =====
   std::string  name               = "RiscvCpu";
   std::string  isa                = "rv64gc";      // rv32i/rv32im/rv32imac/rv64i/rv64gc
+                                                // ⚠️ 2026-10-23: 默认值与实现不符 (实现覆盖 = RV32IM),
+                                                //    ADR-087 D1 将默认改为 "rv32im"; rv64* 为规划态取值
   std::uint8_t pipeline_stages    = 5;             // 3 / 5 / 7 / 10
   std::uint32_t clock_freq_mhz    = 100;
   bool   enable_pmp = true;

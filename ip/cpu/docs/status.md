@@ -106,8 +106,8 @@
 | 任务 | 描述 | 状态 | 进度 | 验收 | 备注 |
 |------|------|------|------|------|------|
 | M4.1 | 实施 `CpuFactory::build_cpu()` | 🟢 PASS | 100% | 编译通过 + 返回可用 PipeBuilder | M4.1 commit |
-| M4.2 | 修订 `configs/cpu_default.json` | 🟢 PASS | 100% | JSON Schema 校验 | 已有 (5 级 RV64GC) |
-| M4.3 | 修订 `configs/cpu_embedded.json` | 🟢 PASS | 100% | JSON Schema 校验 | 已有 (3 级 RV32IMAC) |
+| M4.2 | 修订 `configs/cpu_default.json` | 🟢 PASS | 100% | JSON Schema 校验 | 已有 (5 级, `isa` 声明已按 ADR-087 修正) |
+| M4.3 | 修订 `configs/cpu_embedded.json` | 🟢 PASS | 100% | JSON Schema 校验 | 已有 (3 级, `isa` 声明待按 ADR-087 修正; 实现覆盖 RV32IM) |
 | M4.4 | 新增 `configs/cpu_params_schema.json` | 🟢 PASS | 100% | ajv 校验 | 已有 (draft-07) |
 | M4.5 | `tests/integration/test_5stage_riscv.cpp` | 🟢 PASS | 100% | 5/5 ctest PASS | M4.5 commit |
 | M4.6 | `tests/integration/test_3stage_riscv.cpp` | 🟢 PASS | 100% | 4/4 ctest PASS | M4.6 commit |

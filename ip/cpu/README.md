@@ -10,7 +10,19 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 - **验证规范**: [./docs/verification.md](./docs/verification.md)（前 `ip/cpu/test/README.md`，描述 Level A/B/C 测试层级）
 
 ## 概述
-基于 CppTLM 的 RISC-V CPU IP 核，采用 Plugin + Stageable 架构设计，支持 RV32I/RV64GC 指令集。
+基于 CppTLM 的 RISC-V CPU IP 核，采用 Plugin + Stageable 架构设计。
+
+**当前实现的 ISA 覆盖 = RV32IM + Zicsr（子集）**，即 RV32I 基础指令 40 条 + RV32M 扩展 8 条 + 8 个 M-mode CSR。
+
+> ⚠️ **RV64 状态说明（2026-10-23 修正）**
+>
+> 本文档此前声明「支持 RV32I/RV64GC」，与实现不符 —— 当前实现**全部为 RV32 语义**。RV64 在路线图上已明确推迟到 v1.x 之后（`.rddf/roadmap/archive/phase-2-baremetal.md:5`），非实现遗漏。
+>
+> - **RV64 未实现**：骨架层（Payload key / 寄存器堆 / 传播层 / 内存 bundle）已参数化，但 ISA 语义层（移位掩码、有符号比较、M 扩展高半部、CSR 宽度等）仍写死 RV32，CH_MEM 后端另有 8 处 `kXlenBits = 32` 硬编码。
+> - **RV64GC 的 C / A / F / D 四项扩展全缺**：无 RVC 解码、无 AMO/LR/SC、FPU 为空 stub。
+> - **配置字段 `isa` 当前不参与 dispatch**：`CpuFactory` 按调用方的 `T` 决定 XLEN（默认 `uint32_t`），`isa` 字符串仅作记录。
+>
+> 完整缺口清单（含 file:line 证据 + RV64 准入判据 G1–G9）见 [docs/rv64_readiness_gap.md](docs/rv64_readiness_gap.md)；决策见 [ADR-087](../../docs/architecture/adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md)。
 
 ## 设计方案
 本 IP 采用 **VexRiscv-on-CppTLM Stageable 方案**（详见 `VexRiscvOnCppTLM.md` (未实现)）作为最终实现规范。
@@ -53,7 +65,7 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| isa | string | "rv64gc" | 指令集架构 |
+| isa | string | "rv32im" | 指令集架构（**当前不参与 dispatch**，仅记录；默认 `rv64gc` 已于 2026-10-23 修正，见 ADR-087） |
 | pipeline_stages | int (3/5/7/10) | 5 | 流水线级数 (3=embedded, 5=default, 7=superscalar, 10=deep pipeline; 见 `cpu_params_schema.json` enum) |
 | clock_freq_mhz | int (1-2000) | 100 | 时钟频率 (MHz) |
 | enable_pmp | bool | true | 物理内存保护 |

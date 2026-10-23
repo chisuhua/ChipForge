@@ -731,7 +731,7 @@ build_cpu(const json& config, ImplMode mode) {
 ### 6.1 JSON 配置 Schema
 
 > **三种 ISA 表示法的关系 (2026-06-17 校核)**:
-> - **`isa` 字符串前缀** (`rv32i`/`rv32im`/`rv64gc`) 是 [`cpu_params_schema.json`](../configs/cpu_params_schema.json) 的唯一权威字段,也是所有 `configs/cpu_*.json` 实例文件实际使用的形式
+> - **`isa` 字符串前缀** (`rv32i`/`rv32im`/`rv64gc`) 是 [`cpu_params_schema.json`](../configs/cpu_params_schema.json) 的唯一权威字段,也是所有 `configs/cpu_*.json` 实例文件实际使用的形式 —— ⚠️ **但截至 2026-10-23 该字段仍不参与 dispatch**（`CpuFactory` 按调用方的 `T` 决定 XLEN），且 `rv64*` 取值属未实现的规划态，见 [ADR-087](../../../docs/architecture/adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md)
 > - **`isa_extensions` 数组** (本节描述) 是设计意图视图,与字符串前缀语义等价 (运行时归并)
 > - **`ext_*` boolean 字段** 是 DSE 工具 ([`dse_architecture.md` §4.2](dse_architecture.md)) 为笛卡尔积扫描引入的 flat 形式,运行时与字符串前缀互验
 > 三者冗余但等价,所有变更应同时反映到 `cpu_params_schema.json`
@@ -926,10 +926,11 @@ ip/cpu/
 │       └── (TBD)
 │
 ├── configs/                       # 流水线配置
-│   ├── cpu_default.json           # 5 级 RV32IM_Zicsr
-│   ├── cpu_embedded.json          # 3 级 RV32I
-│   ├── cpu_superscalar.json       # 7 级 RV64IMAFD
+│   ├── cpu_default.json           # 5 级 (isa 声明待按 ADR-087 修正; 实现覆盖 RV32IM_Zicsr)
+│   ├── cpu_embedded.json          # 3 级 (isa 声明待按 ADR-087 修正; 实现覆盖 RV32IM)
+│   ├── cpu_superscalar.json       # 7 级 (isa 声明待按 ADR-087 修正; 实现覆盖 RV32IM)
 │   └── cpu_params_schema.json     # JSON Schema 校验
+│                                   # ⚠️ isa 字段当前不参与 dispatch, 详见 ADR-087
 │
 ├── cpu_factory.h                  # 统一入口：build_cpu(config, ImplMode)
 │
@@ -1200,7 +1201,7 @@ TEST(Compare, RV32I_AllPayloadsMatch) {
 
 **仅以下 5 个 `CPUConfig` 字段在改造后生效** (见 [`dse_architecture.md` §2.1](dse_architecture.md)):
 
-1. `isa ∈ {rv32i, rv32im, rv32imac, rv64i, rv64gc}` (字符串, factory dispatch)
+1. `isa ∈ {rv32i, rv32im, rv32imac, rv64i, rv64gc}` (字符串, factory dispatch —— **⚠️ 截至 2026-10-23 `isa` 仍不参与 dispatch**：`CpuFactory` 按调用方的 `T` 决定 XLEN（默认 `uint32_t`），rv64* 属未实现的规划态取值。声明纠偏与准入判据见 [ADR-087](../../../docs/architecture/adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md) 与 [`rv64_readiness_gap.md`](rv64_readiness_gap.md))
 2. `pipeline_stages ∈ {3, 5, 7, 10}` (拓扑展开)
 3. `branch_predictor ∈ {static, bimodal, gshare, tournament}` (4 选 1)
 4. `btb_entries ∈ {16, 32, 64, 128, 256}` (编译期 5 选 1)

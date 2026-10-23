@@ -89,7 +89,7 @@ ip/cpu/
 │       ├── decoder_table.h        # P0: 译码表 (funct3/funct7 → OpCode)
 │       ├── payload_riscv.h        # P0: RiscvDecodeDetail (funct3/funct7/imm/csr_idx)
 │       ├── decode.h               # P0: RiscvDecodePlugin (同时填通用 + ISA Payload)
-│       ├── int_alu.h              # P0: RiscvIntAluPlugin (RV32I/RV64I 整数)
+│       ├── int_alu.h              # P0: RiscvIntAluPlugin (RV32I 整数运算)
 │       ├── mul.h                  # P1: RiscvMulPlugin (M 扩展, 3 级子流水)
 │       ├── branch.h               # P1: RiscvBranchPlugin
 │       ├── csr.h                  # P2: RiscvCsrPlugin (Zicsr)
@@ -105,9 +105,9 @@ ip/cpu/
 │           └── test_riscv_integration.cpp
 │
 ├── configs/                       # 流水线配置 (议题 4 选 B: multi_isa v2.0 §6.1 标准字段)
-│   ├── cpu_default.json           # 5 级 RV32IM_Zicsr (multi_isa v2.0 §6.5 字段)
-│   ├── cpu_embedded.json          # 3 级 RV32I
-│   ├── cpu_superscalar.json       # 7 级 RV64IMAFD (Phase 5+, 字段先定义)
+│   ├── cpu_default.json           # 5 级 (isa 声明待按 ADR-087 修正; 实现覆盖 RV32IM_Zicsr)
+│   ├── cpu_embedded.json          # 3 级 (isa 声明待按 ADR-087 修正; 实现覆盖 RV32IM)
+│   ├── cpu_superscalar.json       # 7 级 (isa 声明待按 ADR-087 修正; 目标形态 RV64IMAFD 属 Phase 5+)
 │   └── cpu_params_schema.json     # JSON Schema 校验 (按 multi_isa v2.0 §6.1)
 │
 ├── cpu_factory.h                  # 统一入口 (议题 5 选 B: 内置 PluginOrder 列表)
@@ -153,7 +153,7 @@ ip/cpu/
 | Plugin | 职责 | 输入 Payload | 输出 Payload | 优先级 | M 里程碑 |
 |--------|------|--------------|--------------|--------|---------|
 | `RiscvDecodePlugin` | 译码并填两份 Payload | pl::INSTRUCTION | pl::DECODE (通用) + pl::RISCV_DETAIL (ISA 特有) | **P0** | M3 |
-| `RiscvIntAluPlugin` | RV32I/RV64I 整数运算 | pl::DECODE, pl::RS1, pl::RS2 | pl::RESULT | **P0** | M3 |
+| `RiscvIntAluPlugin` | RV32I 整数运算（RV64 语义未实现，见 ADR-087） | pl::DECODE, pl::RS1, pl::RS2 | pl::RESULT | **P0** | M3 |
 | `RiscvBranchPlugin` | 分支跳转 + 链接 | pl::DECODE, pl::RS1, pl::IMM | pl::BRANCH_TARGET, pl::RD_DATA | P1 | M3 |
 | `RiscvMulPlugin` | M 扩展乘除法 (3 级子流水) | pl::RS1, pl::RS2 | pl::RESULT (3 拍后) | P1 | M3 |
 | `RiscvLsuPlugin` | load/store (含地址生成) | pl::DECODE, pl::RS1, pl::IMM | pl::LSU_REQ → MemReqBundle | P1 | M3 |
@@ -452,7 +452,7 @@ namespace pl {
 |------|------|
 | Plugin 数量多 (11 vs L1Cache 1) → 调度顺序确定性 | 议题 5 选 B: CpuFactory 集中注册顺序 |
 | 流水线深度可配置 (3/5/7) → Plugin 跨深度复用 | 用 logical_stage 名 (multi_isa v2.0 §3) |
-| RegFilePlugin 多 xlen (32/64) | 模板参数化, 编译期选 |
+| RegFilePlugin 多 xlen (32/64) | 模板参数化, 编译期选 —— **但 ISA 语义层仍写死 RV32**，切 XLEN=64 会静默算错；见 ADR-087 §D4 编译期护栏 + [`rv64_readiness_gap.md`](rv64_readiness_gap.md) |
 | MulPlugin 3 级子流水 vs 5 级合并 | declare_substage (议题 1 选 C: 复用 cf_plugin + 扩展) |
 | CsrPlugin 270+ CSR 字段 | 表格驱动, 不在 at_stage 闭包内 if/else |
 | picolibc 内存区域 64KB 限制 (议题 6 选 C) | 手工编译小 ELF, 远 < 64KB |

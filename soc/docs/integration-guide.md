@@ -14,7 +14,7 @@
   "name": "riscv_virt",
   "description": "baseline RISC-V virtual platform",
   "ips": [
-    { "name": "cpu", "instance": "cpu0", "params": { "isa": "rv64imac" } },
+    { "name": "cpu", "instance": "cpu0", "params": { "isa": "rv32im" } },
     { "name": "cache", "instance": "l1", "params": { "size_kb": 32 } },
     { "name": "memory", "instance": "ram", "params": { "size_mb": 256 } }
   ],
