@@ -140,6 +140,13 @@ jobs:
           bash tools/check_xlen_hygiene.sh
         continue-on-error: true
 
+      - name: Check TLM freeze (check_tlm_freeze.sh, warn-level per ADR-088 §2)
+        id: verify_tlm_freeze
+        run: |
+          echo "=== Running check_tlm_freeze.sh ==="
+          bash tools/check_tlm_freeze.sh
+        continue-on-error: true
+
       - name: Run Doc link check (doc_link_check.sh)
         id: verify_doc_links
         run: |

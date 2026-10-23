@@ -1,0 +1,27 @@
+# 双模共享文件排除清单 — ADR-088 §2 冻结门禁检测面
+#
+# 用途: 冻结门禁 (tools/check_tlm_freeze.sh) 的检测面 = ip/ 下所有非 _chmem.h 的 .h
+#       减去本清单 (这些文件虽无 _chmem 变体, 但被 CH_MEM 侧 include ⇒ 属双模共享)
+# 口径: include 闭包实测 (禁止按目录名/文件名推断) —— 依据见
+#       openspec/changes/chmem-tlm-backend-freeze/design.md Decision 1
+# 维护: 新增豁免必须同时写进 ADR-088 §2 (本文件是 ADR 的机器可读镜像)
+#
+# 1) cpu_keys.h        CH_MEM 消费: ip/cpu/plugins/mmu.cpp:27, mmu_exception_handler.h:18,
+#                                  tests/cpu/test_cpu_chmem_keys_modality.cpp:62
+ip/cpu/tlm/cpu_keys.h
+# 2) mmu_keys.h        CH_MEM 消费: ip/mmu/plugins/MMUPlugin_chmem.h:70, ip/cpu/plugins/dmem_chmem.h:24
+ip/mmu/tlm/mmu_keys.h
+# 3) ptw.h              CH_MEM 消费: ip/mmu/plugins/MMUPlugin_chmem.h:69
+ip/mmu/lib/ptw.h
+# 4) decoder_table.h   CH_MEM 消费: ip/cpu/cpu_factory_chmem.h:41, int_alu_chmem.h:72
+ip/cpu/arch/riscv/decoder_table.h
+# 5) payload_riscv.h   CH_MEM 消费: ip/cpu/arch/riscv/int_alu_chmem.h:73
+ip/cpu/arch/riscv/payload_riscv.h
+# 6) payload_common.h  CH_MEM 消费: int_alu_chmem.h:74, ip/cpu/plugins/csr_chmem.h:44
+ip/cpu/core/payload_common.h
+# 7) memory_interface.h CH_MEM 消费: ip/mmu/lib/ptw.h:21 <- MMUPlugin_chmem.h:69
+ip/mmu/lib/memory_interface.h
+# 8) mul.h              CH_MEM 消费: ip/cpu/arch/riscv/mul_div_fsm.h:54 <- mul_div_fsm_chmem.h:38
+ip/cpu/arch/riscv/mul.h
+# 9) mul_div_fsm.h     CH_MEM 消费: ip/cpu/plugins/mul_div_fsm_chmem.h:38
+ip/cpu/arch/riscv/mul_div_fsm.h
