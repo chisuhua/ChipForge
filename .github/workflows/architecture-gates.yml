@@ -154,6 +154,23 @@ jobs:
           bash tools/check_coverage_parity_ledger.sh
         continue-on-error: true
 
+      # ADR-088 §5.2 判据 4「CI 有可回归的自动测试」: CI **不跑 ctest** =>
+      # 仅加 ctest entry 不满足该判据 => 必须有 CI 门禁步骤实跑测量脚本做基线漂移检测.
+      - name: Check CH_MEM perf baseline (measure_perf.sh, warn-level)
+        id: verify_perf_baseline
+        run: |
+          echo "=== Running measure_perf.sh --check-baseline ==="
+          if [ ! -x build/bin/cpu_verilator_sim ]; then
+            echo "SKIP: build/bin/cpu_verilator_sim 不存在 (未构建 CH_MEM binary)"
+            exit 0
+          fi
+          if [ ! -f build/dhrystone.elf ]; then
+            echo "SKIP: build/dhrystone.elf 不存在 (CMake 目标 dhrystone_elf 未产出)"
+            exit 0
+          fi
+          bash tools/measure_perf.sh --check-baseline
+        continue-on-error: true
+
       - name: Run Doc link check (doc_link_check.sh)
         id: verify_doc_links
         run: |

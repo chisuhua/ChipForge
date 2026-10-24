@@ -227,3 +227,28 @@ if(TARGET cpu_verilator_sim AND EXISTS "${_cf_verilator_smoke_elf}")
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
 endif()
+
+# ----------------------------------------------------------------------------
+# CH_MEM/Verilator 性能基线漂移检测 (chmem-verilator-perf-harness 交付点 A).
+#
+# Why: ADR-088 §5.2 判据 4「CI 有可回归的自动测试」—— CI **不跑 ctest**,
+#   故本 entry 只是**开发者辅助**; 真正满足判据 4 的是 architecture-gates.yml
+#   里的 `Check CH_MEM perf baseline` 步骤 (warn 级).
+#
+# 判据: Dhrystone 在 CH_MEM/Verilator 后端跑完 (TOHOST==1) 且 cycles/dmips 与
+#   soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv **精确相等** (无容差).
+#   TIMEOUT 一律失败 (cpu_verilator_sim 超时也 exit 0 ⇒ 不可只看退出码).
+#
+# TIMEOUT 300: 实测单跑 ~6s (含 verilator 运行时编译) ⇒ 300s 余量充足.
+# ----------------------------------------------------------------------------
+if(TARGET cpu_verilator_sim AND EXISTS "${CMAKE_BINARY_DIR}/dhrystone.elf")
+    add_test(
+        NAME verilator_perf_baseline
+        COMMAND bash "${CMAKE_SOURCE_DIR}/tools/measure_perf.sh" --check-baseline
+    )
+    set_tests_properties(verilator_perf_baseline PROPERTIES
+        LABELS "verilator;perf;e2e"
+        TIMEOUT 300
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endif()
