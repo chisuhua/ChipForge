@@ -1,6 +1,6 @@
 # ② chmem-bp-btb-gshare — 架构方案简报（architect 主持）
 
-> **状态**: 🚧 **v2 — 双审后修订**（oracle R1–R4 / metis P0–P2；**两个判决实验已完成，见 §0.5**）
+> **状态**: 🚧 **v2.1 — 二审后修订**（oracle 复审 / metis 复审；**BLOCKER 已全部闭合**）
 > **v1 → v2 摘要**: oracle R1（**挂钩点错**：BP 应在 fetch NORMAL 提前一拍预测，不是 branch LATE）· oracle R3 + metis（**TLM 的 BP 是惰性桩 ⇒ ADR-088 §5.3.1 根因归因被证伪**）· metis（**缺 AC 清单 / 台账逐条 / 兜底句无时限 / 阈值循环定义**）。**v1 的 §2.2 时序推演与 §3.2「方向预测无用」的裁决均被推翻** —— 详见 §0.5 与 §7。
 > **日期**: 2026-10-24 · **主持**: architect · **下游**: planner（openspec 立项）→ builder（实施）
 > **上游**: ADR-088 v1.2 §3 BP 行（CH_MEM-only 且必须做）· §5.2 BP 专项删除前置 · §5.3.2 **P-6**（绝对值门禁恢复条件 = ② 落地）
@@ -19,7 +19,7 @@
 |---|--------|------|------------|
 | **A** | **BP 的挂钩点在哪？** | ★ **fetch NORMAL 提前一拍**（不是 branch LATE）—— BTB 在 fetch 期查 `pc_reg`（0-cycle `aread`），预测结果喂给**同拍 branch LATE** 的 `next_pc` mux ⇒ **正确预测时 fall-through 根本不被取出 ⇒ 气泡完全消除** | ★ **v1 的 §2.2 推演错了**（oracle R1） |
 | **B** | **② 的范围** | **BTB + Bimodal 2-bit PHT**（GShare/RAS 延后）⇒ 方向策略有定义；BTB-only 会「恒 taken」⇒ 在 not-taken 分支上**净负收益** | ★ **v1 的「方向预测无用」错了**（oracle R2）—— 方向预测在「提前一拍」的模型下**恢复标准价值** |
-| **C** | **BP 的存储结构** | **单表 `ch_mem<ch_uint<64>, N>`**（tag 32b + target 32b 一个 word）· 容量 **256 entry**（运行时可配，域与 TLM 侧 `btb_entries` 16–256 一致） | ★ v1 的「2 表 × 4096 = 32KB」被推翻（oracle 建议 6：容量过大 + tag 算术不自洽） |
+| **C** | **BP 的存储结构** | **单表 `ch_mem<ch_uint<64>, N>`**（**全 32b PC 作 tag + 32b target，valid 偷 target 的 [1:0]** —— RV32 无 C 扩展 ⇒ target 4 字节对齐 ⇒ `[1:0]` 恒 0 ⇒ 恰好 64b）· 物理深度 **256**（编译期）· 逻辑条目数 M（运行期 mask `& literal(M-1)`） | ★ v1 的「2 表 × 4096 = 32KB」被推翻；★ v2 的「tag 32b + target 32b + valid 1b = **65 bit > 64**」是**算术错误**（oracle 复审 Q3）⇒ 已用「valid 偷 LSB」修正 |
 
 ### 0.2 判决实验（**v2 新增，已实测，代码已复原**）
 
@@ -27,7 +27,7 @@
 |---|------|------|------|
 | **E-1** | 读 TLM `branch_predictor.h` + `ibus.h` | 预测结果**被丢弃**（`:126-129` 注释「M2 阶段: 仅存储预测结果」+ 空函数体）· `flush_when([]{return false;})` 恒 false 演示桩（`:149-151`）· `ibus.h` **0 处**引用预测 | **TLM 的 BP 对 cycle 数零影响** |
 | **E-2** | ★**临时摘掉 TLM 的 BP 注册**（`cpu_factory.h:517`）→ 重建 → 跑 Dhrystone | cycles **794478 → 794478（逐位不变）** · DMIPS **1.43277 → 1.43277（逐位不变）** | ★ **TLM 的 BP 惰性 ⇒ ADR-088 §5.3.1 的根因归因（「TLM 有 BTB ⇒ 预测命中不 flush」）被证伪** |
-| **E-3** | ★**逐拍采样 CH_MEM 的 PC**（临时改 `sim_main.cpp`，已复原）统计控制转移 | **taken 控制转移 = 120065 次** · 顺序步 = 794479 · 794479 + 120065 = **914544 = CH_MEM 总 cycles（逐位吻合）** | ★ **气泡 = 恰好 1 拍 / 每次 taken 转移**（v1 引用的「30 分支 × 2 拍」是**循环论证 + 数字错误**） |
+| **E-3** | ★**逐拍采样 CH_MEM 的 PC**（临时改 `sim_main.cpp`，已复原）统计控制转移 | **taken 控制转移 = 120065 次** · 顺序步 = 794479 | ★ **气泡 = 1 拍 / 每次 taken 转移**。★**承重证据是 TLM 交叉验证**：`914544 − 120065 = 794479 ≈ TLM 的 794478`（残差 **1** 拍）⇒ **CH_MEM 与 TLM 的全部差距被「计数到的重定向」完全吸收，不存在第二种未计入的 slowdown 机制**。⚠️「794479 + 120065 = 914544 逐位吻合」是**分类恒等式**（每 cycle 必属二者之一），**证明力为零**，已降级为自洽性检查 |
 | **E-4** | 读 TLM `ibus.h:114-124` | writeback LATE 在**同一 tick 内**把 `taken ? target : pc+4` 写回 fetch 节点 ⇒ **单遍 tick 语义 ⇒ 重定向零延迟** | ★ **真根因 = 重定向延迟的结构性差异**（TLM 0 拍 vs CH_MEM 1 拍） |
 
 ⇒ **根因（修正后）**：**TLM 单遍模型重定向零代价 vs CH_MEM 两级取指每条 taken 控制转移 1 拍气泡**（120065 拍/iter 集合）。
@@ -40,6 +40,21 @@
 ⇒ 另发现（metis 边界情况 #3）：**档名与硬件分支方向相反** —— `branch_sel` 的 `bnez`（cond≠0 走 taken），而 `branch_cond` mode0 返回 0 ⇒ **mode0「always_taken」实为硬件上的 never-taken** ⇒ 任何按档名推断收益的推理都会**反**。
 
 ### 0.4 结论（v2）
+
+### 0.5 ★★ 绝对值门禁的**定量门槛**（metis 复审 §隐藏意图 1 —— v2 缺失，本 v2.1 补上）
+
+| 项 | 数值 | 依据 |
+|---|------|------|
+| CH_MEM Dhrystone 现状 | **914544 cycles** / 2000 iter = 457.3 cycle/iter · DMIPS **1.24467** | E-3 实测 |
+| TLM 同负载 | 794478 cycles = 397.2 cycle/iter · DMIPS **1.43277** | 实测 |
+| **DMIPS ≥ 1.4 需要的 cycles** | **≤ 813083**（= 2000e6/(1757×1.4)） | 公式 |
+| **必须净省** | **≥ 101461 cycles**（= 914544 − 813083） | 计算 |
+| **可消除的气泡总量** | **120065**（= E-3 的 taken 转移数） | E-3 |
+| ⇒ ★ **净命中率门槛** | **≥ 84.5%**（= 101461 / 120065） | 计算 |
+
+⇒ ★★ **这个数字改变了 ② 的风险评估**：
+- 「GShare 延后」**不是低风险决定** —— 它把 1.4 门禁押在「**Bimodal（无全局历史）能否在 Dhrystone 的分支混合上达到 84.5% 净命中率**」这个**未验证**的假设上。
+- ⇒ **裁决 C-2（范围）须由前置2 的实测数据触发复核**：若前置2 报告的**可达命中率下界 < 84.5%** ⇒ **不得以「GShare 延后」结案** ⇒ 须回 ② 补 GShare（或另立 change）。
 
 ⇒ **② 不取消**，但**必须**：
 1. 先修 0c 微基准（工作量污染 + 档名反向）⇒ **独立 change**
@@ -110,29 +125,61 @@ cycle N     fetch  NORMAL: pc_reg(=P_N) ──► imem.sread(word_addr)   ← �
 
 ## 2. 裁决 A：BP 在 CH_MEM 的**收益模型**（★ v2 已按 oracle R1 重写）
 
-### 2.1 ★ 挂钩点：**fetch NORMAL 提前一拍**（v1 错误已修正）
+### 2.1 ★ 挂钩点与**完整时序**（v2.1 按 oracle 复审 + metis 复审综合修订）
 
-v1 断言「取指地址在 fetch NORMAL 发出、分支结果同拍产出 ⇒ BP 无法影响本拍取指」⇒ **这个断言混淆了两个 PC**：
+#### 2.1.1 三个「PC 角色」必须分清（★ v2.1 的核心澄清）
 
-| PC | 含义 | 何时可知 |
-|----|------|---------|
+| 符号 | 含义 | 何时可知 |
+|------|------|---------|
 | `pc_reg(N)` | **本拍正在取**的指令地址 | fetch NORMAL 读到它 |
 | `pc_lag(N) = pc_reg(N-1)` | **本拍正在解析**的指令地址（branch 阶段解析它） | branch NORMAL 解析它 |
+| `pc_reg(N+1)` | **本拍 branch LATE 决定的**下一取指地址 | branch LATE(N) 写 |
 
-⇒ ★ **BP 在 fetch NORMAL 用 `pc_reg(N)` 查 BTB（0-cycle `aread`）⇒ 得到的预测喂给「同拍 branch LATE」的 `next_pc` mux** ⇒ 预测的是 **`pc_reg(N)` 处那条分支**（正是本拍正在取的）⇒ **提前整整一拍**。
+⚠️ ★ **关键澄清**（oracle 复审 Q1 与 metis 复审 §歧义 1 的分歧点，architect 逐拍重推后的裁定）：
+
+- `branch LATE(N)` 消费的是 `actual_taken(N)` = **instr[pc_reg(N-1)]** 的分支结果（因为 branch NORMAL(N) 解析的是 `pc_lag(N)`）；
+- 而 `fetch NORMAL(N)` 发起的取指是 **pc_reg(N)**（下一拍才解析）；
+- ⇒ ★ **BTB 在 fetch NORMAL(N) 查的是 `pc_reg(N)`，而 branch LATE(N) 的 actual 是 `pc_reg(N-1)`** ⇒ **两者不是同一条分支**；
+- ⇒ ★ **但两者都作用于 `pc_reg(N+1)`** ⇒ 所以它们**可以**放在同一个 mux 里（优先级：`actual` > `BTB 预测` > `pc+4`）⇒ **oracle 的机制主张成立**；
+- ⇒ ★ **metis 指出的「必须抑制该分支自身 redirect」完全正确** —— 若不抑制，正确预测的 taken 分支会让 **target 指令被取两次**（`pc_reg(N+1) = target`，而 `pc_reg(N+2)` 又被 actual redirect 拉回 `target`）⇒ **Δcycles ≈ 0 甚至更差** ⇒ 会**误判「机制不成立」**。★ **v2 的伪码缺这一步 ⇒ 已在本 v2.1 补齐。**
+
+#### 2.1.2 完整三步时序（★ 实施者必须照此实现）
 
 ```
-cycle N:   fetch NORMAL: pc_reg = B
-                     └─ BTB aread(bits(B)) → hit, target = T        ← ★ 预测点
-            branch LATE: pc_reg <<= select(mispredict, correct_target,
-                                          select(btb_hit, T, B+4))
-                                                      ↑ 预测在此生效
-cycle N+1: instr B 可用并解析(taken, T) —— 与预测一致 ⇒ 无纠错、无 flush
-            fetch NORMAL: pc_reg = T
-cycle N+2: instr T 可用  ⇒ B 与 T 背靠背, **0 气泡** ✅
+── cycle N ──────────────────────────────────────────────────────────
+fetch NORMAL(N):
+    pc_reg = B                            (B = pc_reg(N))
+    ★ BTB aread(bits(B)) -> hit, target=T, pht_dir=D
+      (0-cycle; BTB 读地址 = 被 <<= 驱动的 pc_reg ⇒ proxy 可用)
+    写 payload: pred_target=T, pred_taken=D, pred_valid=hit
+
+branch NORMAL(N):
+    解析 instr[pc_lag(N)] = instr[pc_reg(N-1)]  => actual_taken(N), actual_target(N)
+
+branch LATE(N):
+    ★ 写 pc_reg(N+1):
+        select( actual_taken(N), actual_target(N),            <- instr[pc_reg(N-1)] 的结果 (优先)
+          select( pred_valid && pred_taken, pred_target,       <- instr[pc_reg(N)] 的投机预测
+                   pc_reg(N) + 4 ) )
+    ★ 记 1 拍预测记录 (ch_reg 组): pred_taken / pred_target / pred_valid
+
+── cycle N+1 ────────────────────────────────────────────────────────
+branch NORMAL(N+1):
+    解析 instr[pc_lag(N+1)] = instr[pc_reg(N)]  => actual_taken(N+1), actual_target(N+1)
+    ★ 与 1 拍前的预测记录比对:
+        预测一致 (pred_valid && pred_taken == actual_taken && pred_target == actual_target)
+            => 该分支自身 redirect **必须被抑制**  (否则 target 被取两次)
+        预测不一致 (误预测)
+            => 纠错目标 = pc_lag(N+1) + 4   (真正的 fall-through, 不是 pc_reg+4)
+            => flush (抑制错路指令的副作用)
+
+branch LATE(N+1):
+    ★ 写 pc_reg(N+2):
+        select( 预测一致 ? 抑制 : actual_taken(N+1), actual_target(N+1),
+          select( pred_valid && pred_taken, pred_target, pc_reg(N+1) + 4 ) )
 ```
 
-⇒ ★ **收益模型（修正后）**：**正确预测 ⇒ 该 taken 转移的气泡被完全消除**（不是「只能省 fall-through 那一拍」）。
+⇒ ★ **收益**：正确预测的 taken 转移 ⇒ `pc_reg(N+1)` 直接 = target ⇒ **fall-through 那一拍根本不被取出** ⇒ **气泡完全消除**（E-3 实测每条 taken 转移 1 拍气泡）。
 
 ### 2.2 「BTB-only 会净负收益」（oracle R2）⇒ 必须有方向预测
 
@@ -198,36 +245,75 @@ flush 从「上拍 taken」改为「**预测错误**」是**语义变更**，波
 | 「方向预测在 CH_MEM 无收益」 | ★ **撤回该论断** | 方向预测在「提前一拍」的模型下**恢复标准价值**（§2.2） |
 | 台账处置 | BTB 相关条目 → 升级；**PHT/Bimodal 相关**条目 → 升级；**GHR/RAS/TID** 条目 → 保持 `not-covered` + 差异化理由 | ★ metis 修正：`predict_after_update` / `no_predict_initially` 是 **BTB 也有**的语义（冷启动/更新路径）⇒ **不可**归入「方向预测无收益」 |
 
-### 3.2 ⇒ 裁决 B-2：BTB 结构 = **单表 `ch_mem<ch_uint<64>, N>`**
+### 3.2 ⇒ 裁决 B-2：BTB 结构（v2.1 修正 oracle 复审 Q3 的两处错误）
 
 | 项 | 决策 | 依据 |
 |---|------|------|
-| 布局 | **单表 64b/entry**（tag 32b + target 32b + valid 1b ⇒ 打包进 64b） | ★ 单读/写端口对 ⇒ **天然满足** PoC 结论 3「读/写共用同一地址表达式」；容量等价于 v1 的「双 32b 表」但**只有一个端口对**（oracle 建议 10） |
-| 容量 | ★ **256 entry**（**不是** v1 的 4096） | ① TLM 侧 `btb_entries` 的配置域就是 **16–256**（`branch_predictor.h:70`）⇒ 对齐既有域；② Dhrystone/CoreMark 热点分支数十量级；③ 256×64b = **16KB**（v1 是 32KB）；④ **运行时可配**（PoC 结论 6「固定容量 + 运行时逻辑条目数」支撑）⇒ ★ **顺带把台账 `custom_btb_size` / `btb_runtime_{16,64,256}` 4 条升为 covered** |
-| 索引 | `bits<N-1,0>(PC)`（N = 逻辑条目数，运行时可变） | 与运行时可配配合 |
-| tag | PC 的高位（`bits<31, idx_bits>`） | ⚠️ **v1 的「tag 20b」与 4096 不自洽**（12-bit 索引 ⇒ tag = PC[31:14] = 18b）—— 已在 v2 修正为「tag = PC 高位，长度随容量」 |
-| valid | ★ **独立 valid 位**（打包进 64b word） | ★ v1 的「tag == 0xFFFFFFFF ⇒ 无效」**不可行**：① `ch_mem` 零初始化 ⇒ 初值 tag = 0 ⇒ **低地址段首次查询即假命中**；② 真实 tag 可能取 0xFFFFFFFF |
-| **key 是 vaddr 还是 paddr** | ★ **vaddr**（分支 PC payload 本身就是 vaddr） | MMU on/off 之间 key 必须一致 ⇒ 用 paddr 会在两种配置下产生不一致的表项（metis 边界情况 #4） |
+| 布局 | ★ **全 32b PC 作 tag + 32b target，valid 偷 target 的 `[1:0]`** ⇒ 恰好 **64b** | ★ v2 的「tag 32b + target 32b + valid 1b = **65 bit > 64**」是**算术错误**（oracle 复审 Q3）⇒ 修正：RV32 **无 C 扩展** ⇒ target **4 字节对齐** ⇒ `[1:0]` 恒 0 ⇒ **valid 偷 LSB** ⇒ 零成本 |
+| valid 语义 | `valid = (target[1:0] != 0)` ⇒ **有效 target 的 LSB 必为 1** | ⇒ 同时消除 v1 的「tag == 0xFFFFFFFF ⇒ 无效」问题（`ch_mem` 零初始化 ⇒ target = 0 ⇒ LSB = 0 ⇒ **天然无效** ⇒ **不会假命中**） |
+| 物理深度 | ★ **256（编译期，`ch_mem<ch_uint<64>, 256>`）** | `ch_mem` 的 depth 是**编译期模板参数** ⇒ 不可变 |
+| 逻辑条目数 M | ★ **运行期 mask**：索引 = `bits<7,0>(pc) & literal(M-1)`，M ∈ {16,32,64,128,256} | ★ **v2 的「`bits<N-1,0>(PC)`，N 运行时可变」不可实例化**（`bits<>` 边界是**编译期**模板参数）⇒ 修正为「编译期 8-bit 索引 + 运行期 AND mask」 |
+| ⇒ 「运行时可配」的正确论证 | ★ **不是** PoC 结论 6（「越界读 = 0」只是**安全网**，不是可配机制）⇒ 而是：**物理 256 固定 + 运行期 mask 限制有效条目数** ⇒ M=16 时索引只用 PC 低 4 位 ⇒ 逻辑上只有 16 项有效 | ⇒ 台账 4 条（`custom_btb_size` / `btb_runtime_{16,64,256}`）**可升 covered**，但 AC 须含「分别以 M=16/64/256 例化 BP 并验证功能正确 + 容量语义可观测」的 CH_MEM 侧 case |
+| tag 宽度 | **全 32b PC**（不裁剪） | ⇒ M 小时（如 16）不会有「同槽假命中」（若 tag 裁剪到 PC[31:4]，M=16 时 16 个槽位共享 tag ⇒ 结构性假命中率上升且**静默**）⇒ 全 PC tag + valid-in-LSB 成本为零，无理由不取 |
+| 替换策略 | ★ **直接覆盖**（同槽直接写） | TLM 侧 `branch_predictor.h` 亦无替换策略（直接写）⇒ 对齐 |
+| 别名风险 | ★ 256 槽 direct-mapped ⇒ 热点分支互驱逐 ⇒ ★ **前置2 须报告「去重后的热点分支数」** ⇒ 若 > 256 ⇒ 容量裁决提前做 | metis 边界情况 #5 |
+| **BTB 只对直接分支建项** | ★ **`jalr`（间接跳转）不建 BTB 项** ⇒ 走 not-taken | ★ metis 缺失 AC #7：jalr 目标每次可能不同 ⇒ BTB 存「上次目标」必错 ⇒ 显式裁定并绑到台账 #9 终态 |
+| **陈旧目标兜底** | ★ **连续误预测 N 次 ⇒ 撤销该表项（valid=0）降级为不预测** | metis 边界情况 #4：函数指针等场景下陈旧 target 会**自激**（连续误预测）⇒ 需自愈 |
+| key 是 vaddr 还是 paddr | ★ **vaddr**（分支 PC payload 本身就是 vaddr） | metis 边界情况 #4：MMU on/off 之间 key 必须一致 |
 
-### 3.3 ⇒ 裁决 B-3：PHT 结构
+### 3.3 ⇒ 裁决 B-3：PHT 结构（v2.1 补 metis 的实现不变量）
 
 | 项 | 决策 |
 |---|------|
-| 表 | `ch_mem<ch_uint<2>, N>`（N = 256 或 1024）⇒ **2-bit 饱和计数器**（PoC P-3 已验证可行） |
-| 索引 | ★ **Bimodal 语义**：`bits<idx_bits-1,0>(PC)`（**不用**全局历史 XOR）⇒ GShare 延后 |
-| 饱和 | 0→1→2→3 饱和（不回退），2/3 ⇒ 预测 taken |
+| 表 | `ch_mem<ch_uint<2>, N>`（N = 256）⇒ **2-bit 饱和计数器**（PoC P-3 已验证可行） |
+| 索引 | ★ **Bimodal 语义**：`bits<7,0>(PC) & literal(M-1)`（**不用**全局历史 XOR）⇒ GShare 延后 |
+| 饱和 | 0→1→2→3 饱和（不回退），**≥2 ⇒ 预测 taken** |
 | 冷启动 | 初值 0（弱 not-taken）⇒ 冷启动语义由 `no_predict_initially` 条目覆盖 |
+| ★ **PHT 更新使能** | ★ **「分支已解析」（任何方向）** —— ★ **不是**「仅 taken」！若只在 taken 时更新 ⇒ PHT 学不到 not-taken ⇒ 在 not-taken 分支上恒预测 taken ⇒ **净负收益**（§2.2 的老问题换个入口回来） |
+| ★ **BTB 更新使能** | ★ **taken**（目标此时才已知） |
+| ★ **更新地址** | ★ **分支解析处的 `KT::PC`**（= 预测时的 `pc_reg`）⇒ ★ **二者必须同指一条分支**（索引对齐不变量）；若误用 branch 阶段的当前 `pc_reg`（下一条 PC）⇒ **off-by-one ⇒ 学到错误表项** |
+| ★ **无条件跳转不占 PHT 表项** | `jal`/`jalr` 恒 taken ⇒ 不需要方向预测 ⇒ 不更新 PHT（只更新 BTB） |
+| ★ **不变量的可测性** | 需一条 AC：「**同一分支第二次被取时预测命中**」（覆盖 update 路径） |
 
-### 3.4 ⇒ 裁决 B-4：预测的**产出与消费**（payload 契约）
+### 3.4 ⇒ 裁决 B-4：预测的**产出与消费**（payload 契约 + ★ mux 嵌套）
+
+#### 3.4.1 payload 契约
 
 | 方向 | 决策 |
 |------|------|
 | BP 的**输入** | fetch 期的 `pc_reg`（**被 op 节点 `<<=` 驱动** ⇒ 可作 mem 读地址，PoC 结论 2 + P-2P） |
-| BP 的**输出** | ① `predicted_target`（32b）② `predicted_taken`（1b）③ `predicted_valid`（1b）⇒ **写入 payload**（mode-aware `uint_t<N>`，禁裸 `bool`，ADR-040 §10.5） |
-| 消费点 | **同拍 branch LATE** 的 `next_pc` mux（`ibus_chmem.h:171`）⇒ mux 优先级：**mispredict 纠错 > BTB 预测 > `pc+4`** |
+| BP 的**输出** | ① `pred_target`（32b）② `pred_taken`（1b）③ `pred_valid`（1b）⇒ **写入 payload**（mode-aware `uint_t<N>`，禁裸 `bool`，ADR-040 §10.5） |
 | 误预测记录 | `ch_reg` 组（pred_taken / pred_target / pred_valid）⇒ 跨拍保持（PoC 结论 7） |
-| 纠错目标 | 「预测 taken、实际 not-taken」⇒ **`pc_lag + 4`**（不是 `pc+4`，§2.3） |
-| 顺序契约 | 生产者（BP，fetch 侧）写 payload ⇒ 消费者（`update_pc`，branch LATE）读 ⇒ **同 stage 名 / EARLY→LATE**，不得依赖插件注册顺序（ADR-040 §10.6） |
+| 纠错目标 | 「预测 taken、实际 not-taken」⇒ **`pc_lag + 4`**（§2.1.2） |
+| ★ **顺序契约** | ★ **跨 stage**（生产者 fetch NORMAL → 消费者 branch LATE）⇒ 保序机制 = **`elaborate()` 按 `canonical_stage_order()` 执行**（`pipe_builder.h:413-424` + `:215-224`：stage 首现序 × EARLY→NORMAL→LATE）⇒ fetch ≺ branch 且 NORMAL ≺ LATE ⇒ **与插件注册顺序无关** ⇒ v2 简报写的「同 stage 名 / EARLY→LATE」**表述错误，已更正** |
+| ★ **pc_reg 单驱动纪律** | BP **只写 payload**，**禁止**自身 `<<= pc_reg`（`pc_reg` 的唯一写者是 `update_pc`） |
+
+#### 3.4.2 ★★ `next_pc` 的**五级嵌套契约**（oracle 复审建议 8 —— **BLOCKER，v2 完全遗漏**）
+
+**背景（时序倒挂 ⇒ 本简报是规格的责任方）**：
+- `fetch_stall_protocol_v0.11.0.md` **rev.14 定稿**（critic 十五轮 APPROVE）规定 `next_pc` MUST 为 **`trap > branch > freeze > sequential`**（`:201` / `:349` / `:603`）；
+- **R11.1** 裁决把 ECALL/EBREAK/MRET 的 trap redirect 交给 `csr-chmem-trap-pc-jump`，★ **插入点 = `ibus_chmem.h:171-185` 的 `update_pc`**（protocol `:603`）—— **与 BP 的插入点同一处**；
+- BP 已 defer 到 v1.0.0（2026-10-19 S3 决策），而 trap/freeze mux 在 v0.11.0 Phase 3.5/C.4（~2026-11）落地 ⇒ ★ **BP 落地时那 5 项 mux 已存在** ⇒ **嵌套规格只能由本简报给出**；
+- 且 protocol 明确写了「该 pc_reg mux 只含 stall 分量，**不含 BP 分支**」（`mmu-chmem-phase-b-c-launch/tasks.md:39`）⇒ **本简报补的就是那个缺口**。
+
+⇒ ★ **裁决 B-4：五级优先级**
+
+```
+next_pc = select( trap_redirect,              trap_target,        ← 最高 (protocol rev.14)
+              select( branch_actual,           actual_target,      ← 分支实际结果 (含误预测纠错)
+                select( freeze_hold,           hold_pc,            ← stall 期间 PC 保持
+                  select( bp_predict,          bp_target,          ← ★ 本简报新增 (BP 投机)
+                           pc + 4 ) ) ) )                        ← 顺序取指
+```
+
+| 项 | 裁决 |
+|---|------|
+| **BP 预测项的位置** | ★ **在 `freeze` 之下、`seq` 之上** | 
+| 理由 1 | `freeze`（PTW stall）期间 PC 必须**保持**；若 BP 预测项在 freeze 之上 ⇒ 预测会在 walk 期间把 PC 推走 ⇒ 恢复路径要多记一份 pre-hold PC ⇒ 复杂度 > 收益 |
+| 理由 2 | ★ 不违反 protocol rev.14 已 APPROVE 的不变量（critic 十五轮磨出来的，不应由本 change 单方面改） |
+| **FLUSH 的双分量** | protocol §2.2 定 `FLUSH = br_taken_buf \| hold_z` ⇒ ★ v2.1 的「taken → mispredict」改写**必须表述为**：「`br_taken_buf` 分量**替换**为 `mispredict_buf` 分量，**`hold_z` 分量保留**」⇒ 否则与 PTW stall 语义相撞 |
+| **mispredict 纠错的位置** | 与 `branch_actual` **同层**（都是「分支实际结果」的一部分）⇒ `mispredict` 优先于 `branch_actual`（纠错目标 `pc_lag+4` vs actual target） |
+| **本简报的义务** | ★ **上述嵌套规格必须写进 ② 主体的 `design.md` 与 AC-6 的判据对象**（否则 ② 落地时与 protocol 冲突） |
 
 ### 3.5 ⇒ 裁决 B-5：**不做**的事（★防超范围）
 
@@ -275,74 +361,93 @@ flush 从「上拍 taken」改为「**预测错误**」是**语义变更**，波
 
 ⚠️ **裁决**：**前置1 与前置2 未完成前，② 主体不得开工**（AC-8 的判据与 P-6 的前提都依赖它们）。
 
-### 4.1 前置1 `chmem-branch-microbench-fix` 的 AC
+### 4.1 前置1 `chmem-branch-microbench-fix` 的 AC（v2.1 修正）
 
-- [ ] **AC-F1-1** `objdump` 证明 `branch_cond` **0 条条件分支**（纯 `sltiu/seqz/and/or`）+ `branch_sel` 两条路径**指令数相等**
-- [ ] **AC-F1-2** 4 档**动态指令数相等**（★不只是 `.text` 相同）+ 4 档的 **taken 分支数/iter** 已报告
+- [ ] **AC-F1-1** `objdump` 证明 `branch_cond` **0 条条件分支**（纯 `sltiu/seqz/and/or`）+ `branch_sel` 两条路径**指令数相等**（★ 仅证**静态**一致）
+- [ ] **AC-F1-2** ★ **改用计数器**证明 4 档**动态指令数相等**（★ `.text` 相同 + objdump **无法**证动态一致 ⇒ 需 CH_MEM 侧「已执行指令数」计数器 ⇒ 依赖 AC-15 的常驻可观测点）⇒ 并报告 4 档的 **taken 分支数/iter**
 - [ ] **AC-F1-3** 新 `.text` sha256 入册 + CSV 重录 + CI `branchbench_baseline` 仍绿
-- [ ] **AC-F1-4** ★ **档名与硬件方向一致**（mode0/mode1 的 `bnez` 实际方向已核对并据此重命名或修正注释）
-- [ ] **AC-F1-5** ★ **留痕**：0c 的 AC-2「`.text` sha256 一致」**事实仍成立**，但其推论「`.text` 一致 ⇒ 动态指令数相同」**被本次反汇编证伪** ⇒ 该证伪写入 0c 的归档 change（**不得**改动归档产物 ⇒ 写入本 change 的 proposal + CSV notes）
-- [ ] **AC-F1-6** 若跨档 taken 分支数差 **< 1 拍/iter** ⇒ **判定该微基准不足以支撑跨档 AC** ⇒ 改为「单档绝对 Δcycles + 解析模型」判据，**或**在本 change 内新增「分支密度可调」负载
+- [ ] **AC-F1-4** ★ **档名与硬件方向一致** —— ⚠️ **mode0 与 mode1 是「互换」不是单改名**（源码 `c0 = 0` ⇒ mode0 永不 taken；`c1 = 1` ⇒ mode1 恒 taken，而 `branch_sel` 的 `bnez` 在 cond≠0 时 taken）⇒ ★ **强制互换重命名**（**删掉「修正注释」这个弱选项**）+ ★ **改名传播清单**（同 commit）：CSV `mode_name` 列 · `tools/measure_branchbench.sh` 的 `MODE_NAMES` 数组 · plan Task 6 Step 4 的档名引用 · 文档旧档名
+- [ ] **AC-F1-5** ★ **留痕**：0c 的 AC-2「`.text` sha256 一致」**事实仍成立**，但其推论「`.text` 一致 ⇒ 动态指令数相同」**被本次反汇编证伪** ⇒ 写入本 change 的 proposal + CSV notes（**不得**改动归档产物）
+- [ ] **AC-F1-6** ★ **预登记默认出口**（★ 删除「或新增密度可调负载」这个开放式口子）：若跨档 taken 分支数差 **< 1 拍/iter** ⇒ **直接**采用「`always_taken` 单档绝对 Δ + 解析模型」判据 ⇒ ★ **判定权归本 change**（独立执行者）⇒ 结论写入 CSV notes + 本 change 归档产物 ⇒ **不留给 ②**（② 对「判据不可用」有既得利益）
+- [ ] **AC-F1-7** ★ **改名与脚本改动必须同一 commit** ⇒ 否则 `measure_branchbench.sh:52` 的 `grep -E "^${name},"` 找不到行 ⇒ CI `branchbench_baseline` 立刻红
 
-### 4.2 前置2 `chmem-bp-btb-gshare-poc` 的 AC
+### 4.2 前置2 `chmem-bp-btb-gshare-poc` 的 AC（★ v2.1 重写 —— v2 的判据**物理上不可达**）
 
-- [ ] **AC-F2-1** 被测对象与工作负载明确（哪一档 / 哪些分支 / 迭代数）
-- [ ] **AC-F2-2** 测的量与单位明确：**taken 控制转移数**（E-3 的方法）+ **总 cycles**
-- [ ] **AC-F2-3** 决策表**两条分支各自的后果**（成立 ⇒ 进 ②；不成立 ⇒ 上报 architect + 在 ADR-088 §5.3.2 记录「② 不构成绝对值门禁恢复条件」+ 由 architect 另立绝对值路径 change，**不得以「等回复」结束本 change**）
-- [ ] **AC-F2-4** ★ **兜底路径三要素**（触发阈值 + 落点文件 + 时限：不得跨 change 挂起）—— 继承 plan R6 的纪律
+> ★ **v2 的判据错误**（metis 复审 §歧义 3）：v2 说「PoC 后 taken 转移数应显著下降」⇒ ★ **taken 转移数在 BP 生效时是**不变量**（BP 生效后 PC 仍在每条 taken 分支上跳转；误预测还会**增加**非顺序跳转）⇒ 该判据的「成立」分支**不可达** ⇒ 必须改判据。
+
+- [ ] **AC-F2-1** 被测对象与工作负载明确 ★ **必须含一个「恒 taken」定向档**（★ 否则 BTB-only 在 not-taken 密集的负载上净负 ⇒ 机制会被误判「不成立」）
+- [ ] **AC-F2-2** ★ 测的量 = **FLUSH 事件数**（★ 对取指延迟语义变更鲁棒）+ **总 cycles** + **host 侧 PC 序列**（查重复 PC）—— **不再用「taken 转移数」作判据**
+- [ ] **AC-F2-3** ★ **决策表两条分支各自的后果（终局式）**：
+  - **成立**（FLUSH 事件数显著下降 + cycles 下降 ≈ 下降的 FLUSH 数）⇒ 进 ② 主体
+  - **不成立** ⇒ ① 记录 ⇒ ② 在 **ADR-088 §5.3.2** 落**结论**（绝对值门禁恢复 / **不恢复**）⇒ ③ **不恢复时沿用 §5.3.2 已登记的 P-3 临时口径**（cycle 比率 ≤ 1.15 + notes 标注）⇒ ④ **本 change 关闭**，**不留悬空项**
+- [ ] **AC-F2-4** ★ **兜底路径三要素**（触发阈值 + 落点文件 + ★ **可判定的时限**：「≤ N 个工作日」或「本 change 内闭环」）—— 继承 plan R6
 - [ ] **AC-F2-5** ★ 显式声明「**本 PoC 不产出 P-6 结论**」（P-6 结论归 architect）
 - [ ] **AC-F2-6** PoC 的代码**不复用**为 ② 主体（避免「半成品进主体」）
+- [ ] **AC-F2-7** ★ **报告「去重后的热点分支数」** ⇒ 若 > 256 ⇒ 容量裁决提前做（§3.2）
+- [ ] **AC-F2-8** ★ **报告「可达净命中率下界」** ⇒ 与 **84.5% 门槛**（§0.5）对照 ⇒ ★ **若下界 < 84.5% ⇒ 不得以「GShare 延后」结案**
+- [ ] **AC-F2-9** ★ **测量设施产品化**：E-3 的「临时改 `sim_main.cpp`」必须变成**常驻输出**（`--stats`）⇒ 否则每个 change 重做一次性 hack，测量结论不可复核
+- [ ] **AC-F2-10** ★ **TLM 侧 cycle 数同时输出** ⇒ 让「差距全吸收」交叉验证成为**可重复判据**（而非一次性手工核对）
+- [ ] **AC-F2-11** ★ **测量方法护栏**：`enable_mmu=false`（**bare**）· **排除 trap 周期** · **无条件跳转（jal/jalr/ret）与条件分支分开统计**
 
-### 4.3 ② 主体 `chmem-bp-btb-gshare` 的 AC（**v2 重写**）
+### 4.3 ② 主体 `chmem-bp-btb-gshare` 的 AC（**v2.1 重写**）
 
-| # | AC | 相对 v1 |
+| # | AC | 相对 v2 |
 |---|-----|---------|
-| **AC-1** | `ip/cpu/plugins/branch_predictor_chmem.h` 存在且实现 **BTB（256 entry × 64b：tag+target+valid）+ Bimodal 2-bit PHT**；★ **GShare / RAS 明确不在范围内**（v1 的「+ GShare 13-bit PHT(2-bit) + RAS 8-entry」已删） | ★ 重写 |
-| **AC-2** | `cpu_factory_chmem.h` **已注册** BP plugin，canonical ordering 断言 PASS；★ BP 在 **fetch 侧**的注册位已定义（ADR-048） | 保留 + 追加 |
-| **AC-3** | ★ **台账逐条表**：14 条**逐条**给出「目标态 + CH_MEM 锚点 + 显式理由 + 是否删除该行」；★ **CH_MEM 侧 case 名与 TLM-only case 名零交集**（否则 `check_coverage_parity_ledger.sh` 会报「条目不在 TLM 独占差集」⇒ 推荐命名 `chmem_btb_entry` 等） | ★ 重写 |
-| **AC-4** | **BTB miss ⇒ 不预测**（不跳转、不 flush） | 保留（语义微调） |
+| **AC-1** | `ip/cpu/plugins/branch_predictor_chmem.h` 存在且实现 **BTB（256×64b：全 PC tag + 32b target + valid-in-LSB）+ Bimodal 2-bit PHT（256×2b）**；★ **GShare / RAS 明确不在范围内** | 保留 |
+| **AC-2** | `cpu_factory_chmem.h` **已注册** BP plugin，canonical ordering 断言 PASS；BP 在 **fetch 侧**的注册位已定义（ADR-048） | 保留 |
+| **AC-3** | ★ **台账逐条表**（§5.1）：14 条**逐条**给出「目标态 + CH_MEM 锚点 + 显式理由 + 是否删除该行」；★ **CH_MEM 侧 case 名与 TLM-only case 名零交集**；★ **台账 §7 的 BP 裁决行同步**（`tlm-coverage-parity-ledger.md:742`） | ★ 补 §7 同步项 |
+| **AC-4** | **BTB miss ⇒ 不预测**（不跳转、不 flush） | 保留 |
 | **AC-5** | 预测方向/目标为**活节点**（`impl()->is_const() == false`）⇒ 禁 `static_cast<bool>` | 保留 |
-| **AC-6** | ★ **预测错误 ⇒ 只在预测错误时抑制错路指令**；且 flush 语义变更后 **3 个消费者**（branch/dmem/reg_file）行为正确 | ★ 重写（判据对象变了） |
-| **AC-7** | `[chmem]` 47 ELF + `[verilator]` 48 ELF **0 退化**；★ **BP on/off 的 4 档校验和逐位相等**（确定性 · 零阈值 · 能直接抓出 flush 语义改错） | ★ 追加 |
-| **AC-8** | ★ **整体重写**（见下） | ★ 重写 |
-| **AC-9** | 8 门禁全 PASS + 全量回归 0 退化（失败集合恰 1 个 pre-existing） | 保留 |
-| **AC-10** | 台账重判完毕 + **§2 族级判定行同步** + **§2「涉及 case 数」与文档头部「463 条」计数同步** + ★ **`check_coverage_parity_ledger.sh` exit 0**（该脚本 CI 是 warn 级 ⇒ 否则会静默违规） | ★ 追加 |
+| **AC-6** | ★ **预测错误 ⇒ 只在预测错误时抑制错路指令**；且 flush 双分量语义正确（`br_taken_buf` 分量替换为 `mispredict_buf`，**`hold_z` 保留**，protocol §2.2） | ★ 补双分量 |
+| **AC-6b** | ★★ **正确预测 ⇒ 该分支自身的 redirect 被抑制**（目标指令**只被取一次**）⇒ 验证：host 侧 PC 序列在 bp=on 下**无重复 PC** | ★ **新增**（metis P0-2） |
+| **AC-7** | `[chmem]` 47 ELF + `[verilator]` 48 ELF **0 退化**；★ **双跑**：BP 关一遍 + BP 开一遍，两套全绿；★ **BP on/off 的 4 档校验和逐位相等** | ★ 双跑 |
+| **AC-8** | ★ **拆三条**（见下） | ★ 重写 |
+| **AC-9** | ★ **具名门禁清单**：`verify_adr` · `verify_plugin_decision` · `check_plugin_portability` · `doc_link_check` · `roadmap-r9-check` · `check_xlen_hygiene` · `check_tlm_freeze` · `check_coverage_parity_ledger` + `bash tools/run_chipforge_tests.sh --all`（失败集合恰 1 个 pre-existing）★ 注明「**仅本地成立 ⇒ ADR-088 §5.2 判据 4 仍未满足**（CI 不构建）」 | ★ 具名化 |
+| **AC-10** | 台账重判完毕 + **§2 族级判定行同步** + **「涉及 case 数」与头部「463 条」计数同步** + ★ **`check_coverage_parity_ledger.sh` exit 0**（CI warn 级 ⇒ 无强制力 ⇒ 须本地跑 + 贴 PR） | ★ 保留 |
 | **AC-11** | **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，需双前置） | 保留 |
-| **AC-12** | ★ **「不做什么」显式化**：GShare / RAS / 多级 TLB / 改取指延迟 等**逐项标注「本期不实现（理由 + 归属）」** ⇒ 漏判可检测 | ★ 新增 |
+| **AC-12** | ★ **「不做什么」机检化**（非散文）：`branch_predictor_chmem.h` 内**不得出现** GShare / GHR / RAS 标识、**不得出现** `ch_reg<ch_uint<13>>` ⇒ grep 门禁 | ★ 机检化 |
+| **AC-13** | ★ **BP 必须可学**：同一分支**第二次**被取时预测命中（PHT 更新使能 = 分支已解析，任何方向；更新地址 = 分支解析处 `KT::PC`，与预测 `pc_reg` 同指一条分支） | ★ 新增 |
+| **AC-14** | ★ **`jalr` 不建 BTB 项** ⇒ 走 not-taken；无条件跳转不占 PHT 表项 | ★ 新增 |
+| **AC-15** | ★ **host 可见事件计数**：`已执行指令数` + `FLUSH 事件数`（两个计数器 + `cpu_verilator_sim --stats` 输出行）⇒ 供 AC-8b 与前置2 的机制判据使用 | ★ 新增（metis P0-3） |
 
-#### AC-8 的新写法（★metis 建议，关键是去掉循环定义）
+#### AC-8 的三条子判据（★ metis P0-4：v2 的写法不可执行且会被正确实现判 FAIL）
 
-- **AC-8a（功能，无阈值）**：4 档在 `bp=on` 与 `bp=off` 下**校验和逐位相等**
-- **AC-8b（收益，阈值由 architect 在 tasks.md 开工前预登记为精确整数）**：
-  `Δcycles(bp=on − bp=off)` **等于**「该档被正确预测的 taken 转移数 × 1 拍」（1 拍 = E-3 实测）
-  ⇒ **禁止**百分比、**禁止**「阈值由基线实测确定」（v1 的循环表述已删）
-- **AC-8c（反证）**：若 `Δcycles == 0` ⇒ **BP 未生效**（不是「档选得不好」）
-- **AC-8d（信号强度前置条件）**：若前置1 报告的跨档 taken 分支数差 **< 1 拍/iter** ⇒ **跨档判据不可用** ⇒ 改用「单档绝对 Δcycles + 解析模型」
+| # | 判据 | 说明 |
+|---|------|------|
+| **AC-8a**（功能，无阈值） | 4 档在 `bp=on` 与 `bp=off` 下**校验和逐位相等** | 保留 |
+| **AC-8b-1**（结构等式，★ 零新仪表，现在可测） | 在**误预测为 0**的档（`always_taken` 档：PHT 饱和 ⇒ 全对；且无 not-taken 分支 ⇒ 无误判）⇒ `Δcycles(bp=off − bp=on)` **逐位等于**「该档在 bp=off 下用同一 PC 跳变法测得的 taken 转移数 × 1」 | ★ 把「1 拍/taken」从**分类恒等式**升级为**实测等式** |
+| **AC-8b-2**（净收益模型） | 其余档 `Δcycles(off − on) = N_correct×1 − N_false×1`，N 由 **BP 内部计数器**（AC-15）导出 | ★ **符号修正**：v2 写成 `on − off`（方向反了）；★ **误预测代价 = 2 拍**（错误目标被取 + 纠错落回 `pc_lag+4`）⇒ 正确模型含 `N_false` 项 |
+| **AC-8b-3**（有界替代，不引入计数器时） | 只断言 `0 ≤ Δcycles(off − on) ≤ N_taken×1`，精确净收益降级为 PoC 报告项 | 兜底 |
+| **AC-8c**（反证）★ **限定 `always_taken` 档** | `Δcycles(off − on) == 0` ⇒ **BP 未生效**。⚠️ v2 的写法对 `always_not_taken` 档**不成立**（该档预测 not-taken 与无 BP 等价 ⇒ Δ 合法地 ≈ 0） | ★ 修正 |
+| **AC-8d**（信号强度前置条件） | 若前置1 报告的跨档 taken 分支数差 **< 1 拍/iter** ⇒ **跨档判据不可用** ⇒ 改用「`always_taken` 单档绝对 Δ + 解析模型」。★ **判定权归前置1**（独立 change、独立执行者）⇒ 结论写入 CSV notes + 前置1 归档产物 ⇒ **不留给 ② 的执行者**（② 对「判据不可用」有既得利益） | ★ 判定权归属修正 |
+| **AC-8e**（跨档判据形式） | ★ 跨档比较必须写成**差值**：`Δ(mode) − Δ(always_not_taken)` ⇒ 因 4 档都含**同一条循环回边**（每 iter 恒 1 次 taken ⇒ 各档统一收益）⇒ 解析模型须扣掉回边 | ★ 新增（metis 缺失 AC §3） |
 
 ## 5. 待裁决问题（**明确列出，不留给实施者**）
 
-### 5.1 ★ 台账 14 条的**逐条目标态表**（metis 建议 9，**预登记以防漏判/误判**）
+### 5.1 ★ 台账 14 条的**逐条目标态表**（v2.1 写死 #8/#9/#10 + 补 §7 同步项）
 
-| # | 条目 | v1 说法 | ★ **v2 目标态** | 理由（**逐条差异化，非加后缀**） |
-|---|------|---------|----------------|---------------------------|
-| 1 | `btb_entry` | covered | **covered** | CH_MEM 侧有 BTB 结构 + 单测锚（case 名用 `chmem_btb_entry` 等，**与 TLM-only case 名零交集**） |
-| 2 | `custom_btb_size` | not-covered | ★ **covered** | 容量 256 + **运行时逻辑条目数**（PoC 结论 6）⇒ 运行时可配成立 |
-| 3 | `btb_runtime_16` | not-covered | ★ **covered** | 同上（16 是运行时可选值之一） |
-| 4 | `btb_runtime_64` | not-covered | ★ **covered** | 同上 |
-| 5 | `btb_runtime_256` | not-covered | ★ **covered** | 同上 |
-| 6 | `predict_after_update` | （归 PHT） | ★ **covered** | ★ metis 修正：这是 **BTB 也有**的语义（预测器更新路径）⇒ **不可**归入「方向预测无收益」 |
-| 7 | `no_predict_initially` | （归 PHT） | ★ **covered** | ★ 同上：冷启动语义（BTB 初值无效 ⇒ 不预测） |
-| 8 | `not_taken_returns_zero` | partial | **partial 或 covered** | not-taken 时预测目标应为 0/无效 ⇒ 视实现语义定 |
-| 9 | `multiple_addresses` | partial | **partial 或 covered** | 多地址（jalr 间接）⇒ BTB 存的是「某次的目标」⇒ 需显式说明 |
-| 10 | `reset` | partial | **partial** | CH_MEM 无 reset 语义（`ch_mem` 零初始化 ⇒ BTB 天然全无效） |
-| 11 | `per_thread_ghr_isolation` | （归 PHT） | **not-covered** | **GHR 属 GShare**（本期不做）⇒ 理由：「GShare 全局历史本期不实现（收益待 PoC 数据）」 |
-| 12 | `d2_branch_predictor_multi_thread` | not-covered | **not-covered** | 「CH_MEM 侧无框架级多线程 TID 机制」 |
+> ★ **构成说明**（防未来误读）：14 条 = **10 条 `not-covered`** + **4 条 `partial`** 的并集（台账 `tlm-coverage-parity-ledger.md:264-274` / `:349` / `:351` / `:357` + `:267-270`）。★ **注意**：台账 **§5.1/:742** 写的「10 条 BP 条目」只覆盖 `not-covered` 部分 ⇒ 与本表的「14 条」不矛盾（口径不同）。
+
+| # | 条目 | 现状 | ★ **v2.1 目标态** | 理由（**逐条差异化，非加后缀**） |
+|---|------|------|------------------|---------------------------|
+| 1 | `btb_entry` | not-covered | **covered** | CH_MEM 侧有 BTB 结构 + 单测锚（case 名 `chmem_btb_entry` 等，**与 TLM-only case 名零交集**） |
+| 2 | `custom_btb_size` | not-covered | **covered** | 物理 256 固定 + **运行期 mask** 限制逻辑条目数 M（§3.2）⇒ 运行时可配成立 |
+| 3 | `btb_runtime_16` | not-covered | **covered** | 同上（M=16 为合法域之一） |
+| 4 | `btb_runtime_64` | not-covered | **covered** | 同上（M=64） |
+| 5 | `btb_runtime_256` | not-covered | **covered** | 同上（M=256 = 物理满容量） |
+| 6 | `predict_after_update` | not-covered | **covered** | 预测器更新路径（AC-13 提供锚点） |
+| 7 | `no_predict_initially` | not-covered | **covered** | 冷启动语义（`ch_mem` 零初始化 ⇒ target=0 ⇒ valid=0 ⇒ 天然不预测） |
+| 8 | `not_taken_returns_zero` | partial | ★ **covered** | not-taken 时不预测（目标不投机）⇒ 语义等价 |
+| 9 | `multiple_addresses` | partial | ★ **partial** | ★ **`jalr` 不建 BTB 项**（AC-14）⇒ 间接跳转的多地址语义**明确不覆盖** ⇒ 理由写「间接跳转不建 BTB 项（目标随运行时变化，不可静态缓存）」 |
+| 10 | `reset` | partial | ★ **partial** | CH_MEM 无 reset 语义（`ch_mem` 零初始化 ⇒ 无需 reset） |
+| 11 | `per_thread_ghr_isolation` | not-covered | **not-covered** | 「GShare 全局历史本期不实现（相对 Bimodal 的增益待前置2 的命中率数据）」 |
+| 12 | `d2_branch_predictor_multi_thread` | not-covered | **not-covered** | 「CH_MEM 侧无框架级多线程 TID 机制」★ 补一句「BTB/PHT 为**全局共享**（CH_MEM 单线程 ⇒ 无隔离需求）」 |
 | 13 | `d4_branch_predictor_tid_param` | not-covered | **not-covered** | 同上 |
 | 14 | `branch_predictor_set_tid_stores_tid` | not-covered | **not-covered** | 同上 |
 
-⇒ ★ **红线核算**：`not-covered` 分组 = **3 条**（TID，共享 1 个理由）+ **1 条**（GHR）⇒ **最大组 3 条 ≪ 红线 10** ✅（★ metis 修正：v1 担心的「接近 10」**不成立**）
-⇒ ★ **同步项**：台账 §2 `cpu` 族判定行 + **「涉及 case 数」（现 137）** + 文档头部「463 条」计数
-⇒ ★ **机检**：① `check_coverage_parity_ledger.sh` **exit 0** ② CH_MEM 侧 case 名与 TLM-only case 名**零交集**
+⇒ ★ **红线核算**：`not-covered` 分组 = **3 条**（TID，共享 1 个理由）+ **1 条**（GHR）⇒ **最大组 3 条 ≪ 红线 10** ✅
+⇒ ★ **同步项**：① 台账 **§2 `cpu` 族判定行** ② **「涉及 case 数」（现 137）** ③ 文档头部「463 条」计数 ④ ★ **台账 §7 的 BP 裁决行**（`:742`「10 条 BP 条目 partial → not-covered」⇒ 须改为反映新终态）
+⇒ ★ **机检**：① `check_coverage_parity_ledger.sh` **exit 0** ② CH_MEM 侧 case 名与 TLM-only case 名**零交集**（★ **先快照 TLM-only 名单**（`comm -23`）再命名 —— 否则新 case 撞名 ⇒ 该名从差集消失 ⇒ 台账对应行变「不在 TLM 独占差集」⇒ 违规）
 
 ### 5.2 待裁决问题
 
@@ -353,7 +458,8 @@ flush 从「上拍 taken」改为「**预测错误**」是**语义变更**，波
 | **Q3** | 机制 PoC 作为**② 的前置**？ | **是** | 确认 |
 | **Q4** | BTB = **单表 64b × 256 entry**（运行时可配）？ | **是** | 确认 |
 | **Q5** | 台账 14 条的**逐条目标态**（§5.1）？ | **是** | 确认（尤其 #6/#7 从 not-covered 升 covered） |
-| **Q6** | ★ **净收益 < 预期 ⇒ P-6 前提不成立**的处置路径？ | **默认动作 = 上报 architect + 在 ADR-088 §5.3.2 记录「② 不构成绝对值门禁恢复条件」+ 由 architect 另立绝对值路径 change** | 确认「**不得以「等回复」结束本 change**」 |
+| **Q6** | ★ **净收益 < 预期 ⇒ P-6 前提不成立**的处置路径？ | ★ **终局式**：① 记录 ② 实测净收益 ⇒ ③ 在 **ADR-088 §5.3.2** 落**结论**（恢复 / **不恢复**绝对值门禁）⇒ ④ **不恢复时沿用 §5.3.2 已登记的 P-3 临时口径**（cycle 比率 ≤ 1.15 + notes 标注）⇒ ⑤ **本 change 关闭**，**不留悬空项** | 确认 |
+| **Q9** | ★ **B3 的 BP 阻塞由谁解除？** | ★ **不由本 change 解除** —— ADR-088 §5.2 的双前置 ②（CoreMark harness 产出实测值）属**交付点 B**。⇒ ★ **plan Task 7 Step 4 的「① 已达成 / ② 已达成 ⇒ B3 阻塞解除」是**假完工声明**，须改为「① 已达成；**② 未达成（属交付点 B）⇒ B3 的 BP 阻塞未解除**」+ 登记「CI 判据 4 未满足（CI 不构建）」 | 确认 |
 | **Q7** | ★ **flush 语义变更**（taken → mispredict）是否纳入 ② 的 scope？ | **是**（否则 BP 无法工作） | 确认（这是**语义变更**，波及 3 个消费者） |
 | **Q8** | ★ **BP 开关面**的最终形态（见 §5.3）？ | 见 §5.3 | 确认 |
 
@@ -372,12 +478,27 @@ flush 从「上拍 taken」改为「**预测错误**」是**语义变更**，波
 | CSV 列 | 增 `bp_mode` + `workload_sha` ⇒ `--check-baseline` 按 `(workload_sha, bp_mode)` **分组精确比对** |
 | 跨 build 漂移 | Verilator 确定性 ⇒ 同 build 噪声为 0 ⇒ 阈值可很紧；★ **跨 build 可能漂移** ⇒ CSV 必须记录 build 标识，否则「精确相等」会变成随机红 |
 
-### 5.4 ★ 通用规则：**兜底句三要素**（metis 建议 17，防「AI 静默挂起」）
+### 5.4 ★ 通用规则：**兜底句三要素**（v2.1 升级：时限必须**可判定**）
 
-> **任何「交 architect / 上报 / 与 X 议 / 待裁决」句，必须同句给出：① 触发阈值 ② 落点文件 ③ 时限（不得跨 change 挂起）。**
+> **任何「交 architect / 上报 / 与 X 议 / 待裁决」句，必须同句给出：① 触发阈值 ② 落点文件 ③ 时限（★ **可判定形态**：「≤ N 个工作日」或「本 change 内闭环」）。**
 > **无三要素的兜底句视为无效条款。**
+> ★ **v2.1 追加**：**「不得跨 change 挂起」本身不是时限**（无日期/拍数）⇒ 必须写成可判定形态。
+> ★ **自查**：§5.2 的 Q1–Q9 本身**也必须**符合本规则 ⇒ **「v2.1 倾向即裁决；异议须在 ≤ 2 个工作日内提出，否则按 v2.1 执行，不得挂起」**。
 
-（继承自 plan R6；v1 的 Q6/§2.6 未继承 ⇒ 本次补齐）
+### 5.5 ★★ 「builder 开工须知」清单（★ metis P2-16 + 本轮新增，**必须随 change 的 tasks.md 交付**）
+
+| # | 须知 | 出处 |
+|---|------|------|
+| 1 | ★ 台账条目行**必须正好 7 列**（`check_coverage_parity_ledger.sh:85` 的 NF==7 护栏）；★ **理由列不得含未转义的 `\|`** | 脚本脆弱性 |
+| 2 | ★ 新增 CH_MEM 侧 case 前**先快照 TLM-only 名单**（`comm -23`）再命名 ⇒ 保证零交集 | 台账脚本 ① |
+| 3 | ★ 台账脚本需**两个 binary**（TLM + CH_MEM）⇒ **本地跑 + 输出贴 PR**（CI 是 warn 级 ⇒ **无强制力**） | CI 现实 |
+| 4 | ★ CSV / 脚本的**改名必须同一 commit** | `measure_branchbench.sh:52` 的 `grep -E "^${name},"` |
+| 5 | ★ CSV **按表头名取列**（★ **强制**，不是「更稳的做法」）—— 现 notes 字段含逗号 ⇒ 位置访问必错位；`--check-baseline` 分组键 = `(workload_sha, bp_mode, build_id)` | metis 边界情况 #12 |
+| 6 | ★ `--btb-entries N` 合法域 = **16/32/64/128/256**（与 TLM `CPUConfig::btb_entries` 对齐）；**越界 fail-fast**（不得静默 clamp） | metis 边界情况 #8 |
+| 7 | ★ ② 主体的 diff **不得触碰** `tests/cpu/manual_elf/branchbench/` 与 `tools/measure_branchbench.sh`（那是前置1 的范围）⇒ 三 change 边界须为**硬门禁** | metis slop 风险 #6 |
+| 8 | ★ 修正 `ibus_chmem.h:83-87` 的**过时注释**（「aread/sread 都是 1-cycle」与 §1.1 的 aread 0-cycle **承重前提直接矛盾**）⇒ 挂进前置2 的 AC | oracle 建议 4 |
+| 9 | ★ `build_cpu_with_elaborate`（`cpu_factory_chmem.h:451-458`）**现状就已丢失** `enable_mmu`/`mmu_mode`/`enable_cache` 三个参数 ⇒ BP 参数进来前**顺带修全部 4 个的转发**（或显式登记为 known gap） | oracle 建议 6 |
+| 10 | ★ 顺手修 `branch_chmem.h:20` 的注释（「JAL/JALR 推迟」）与 `:221-226` 的实装不符 | oracle 建议 9 |
 
 ## 6. 与上游 ADR 的关系（**★ 必须修订，不是「微调」**）
 

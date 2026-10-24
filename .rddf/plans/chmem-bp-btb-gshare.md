@@ -8,6 +8,53 @@
 > **上游裁决**: ADR-088 v1.1 §3 BP 行（**CH_MEM-only 且必须做；不适用 §5.2「不做」出口**）+ §5.2 BP 专项删除前置（双前置）
 > **被依赖**: B3 删除门禁（`branch_predictor.h` 不可删）
 
+
+---
+
+## ★★★ v2.1 覆盖声明（architect 2026-10-24，**优先级高于本文件以下全部内容**）
+
+> ⚠️ **本文件的 Goal / Task 3 / Task 4 / Task 5.5 / AC-1 / AC-8 旧文本 / Task 6 Step 4 / Task 7 Step 3-4 已被 architect 双审后的 v2.1 简报
+> （`docs/architecture/bp-btb-gshare-design-brief.md`）**逐条覆盖**。**
+> ★ **理由**：builder 按本文件的 checklist 执行 ⇒ 若不划掉，实施者会去实现 GShare/RAS（GShare 还会触发 PHT 体积膨胀 ⇒ 触发 Task 5.5 的新阻塞），
+> 并会自行发明阈值（「阈值由 0c 微基准基线确定」是**循环表述** —— 基线给的是绝对 cycle，不是信号强度）。
+
+### 逐条作废清单
+
+| 位置 | v1/v2 原内容 | ★ **v2.1 裁决** |
+|------|--------------|----------------|
+| **Goal** | 「BTB 4K-entry + GShare 13-bit PHT + RAS 8-entry」 | ★ **BTB（256×64b）+ Bimodal 2-bit PHT（256×2b）**；★ **GShare / RAS 本期不实现** |
+| **Task 3（GShare）** | 实现 13-bit 全局历史 + PHT | ★ **作废**（本期不做）⇒ 理由见简报 §3.1 |
+| **Task 4（RAS）** | 实现 8-entry call/ret 栈 | ★ **作废**（本期不做）⇒ 理由见简报 §3.1 |
+| **Task 5.5（PHT 2^13 体积预算）** | PHT 2^13 的 Verilog 体积/编译耗时 | ★ **作废**（PHT 改 2^9 ⇒ 体积不再是阻塞）⇒ 体积预算仍需做，但按 **256×2b** 重算 |
+| **AC-1** | 「BTB 4K + GShare 13-bit PHT(2-bit) + RAS 8-entry」 | ★ 改为「BTB（256×64b）+ Bimodal 2-bit PHT」；★ **GShare/RAS 明确不在范围内** |
+| **AC-2** | 注册 + canonical ordering | ★ 保留 + 追加「BP 在 **fetch 侧**的注册位已定义（ADR-048）」 |
+| **AC-3 / AC-10** | 14 条台账重判 | ★ 改为**逐条表**（简报 §5.1，含 #8/#9/#10 终态写死）+ ★ **台账 §7 同步** + ★ **计数同步** + ★ **机检 exit 0** |
+| **AC-8** | 「方向变化频繁的两档降幅显著更大」+「阈值由 0c 微基准基线确定」+「四档单调性」 | ★ **整体作废** ⇒ 改为简报 §4.3 的 **AC-8a / 8b-1 / 8b-2 / 8b-3 / 8c / 8d / 8e** 七条子判据；★ **阈值由 architect 在 tasks.md 开工前预登记为精确整数**；★ **禁止**百分比 |
+| **Task 6 Step 4** | 两段**重复**的「中间验收」+「四档单调性 always_taken→pseudo_random」 | ★ **作废** ⇒ 以简报 §4.3 的 AC-8 为准 |
+| **Task 6 Step 4 的「如 `CPUConfig` 字段」** | BP 开关面用 CPUConfig | ★ **作废** ⇒ CH_MEM 工厂**不接 `CPUConfig`**（ADR-088 §9.1 NG1-3）⇒ 改「工厂参数 + CLI flag 双层」，详见简报 §5.3 |
+| **Task 7 Step 3** | 「10 条 → covered」 | ★ 改为简报 §5.1 的**逐条表**（含 4 条 `partial` 的重判方向） |
+| **Task 7 Step 4** | 「① 已达成 / ② 已达成 ⇒ B3 阻塞解除」 | ★ **改为**「① 已达成；**② 未达成（CoreMark harness 属交付点 B）⇒ B3 的 BP 阻塞未解除**」+ 登记「CI 判据 4 未满足（CI 不构建）」 |
+| **实施期修正 #1** | 台账出口定为 (a) 不适用 | ★ **改为**简报 §3.2 的「物理 256 固定 + 运行期 mask」⇒ 4 条 `btb_*` 条目 **covered**（须有 M=16/64/256 的 CH_MEM 侧 case） |
+
+### ★ 新增的强制项（v2.1）
+
+| 项 | 内容 | 出处 |
+|---|---|---|
+| **实施顺序** | ★ **本 change 主体不得开工**，直到两个前置 change 完成：① `chmem-branch-microbench-fix` ② `chmem-bp-btb-gshare-poc` | 简报 §4 |
+| **next_pc 五级嵌套** | ★ `trap > branch-actual/mispredict > freeze(hold) > bp-predict > seq`（与 `fetch_stall_protocol` rev.14 + R11.1 协调） | 简报 §3.4.2 |
+| **完整三步时序** | ★ 正确预测 ⇒ **必须抑制该分支自身的 redirect**（否则目标指令被取两次 ⇒ Δcycles≈0 ⇒ 误判机制不成立） | 简报 §2.1.2 |
+| **host 可见事件计数** | 「已执行指令数」+「FLUSH 事件数」⇒ 供 AC-8b 与前置2 判据 | AC-15 |
+| **绝对值门槛** | ★ 净命中率门槛 **≥ 84.5%**（= 101461 / 120065）⇒ ★ 若前置2 报告的可达下界 < 84.5% ⇒ **不得以「GShare 延后」结案** | 简报 §0.5 |
+| **「不做什么」机检化** | `branch_predictor_chmem.h` 内不得出现 GShare/GHR/RAS 标识、不得出现 `ch_reg<ch_uint<13>>` ⇒ grep 门禁 | AC-12 |
+| **builder 开工须知** | ★ 10 条（含台账 7 列护栏 / case 名零交集 / CSV 按表头名取列 / `--btb-entries` 合法域 / 三 change 边界硬门禁） | 简报 §5.5 |
+
+### ★ 引用
+
+- **架构方案简报（权威）**：`docs/architecture/bp-btb-gshare-design-brief.md`（v2.1）
+- **实施边界简报**：`docs/architecture/bp-btb-gshare-brief.md`（⚠️ 其 §1.3「BP 开关面用 `optional<bool>`」与 §3.3「ch_mem 深度编译期 ⇒ 建议固定容量」**已被 v2.1 覆盖** ⇒ 以 v2.1 为准）
+- **Task 1 的 PoC 与机制结论**：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（8 case / 51 assertions 全绿）· 本文件 §Task 1.5
+
+
 ---
 
 ## Goal
