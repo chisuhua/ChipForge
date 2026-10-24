@@ -1,5 +1,8 @@
 # ② chmem-bp-btb-gshare — 实施边界简报（planner → builder 交接物）
 
+> ⚠️ **档名互换重命名（`chmem-branch-microbench-fix`, 2026-10-24）**：本文的 `always_taken`/`always_not_taken` 为**旧名**（与硬件方向相反）⇒ 已互换；旧 cycles 数值已作废（工作量污染）。
+
+
 > **change**: `chmem-bp-btb-gshare`（B1 执行图 §5.1 顺序 1 = **最高杠杆**）
 > **简报日期**: 2026-10-24 · **作者**: planner · **接收方**: builder
 > **配套**: 执行文件 `.rddf/plans/chmem-bp-btb-gshare.md`（40 open / 11 AC）

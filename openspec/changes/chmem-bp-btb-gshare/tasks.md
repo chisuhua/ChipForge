@@ -47,8 +47,8 @@ depends_on:
 - [ ] **AC-8b-2** ★ **净收益模型（★ v2.2 按情形 A/B 修正）**：其余档 `Δcycles(off − on) = N_correct×1 − N_false_A×1`（N 由 AC-15 计数器导出）⇒ ★ **符号为 `off − on`**；★ **N_false MUST 只计情形 A**（预测 taken / 实际 not-taken，代价 **1 拍**）；★ **情形 B**（预测 not-taken / 实际 taken）代价 **0 拍**（与无 BP 行为相同）⇒ **MUST NOT** 计入 ⇒ ★ **MUST NOT** 用「2×命中率 − 1」推导门槛（该式仅在情形 B ≈ 0 时成立）
 - [ ] **AC-8b-3** **有界替代**（不引入计数器时）：只断言 `0 ≤ Δcycles(off − on) ≤ N_taken×1`，精确净收益降级为报告项
 - [ ] **AC-8c** ★ **反证（限定 `always_taken` 档）**：该档 `Δcycles(off − on) == 0` ⇒ **BP 未生效**。⚠️ 该判据对 `always_not_taken` 档**不成立**（该档预测不跳转与无 BP 等价 ⇒ Δ 合法地 ≈ 0）
-- [ ] **AC-8d** ★ **信号强度前置条件**：若前置1 报告的跨档 taken 分支数差 **< 1 拍/iter** ⇒ **跨档判据不可用** ⇒ 改用「`always_taken` 单档绝对 Δ + 解析模型」。★ **判定权归前置1**（独立 change、独立执行者）⇒ 结论写入 CSV notes + 前置1 归档产物 ⇒ **不留给本 change**（本 change 对「判据不可用」有既得利益）
-- [ ] **AC-8e** ★ **跨档判据用差值形式**：`Δ(mode) − Δ(always_not_taken)` ⇒ 因 4 档都含**同一条循环回边**（每 iter 恒 1 次跳转 ⇒ 各档统一收益）⇒ 解析模型须扣掉回边
+- [ ] **AC-8d** ★ **信号强度前置条件**：若前置1 报告的跨档 taken 转移数差 **≤ 1 拍/iter**（★ **含恰好 1.0**）⇒ **跨档判据不可用** ⇒ 改用「`always_taken` 单档绝对 Δ + 解析模型」。★ **判定权归前置1** ⇒ **✅ 前置1 已判定（2026-10-24）：happened 跨档差 = 恰好 1.000 ⇒ 触发 ⇒ 本 change 的性能判据 MUST 用单档绝对 Δ**
+- [ ] **AC-8e** ★ **跨档判据用差值形式**（★ **已被 AC-F1-6 判定为不可用** —— 跨档差恰好 1.000 ⇒ 恒真；保留此条仅为**记录**，MUST NOT 作为判据）：`Δ(mode) − Δ(always_not_taken)`
 - [ ] **AC-9** ★ **具名门禁清单**：8 个门禁脚本（`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / `check_xlen_hygiene` / `check_tlm_freeze` / `check_coverage_parity_ledger`）全 PASS + `bash tools/run_chipforge_tests.sh --all`。★ **失败集合判据**：失败集合 MUST **⊆ 已登记的 pre-existing 清单**（`tests/README.md` §已知问题 + 本仓库基线）且 ★ **新增失败 MUST = 0** ⇒ ★ **MUST NOT** 硬编码「恰 1 个」作为期望集合（清单会变 ⇒ 硬编码会假 RED，或让 builder 把额外失败「认领」为已知 ⇒ **掩盖回归**）
 - [ ] **AC-10** 台账重判完毕 + **§2 族级判定行同步** + ★ **计数同步（注意二义）**：台账 `:16` 的 **463 = TLM 独占 case 数**（**本 change MUST 保持 463 不变**）· 台账 `:80` 的 **463 = 条目级台账条目数**（= 463 − 被删行数；★ 本 change 的 14 条**全部保留行**（不删）⇒ 仍为 463）⇒ ★ **MUST 写明本 change 采用哪种口径** + ★ **`check_coverage_parity_ledger.sh` exit 0**（CI warn 级 ⇒ 无强制力 ⇒ 须本地跑 + 输出贴 PR）
 - [ ] **AC-11** **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，需双前置）

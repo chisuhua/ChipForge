@@ -102,6 +102,13 @@ struct Options {
   bool enable_mmu = false;
   std::string mmu_mode = "bare";
   bool enable_cache = false;
+  // chmem-branch-microbench-fix: resident per-static-PC fetch histogram.
+  // --stats            print PC_HIST lines (one per fetched static PC)
+  // --stats-base <hex> histogram window base (default = ELF base)
+  // --stats-len  <n>   number of 4-byte slots (default 256)
+  bool stats = false;
+  std::uint32_t stats_base = 0x80000000u;
+  std::uint32_t stats_len = 256;
 };
 
 bool parse_args(int argc, char** argv, Options& opts) {
@@ -121,6 +128,13 @@ bool parse_args(int argc, char** argv, Options& opts) {
       opts.mmu_mode = argv[++i];
     } else if (a == "--enable-cache") {
       opts.enable_cache = true;
+    } else if (a == "--stats") {
+      opts.stats = true;
+    } else if (a == "--stats-base" && i + 1 < argc) {
+      opts.stats_base = static_cast<std::uint32_t>(
+          std::strtoul(argv[++i], nullptr, 0));
+    } else if (a == "--stats-len" && i + 1 < argc) {
+      opts.stats_len = static_cast<std::uint32_t>(std::atoi(argv[++i]));
     } else if (a == "--help" || a == "-h") {
       std::printf("usage: %s --elf <path> [flags]\n", argv[0]);
       std::printf("  --elf            vendored rv32ui-p-* ELF path (required)\n");
@@ -131,6 +145,9 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::printf("  --enable-mmu     emit plumbing-only no-op MMU hook (CH_MEM stub)\n");
       std::printf("  --mmu-mode <s>   mmu mode string for the log only (default \"bare\")\n");
       std::printf("  --enable-cache   fail-fast: L1Cache CH_MEM not implemented\n");
+      std::printf("  --stats          print PC_HIST lines (per static PC fetch counts)\n");
+      std::printf("  --stats-base <h> histogram window base (default 0x80000000)\n");
+      std::printf("  --stats-len <n>  histogram slots of 4 bytes (default 256)\n");
       std::printf("\n");
       std::printf("Note: --enable-cache requires L1Cache CH_MEM (see change\n");
       std::printf("      verilator-l1cache-e2e-coverage in wave4 P2 placeholder).\n");
@@ -240,7 +257,39 @@ int main(int argc, char** argv) {
   }
 
   void* top = new_vtop();
-  int rc = run_sim(top, opts.max_cycles, elf_name.c_str());
+  int rc;
+  if (opts.stats) {
+    auto* run_stats =
+        reinterpret_cast<int (*)(void*, std::uint32_t, const char*,
+                                 std::uint32_t*, std::uint32_t, std::uint32_t,
+                                 std::uint32_t*, std::uint32_t*,
+                                 std::uint32_t*, std::uint32_t*)>(
+            dlsym(handle, "cf_run_sim_stats"));
+    if (!run_stats) {
+      std::fprintf(stderr, "dlsym cf_run_sim_stats failed: %s\n", dlerror());
+      delete_vtop(top);
+      dlclose(handle);
+      return 1;
+    }
+    std::vector<std::uint32_t> hist(opts.stats_len, 0u);
+    std::uint32_t cycles = 0, tohost = 0, dropped = 0, pc_changes = 0;
+    rc = run_stats(top, opts.max_cycles, elf_name.c_str(), hist.data(),
+                   opts.stats_len, opts.stats_base, &cycles, &tohost,
+                   &dropped, &pc_changes);
+    // One line per fetched static PC (dense form; the host tool aggregates).
+    std::uint32_t distinct = 0;
+    for (std::uint32_t i = 0; i < opts.stats_len; ++i) {
+      if (hist[i] == 0) continue;
+      ++distinct;
+      std::printf("PC_HIST pc=0x%08x count=%u\n", opts.stats_base + (i << 2),
+                  hist[i]);
+    }
+    std::printf("PC_HIST_TOTAL distinct=%u dropped=%u window=0x%08x+%u\n",
+                distinct, dropped, opts.stats_base, opts.stats_len);
+    std::printf("PC_STATS cycles=%u pc_changes=%u\n", cycles, pc_changes);
+  } else {
+    rc = run_sim(top, opts.max_cycles, elf_name.c_str());
+  }
   delete_vtop(top);
   dlclose(handle);
   return rc;

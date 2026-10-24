@@ -1,4 +1,11 @@
 # chmem-branch-microbench — 执行文件（planner 起草，2026-10-24）
+
+> ⚠️ **档名已互换重命名**（`chmem-branch-microbench-fix`，2026-10-24）：
+> 本文件出现的 `always_taken` / `always_not_taken` 是**旧名**（与硬件方向相反）⇒ 对应关系：
+> 旧 `always_taken`(=66034) ⇒ 新 **`always_not_taken`**(=86034)；旧 `always_not_taken`(=68034) ⇒ 新 **`always_taken`**(=88034)。
+> ★ 旧 cycles 数值（66034/68034/79534/73012）**已作废**（工作量污染）⇒ 新值见 `soc/cpu/docs/dse/branchbench-baseline-matrix.csv`。
+> ★ 本文件**不是**执行依据（0c 已归档）；前置1 的执行依据 = `.rddf/plans/chmem-branch-microbench-fix.md`。
+
 >
 > ⚠️ **ARCHIVED（归档件）—— MUST NOT 作为前置1 `chmem-branch-microbench-fix` 的执行依据**
 > ★ 本文件是 0c（已归档 change `chmem-branch-microbench`）的旧计划，内含**已被证伪**的判据

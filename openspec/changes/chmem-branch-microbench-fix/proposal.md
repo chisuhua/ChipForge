@@ -79,3 +79,34 @@ depends_on: []
 
 > Capability topic: `chmem-branch-microbench-fix`（分支微基准的**工作量污染修正** + **档名方向修正**）。
 > 上游 = `docs/architecture/bp-btb-gshare-design-brief.md` §2.4 / §4.1。
+
+## ★ 实施结果（2026-10-24，已完成）
+
+| 项 | 结果 |
+|---|---|
+| `branch_cond` 无分支化 | ✅ 反汇编 **0 条条件分支**（`andi/sltiu/seqz/and/or`） |
+| `branch_sel` 两路径等长 | ✅ taken / not-taken **各 3 条**（taken 路径补 1 条 `j`） |
+| 档名互换重命名 | ✅ `always_taken` ⇄ `always_not_taken`（CSV / 脚本 / 代码注释 / 下游文档指针） |
+| 4 档 `.text` sha256 | ✅ **逐档相同**（`2916f2a5…`，376 B）；ELF 唯一差异 = 1 字节（mode 字） |
+| 工作量一致性 | ✅ **`pc_changes` 4 档逐位相同 = 86034**（常驻 `--stats`） |
+| 气泡模型 | ✅ **气泡/taken = 恰好 1.000**（4 档全同）⇒ 确认「每条 taken 转移 1 拍气泡」 |
+| 新基线 cycles | 86034 / 88034 / 86534 / 87056（旧 66034/68034/79534/73012 已作废） |
+| 回归 | ✅ 8 门禁全 PASS；全量 ctest **新增失败 = 0**（唯一失败为已登记 pre-existing） |
+
+### ★ AC-F1-6 判定（本 change 的**预登记出口**，判定权归本 change）
+
+跨档 taken/iter = 0.000 / 1.000 / 0.250 / 0.511 ⇒ **差 = 恰好 1.000**（= 1 条条件分支/iter）
+⇒ **≤ 1 拍/iter 阈值触发** ⇒ 跨档判据（AC-8d / AC-8e）**结构性不可用**
+⇒ ★ **下游（②）的性能判据 MUST 退化为「单档绝对 Δ（`always_taken`）+ 解析模型」**
+⇒ ★ 结论已写入 CSV notes + 本 change 归档产物，**不留给 ②**（② 对「判据不可用」有既得利益）。
+
+### ★ 证伪留痕（AC-F1-5，不改动归档产物）
+
+| # | 0c 的说法 | 事实 |
+|---|---|---|
+| 1 | 「`.text` 一致 ⇒ 指令数相同 ⇒ cycle 差只来自分支方向」 | `.text` 一致**事实仍成立**；推论**被证伪**（`branch_cond` 编译成分支链 ⇒ 各档动态指令数不同）⇒ 修正后的证明 = `pc_changes` 常驻计数 |
+| 2 | 「预期 `pattern_6of8` 档 BP 收益最大」 | 按**档名**推断收益，而档名与硬件方向**互换** ⇒ 失效 ⇒ 已从 CSV notes 移除 |
+| 3 | `branch_sel` 两路径指令数相同 | 实测 taken 缺 1 条 `j`（3 vs 2）⇒ 已补 |
+| 4 | 档名方向 | mode0 名 `always_taken` 实为硬件 never-taken，mode1 反之 ⇒ 已互换 |
+
+★ 证伪记录写入**本 change** 的 proposal 与 CSV notes（**未**修改已归档的 0c 目录）。

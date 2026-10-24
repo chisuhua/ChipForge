@@ -3,14 +3,18 @@
  * 分支微基准 (chmem-branch-microbench) —— 4 档**可控预测率**负载.
  *
  * 设计要点 (对应 plan 的 AC-1/AC-2/AC-3):
- *   ① **指令数完全相同**: 分支用 inline asm 的显式 `beq`, 两条路径各 1 条 `mv`
- *      => 无论分支走向, 每迭代执行指令数恒等 => cycle 差**只**来自分支预测
- *      (flush 代价), 不来自工作量差异.
+ *   ① **指令数完全相同**: 分支方向用 inline asm 的显式条件跳转, 两条路径
+ *      **等长** (各 1 条 `mv` + 1 条 `j`) => 无论分支走向, 每迭代执行指令数
+ *      恒等 => cycle 差**只**来自分支预测 (flush 代价), 不来自工作量差异.
+ *      ★ chmem-branch-microbench-fix 修正 (2026-10-24): 原 taken 路径缺一条 `j`
+ *        => 两路径 3 vs 2 条 => **工作量不等** => 该前提被反汇编证伪 (已修复).
  *   ② **可预测性由模式决定** (编译期 -DBENCH_MODE=N), 其余计算逐位相同:
- *        0 always_taken     恒 taken
- *        1 always_not_taken 恒 not-taken
- *        2 pattern_6of8     6/8 taken (周期性 => BTB/GShare 可学习)
+ *        0 always_not_taken 恒 not-taken (硬件: cond=0 => `bne` 不 taken)
+ *        1 always_taken     恒 taken     (硬件: cond=1 => `bne` taken)
+ *        2 pattern_6of8     6/8 not-taken (2/8 taken, 周期性 => 预测器可学习)
  *        3 pseudo_random    LCG 伪随机 (理想预测器也难命中)
+ *      ★ 档名方向修正 (2026-10-24): 原 mode0 名为 always_taken 但硬件上**从不 taken**
+ *        (c0=0 => `bne` 不满足), mode1 反之 => 名与硬件方向**互换** => 已互换重命名.
  *   ③ **结果校验放在宿主侧** (关键设计):
  *      程序恒写 `sum | 1` 到 tohost —— LSB 置 1 让 runner 的 done 位
  *      (`tohost_raw & 0x1`) 恒成立 => cycle 计数是**真实完成时刻**;
@@ -42,8 +46,10 @@ extern "C" void tohost_pass(void) {
   while (1);
 }
 
-/* 显式 beq 分支: cond==0 -> a (taken 路径); cond!=0 -> b.
- * 两条路径指令数相同 => 工作量恒定. */
+/* 显式条件跳转: cond!=0 -> b (taken 路径); cond==0 -> a (fall-through 路径).
+ * ★ 两条路径**等长** (各 1 条 `mv` + 1 条 `j`) => 工作量恒定.
+ *   chmem-branch-microbench-fix (2026-10-24): 原 taken 路径缺末尾 `j`
+ *   => taken = 2 条 / not-taken = 3 条 => 指令数不等 => 已补 `j` 使两者均 3 条. */
 static inline uint32_t branch_sel(uint32_t cond, uint32_t a, uint32_t b) {
   uint32_t r;
   __asm__ volatile(
@@ -52,6 +58,7 @@ static inline uint32_t branch_sel(uint32_t cond, uint32_t a, uint32_t b) {
       "j   2f\n\t"
       "1:\n\t"
       "mv  %[r], %[b]\n\t"
+      "j   2f\n\t"
       "2:\n\t"
       : [r] "=&r"(r)
       : [c] "r"(cond), [a] "r"(a), [b] "r"(b)
@@ -68,15 +75,22 @@ static inline uint32_t branch_sel(uint32_t cond, uint32_t a, uint32_t b) {
 volatile const uint32_t bench_mode = (uint32_t)BENCH_MODE;
 
 /* 分支方向: 四种候选全部算出, 再用**无分支**的 select 选一个.
- *   => 无论 mode 取何值, 执行的指令序列完全相同 (select 走 cmov 或
- *      loop-invariant 分支, 后者被完美预测 => 代价各档一致). */
+ *   => 无论 mode 取何值, 执行的指令序列完全相同 (位运算 and/or, 无分支).
+ *   ★ chmem-branch-microbench-fix (2026-10-24): 原实现用**嵌套三目**
+ *     `(mode==0)?c0:((mode==1)?c1:((mode==2)?c2:c3))` => 编译成**分支链**
+ *     (beqz/beq/beq) => mode0 只过 1 个分支、mode2 过 3 个 => **各档动态指令数
+ *     不同** => cycle 差混入工作量差 => 基准失效 (反汇编实测). 已改为位运算 select. */
 static inline uint32_t branch_cond(uint32_t i, uint32_t w) {
   const uint32_t mode = bench_mode;
-  const uint32_t c0 = 0u;                          /* always_taken */
-  const uint32_t c1 = 1u;                          /* always_not_taken */
-  const uint32_t c2 = ((i & 7u) >= 6u) ? 1u : 0u;  /* pattern_6of8 */
-  const uint32_t c3 = w & 1u;                       /* pseudo_random */
-  return (mode == 0u) ? c0 : ((mode == 1u) ? c1 : ((mode == 2u) ? c2 : c3));
+  const uint32_t c0 = 0u;                          /* mode0: 恒 0 => 分支不 taken */
+  const uint32_t c1 = 1u;                          /* mode1: 恒 1 => 分支恒 taken */
+  const uint32_t c2 = ((i & 7u) >= 6u) ? 1u : 0u;  /* mode2: 6/8 not-taken (2/8 taken) 周期 */
+  const uint32_t c3 = w & 1u;                       /* mode3: 伪随机 */
+  const uint32_t eq0 = (mode == 0u);
+  const uint32_t eq1 = (mode == 1u);
+  const uint32_t eq2 = (mode == 2u);
+  const uint32_t eq3 = (mode == 3u);
+  return (eq0 & c0) | (eq1 & c1) | (eq2 & c2) | (eq3 & c3);
 }
 
 extern "C" void _cstart(void) {

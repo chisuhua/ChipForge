@@ -12,6 +12,13 @@
 //   cf_read_dmem(word)               — read the dmem ch_mem array (tohost)
 //   cf_read_pc                       — current PC (diagnostics)
 //   cf_run_sim                       — full reset+loop+verify+report
+//   cf_run_sim_stats                 — same, plus per-static-PC fetch histogram
+//                                      AND a pc_changes counter (= dynamic
+//                                      instruction count proxy; a bubble cycle
+//                                      holds PC, so it is excluded)
+//                                      (chmem-branch-microbench-fix: replaces the
+//                                       one-off "temporarily patch sim_main.cpp"
+//                                       measurement with a resident facility)
 //
 // tohost is read from the ch_mem array via --public-flat-rw
 // (Option c: rootp->top__DOT__dmem[tohost_word]). We mask with 0x1 because
@@ -92,6 +99,80 @@ int cf_run_sim(void* top, std::uint32_t max_cycles, const char* elf_name) {
     done_bit = tohost_raw & 0x1u;
   }
 
+  const bool done = (done_bit != 0);
+  const bool pass = done && (tohost_raw == 1);
+  const char* name = elf_name ? elf_name : "?";
+  std::printf("TOHOST=%u CYCLES=%u ELF=%s %s\n", tohost_raw, cycles, name,
+              !done ? "TIMEOUT" : (pass ? "PASS" : "FAIL"));
+  return pass ? 0 : 1;
+}
+
+// Same simulation, plus a resident per-static-PC fetch histogram
+// (chmem-branch-microbench-fix AC-F1-2). `hist` is indexed by
+// (pc - hist_base) / 4 and MUST have hist_len entries; entries outside the
+// window are dropped (and reported via *out_dropped). Returns the same
+// rc as cf_run_sim; *out_cycles / *out_tohost carry the counters.
+//
+// Rationale: the fetch workload parity criterion needs "how many times each
+// static PC was fetched" — a quantity that objdump cannot provide (it only
+// proves the static instruction stream matches). Sampling PC once per cycle
+// is the same method the E-3 bubble measurement used.
+int cf_run_sim_stats(void* top, std::uint32_t max_cycles, const char* elf_name,
+                     std::uint32_t* hist, std::uint32_t hist_len,
+                     std::uint32_t hist_base, std::uint32_t* out_cycles,
+                     std::uint32_t* out_tohost, std::uint32_t* out_dropped,
+                     std::uint32_t* out_pc_changes) {
+  auto* vtop = static_cast<Vtop*>(top);
+  for (std::uint32_t i = 0; i < hist_len; ++i) hist[i] = 0;
+
+  vtop->default_clock = 0;
+  vtop->default_reset = 1;
+  vtop->eval();
+  vtop->default_clock = 1;
+  vtop->eval();
+  vtop->default_reset = 0;
+  vtop->default_clock = 0;
+  vtop->eval();
+
+  std::uint32_t tohost_raw = 0;
+  std::uint32_t done_bit = 0;
+  std::uint32_t cycles = 0;
+  std::uint32_t dropped = 0;
+  // pc_changes counts cycles in which the fetch PC advanced. A bubble cycle
+  // holds PC unchanged, so pc_changes is the resident proxy for the dynamic
+  // instruction count (== fetched instructions); the histogram alone cannot
+  // provide it because it samples every cycle including bubbles.
+  std::uint32_t pc_changes = 0;
+  std::uint32_t prev_pc = vtop->rootp->top__DOT___pc;
+  for (std::uint32_t i = 0; i < max_cycles && done_bit == 0; ++i) {
+    vtop->default_clock = 1;
+    vtop->eval();
+    vtop->default_clock = 0;
+    vtop->eval();
+    ++cycles;
+
+    const std::uint32_t pc = vtop->rootp->top__DOT___pc;
+    if (pc != prev_pc) ++pc_changes;
+    prev_pc = pc;
+    if (pc >= hist_base) {
+      const std::uint32_t idx = (pc - hist_base) >> 2;
+      if (idx < hist_len) {
+        ++hist[idx];
+      } else {
+        ++dropped;
+      }
+    } else {
+      ++dropped;
+    }
+
+    tohost_raw = vtop->rootp->top__DOT__dmem[kToHostWord];
+    done_bit = tohost_raw & 0x1u;
+  }
+
+  if (out_cycles) *out_cycles = cycles;
+  if (out_tohost) *out_tohost = tohost_raw;
+  if (out_dropped) *out_dropped = dropped;
+  if (out_pc_changes) *out_pc_changes = pc_changes;
   const bool done = (done_bit != 0);
   const bool pass = done && (tohost_raw == 1);
   const char* name = elf_name ? elf_name : "?";

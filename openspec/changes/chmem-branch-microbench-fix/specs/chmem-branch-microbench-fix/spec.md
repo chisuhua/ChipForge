@@ -16,13 +16,13 @@
 
 #### Scenario: 动态指令数相等须可证
 
-- **WHEN** 在 CH_MEM/Verilator 后端测量 4 档的**取指次数**
-- **THEN** ★ **除分支 PC 及其两个后继外**，各静态地址的取指次数 MUST **逐档相同**（★ **MUST NOT** 要求「全部取指次数相等」—— 方向本来就不同 ⇒ taken 档不取 fall-through 后继 ⇒ 该等式本就不成立）
+- **WHEN** 在 CH_MEM/Verilator 后端测量 4 档的 **取指地址变化次数**（取指地址被保持的 cycle 不计入）
+- **THEN** 该计数 MUST **逐档相同**（= 实际取到的指令数一致 ⇒ 工作量一致）⇒ ★ 由此 `cycles` 的跨档差异 MUST **全部**归因于气泡（取指地址被保持的 cycle）
 
-#### Scenario: 已执行指令数须可观测
+#### Scenario: 工作量计数须常驻可观测
 
-- **WHEN** 运行测量脚本
-- **THEN** MUST 输出**取指次数**计数（host 可见，由 PC 轨迹导出）⇒ 工作量一致性 MUST 可复核（不得依赖「临时改 harness」的一次性测量）。★ **「已执行(retired)指令数」与「FLUSH 事件数」归前置2** —— FLUSH 是 DUT 内部 payload（`ibus_chmem.h:167` 的 `br_taken_buf`）⇒ **host 不可直接见** ⇒ 计数须改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **违反本 change 的「不得触碰 `ip/**`」边界**；★ 且 retired = 取指 − flush ⇒ **在本 change 语境下不可得**
+- **WHEN** 运行测量脚本（带统计开关）
+- **THEN** MUST 输出**取指地址变化次数**与**总周期数**两个 host 可见计数 ⇒ 工作量一致性与气泡数 MUST 可复核（**MUST NOT** 依赖「临时改 harness」的一次性测量）。★ 该计数由**取指地址轨迹**导出（本 change 不触碰 `ip/**`）；★ **冲刷（flush）事件计数归前置2** —— 冲刷是 DUT 内部信号 ⇒ host 不可直接见 ⇒ 计数须改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **违反本 change 的「不得触碰 `ip/**`」边界**
 
 ### Requirement: branchbench-mode-name-direction
 

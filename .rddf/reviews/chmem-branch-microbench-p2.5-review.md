@@ -1,5 +1,12 @@
 # P2.5 Review 报告 — chmem-branch-microbench
 
+> ⚠️ **档名已互换重命名**（`chmem-branch-microbench-fix`，2026-10-24）：
+> 本文件出现的 `always_taken` / `always_not_taken` 是**旧名**（与硬件方向相反）⇒ 对应关系：
+> 旧 `always_taken`(=66034) ⇒ 新 **`always_not_taken`**(=86034)；旧 `always_not_taken`(=68034) ⇒ 新 **`always_taken`**(=88034)。
+> ★ 旧 cycles 数值（66034/68034/79534/73012）**已作废**（工作量污染）⇒ 新值见 `soc/cpu/docs/dse/branchbench-baseline-matrix.csv`。
+> ★ 本文件**不是**执行依据（0c 已归档）；前置1 的执行依据 = `.rddf/plans/chmem-branch-microbench-fix.md`。
+
+
 > **change**: `chmem-branch-microbench`（B1 的 **0c** 项：② 的中间验收载体 + 无 BP 参照值）
 > **分支**: ⚠️ **实施直接在 `main` 上完成**（builder 疏漏：建 change 时**忘记 `git checkout -b`**，与 2026-10-24 早先那次 C change 同型疏漏）
 > —— 已补建 ref `feature/chmem-branch-microbench` 指向实施终态 `ca53fa9` 供追溯；4 个 commit 线性落在 main（无分叉）⇒ 技术无害，但**工作流惯例未遵守**
