@@ -229,6 +229,27 @@ if(TARGET cpu_verilator_sim AND EXISTS "${_cf_verilator_smoke_elf}")
 endif()
 
 # ----------------------------------------------------------------------------
+# CH_MEM/Verilator 分支微基准基线漂移检测 (chmem-branch-microbench).
+#
+# 判据: 4 档可控预测率负载的 TOHOST(校验和) 与 cycles 均与基线 CSV **精确相等**
+#   (soc/cpu/docs/dse/branchbench-baseline-matrix.csv); 校验和不符 => 结果错, 失败.
+#   注: runner 的 PASS/FAIL 标签对本基准无意义 (其判据 tohost==1, 而本基准
+#   tohost 携带校验和) => 判定权在宿主侧比对.
+# TIMEOUT 300: 实测单跑 4 档 ~40s (含 verilator 运行时编译).
+# ----------------------------------------------------------------------------
+if(TARGET cpu_verilator_sim AND EXISTS "${CMAKE_BINARY_DIR}/branchbench_m0.elf")
+    add_test(
+        NAME branchbench_baseline
+        COMMAND bash "${CMAKE_SOURCE_DIR}/tools/measure_branchbench.sh" --check-baseline
+    )
+    set_tests_properties(branchbench_baseline PROPERTIES
+        LABELS "verilator;perf;e2e"
+        TIMEOUT 300
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endif()
+
+# ----------------------------------------------------------------------------
 # CH_MEM/Verilator 性能基线漂移检测 (chmem-verilator-perf-harness 交付点 A).
 #
 # Why: ADR-088 §5.2 判据 4「CI 有可回归的自动测试」—— CI **不跑 ctest**,

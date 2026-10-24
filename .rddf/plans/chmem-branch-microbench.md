@@ -44,12 +44,12 @@ C / 汇编（crt0）· RISC-V toolchain（**必须用 `riscv32-unknown-elf-g++`*
 
 ## Tasks
 
-### Task 1: 负载实现
+### Task 1: 负载实现（★实施期 2 处纠正，见文末「实施期修正」：golden 与 mode **都不能**做编译期常量）
 
-- [ ] **Step 1: 写 `branchbench.c`** —— 四档模式（编译期常量选择，或运行时参数写入固定地址）；每档固定工作量（同样的指令数，仅分支可预测性不同）⇒ **cycle 差只来自分支预测**
-- [ ] **Step 2: 写 `branchbench_crt0.S` + `link_branchbench.ld`** —— 照抄 `dhrystone_crt0.S` + `link_dhrystone.ld`（**PHDRS 双段**，否则 CH_MEM 段路由落空 ⇒ IBus 为空）
-- [ ] **Step 3: 写 `build_manual_elf.sh` 目标** —— ⚠️ **注意**：dhrystone 走 **CMake** 目标（`src/cf_plugin/CMakeLists.txt:136-146`）⇒ 本 microbench **同样走 CMake**（加进 `ELF_PAIR` 列表），**不新增 shell 路径**（避免两条构建路径 ⇒ 字节不一致，见 `chmem-verilator-perf-harness` 的实施期修正 #1）
-- [ ] **Step 4: 构建** —— `readelf -l` 验两段（RX+RW）+ `nm -u` 空 + **两次构建字节一致**
+- [x] **Step 1: 写 `branchbench.c`** —— 四档模式（**mode 走 `volatile` 全局数据**，不可编译期常量）；每档固定工作量（显式 `beq` + 两条路径**等指令数**）⇒ **cycle 差只来自分支方向**
+- [x] **Step 2: 写 `branchbench_crt0.S` + `link_branchbench.ld`** —— 照抄 `dhrystone_crt0.S`（栈初始化 + `jal _cstart` + `tail tohost_pass`；**`tohost_pass` 必须 `extern "C"`** —— 否则 C++ 名字修饰 ⇒ crt0 的 `tail tohost_pass` 链接失败，实测踩过）+ `link_branchbench.ld`（**PHDRS 双段**：RX `.text` + RW `tohost`+data；`tohost` 必须是 RW 段**第一个** output section，否则段 vaddr 偏移 ⇒ tohost 落到加载区外 ⇒ 写入被丢弃）
+- [x] **Step 3: CMake 目标（★实施期纠正：走 CMake，**不**走 `build_manual_elf.sh`）** —— dhrystone 已有 CMake 目标（`src/cf_plugin/CMakeLists.txt:136-146`）⇒ 沿用**同一构建路径**（同一 `RISCV_GPP` + 同一 flags）⇒ 避免第二条构建路径（双路径 ⇒ 字节不一致，见 `chmem-verilator-perf-harness` 实施期修正 #1）
+- [x] **Step 4: 构建** —— `readelf -l` 验两段（RX+RW）+ `nm -u` 空 + **两次构建字节一致** + **4 档 `.text` sha256 一致**（实测 `5a7c0b2c4265c156`）
 
 ### Task 2: 测量脚本 + 基线
 
@@ -88,3 +88,25 @@ C / 汇编（crt0）· RISC-V toolchain（**必须用 `riscv32-unknown-elf-g++`*
 
 落地为 `.rddf/plans/chmem-branch-microbench.md`；change 名 `chmem-branch-microbench`；建议 **rdd-quick**（测试资产 + 脚本 + CSV，AC 机械可验，零 `ip/` 改动）。
 **必须在 ② 之前完成**（② 的 AC 依赖其基线与增益度量）。
+
+
+---
+
+## 实施期修正（2026-10-24，交付实测）
+
+| # | plan v1 的设计 | 实测问题 | 修正 |
+|---|---------------|---------|------|
+| 1 | 期望校验和做**编译期常量**（`-DBENCH_GOLDEN`） | ① 被折进 `.text` ⇒ **4 档机器码不同** ⇒ cycle 差混入工作量差异（实测 mode2/3 明显更慢，正是这个污染）② 比较行为异常（实测 TOHOST 报的是 sum 而非 1） | **期望值移到宿主侧**：程序恒写 `sum \| 1`（LSB 置 1 ⇒ runner 的 done 位恒成立 ⇒ cycle 计数 = 真实完成时刻；tohost 同时携带校验和）⇒ 期望值存**基线 CSV** ⇒ `.text` 与 golden 无关 ⇒ 4 档一致 |
+| 2 | 模式做**编译期常量** | 编译器把 select 折叠 ⇒ 各档生成的指令流不同 ⇒ 工作量差异 | 模式改 `volatile const uint32_t bench_mode`（运行时读，**不可折叠**）⇒ 4 档 `.text` sha256 一致（实测 `5a7c0b2c4265c156`） |
+| 3 | 走 `build_manual_elf.sh` | dhrystone 已有 CMake 目标 ⇒ 新增 shell 路径会造成**双构建路径**（字节不一致风险） | 改走 CMake（`branchbench_elfs` 目标） |
+| 4 | `tohost_pass` 直接定义 | C++ 名字修饰 ⇒ crt0 的 `tail tohost_pass` **链接失败**（undefined reference） | 加 `extern "C"`（与 dhrystone.c 同构） |
+| 5 | AC-3 假设「恒 taken 档收益最大」 | 实测形态相反：方向**恒定**的档 cycle **最少**（m0 66034 / m1 68034），方向**变化**的 m2 **最多**（79534）⇒ CH_MEM 的分支代价与**方向变化次数**相关 | AC-3 改为**机制化**判据：「BP 落地后，**方向变化频繁**的档（m2/m3）Δcycles 显著大于**方向恒定**的档（m0/m1）」⇒ 恒定档本就无变化惩罚 ⇒ 收益小 —— 这与「BP 消除变化惩罚」的机制一致 |
+
+### 实测结果（无 BP 参照值）
+
+| 档 | 方向 | 校验和 | cycles |
+|---|---|---|---|
+| `always_taken` | 恒 taken | 103 | **66034** |
+| `always_not_taken` | 恒 not-taken | 183 | **68034** |
+| `pattern_6of8` | 6/8 taken（周期） | 147 | **79534** |
+| `pseudo_random` | 伪随机 | 101 | **73012** |

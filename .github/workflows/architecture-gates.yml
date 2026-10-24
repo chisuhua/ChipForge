@@ -171,6 +171,22 @@ jobs:
           bash tools/measure_perf.sh --check-baseline
         continue-on-error: true
 
+      # 分支微基准基线 (chmem-branch-microbench) —— B1 ② (BP) 的中间验收载体
+      - name: Check CH_MEM branchbench baseline (measure_branchbench.sh, warn-level)
+        id: verify_branchbench_baseline
+        run: |
+          echo "=== Running measure_branchbench.sh --check-baseline ==="
+          if [ ! -x build/bin/cpu_verilator_sim ]; then
+            echo "SKIP: build/bin/cpu_verilator_sim 不存在 (未构建 CH_MEM binary)"
+            exit 0
+          fi
+          if [ ! -f build/branchbench_m0.elf ]; then
+            echo "SKIP: build/branchbench_m0.elf 不存在 (CMake 目标 branchbench_elfs 未产出)"
+            exit 0
+          fi
+          bash tools/measure_branchbench.sh --check-baseline
+        continue-on-error: true
+
       - name: Run Doc link check (doc_link_check.sh)
         id: verify_doc_links
         run: |

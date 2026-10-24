@@ -1,0 +1,5 @@
+mode_name,expected_tohost,cycles,cycles_per_iter,status,notes
+always_taken,103,66034,33.017,PASS,"CH_MEM/Verilator 后端实测 (chmem-branch-microbench, 2026-10-24): 方向恒 taken; TOHOST = 校验和|1 = 103 (LSB 置 1 使 runner 的 done 位恒成立 => cycle 计数 = 真实完成时刻); 4 档 .text 逐字节相同 (sha 5a7c0b2c4265c156) => 指令数一致 => cycle 差只来自分支方向; **微基准, 绝对值不代表真实应用**; 本行 = **无 BP 参照值** (BP 落地后重测 => Δcycles = BP 收益)"
+always_not_taken,183,68034,34.017,PASS,"方向恒 not-taken; TOHOST = 183; 同一 .text; **无 BP 参照值**"
+pattern_6of8,147,79534,39.767,PASS,"方向 6/8 taken (周期性 => 预测器可学习); TOHOST = 147; 同一 .text; **无 BP 参照值** —— 预期 BP 落地后本档收益最大 (方向变化最频繁且可学习)"
+pseudo_random,101,73012,36.506,PASS,"方向伪随机 (LCG); TOHOST = 101; 同一 .text; **无 BP 参照值** —— 预期 BP 收益最小 (不可预测)"

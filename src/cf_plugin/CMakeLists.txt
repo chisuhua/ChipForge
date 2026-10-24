@@ -172,6 +172,46 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cpu_sim/main.cpp)
           DEPENDS ${CMAKE_BINARY_DIR}/${ELF_NAME}.elf)
       endif()
     endforeach()
+
+    # ---------------------------------------------------------------------
+    # chmem-branch-microbench: 4 档**可控预测率**分支负载 (2026-10-24)
+    #
+    # 目的: 为 B1 ② (chmem-bp-btb-gshare) 提供**中间验收**手段 ——
+    #   ① 四档**机器码完全相同** (.text 逐字节一致; 唯一差异是数据里的 mode 字)
+    #      => cycle 差只来自分支方向, 不混入工作量差异
+    #   ② BP 落地后重测 => Δcycles = BP 收益 (方向变化越频繁, 收益越大)
+    #
+    # 构建路径与 dhrystone **同源** (同一 RISCV_GPP + 同一 flags), 刻意**不走**
+    # build_manual_elf.sh —— 避免第二条构建路径 (chmem-verilator-perf-harness
+    # 实施期修正 #1: 双路径 => 字节不一致).
+    # 期望校验和在**基线 CSV** (soc/cpu/docs/dse/branchbench-baseline-matrix.csv),
+    # **不进二进制** => .text 4 档逐字节一致 (唯一差异 = 数据里的 mode 字).
+    # ---------------------------------------------------------------------
+    if(RISCV_GPP)
+      set(_cf_bench_modes 0 1 2 3)
+      set(_cf_bench_elfs)
+      foreach(_cf_bm IN LISTS _cf_bench_modes)
+        add_custom_command(
+          OUTPUT ${CMAKE_BINARY_DIR}/branchbench_m${_cf_bm}.elf
+          COMMAND ${RISCV_GPP} -O2 -fno-inline -march=rv32im_zicsr -mabi=ilp32
+            -nostdlib -static
+            -DBENCH_MODE=${_cf_bm}
+            -T ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link_branchbench.ld
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/branchbench/branchbench_crt0.S
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/branchbench/branchbench.c
+            -o ${CMAKE_BINARY_DIR}/branchbench_m${_cf_bm}.elf
+          DEPENDS
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/branchbench/branchbench_crt0.S
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/branchbench/branchbench.c
+            ${CMAKE_SOURCE_DIR}/tests/cpu/manual_elf/link_branchbench.ld
+          COMMENT "Building branchbench_m${_cf_bm}.elf (mode=${_cf_bm})"
+          VERBATIM
+        )
+        list(APPEND _cf_bench_elfs ${CMAKE_BINARY_DIR}/branchbench_m${_cf_bm}.elf)
+      endforeach()
+      add_custom_target(branchbench_elfs ALL DEPENDS ${_cf_bench_elfs})
+    endif()
+
     if(TARGET add_elf)
       add_dependencies(cpu_sim add_elf)
     endif()
