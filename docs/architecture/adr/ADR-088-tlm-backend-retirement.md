@@ -118,6 +118,8 @@ ADR-083（Accepted 2026-10-08）已定性：
 
 **内容交付**：由姊妹提案 `chmem-tlm-coverage-parity-ledger`（P1）承担。**格式不得后置**（格式后置 ⇒ B3 无判据）。
 
+**红线可机检性（2026-10-24 闭环）**：§4 的三条红线现已**全部**由 `tools/check_coverage_parity_ledger.sh` 机检 —— ① `not-covered` 总数 ≤135 · ② **同一理由 ≤10 次** · ③ `[framework]` 族零 `not-covered`；另加相邻校验「`not-covered` 必须有显式手写理由（不得为空 / 不得为继承标记）」。② 的口径（仅作用于 `not-covered` · 理由取台账第 5 列 · 归一化仅去首尾空白 · 字面相同即同组 · 违规须列出条目名）记录在台账 §7。
+
 ### 5. B3 删除判据
 
 #### 5.1 双模共享文件清单（9 个，include 闭包实测）

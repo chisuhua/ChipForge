@@ -71,6 +71,46 @@ grep -E '^\| `[^`]+` \| [^|]*\| `(covered|partial)` \|' "$LEDGER" \
   | tee "$tmp/v3" | head -5
 [ -s "$tmp/v3" ] && VIOL=1
 
+# ③-b/③-c 同一理由 ≤ MAX_SAME_REASON + not-covered 必须有显式理由
+#   口径 (依已归档 spec tlm-coverage-parity-ledger-red-lines):
+#     - 仅作用于 not-covered 条目 —— covered/partial 的理由列大量相同 (继承族级),
+#       属正常形态, 不适用本红线
+#     - 理由 = 台账第 5 列 (awk $6; $1 是首个 | 之前的空串) => NF 必为 7
+#     - 归一化 = 仅去首尾空白; 分组 = 完全相同的理由字符串 (字面口径)
+#     - 违规必须逐条列出该组条目名 (spec Scenario: 「脚本报错并列出违规条目」)
+grep -E '^\| `[^`]+` \| [^|]*\| `not-covered` \|' "$LEDGER" \
+  | awk -F'|' 'NF>=7 {
+      name=$2; reason=$6;
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", name);
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", reason);
+      print reason "\t" name;
+    }' > "$tmp/nc_reasons"
+
+awk -F'\t' -v max="$MAX_SAME_REASON" -v vf="$tmp/v3b" '
+  function viol(msg) { print msg; print msg > vf; bad=1 }
+  function viol_missing(msg) { print msg; print msg > vf; bad=1; missing++ }
+  {
+    r=$1; n=$2;
+    if (r == "") { viol_missing("VIOLATION: not-covered 条目缺显式理由: " n); next }
+    if (r ~ /^继承/) { viol_missing("VIOLATION: not-covered 条目缺显式理由 (继承标记): " n); next }
+    if (!(r in cnt)) { ord[++k]=r }
+    cnt[r]++; lst[r]=lst[r] "\n    - " n
+  }
+  END {
+    for (i=1;i<=k;i++) {
+      r=ord[i]
+      if (cnt[r] > max) {
+        viol("VIOLATION: 同一理由出现 " cnt[r] " 次 (上限 " max "): " r)
+        print lst[r]
+        print lst[r] > vf
+      }
+    }
+    mx=0; for (i=1;i<=k;i++) if (cnt[ord[i]]>mx) mx=cnt[ord[i]]
+    dup=0; for (i=1;i<=k;i++) if (cnt[ord[i]]>1) dup++
+    printf "  理由分组数 %d | 最大组 %d 次 | 重复(>1)组 %d 个 | 显式理由缺失 %d 条\n", k, mx, dup, missing+0
+  }' "$tmp/nc_reasons"
+[ -s "$tmp/v3b" ] && VIOL=1
+
 echo "=== ④ 口径守卫 ==="
 if grep -qE '按族(求和|汇总)' "$LEDGER" && ! grep -q '禁止按族求和' "$LEDGER"; then
   echo "VIOLATION: 台账疑似使用族求和口径 (须用 --list-tests 差集口径)"

@@ -747,4 +747,14 @@
 
 **红线复核（裁决后）**：`not-covered` 总数 **27**（原 17 + BP 10）≤ 135 ✅ · `[framework]` 族 0 条 `not-covered` ✅ · 同一理由 ≤10 次（BP 的 10 条按 4 组差异化理由写，最大组 5 条）✅。
 
-**已知实现缺口（登记，非本轮范围）**：`tools/check_coverage_parity_ledger.sh` 当前**未机检**「同一理由 ≤10 次」这一红线（只机检 `not-covered` 总数与 `framework` 零退役）⇒ AC6 的半条判据目前靠人工保证 ⇒ 交 builder 补机检（独立小 change）。
+**实现缺口已闭环（2026-10-24，rdd-quick `quick-ledger-same-reason-redline`）**：`tools/check_coverage_parity_ledger.sh` 现已机检全部三条红线 ——
+① `not-covered` 总数 ≤135 · ② **同一理由 ≤10 次**（原脚本仅声明 `MAX_SAME_REASON=10` 常量而未使用 ⇒ 属既有 spec `tlm-coverage-parity-ledger-red-lines` 的实现缺口）· ③ `[framework]` 族零 `not-covered`。
+
+**② 的机检口径**（记录以防口径漂移）：
+- **仅作用于 `not-covered` 条目** —— `covered`/`partial` 的理由列大量相同（`继承族级差异说明…`）属正常继承形态，不适用本红线；
+- **理由 = 台账第 5 列**（`awk -F'|'` 的 `$6`；`$1` 是首个 `|` 之前的空串 ⇒ 条目行 NF 恒为 7，已实测 27/27 行符合）；
+- **归一化 = 仅去首尾空白**；**分组 = 完全相同的理由字符串**（字面口径）—— 不做语义归类，避免「语义相同但措辞不同」的批量理由逃逸；
+- **违规须逐条列出该组条目名**（spec Scenario 明文要求「脚本报错并列出违规条目」）；
+- 附带输出**理由分布**（分组数 / 最大组 / 重复组数 / 显式理由缺失数）供人工复核批量退役形态。
+
+**相邻校验**：`not-covered` 条目的理由列**不得为空、也不得为继承标记**（`继承…`）—— 二者等价于「未写理由」，一并报 `VIOLATION: not-covered 条目缺显式理由`。
