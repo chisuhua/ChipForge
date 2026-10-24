@@ -1,7 +1,9 @@
 # ② chmem-bp-btb-gshare — 执行文件
 
 > **change**: `chmem-bp-btb-gshare`
-> **规模**: 大 · **前置**: ① `chmem-verilator-perf-harness` ✅ **已归档**（2026-10-24，交付点 A：Dhrystone 已在 CH_MEM 跑通 + 基线入库）· **★新增前置 `chmem-branch-microbench`**（中间验收 + BP 增益量化，ADR-088 v1.2 §5.3.2 P-5）· **★新增前置 P-2 `chmem-load-use-bypass`**（绝对值性能验收；**功能实现 Task 1–5 不受其阻塞**）
+> **规模**: 大 · **前置**: ① `chmem-verilator-perf-harness` ✅ **已归档**（2026-10-24，交付点 A：Dhrystone 已在 CH_MEM 跑通 + 基线入库）· **★前置 `chmem-branch-microbench`** ✅ **已归档**（2026-10-24，交付 0c：4 档可控预测率负载 + 无 BP 参照基线）⇒ **本 change 的硬前置全部解除**
+> 
+> ⚠️ **原 P-2 前置（`chmem-load-use-bypass`）已于 2026-10-24 作废**（实施期 PoC 证伪：禁用 CH_MEM 侧 RAW stall 后 cycles **完全不变** 914544 ⇒ load-use **不是**差距根因；真根因 = **CH_MEM 无分支预测**，见 ADR-088 v1.2 §5.3.1）⇒ **不存在待落地的 load-use 前置**。**绝对值 1.4 门禁的恢复条件 = 本 change 自身落地**（ADR-088 v1.2 §5.3.2 **P-6**：与本 change 同源）⇒ 不再是外部依赖，而是本 change 的**交付物**
 > **路线图**: `feat-bp-btb-gshare`（已改绑 CH_MEM-only + 归 B1 第 5 项）· `feat-tlm-backend-retirement` B1 第 5 项
 > **上游裁决**: ADR-088 v1.1 §3 BP 行（**CH_MEM-only 且必须做；不适用 §5.2「不做」出口**）+ §5.2 BP 专项删除前置（双前置）
 > **被依赖**: B3 删除门禁（`branch_predictor.h` 不可删）
@@ -146,7 +148,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 | R4 | **CoreMark/MHz 可能达不到 1.9**（CH_MEM 全组合的 cycle 数与 TLM 不可比 ⇒ 数值不可直接对标） | AC-8 已设计为「记录实测值，达标判定依 ADR」⇒ 避免用不可比的数值下结论 |
 | R5 | 3 条 TID 条目（+ 同族 6 条 `partial`）在 CH_MEM 侧无对应（**无框架级多线程 TID 机制**） | 显式标注 + 台账写明差异 ⇒ **不静默丢弃**；⚠️ 台账红线「同一理由 ≤10 次」⇒ 这批共享 1 个理由（≤9 条）合规，但**不得**扩大化 |
 | R6 | **兜底句会诱发 AI 静默挂起**（v1 常见：「登记为决策」「报 architect」「与 architect 议」） | ★每处兜底补**触发阈值 + 落点 + 时限**：GShare PoC 不可行 ⇒ **触发** = Task 3 Step 1 的 PoC 连续 2 次失败 ⇒ **落点** = ADR-088 §3 追加一行 + 本 change Task 记录 ⇒ **时限** = 本 change 内必须闭环，不得挂起等回复 |
-| R7 | **CH_MEM 的 load-use 通路缺失**（ADR-088 v1.2 §5.3：纯 stall 无旁路 ⇒ DMIPS 1.24467 < 1.4）⇒ 绝对值性能验收受阻 | 功能实现（Task 1–5）**不受阻**；绝对值验收依赖 **P-2 `chmem-load-use-bypass`**（已立项，planner 已起草 plan）⇒ 本 change 的性能 AC 改为 **microbench 中间验收**（P-5）
+| R7 | ~~**CH_MEM 的 load-use 通路缺失**（原假设：纯 stall 无旁路 ⇒ DMIPS 1.24467 < 1.4）⇒ 绝对值性能验收受阻~~ → **★前提已被 PoC 证伪（2026-10-24）**：禁用 CH_MEM 侧 RAW stall 后 **cycles 完全不变（914544）** ⇒ load-use **不是**根因 ⇒ **P-2 `chmem-load-use-bypass` 已作废，不立项**。**真根因 = CH_MEM 无分支预测**（ADR-088 v1.2 §5.3.1：比率随分支密度单调升 add 1.037 / jal 1.078 / beq 1.098 / Dhrystone 1.151）⇒ **与本 change 同源** | **本 change 即根因的解法** ⇒ 绝对值 1.4 门禁的恢复条件 = **本 change 落地**（ADR-088 v1.2 §5.3.2 **P-6**）⇒ 性能 AC 走 **microbench 中间验收**（P-5，绝对值由本 change 的副产品恢复）
 | R7 | 「不适用 §5.2『不做』出口」意味着 B3 时 TLM BP **必须**能删 —— 若本 change 延期，B3 会被阻塞 | 把本 change 排在 ① 之后立即执行；进度风险已在 ADR-088 §3 BP 行登记 |
 
 ## 迁移说明

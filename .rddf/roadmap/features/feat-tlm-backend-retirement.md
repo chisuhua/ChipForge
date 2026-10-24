@@ -32,8 +32,8 @@ phase_refs: [phase-4, phase-5]
 
 ### 测试与门禁损失面（实测 `--list-tests` 逐条比对）
 
-- TLM binary `chipforge_tests` **481 case**；CH_MEM binary `chipforge_tests_chmem` **130 case**；共享 30
-- **TLM 独占 451 case（93.7%）**：其中 `[cpu-integration]` 96、`[riscv-tests]` 48、`[framework]` 94、`[cpu]` 129、`[mmu]` 59、`[cache]` 25、`[soc]` 20、`[bundles]` 9、`[mul-div-fsm]` 9、`[picolibc]` 7、`[cpu-l1-mmu-demo]` 6、`[mmu-exception-handler]` 4、`[dhrystone]` 3
+- TLM binary `chipforge_tests` **493 case**（2026-10-24 实测：492 passed + 1 pre-existing fail）；CH_MEM binary `chipforge_tests_chmem` **130 case**；共享 30
+- **TLM 独占 463 case**：其中 `[cpu-integration]` 96、`[riscv-tests]` 48、`[framework]` 94、`[cpu]` 129、`[mmu]` 59、`[cache]` 25、`[soc]` 20、`[bundles]` 9、`[mul-div-fsm]` 9、`[picolibc]` 7、`[cpu-l1-mmu-demo]` 6、`[mmu-exception-handler]` 4、`[dhrystone]` 3
 - **两条性能硬门禁载体 100% 在 TLM**：
 
 | 门禁 | 载体 | CH_MEM 替代 |
@@ -43,7 +43,7 @@ phase_refs: [phase-4, phase-5]
 
 ### CI 盲区（放大风险）
 
-Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture-gates.yml` 只跑 3 个架构门禁脚本）。⇒ 删掉 451 个 case 后**没有任何自动机制能发现语义退化**。
+Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture-gates.yml` 只跑架构门禁脚本，**当前 8 个**：`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / `check_xlen_hygiene` / `check_tlm_freeze` / `check_coverage_parity_ledger`；**不构建项目** ⇒ ①/0c 新增的测量 step 恒 SKIP）。⇒ 删掉 463 个 case 后**没有任何自动机制能发现语义退化** ⇒ 「**CI 具备 build 能力**」已登记为 **B3 前置**（ADR-088 v1.2 §5.3.3；判据 4 仍未满足）。
 
 ## 跨阶段拆分
 
@@ -58,7 +58,7 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 - **策略 C 安全子集清理**：删 4 个死代码文件（201 行），判据 = 0 includer + 非公开 API + 双 binary 编译验证
 - **ADR-088 起草**：《TLM 仿真后端退役与 CH_MEM 单后端收敛》—— 承载冻结条款、语义裁决表、性能门禁重基线决策、覆盖平价台账、删除判据
 - **目录去误导**（非删除）：`ip/mmu/tlm/` + `ip/cpu/tlm/` 下的双模共享文件迁到 `core/` 命名空间，消除"目录名 = 后端绑定"的误导
-- **覆盖平价台账**建立：451 个 TLM 独占 case 逐条标注三态 —— 「已移植 CH_MEM」/「由 `[verilator]` ELF 级覆盖」/「显式退役（ADR-088 记录理由）」；`[framework]` 94 个框架语义锚**禁止退役，只允许移植**
+- **覆盖平价台账**建立：**463** 个 TLM 独占 case 逐条标注三态 —— 「已移植 CH_MEM」/「由 `[verilator]` ELF 级覆盖」/「显式退役（ADR-088 记录理由）」；`[framework]` 94 个框架语义锚**禁止退役，只允许移植**
 
 ### phase-5（v1.0.0+）— B1 承载力 → B2 语义裁决 → B3 删除
 

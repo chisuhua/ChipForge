@@ -112,8 +112,8 @@ graph TD
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
 | `2026-10-08-cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-08-verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 52 0 |
-| `mmu-chmem-phase-b-c-launch` | wave5-isa-coverage-and-bp | P1 | TODO | 27 0 |
-| `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (29/168) | 139 29 |
+| `mmu-chmem-phase-b-c-launch` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (10/33) | 23 10 |
+| `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (29/173) | 144 29 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
@@ -135,7 +135,19 @@ graph TD
 | `2026-10-18-scope-state-show-and-read-hint` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-18-tests-cpu-configs-to-schema-rename` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 37 0 |
 | `2026-10-18-tests-soc-topology-restructure` | wave5-isa-coverage-and-bp | P2 | ✅ DONE (archived) | 47 0 |
+| `2026-10-20-chmem-alu-unit-semantics` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 39 |
+| `2026-10-20-chmem-dmem-read-latency` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 1 29 |
+| `2026-10-20-chmem-mext-comb-datapath` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 42 |
+| `2026-10-21-chmem-dmem-read-latency-aligned` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 6 |
+| `2026-10-22-chmem-cpu-keys-modality` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 46 |
+| `2026-10-22-chmem-mmu-keys-modality` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 46 |
+| `2026-10-22-ctrl-link-chmem-reg-handle` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 4 31 |
+| `2026-10-24-rv64-isa-declaration-correction` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 0 14 |
 | `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
+| `2026-10-24-chmem-branch-microbench` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 4 |
+| `2026-10-24-chmem-tlm-backend-freeze` | wave6-linux-and-productization | P0 | ✅ DONE (archived) | 0 9 |
+| `2026-10-24-chmem-tlm-coverage-parity-ledger` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 8 |
+| `2026-10-24-chmem-verilator-perf-harness` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 6 |
 
 > **Status 解读**:
 > - `TODO`: tasks.md 全部 open 或不存在

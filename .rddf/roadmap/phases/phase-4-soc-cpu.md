@@ -24,11 +24,11 @@ phase_refs: []
 - [ ] **PoC-1**: MUL/DIV 1c/33c rv32um 100% · **PoC-2**: RV32C ≥95% · **PoC-3**: ICache ≥90%
 - [ ] ADR-082 negotiate capability 集成（mfc Phase G）
 - [ ] **PoC-6**: CoreMark/MHz ≥ 1.9 (BP 完成) — **defer → v1.0.0** (决策 2026-10-19, 见 `objective-soc-cpu-v0110-launch.md §11`)
-- [ ] **TLM 冻结门禁上线**（B0）: CI 可执行，TLM-only 文件新增 feature 函数即 fail — 见 `objective-ip-cpu-tlm-backend-retirement` Gate 1
-- [ ] **TLM 死代码清理**（B0）: 4 文件 / 201 行删除，双 binary 0 退化
-- [ ] **ADR-088 Proposed**（B0）: TLM 仿真后端退役与 CH_MEM 单后端收敛（冻结条款 + 语义裁决表 + 覆盖平价台账 + 删除判据）
-- [ ] **覆盖平价台账建立**（B0）: 451 个 TLM 独占 case 三态标注 100% 覆盖，`[framework]` 94 条标「移植」
-- [ ] **ISA 声明纠偏落地**（ADR-087 D1/D2）: `isa` 默认 `rv32im` + `xlen` 字段 + schema 三态 — 见 `feat-rv64-isa-declaration-integrity`
+- [x] **TLM 冻结门禁上线**（B0）: CI 可执行，TLM-only 文件新增 feature 函数即 fail — 见 `objective-ip-cpu-tlm-backend-retirement` Gate 1 ✅ **已完成**（2026-10-24，change `chmem-tlm-backend-freeze` 归档；`tools/check_tlm_freeze.sh` 已在 `architecture-gates.yml` warn 级 step，violations=0 / candidates=31 / base=a9f0d97432）
+- [x] **TLM 死代码清理**（B0）: 4 文件 / 201 行删除，双 binary 0 退化 ✅ **已完成**（2026-10-24，同上 change 归档；`ip/cpu/plugins/{exception,fpu}.h` + `ip/cpu/arch/riscv/fpu.h` + `ip/cache/plugins/cache_keys.h` 已删）
+- [x] **ADR-088 Proposed**（B0）: TLM 仿真后端退役与 CH_MEM 单后端收敛（冻结条款 + 语义裁决表 + 覆盖平价台账 + 删除判据） ✅ **已完成并升 Accepted v1.2**（2026-10-24；B0 立冻结契约 + B2 语义裁决完成 + §5.3 性能门禁承接裁决）
+- [x] **覆盖平价台账建立**（B0）: TLM 独占 case 三态标注 100% 覆盖，`[framework]` 94 条标「移植」 ✅ **已完成**（2026-10-24，change `chmem-tlm-coverage-parity-ledger` 归档；台账 `docs/architecture/tlm-coverage-parity-ledger.md` = **463** 条 / 46 族 · covered 154 · partial 292 · not-covered 27；机检 `tools/check_coverage_parity_ledger.sh` PASS。★**数字更正**：草案 451 → 实测 463（ADR-088 §1.3 已同步））
+- [x] **ISA 声明纠偏落地**（ADR-087 D1/D2）: `isa` 默认 `rv32im` + `xlen` 字段 + schema 三态 — 见 `feat-rv64-isa-declaration-integrity` ✅ **已完成**（2026-10-24，change `rv64-isa-declaration-correction` 归档，AC 10/10；`[cpu]` 129 → **137**；新增 `tools/check_xlen_hygiene.sh` 软门禁）
 
 ## 关联
 - OpenSpec: `wave5-isa-coverage-and-bp` initiative

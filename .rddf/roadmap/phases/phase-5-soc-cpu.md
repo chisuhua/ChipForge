@@ -23,7 +23,7 @@ phase_refs: []
 - [ ] v1.2.0: 4-way + PMP + Debug + Linux-sim
 - [ ] v1.3.0: Linux-on-FPGA + RV32F + chip-selector
 - [ ] **B1 承载力补齐**: Dhrystone 在 `cpu_verilator_sim` 跑通 + 新基线 CSV · CH_MEM 侧 LSU 全宽度 + LD/SD · MMU PTW walk FSM · MMU exception handler CH_MEM 注册 · BP CH_MEM 版 — 见 `objective-ip-cpu-tlm-backend-retirement` Gate 2
-- [ ] **B2 语义裁决**: ADR-088 §语义裁决表 5 子系统逐条表态（M 扩展 cycle 裁决明确）+ DMIPS 判据改绑 Verilator 后端并重测基线
+- [x] **B2 语义裁决**: ADR-088 §语义裁决表 5 子系统逐条表态（M 扩展 cycle 裁决明确）+ DMIPS 判据改绑 Verilator 后端并重测基线 ✅ **已完成**（2026-10-24，ADR-088 **v1.2 Accepted**：§3 五行正式表态 + §7 ADR-080 范围重定义 + §5.2 BP 专项前置 + §5.3 性能门禁承接；台账已按 §3 重标。★**DMIPS 基线已改绑并重测**（交付 ①：CH_MEM 侧 **1.24467**，**未达 1.4** ⇒ 依 **P-6**，恢复条件 = ② BP 落地，不重校准判据））
 - [ ] **B3 TLM 删除**: CppTLM 链接归零 · TLM-only 业务文件归零 · `tools/cpu_sim` + `src/cf_plugin/bridge/` 移除 · 全量 ctest 4 entries PASS — Gate 3
 - [ ] **XLEN 护栏形态切换**: `grep -rn "kXlenBits = 32" ip/cpu/` = 0 + CH_MEM 侧 CI grep 门禁上线（ADR-087 D3/D4，v1.1 修订）
 
