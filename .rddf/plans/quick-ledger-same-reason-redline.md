@@ -153,12 +153,16 @@
 - [x] AC-5: 8 个架构门禁全 PASS（含 `check_coverage_parity_ledger`）
 - [x] AC-6: **零生产代码改动** —— `git status` 中 `.h` / `.cpp` 改动数 = 0
 - [x] AC-7: 台账 §7 的「已知实现缺口」登记项已改为已闭环，并记录机检口径
-- [x] AC-8: 变异全部还原（`git diff` 仅含本 change 的 3 个预期文件，无台账残留变异）
+- [x] AC-8: 变异全部还原（`git diff` 仅含本 change 的预期文件，无台账残留变异）
+- [x] AC-9: `NF!=7` 解析护栏 —— 理由列含竖线时报 `PARSE-VIOLATION` 而非静默错位（变异 D 验证）
+- [x] AC-10: 非阻塞尾部观察项 —— 共享同一裁决引用的 not-covered 理由达阈值时打 `WARN (non-blocking)` + 列出条目，**不置 VIOL**（基线可见 BP 的 10 条形态，门禁仍 PASS）
+- [x] AC-11: 违规行带 `::warning file=...::` annotation 前缀 + 脚本尾部标注 CI warn 级语义
 
 ## 审计记录
 
 - **complexity**: `simple`（单模块、AC 可机械验证、可逆）
 - **reviewed_by**: `["oracle"]`（技术审阅；Metis 未派 —— 需求由已归档 spec 的 Scenario 完全确定，无歧义可挖）
+- **Oracle 审阅落地**: 采纳 6 项（含 1 项真 bug = 台账 §1 计数漂移 17→27）⇒ 见 Task 5
 - **mode**: `b`（direct）
 
 
@@ -192,3 +196,38 @@
    "reasoning": "台账条目行零 diff，3 轮变异全部还原干净。"}
 ]
 ```
+
+---
+
+### Task 5: Oracle 审阅追加修正（P4 补正，2026-10-24）
+
+> **触发**: Oracle 技术审阅（后台）在本 change 首次提交（`e483446`）后返回，抓到 **4 处疏漏** —— 其中 1 处是**我在 B2 重标时引入的台账计数漂移（真 bug）**。
+
+- [x] **Step 1: 加 `NF!=7` 解析护栏**（Oracle ①）—— 理由列若含 `|`（markdown 合法写法 `\|`），条目行 NF 变 8 ⇒ `$6` **静默错位** ⇒ 分组计数被污染且不报错 ⇒ 改为显式 `PARSE-VIOLATION`
+- [x] **Step 2: 加尾部观察项（Oracle ④，非阻塞）** —— 字面红线可被「每句改一字」绕过（BP 10 条共享尾巴「（ADR-088 §3 BP 行）」）⇒ 按**最后一个含 `ADR-` 的括号子句**分组，条目数 ≥ 红线阈值 ⇒ 打 `WARN (non-blocking)` + 列出条目（**不置 VIOL**）
+- [x] **Step 3: CI 可见性（Oracle ⑤）** —— 违规行加 `::warning file=docs/architecture/tlm-coverage-parity-ledger.md::` annotation 前缀（浮到 PR Annotations 面板）+ 脚本尾部显式标注「CI 层为 warn 级，脚本 exit 1 不阻塞 PR」
+- [x] **Step 4: 修台账 §1 计数漂移（Oracle ⑥，真 bug）** —— §1「三态分布」写 `not-covered 17`，实测 **27**（B2 裁决降级 BP 10 条时改了 §7 漏改 §1）⇒ 已纠正并注明来源
+- [x] **Step 5: 归一化补 U+3000**（Oracle ②）—— 外沿 trim 追加全角空格处理（其余口径不变：**不做**前缀剥离 / 语义归类）
+- [x] **Step 6: 不截断违规条目列表**（Oracle ③）—— spec Scenario 明确要求「列出违规条目」⇒ 不使用 `head` 截断（≤135 条，成本可忽略）
+- [x] **Step 7: 4 变异回归**（含新增的解析护栏变异）
+
+| 变异 | 期望 | 实测 |
+|---|---|---|
+| A: 11 条同理由 | 检出 + 列出 11 个条目名 + exit 1 | OK `VIOLATION: 同一理由出现 11 次 (上限 10)` + 11 条目名 |
+| B: 空理由 | 检出 + exit 1 | OK `VIOLATION: not-covered 条目缺显式理由` |
+| C: 继承标记 | 检出 + exit 1 | OK `... (继承标记)` |
+| D: 理由含竖线（新增） | 解析护栏检出 + exit 1 | OK `PARSE-VIOLATION: 条目行列数异常 (NF!=7, 理由列疑似含竖线)` |
+| 还原 | exit 0 | OK |
+
+### Oracle 审阅结论摘要（采纳项）
+
+| # | Oracle 建议 | 处置 |
+|---|---|---|
+| ① | `NF!=7` 解析护栏 | 采纳（Task 5 Step 1） |
+| ② | 归一化只做外沿 trim（含 U+3000），不做前缀剥离/语义归类 | 采纳（Step 5） |
+| ③ | 违规条目列表不 `head` 截断 | 采纳（Step 6） |
+| ④ | 字面红线 + 非阻塞尾部观察项（暴露 BP 逃逸形态） | 采纳（Step 2） |
+| ⑤ | CI warn 级可见性：`::warning` annotation + 措辞标注 | 采纳（Step 3） |
+| ⑥ | 台账 §1 计数漂移 17→27 | 采纳（Step 4，真 bug） |
+| ⑦ | 升 blocking 门禁 | 不采纳 —— 与本仓「测试脚本 warn 级」既定策略冲突，应走独立 change |
+| 备选 | 语义聚类做红线 / 剥离「同上：」前缀 / 引入 markdown 解析器 | 不采纳（不可复现 / 半吊子规则 / 杀鸡用牛刀，Oracle 同结论） |
