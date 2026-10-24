@@ -25,7 +25,7 @@ status: in-progress
 ## Acceptance
 
 - [x] **AC-F1-1** `objdump` 证明 `branch_cond` **0 条条件分支**（纯 `sltiu/seqz/and/or`）+ `branch_sel` 两条路径**指令数相等**（★ 仅证**静态**一致；★ **计数口径**：以 objdump 的函数体为准，**含 `ret`**；★ MUST 报告两段 objdump 片段与各自的条数）
-- [x] **AC-F1-2** ★ 用 **host 可导出的判据**证明 4 档工作量一致：**`pc_changes`（取指地址变化的 cycle 数）4 档逐位相同**（★ 由常驻 `--stats` 计数器产出；★ 气泡拍 PC 保持不变 ⇒ 不计入 ⇒ 该量 = **实际取到的指令数**（≠ cycles）；★ **MUST NOT** 用「取指数 ≈ cycles」的等价物做判据 —— 那才是循环论证；`pc_changes` 与 `cycles` 在 taken 档**不相等**（86034 vs 88034）正是非循环性的证明）+ 报告 4 档的 **气泡拍数 / iter**（= (cycles − pc_changes) / iterations，即 taken 转移数/iter —— 由 `cycles` 与 `pc_changes` 之差直接给出，**无需另设计数器**）
+- [x] **AC-F1-2** ★ **工作量一致性判据（★ 修正口径 —— critic B1 复核后）**：★ **承重证据 = AC-F1-1 的静态结构论证**：`branch_cond` **0 条条件分支** + `branch_sel` 两条路径**等长** ⇒ **4 档执行同一条指令序列** ⇒ 动态指令数**结构上必然相同**（无需测量）。★ **动态佐证（非承重，语义已核实）**：`--stats` 的 `pc_changes`（**前端取指地址流的变化点数**）4 档逐位相同 = 86034 ⇒ 前端取指活动的步数一致。⚠️ ★ **`pc_changes` MUST NOT 被称为「已执行/动态指令数」** —— 它包含**投机（错路）取指**（实测 `0x80000068`（`ret` 的 `pc+4`）/ `0x80000128`（`bne` 的 `pc+4`）各 2000 次，架构上不可达）⇒ 它是**前端活动量**，不是退休指令数（退休计数需 flush 信号 ⇒ host 不可见 ⇒ 归前置2）。★ **独立交叉验证（打破循环）**：`cycles − pc_changes` = 0/2000/500/1022，与**由源码语义独立算出的 taken 分支数**（`c1=1` ⇒ 2000；`i&7>=6` ⇒ 500；LCG `w&1` ⇒ 1022）**逐一相等** ⇒ 确认「**每条 taken 条件分支额外 1 拍**」。
 - [x] **AC-F1-3** ★ **4 档 `.text` sha256 MUST 逐档相同**（新值入册）—— ★ 改写 `branch_cond`/`branch_sel` 后**必须继续成立**（否则档间差异不再只是「data 段 1 个字」⇒ 判据地基失效）+ `bench_mode` 仍是唯一档间差异 + CSV 重录 + ★ **本地** `bash tools/measure_branchbench.sh --check-baseline` **exit 0**（★ CI 该 job 是 **warn-level** ⇒ 以本地为准）
 - [x] **AC-F1-4** ★ **档名与硬件方向一致** —— ★ **mode0 与 mode1 是「互换」不是单改名** ⇒ **强制互换重命名**（**删掉「修正注释」这个弱选项**）+ ★ **改名传播清单**（同 commit）。★ **下游指向须同步**：主体 AC-8b-1 / AC-8c / AC-8e 使用的 `always_taken` MUST 指「**重命名后**硬件方向恒 taken 的那一档」（⇒ 重命名前后同名异义 ⇒ 不钉死则 AC 会打在错误的档上 ⇒ 假 RED / 假绿）
 - [x] **AC-F1-5** ★ **留痕 + 替换失效断言**：0c 的 AC-2「`.text` sha256 一致」**事实仍成立**，其推论「`.text` 一致 ⇒ 动态指令数相同」**被证伪** ⇒ 写入本 change 的 proposal + CSV notes（**不得**改动归档产物）。★ **CSV notes MUST 替换/删除两条失效断言**：① 「`.text` 一致 ⇒ 指令数一致 ⇒ cycle 差只来自分支方向」（**已被证伪**）② 「预期本档收益最大/最小」（**按档名推断收益** ⇒ 档名反向使其失效）⇒ 否则 CSV 会继续向下游提供**反向证据**。★ 佐证：归档基线自身已记录档名反向（`always_taken` 33.017 c/iter **快于** `always_not_taken` 34.017 ⇒ 名为 always_taken 的档在硬件上从不 taken ⇒ 无气泡 ⇒ 最快）
@@ -71,9 +71,9 @@ status: in-progress
 （实施后填写）
 
 
-## 实测留证（2026-10-24，branch `feature/chmem-bp-btb-gshare`）
+## 实测留证（2026-10-24，branch `feature/chmem-bp-btb-gshare`；★ 2026-10-25 按 critic 复核修正口径）
 
-### 构建与静态验证
+### 构建与静态验证（★ 承重证据）
 
 ```
 $ riscv32-unknown-elf-g++ -O2 -fno-inline -march=rv32im_zicsr -mabi=ilp32 -nostdlib -static \
@@ -98,38 +98,57 @@ $ cmake --build build --target branchbench_elfs        # 与手工编译产物�
 ```
 8000000c: bnez  a0,80000018        <- 分支点
 80000010: mv    a5,a1              <- not-taken 路径 (1/3)
-80000014: j     80000020           <- not-taken 路径 (2/3)  [3/3 = 汇合]
+80000014: j     80000020           <- not-taken 路径 (2/3)
 80000018: mv    a5,a2              <- taken 路径 (1/3)
-8000001c: j     80000020           <- taken 路径 (2/3)  [3/3 = 汇合]  ★ 本 `j` 为修正新增
+8000001c: j     80000020           <- taken 路径 (2/3)  ★ 本 `j` 为修正新增 (目标 == pc+4)
 80000020: mv    a0,a5 ; ret        <- 共享尾
 ```
 ⇒ taken/not-taken **各 3 条**（含 `ret` 口径下各 5 条）⇒ 等长 ✓
+⇒ ★ **由 AC-F1-1 直接推出**：4 档执行**同一条指令序列** ⇒ **动态指令数结构上必然相同**（这是**证明**，不是测量）
 
-**AC-F1-3** —— 4 档 `.text` sha256（`objcopy -O binary --only-section=.text`）：
+**AC-F1-3** —— 证据（★ 区分两个产物，避免 conflate）：
 
 ```
-m0..m3 全部 = 2916f2a5c7cf95db...  (376 bytes)   ⇒ 逐档相同 ✓
-cmp -l bb_m0.bin bb_m1.bin  =>  "4101 0 1"      ⇒ 唯一差异 = 1 字节 (data 段 mode 字) ✓
+# (a) .text 段（376 B）逐档 **sha256 相同**  => 静态指令流一致
+$ objcopy -O binary --only-section=.text build/branchbench_m0.elf .bb_m0.text
+$ sha256sum .bb_m0.text ; ...   # m0..m3 全部 = 2916f2a5c7cf95db...
+
+# (b) 加载镜像（objcopy -O binary 全镜像, 4104 B）唯一差异 = 偏移 4101 的 mode 字
+$ objcopy -O binary build/branchbench_m0.elf flat_m0.bin ; ... m1
+$ cmp -l flat_m0.bin flat_m1.bin   =>  "4101 0 1"
 ```
+★ **MUST NOT** 说「ELF 文件唯一差异 = 1 字节」—— **ELF 文件本身**差 7 字节
+（`.rodata` 的 `bench_mode` 字 + `.strtab` 里编译器临时对象名 `cc*.o`，后者**不可控**）
+⇒ ELF 字节级**不可复现**，任何「ELF 逐字节比对」都会 flaky ⇒ 判据 MUST 用 **.text 段** 或**加载镜像**。
 
-### 动态验证（`--stats`，CH_MEM/Verilator 后端）
+### 动态测量（`--stats`，CH_MEM/Verilator 后端）
 
-| mode | 档名 | TOHOST | cycles | **pc_changes** | bubbles | taken/iter | 气泡/taken |
-|---|---|---|---|---|---|---|---|
-| 0 | `always_not_taken` | 103 | 86034 | **86034** | 0 | 0.000 | — |
-| 1 | `always_taken` | 183 | 88034 | **86034** | 2000 | 1.000 | **1.000** |
-| 2 | `pattern_6of8` | 147 | 86534 | **86034** | 500 | 0.250 | **1.000** |
-| 3 | `pseudo_random` | 101 | 87056 | **86034** | 1022 | 0.511 | **1.000** |
+| mode | 档名 | TOHOST | cycles | pc_changes(前端) | cycles−pc_changes | 独立复算 taken |
+|---|---|---|---|---|---|---|
+| 0 | `always_not_taken` | 103 | 86034 | 86034 | 0 | 0 |
+| 1 | `always_taken` | 183 | 88034 | 86034 | 2000 | 2000 |
+| 2 | `pattern_6of8` | 147 | 86534 | 86034 | 500 | 500 |
+| 3 | `pseudo_random` | 101 | 87056 | 86034 | 1022 | 1022 |
 
-- **AC-F1-2 ✓**：`pc_changes` 4 档**逐位相同 = 86034** ⇒ 动态指令数（工作量）一致；`cycles` 差异**全部**是气泡 ⇒ 纯方向效应。
-  ★ 非循环性证据：taken 档 `cycles(88034) ≠ pc_changes(86034)` ⇒ 该量**不是** cycles 的等价物。
-- **AC-F1-6 判定**：跨档 taken/iter 差 = **恰好 1.000** ⇒ **≤ 1 拍/iter 阈值触发** ⇒ 跨档判据（AC-8d/AC-8e）**结构性不可用** ⇒ 下游（②）性能判据 MUST 退化为「**单档绝对 Δ（`always_taken`）+ 解析模型**」⇒ 判定权归本 change，结论已写入 CSV notes + 本文件。
-- ★ **解析模型自验证**：气泡/taken = **恰好 1.000**（4 档全同）⇒ 「**每条 taken 控制转移 1 拍气泡**」被实测确认（该模型即 ② 的 AC-8b-1 结构等式的基础）。
+- ★ **独立复算**（★ 打破循环，critic B2）：taken 分支数由**源码语义**算出
+  （`c1=1` ⇒ 2000/2000；`i&7>=6` ⇒ 500/2000；LCG `w&1` ⇒ 1022/2000；`c0=0` ⇒ 0）
+  ⇒ 与 `cycles − pc_changes` **逐一相等** ⇒ 确认「**每条 taken 条件分支额外 1 拍**」。
+  ⚠️ **MUST NOT** 把 taken/iter 定义为 `(cycles − pc_changes)/iter` 再去「验证」它 —— 那是恒等式。
+- ⚠️ **`pc_changes` 的语义** = **前端取指地址流的变化点数**（含投机/错路取指）
+  ⇒ **≠ 动态指令数**（实测 `0x80000068`/`0x80000128` 各 2000 次为投机取指）
+  ⇒ 故它只作**动态佐证**（前端活动量逐档一致），**承重证据是 AC-F1-1 的静态论证**。
+
+### AC-F1-6 判定（跨档信号强度，本 change 的预登记出口）
+
+跨档 taken 分支数（由源码语义独立算出）= 0 / 2000 / 500 / 1022 ⇒ **极差 = 1.000 条/iter**
+⇒ **≤ 1 拍/iter 阈值触发**（本基准每 iter 恰 1 条条件分支 ⇒ 该条件**恒真**）
+⇒ 跨档判据（AC-8d / AC-8e）**结构性不可用** ⇒ 下游（②）性能判据 MUST 退化为「**单档绝对 Δ（`always_taken`）+ 解析模型**」
+⇒ ★ 判定权归本 change；结论已写入 CSV notes + 本文件；**不留给 ②**
 
 ### 回归
 
 - `openspec validate` 3 change 全 valid；8 架构门禁全 PASS
-- `ctest -R branchbench_baseline` **PASS**（60s）
+- `ctest -R branchbench_baseline` **PASS**
 - 全量 `ctest`：**唯一失败 = `tests/cpu/integration/test_7stage_riscv.cpp:124`（已登记 pre-existing）** ⇒ **新增失败 = 0**
 - `bash tools/measure_branchbench.sh --check-baseline` **exit 0**
 
@@ -137,7 +156,7 @@ cmp -l bb_m0.bin bb_m1.bin  =>  "4101 0 1"      ⇒ 唯一差异 = 1 字节 (dat
 
 | # | 0c 的说法 | 事实 |
 |---|---|---|
-| 1 | 「`.text` sha256 一致 ⇒ 指令数相同 ⇒ cycle 差只来自分支方向」 | `.text` 一致这一**事实仍成立**，但该**推论被证伪**：`branch_cond` 当时编译成分支链（`beqz/beq/beq`）⇒ 各档动态指令数不同（mode0 过 1 个分支 / mode2 过 3 个）⇒ cycle 差**混入工作量差**。**修正后的证明方式** = `pc_changes` 常驻计数（AC-F1-2） |
-| 2 | 「预期 `pattern_6of8` 档 BP 收益最大」 | 该断言**按档名推断收益**，而档名原与硬件方向**互换** ⇒ 断言失效 ⇒ 已从 CSV notes 移除 |
-| 3 | `branch_sel` 两条路径指令数相同 | 实测 taken 路径缺 1 条 `j`（3 vs 2）⇒ 不等长 ⇒ 已补 `j` |
-| 4 | 档名与硬件方向 | mode0 名为 `always_taken` 但硬件上**从不 taken**（`c0=0` ⇒ `bne` 不满足），mode1 反之 ⇒ **互换** ⇒ 已互换重命名 |
+| 1 | 「`.text` sha256 一致 ⇒ 指令数相同 ⇒ cycle 差只来自分支方向」 | `.text` 一致这一**事实仍成立**，但该**推论被证伪**：`branch_cond` 当时编译成分支链 ⇒ 各档动态指令数不同。**修正后**：工作量一致由 **AC-F1-1 的静态结构论证**证明（不是由 `.text` 一致推断） |
+| 2 | 「预期 `pattern_6of8` 档 BP 收益最大」 | 该断言**按档名推断收益**，而档名原与硬件方向**互换** ⇒ 失效 ⇒ 已从 CSV notes 移除 |
+| 3 | `branch_sel` 两条路径指令数相同 | 实测 taken 路径缺 1 条 `j`（3 vs 2）⇒ 不等长 ⇒ 已补 |
+| 4 | 档名与硬件方向 | mode0 名为 `always_taken` 但硬件上**从不 taken**，mode1 反之 ⇒ **互换** ⇒ 已互换重命名 |

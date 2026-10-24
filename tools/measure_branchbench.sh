@@ -18,7 +18,7 @@
 #
 # ★基线列访问 (修正): **按表头名取列** —— 原实现按**位置**取列 ($2/$3),
 #   而 notes 字段含逗号 ⇒ 一旦新增列或 notes 含逗号即**静默错位**.
-#   分组键 = (mode_name, bp_mode); workload_sha / build_id 作漂移守卫.
+#   分组键 = (mode_name, bp_mode); workload_sha 作**硬**漂移守卫 (fail-closed); build_id 仅记录.
 #
 # 用法:
 #   bash tools/measure_branchbench.sh                    # 测量并打印
@@ -111,12 +111,20 @@ IDX_BID=$(col_index build_id)
   || fail "基线表头缺少必需列 (mode_name / expected_tohost / cycles)"
 
 # ---- workload_sha 守卫: 基线记录的 .text sha 必须与当前 ELF 一致 ----
+# ★ fail-closed (critic B3): 缺 objcopy ⇒ 无法验证 workload_sha ⇒ **必须失败**
+#   (原实现静默跳过守卫 => 「基线属于另一份代码」的假绿通道开着)
 OBJCOPY="${BENCH_OBJCOPY:-}"
 if [ -z "$OBJCOPY" ]; then
   for c in riscv32-unknown-elf-objcopy /workspace/main/opt/riscv/bin/riscv32-unknown-elf-objcopy; do
-    command -v "$c" >/dev/null 2>&1 && OBJCOPY="$c" && break
-    [ -x "$c" ] && OBJCOPY="$c" && break
+    if command -v "$c" >/dev/null 2>&1; then OBJCOPY="$c"; break; fi
+    if [ -x "$c" ]; then OBJCOPY="$c"; break; fi
   done
+fi
+if [ -z "$OBJCOPY" ]; then
+  fail "缺少 riscv32-unknown-elf-objcopy ⇒ 无法验证 workload_sha (基线归属守卫) —— 设 BENCH_OBJCOPY 或安装工具链 (★ fail-closed: 不得静默跳过)"
+fi
+if [ -n "$IDX_WSHA" ] && ! "$OBJCOPY" --version >/dev/null 2>&1; then
+  fail "BENCH_OBJCOPY=$OBJCOPY 不可执行 ⇒ 无法验证 workload_sha (★ fail-closed)"
 fi
 
 for m in "${MODES[@]}"; do
@@ -125,10 +133,14 @@ done
 
 # 当前 build 的 .text sha (4 档共用 => 取 mode0)
 cur_wsha=""
-if [ -n "$OBJCOPY" ] && [ -n "$IDX_WSHA" ]; then
-  "$OBJCOPY" -O binary --only-section=.text "$ELF_DIR/branchbench_m0.elf" "$ELF_DIR/.bb_m0.text" 2>/dev/null \
-    && cur_wsha=$(sha256sum "$ELF_DIR/.bb_m0.text" | cut -c1-16)
+if [ -n "$IDX_WSHA" ]; then
+  if ! "$OBJCOPY" -O binary --only-section=.text "$ELF_DIR/branchbench_m0.elf" "$ELF_DIR/.bb_m0.text" 2>/dev/null; then
+    rm -f "$ELF_DIR/.bb_m0.text"
+    fail "objcopy 提取 .text 失败 ⇒ 无法计算 workload_sha (★ fail-closed)"
+  fi
+  cur_wsha=$(sha256sum "$ELF_DIR/.bb_m0.text" | cut -c1-16)
   rm -f "$ELF_DIR/.bb_m0.text"
+  [ -n "$cur_wsha" ] || fail "workload_sha 计算为空 (★ fail-closed)"
 fi
 
 rc=0
@@ -168,6 +180,14 @@ for i in "${!MODES[@]}"; do
     || fail "mode $m ($name): 校验和不符 —— 实测 $tohost != 基线 $exp_tohost (结果错, 不得产出数值)"
   [ "$status" != "TIMEOUT" ] \
     || fail "mode $m ($name): TIMEOUT (cycles>=$MAX_CYCLES) —— 程序未跑完, 不得产出数值"
+
+  # ---- build_id 记录 (★ critic B3: 原实现赋值后从未使用 => 注释为假;
+  #      这里做**记录性输出**, 漂移判定交给 workload_sha (build_id 会随任何重建变化,
+  #      硬比对会假红) ----
+  if [ -n "$IDX_BID" ] && [ -n "$CHECK_ONLY" ]; then
+    base_bid=$(field "$row" "$IDX_BID")
+    [ -n "$base_bid" ] && printf "  (基线 build_id=%s; 本 build 的仿真器 sha 见 git 记录 —— build_id 不作硬门禁, 仅记录)\n" "$base_bid"
+  fi
 
   # ---- workload_sha 守卫 ----
   if [ -n "$IDX_WSHA" ] && [ -n "$cur_wsha" ]; then
