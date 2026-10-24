@@ -1,7 +1,7 @@
 # ② chmem-bp-btb-gshare — 执行文件
 
 > **change**: `chmem-bp-btb-gshare`
-> **规模**: 大 · **前置**: ① `chmem-verilator-perf-harness`（**硬依赖** —— 本 change 的核心 AC「CoreMark/MHz ≥1.9」需要 ① 的测量链路）
+> **规模**: 大 · **前置**: ① `chmem-verilator-perf-harness` ✅ **已归档**（2026-10-24，交付点 A：Dhrystone 已在 CH_MEM 跑通 + 基线入库）· **★新增前置 `chmem-branch-microbench`**（中间验收 + BP 增益量化，ADR-088 v1.2 §5.3.2 P-5）· **★新增前置 P-2 `chmem-load-use-bypass`**（绝对值性能验收；**功能实现 Task 1–5 不受其阻塞**）
 > **路线图**: `feat-bp-btb-gshare`（已改绑 CH_MEM-only + 归 B1 第 5 项）· `feat-tlm-backend-retirement` B1 第 5 项
 > **上游裁决**: ADR-088 v1.1 §3 BP 行（**CH_MEM-only 且必须做；不适用 §5.2「不做」出口**）+ §5.2 BP 专项删除前置（双前置）
 > **被依赖**: B3 删除门禁（`branch_predictor.h` 不可删）
@@ -54,7 +54,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
   - **4 条 `partial`**（§4 行 267–270，**v1 完全漏掉**）：`not_taken_returns_zero` · `multiple_addresses` · `reset` · `per_thread_ghr_isolation`
   - ⇒ **14 条全部要重判**（10 条降级 + 4 条升级方向）；行号以台账实际为准，实施时 grep 复核（pattern: `^\| \`(btb_|predict|no_predict|not_taken|multiple_addresses|reset|per_thread_ghr|d2_branch_predictor|d4_branch_predictor|branch_predictor_set_tid)`）
 - [ ] **Step 3: 确认 canonical ordering** —— BP 在 fetch 路径 ⇒ 查 ADR-048 的注册规范序 + `cpu_factory_chmem.h` 现有 8-plugin 顺序 ⇒ 定 BP 的注册位（**必须**用 `tools/verify_plugin_decision.sh` 验证）
-- [ ] **Step 4: 确认 ① 已合入** —— ① 的基线 CSV 入库 + harness ctest PASS ⇒ **否则停止**（硬依赖）
+- [ ] **Step 4: 确认 ① 已归档** —— ①（`chmem-verilator-perf-harness`）✅ 已归档 2026-10-24（基线 CSV 入库 + harness ctest PASS）⇒ **本 change 的功能实现可立即开工**；★但 **性能验收（Task 6 Step 4）另需**：`chmem-branch-microbench` 基线（增益度量）+ P-2 落地（绝对值判据）
 
 ### Task 2: BTB 实现（CH_MEM）
 
@@ -96,7 +96,11 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 - [ ] **Step 1: 注册** —— `ip/cpu/cpu_factory_chmem.h` 加 `BranchPredictorPluginChmem<T>`（**canonical ordering 位置须过 ADR-048 断言**）
 - [ ] **Step 2: 无静默退化** —— 若某配置下 BP 不可用 ⇒ **fail-fast throw**（对齐 `enable_cache=true` 的既有风格），**不得**静默关掉
 - [ ] **Step 3: ELF 级回归** —— `[chmem] chmem_vendored_elf_tohost1`（47 ELF）+ `[verilator]`（48 ELF）**0 退化**
-- [ ] **Step 4: 性能验收（★v2：依赖顺序 + 达标判定口径写死）** ——
+- [ ] **Step 4: 性能验收（★v3：依 ADR-088 v1.2 §5.3.2 P-5 + P-2 修订）** ——
+  - **中间验收（不依赖 CoreMark）**：用 `chmem-branch-microbench` 的**四档可控预测率负载**测「启用 BP vs 禁用 BP」的 **cycles/iter 降幅** ⇒ 判据 = 「`pattern_6of8` 档降幅显著（阈值由 microbench 基线实测确定）」+「**四档单调性成立**（`always_taken` 收益最大 → `pseudo_random` 最小）」⇒ **单调性破坏 ⇒ BP 实现有 bug**（这是本 change 的核心验收锚）
+  - **★对外接口需求**：本 change **必须提供「可关闭 BP 的配置面」**（如 `CPUConfig` 字段）⇒ 否则「启用/禁用 BP 对比」无法做（microbench plan R3 已登记此依赖）
+  - **绝对值判据**（「CoreMark/MHz ≥1.9」）⇒ 属**交付点 B**（`chmem-verilator-coremark-harness`）⇒ 本 change **不宣告绝对值达标**；且依 **P-2**，CH_MEM 的绝对值达标还须先补 load-use 通路（DMIPS 1.24467 → ≥1.4）
+  - ⇒ 本 change 的性能 AC = 「**中间验收（microbench 增益 + 单调性）**」⇒ **不被 CoreMark 移植的不确定性阻塞**（P-5 的目的）
   - **开工前置**：① 必须**已合入并入库基线 CSV**（D4「两个 change + 硬依赖」）⇒ ① 未合入则**本 Task 不得开工**（Task 1–5 可先做）
   - **测量**：用 ① 的 harness 跑 CoreMark ⇒ `CoreMark/MHz` **实测值**记入基线 CSV（mode=`verilator+bp`）⇒ 与**无 BP** 的同条件实测对比 ⇒ 记录增益
   - **达标判定**：**「CoreMark/MHz ≥ 1.9」在 CH_MEM 后端不成立为默认判据**（cycle 不可比 ⇒ ADR-088 §3 M 扩展行同源裁决）⇒ 本 Task 的判据是「**产出可比实测值 + 增益可量化**」，而**不是**「≥1.9」；「≥1.9 是否仍作为门禁」由**判据重校准 ADR**（owner = architect，窗口 = ① 合入后、本 change 开工前）裁决 ⇒ ADR 未出时**只登记实测值，不宣告达标**（AC-8 的可判定性由此保证）
@@ -122,7 +126,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 - [ ] AC-5: 预测方向与目标为**活节点**（cell `impl()->is_const() == false`）⇒ 不得 `static_cast<bool>`（ADR-040 §10.5）
 - [ ] AC-6: misprediction ⇒ CtrlLink flush **真实消费**（有 case 证明 flush 发生）
 - [ ] AC-7: `[chmem]` + `[verilator]` 全量 **0 退化**（47 + 48 ELF）
-- [ ] AC-8: CoreMark 在 `cpu_verilator_sim` 产出 `CoreMark/MHz` **实测值**并入库；**达标判定 = 「产出可比实测值 + 相对无 BP 的增益可量化」**（不是「≥1.9」—— 后者待**判据重校准 ADR** 裁决）；ADR 未出 ⇒ **只登记实测值，不宣告达标**（判据不依赖未决事项）
+- [ ] AC-8: ★**中间验收**（`chmem-branch-microbench` 四档）：① `pattern_6of8` 档「启用 BP vs 禁用 BP」的 cycles/iter 降幅**可量化**（阈值由 microbench 基线确定）② **四档单调性成立**（`always_taken` 收益最大 → `pseudo_random` 最小）③ 本 change **提供「可关闭 BP 的配置面」**。**绝对值判据（CoreMark ≥1.9）不属本 change**（交付点 B + P-2）⇒ 本 change **不宣告绝对值达标**
 - [ ] AC-9: 8 门禁全 PASS + 全量回归 0 退化
 - [ ] AC-10: 台账 **14 条** BP 条目重判完毕 + **§2 族级判定行同步** + ADR-088 §5.2 BP 双前置状态更新
 - [ ] AC-11: **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，且需双前置）
@@ -137,6 +141,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 | R4 | **CoreMark/MHz 可能达不到 1.9**（CH_MEM 全组合的 cycle 数与 TLM 不可比 ⇒ 数值不可直接对标） | AC-8 已设计为「记录实测值，达标判定依 ADR」⇒ 避免用不可比的数值下结论 |
 | R5 | 3 条 TID 条目（+ 同族 6 条 `partial`）在 CH_MEM 侧无对应（**无框架级多线程 TID 机制**） | 显式标注 + 台账写明差异 ⇒ **不静默丢弃**；⚠️ 台账红线「同一理由 ≤10 次」⇒ 这批共享 1 个理由（≤9 条）合规，但**不得**扩大化 |
 | R6 | **兜底句会诱发 AI 静默挂起**（v1 常见：「登记为决策」「报 architect」「与 architect 议」） | ★每处兜底补**触发阈值 + 落点 + 时限**：GShare PoC 不可行 ⇒ **触发** = Task 3 Step 1 的 PoC 连续 2 次失败 ⇒ **落点** = ADR-088 §3 追加一行 + 本 change Task 记录 ⇒ **时限** = 本 change 内必须闭环，不得挂起等回复 |
+| R7 | **CH_MEM 的 load-use 通路缺失**（ADR-088 v1.2 §5.3：纯 stall 无旁路 ⇒ DMIPS 1.24467 < 1.4）⇒ 绝对值性能验收受阻 | 功能实现（Task 1–5）**不受阻**；绝对值验收依赖 **P-2 `chmem-load-use-bypass`**（已立项，planner 已起草 plan）⇒ 本 change 的性能 AC 改为 **microbench 中间验收**（P-5）
 | R7 | 「不适用 §5.2『不做』出口」意味着 B3 时 TLM BP **必须**能删 —— 若本 change 延期，B3 会被阻塞 | 把本 change 排在 ① 之后立即执行；进度风险已在 ADR-088 §3 BP 行登记 |
 
 ## 迁移说明

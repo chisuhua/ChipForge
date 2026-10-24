@@ -102,7 +102,33 @@ CH_MEM 侧与 TLM 侧的**注册差距 = 10 处**（TLM 工厂 19 处 `register_
 | **C4** | M 扩展语义规范取哪边？ | **CH_MEM 组合式为规范（功能 + cycle 均是）** —— 见 ADR-088 §3 M 扩展行（含降级项：`chmem-mext-fsm-cycle-parity` 转可选演进；`rv32um-baseline-matrix.csv` 降为 TLM-only 历史基线） | ADR-088 §3 · oracle 取证（`int_alu_chmem.h:324-334` vs `mul_div_fsm.h:144-148`） |
 | **B1/B3 先后** | BP 与 L1Cache 本体谁先？ | **BP 先（与其前置测量链路同批），L1Cache 本体次之。** 依据：① BP 是 **CoreMark/MHz ≥1.9 硬门禁的唯一载体**（已承诺的路线图门禁，判「不做」= 门禁孤儿化）；② BP 的验收需要 Verilator 侧 CoreMark harness（B1 item 1），两者**必须同批**否则无法验证；③ L1Cache 本体覆盖面更大（连带 4 条 `not-covered`）但**不阻塞任何已承诺门禁** ⇒ 排第二 | ADR-088 §3 BP 行 + §5.2 BP 专项前置 |
 
-### 5.1 由本定案产生的 B1 change 清单（建议立项顺序）
+### 5.1 由本定案产生的 B1 change 清单（**2026-10-24 更新：交付点 A 已归档 + 2 个新 change + ⑤ 拆分**）
+
+> **本节是 B1 执行图的 SSOT**（原 00-b1-index 为评审导读，未入库）。**依赖与顺序已随 ① 交付点 A 的实测结果 + ADR-088 v1.2 §5.3 裁决更新**。
+
+| 顺序 | change | 内容 | 依赖 | 规模 | 状态 |
+|---|---|---|---|---|---|
+| **0a** | `chmem-verilator-perf-harness`（**交付点 A**） | Dhrystone harness + 测量脚本 + 基线 CSV + CI 门禁 | 无 | 中 | ✅ **已归档 2026-10-24** |
+| ~~0b~~ | ~~`chmem-load-use-bypass`~~ | **已作废**（实施期 PoC 证伪：禁用 RAW stall 后 cycles 不变 ⇒ 非根因）⇒ **不立项**（plan 留证） | — | — | ⛔ 作废 |
+| **0c** | `chmem-branch-microbench` | **分支微基准**（四档可控预测率）⇒ ② 的**中间验收**与 BP 增益量化（ADR-088 v1.2 P-5） | 无 | 小-中 | 📋 plan 已起草 |
+| 1 | `chmem-bp-btb-gshare` | `branch_predictor_chmem.h`（BTB 4K + GShare 13-bit + RAS 8-entry）+ 工厂注册。★**地位升级**（ADR-088 v1.2 §5.3.2 **P-6**）：既是 §3 BP 行的门禁载体，**又是 CH_MEM 绝对值 1.4 门禁恢复的必要条件**（差距根因 = 无 BP ⇒ 与本项同源） | **#0c**（中间验收） | 大 | 📋 plan 已起草 |
+| 2 | `chmem-l1cache-body`（D3 改名） | L1CachePlugin CH_MEM 本体 + 工厂 `enable_cache=true` 解禁 + 容量参数表 + refill FSM 存废裁决 | 本体无前置；**接 Cache（阶段 B）需 #0b** | 大 | 📋 plan 已起草 |
+| 3 | `chmem-dbus-lsu` | **抽取重构** `dmem_chmem.h` 的宽度语义 + **总线仲裁层**（宽度语义**早已存在** ⇒ 非「补齐」） | 阶段 A 无前置；阶段 B 需 #2 + **#0b** | 中 | 📋 plan 已重写 |
+| 4a | `chmem-ptw-walk-core` | PTW **单元级**：`FsmBase` 封装 + `MMU_TLB` 两级 + `MMU_PTW` walk + `PTWCache` + D16 变更面 | **无**（不依赖 C.x）⇒ **现在可启动** | 中大 | 📋 plan 已起草 |
+| 4b | `chmem-ptw-walk-wiring` | PTW **流水线接线**（注册 + fetch stall）+ 目录合规（D18） | `mmu-chmem-phase-b-c-launch` 的 C.1/C.4/C.5（**全部未完成** ⇒ 12 月后） | 中 | 📋 plan 已起草 |
+| 5 | `chmem-verilator-coremark-harness`（**交付点 B**） | CoreMark 全移植（EEMBC → RV32IM） | #0c（microbench）+ #1（BP 存在才有意义） | 大 | 📋 未起草（可顺延） |
+| — | `chmem-tlm` 目录名治理（B0 剩余项 86） | `ip/{mmu,cpu}/tlm/` 双模共享文件迁 `core/` | 无 | 小 | 📋 未起草 |
+
+> **★执行顺序的关键变更（2026-10-24，ADR-088 v1.2 §5.3 裁决驱动）**：
+> ① 原「① → ②」的硬依赖链**未变**，但 ① 已完成 ⇒ **② 的功能实现可立即开工**；
+> ② **新增两个前置**（#0b load-use 通路、#0c 分支 microbenchmark）⇒ **② 的性能验收**改为「#0c 的 microbench 中间验收」（不依赖 CoreMark）+「#0b 落地后的绝对值」⇒ **② 不再被 CoreMark 移植阻塞**；
+> ③ ~~**#0b 是全局最高杠杆项**~~ → **作废**（PoC 证伪：load-use 非根因）⇒ **最高杠杆项改为 ② 本身**（它同时决定 ① 的绝对值门禁恢复 + §3 BP 门禁 + B3 删除判据 2）⇒ **② 优先于 ③/④**；
+> ④ **#4a 是唯一「完全无前置」的实质工作** ⇒ 可与 #0b/#0c 并行；
+> ⑤ **判据不重校准**（ADR-088 v1.2 P-1）⇒ CH_MEM 必须**达标**而非**改标**；过渡期口径见 §5.3.2 P-3（cycle 比率 ≤1.15）。
+
+### 5.1.1 旧清单（2026-10-24 首次定案，已被上表取代）
+
+| 顺序 | change（建议名） | 内容 | 依赖 | 规模 |
 
 | 顺序 | change（建议名） | 内容 | 依赖 | 规模 |
 |---|---|---|---|---|

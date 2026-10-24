@@ -1,7 +1,7 @@
 # ③ chmem-l1cache-body — 执行文件
 
 > **change**: `chmem-l1cache-body`（**改名理由见索引 D3**：原候选 `chmem-l1cache-本体` 中文名不合 kebab-case 惯例）
-> **规模**: 大 · **前置**: 无（可与 ② 并行）· **owner**: 本 change 事实承接（`verilator-l1cache-e2e-coverage` **不存在** ⇒ 原 owner 声明是空指针）
+> **规模**: 大 · **前置**: 阶段 A（本体）**无前置，可与 ② 并行**；★**阶段 B（接 Cache）需 P-2 `chmem-load-use-bypass`**（Cache 命中路径同样需要 load-use 解析 ⇒ ADR-088 v1.2 §5.3 同源缺口）· **owner**: 本 change 事实承接（`verilator-l1cache-e2e-coverage` **不存在** ⇒ 原 owner 声明是空指针）
 > **路线图**: `feat-tlm-backend-retirement` B1 第 3 项 · 台账 `[cache]` 25 条 + `[MMUCacheIntegration]` 4 条
 > **上游**: ADR-088 v1.1 §5.2 判据 2（台账 `not-covered` 条目须有归属）· ADR-085/086（MMU 侧目标架构）
 
@@ -68,7 +68,7 @@ C++23 · CppHDL（`ch_mem` / `ch_uint` / `ch_reg`）· Catch2 · ADR-040 v3.0 �
 
 - [ ] **Step 1: 接口** —— Cache 位于 IBus（取指）与 DMem（访存）之间 ⇒ 定义 payload key（地址/命中/数据），mode-aware（`uint_t<N>`）
 - [ ] **Step 2: 顺序契约** —— ADR-040 §10.6：生产者 EARLY ⇒ 消费者 NORMAL，同 stage 名；**不得**依赖注册顺序
-- [ ] **Step 3: 工厂注册 + 解禁** —— `enable_cache=true` 不再 throw；注册 `L1CachePluginChmem`；**无静默退化**：配置了却未生效 ⇒ throw
+- [ ] **Step 3: 工厂注册 + 解禁（★v3：阶段 B 的 load-use 前置）** —— `enable_cache=true` 不再 throw；注册 `L1CachePluginChmem`；**无静默退化**：配置了却未生效 ⇒ throw。★**依赖**：CH_MEM 的 **load-use 通路缺失**（纯 stall 无旁路，ADR-088 v1.2 §5.3）⇒ Cache 命中路径会引入新的 stall ⇒ **接 Cache（阶段 B）须在 P-2 `chmem-load-use-bypass` 落地后进行**（否则性能基线不可比）
 - [ ] **Step 4: 回归** —— `[chmem]` + `[verilator]` 0 退化；`enable_cache=true` 的行为测试（现在期望 throw ⇒ 改后期望成功）
 
 ### Task 5: 与 refill FSM 的关系（避免双实现）

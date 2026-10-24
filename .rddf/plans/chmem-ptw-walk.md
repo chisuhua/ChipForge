@@ -1,9 +1,10 @@
 # ⑤ chmem-ptw-walk — 执行文件
 
-> **change**: `chmem-ptw-walk`（**owner 已定案**：architect 2026-10-24 用户拍板 —— 归本 change，不归 `mmu-chmem-phase-b-c-launch`）
-> **规模**: 大（**拆两批**：批 1 = 单元级 PTW/TLB/FsmBase 封装，**现在即可启动**；批 2 = 流水线接线，**依赖 `mmu-chmem-phase-b-c-launch` 的 C.1/C.4/C.5**）· **前置**: 批 1 无前置；批 2 需 C.1/C.4/C.5
+> **change**: ★**拆成 2 个 change**（planner 裁决 2026-10-24）—— ① **`chmem-ptw-walk-core`**（批 1：Task 1–4 = 差距表 + `FsmBase` 封装 + `MMU_TLB` 两级 + `MMU_PTW` walk/PTWCache + D16 变更面，**无前置，现在启动**）· ② **`chmem-ptw-walk-wiring`**（批 2：Task 5–7 = 流水线注册 + fetch stall + 目录合规 + 收口，**依赖 `mmu-chmem-phase-b-c-launch` 的 C.1/C.4/C.5**）。
+> **★拆分理由**：若两批同属一个 change ⇒ 批 1 完成后 change **无法归档**（AC 未全绿）⇒ 会被 12 月后的 C.x 长期阻塞；拆分后批 1 可独立归档（与 ① 的交付点 A/B 拆分同理）
+> **规模**: 批 1 = 中大（**无前置**）· 批 2 = 中（**依赖 C.x**）
 > **上游**: **ADR-085 / ADR-086**（MMU PTW / L0-L1 TLB 架构 —— 目标架构**已锁定**）· ADR-088 v1.1 §3 PTW 行（**现在不接线**；回退 vaddr = 已知临时降级）
-> **tasks 骨架来源**: `openspec/changes/mmu-chmem-phase-b-c-launch/tasks.md` 的 defer 列表（**B.2' / B.3' / B.3'' / B.4' / B.3'''**）
+> **tasks 骨架来源**: `openspec/changes/mmu-chmem-phase-b-c-launch/tasks.md` 的 defer 列表（**B.2' / B.3' / B.3'' / B.4' / B.3'''**）—— **批 1 收 B.3'/B.4' 的单元级部分，批 2 收 B.2'/B.3''/B.3''' 的接线部分**
 > **v2 修订（2026-10-24，oracle 审阅）**：① **owner 重叠已修正** —— exception handler 的**注册归 C.1**（`mmu_exception_handler_chmem.h:26-28` 自述「接线归 C.1」），**本 change 不碰**（v1 越界）② `#ifndef` 守卫方向修正（**反向**守卫 ⇒ CH_MEM 分支**新增**注册，不是「解除包裹」）③ **D16 变更面确定化**（必须改 `dmem_chmem.h`）④ **FsmBase 已存在**（复用，不新建）⑤ **拆两批** + 排期结论 ⑥ 差距表格式定义
 
 ---
@@ -56,8 +57,8 @@ C++23 · CppHDL（`ch_state_machine` **经 `FsmBase` 封装**）· `ch_mem` 物�
 
 | 批 | 内容 | 前置 | 何时可启动 |
 |---|------|------|-----------|
-| **批 1** | Task 1（差距表）+ Task 2（`FsmBase` 封装）+ Task 3（`MMU_TLB` 两级）+ Task 4（`MMU_PTW` walk + PTWCache + D16 变更面） | **无** | **现在**（不依赖 C.x） |
-| **批 2** | Task 5（流水线注册 + fetch stall）+ Task 6（目录合规）+ Task 7（收口） | `mmu-chmem-phase-b-c-launch` 的 **C.1/C.4/C.5**（全部未完成） | **12 月之后**（C.x 窗口 2026-11-30~12-15） |
+| **批 1** = change **`chmem-ptw-walk-core`** | Task 1（差距表）+ Task 2（`FsmBase` 封装）+ Task 3（`MMU_TLB` 两级）+ Task 4（`MMU_PTW` walk + PTWCache + D16 变更面） | **无** | **现在**（不依赖 C.x） |
+| **批 2** = change **`chmem-ptw-walk-wiring`** | Task 5（流水线注册 + fetch stall）+ Task 6（目录合规）+ Task 7（收口） | `mmu-chmem-phase-b-c-launch` 的 **C.1/C.4/C.5**（全部未完成） | **12 月之后**（C.x 窗口 2026-11-30~12-15） |
 
 ⇒ **批 1 必须独立可归档**（AC-1…AC-5 + AC-7 不依赖批 2）；批 2 的 AC（AC-8/AC-10/AC-12）标注「待 C.x」。
 
@@ -145,4 +146,4 @@ C++23 · CppHDL（`ch_state_machine` **经 `FsmBase` 封装**）· `ch_mem` 物�
 
 ## 迁移说明
 
-落地为 `.rddf/plans/chmem-ptw-walk.md`；change 名 `chmem-ptw-walk`；**owner = 本 change**（architect 已定案，2026-10-24）。建议**完整 rdd-builder P1–P3**（目标架构约束密集 + 跨 change 协作 + 需 architect 参与 R4 判定）。**Task 1 是硬前置**（差距表未出 ⇒ 不进实施）。
+落地为 **两份** plan：`.rddf/plans/chmem-ptw-walk-core.md`（批 1）与 `.rddf/plans/chmem-ptw-walk-wiring.md`（批 2）；本文件为**合并总览**（两批的完整内容 + 边界）。★**owner = `chmem-ptw-walk`**（architect 已定案 2026-10-24）⇒ 拆分后 owner 名沿用 `chmem-ptw-walk-*` 前缀。批 1 建议**完整 rdd-builder P1–P3**；批 2 可 rdd-quick（接线 + 目录 + 收口）。

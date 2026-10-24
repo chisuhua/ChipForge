@@ -1,7 +1,7 @@
 # ④ chmem-dbus-lsu — 执行文件（v2，oracle + metis 审阅后重写）
 
 > **change**: `chmem-dbus-lsu`
-> **规模**: 中 · **前置**: ③ `chmem-l1cache-body`（**依赖的本质需修正**，见下）
+> **规模**: 中 · **前置**: 阶段 A（抽取重构）**无前置**；★**阶段 B（接 Cache）需 P-2 `chmem-load-use-bypass`**（同 ③）；★**与 P-2 的边界（planner 裁决）**：本 change 拥有**总线层组织**（仲裁 + 宽度语义抽取），P-2 拥有**依赖判定**（RAW 精确化 / 旁路）⇒ **若 P-2 选型结论为「真旁路」且需数据通路重组 ⇒ 该重组归本 change 阶段 A ⇒ P-2b 必须排在本 change 阶段 A 之后**（避免双写）
 > **路线图**: `feat-tlm-backend-retirement` B1 第 4 项
 > **上游**: ADR-040 v3.0（payload key 模态 §10.5 / 顺序契约 §10.6）· ADR-083（双文件分离）
 > **v2 重写原因**: oracle 审阅发现 **v1 的因果链是错的** —— ①「宽度语义」**已经存在**于 `ip/cpu/plugins/dmem_chmem.h:104-160`（funct3 全宽度译码 + sub-word RMW + 符号扩展；vendored 47 ELF 全 PASS 为证）；② TLM 侧**不存在**宽度语义 case（`test_lsu.cpp` 4 条 / `test_dbus.cpp` 5 条全是 instantiate/build/destruction）⇒ v1 的「迁移 TLM 侧 LSU 宽度判据」是**虚构的**；③ v1 的「取消阶段 1 / 与③并行」会造成**双 owner**（阶段 2「接 Cache」与 ③ 的「Cache 确实生效」是同一路径）。
@@ -53,7 +53,7 @@ C++23 · CppHDL · Catch2 · ADR-040 v3.0 约束
 ### Task 2: 阶段划分与依赖（v2 修正）
 
 - [ ] **Step 1: 阶段 A 的交付边界** —— 抽取重构 + 单主端口仲裁骨架 ⇒ **行为必须 byte-identical**（不改任何 ISA 可见行为）
-- [ ] **Step 2: 阶段 B 的前置** —— ③ 的 Cache 本体交付且注册生效 ⇒ 阶段 B 才能接线
+- [ ] **Step 2: 阶段 B 的前置（★v3）** —— ③ 的 Cache 本体交付且注册生效 **且 P-2 `chmem-load-use-bypass` 已落地**（Cache 命中路径的 load-use 解析依赖它）⇒ 阶段 B 才能接线
 - [ ] **Step 3: 非对齐访问语义基准（★v2 必须先定）** —— RISC-V 对非对齐 load/store **要求 trap**（除非实现显式支持）⇒ 必须先决定 CH_MEM 侧是「支持」还是「trap」：
   - **建议：保持现状 = 不支持非对齐**（沿用当前 `dmem_chmem.h` 的行为，vendored 47 ELF 全是对齐访问 ⇒ 无行为变化）⇒ **不得**在重构中「顺手支持」非对齐（那是新功能，超出本 change scope，且会与 ③ 的 Cache 行边界语义纠缠）
   - ⇒ 若决定支持 ⇒ 须先出 ADR（架构后果）并单独立项

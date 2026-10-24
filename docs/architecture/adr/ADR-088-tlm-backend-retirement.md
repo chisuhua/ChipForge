@@ -1,7 +1,7 @@
 # ADR-088: TLM 后端退役 — 冻结契约与语义裁决锚（TLM Backend Retirement: Freeze Contract & Semantic Adjudication Anchor）
 
-> **Status**: ✅ **Accepted（v1.1，2026-10-24）** —— B0（`chmem-tlm-backend-freeze`，已归档）立冻结契约与治理锚；**B2 语义裁决已完成**（§3 五行正式表态 + §6.1 ADR-080 范围重定义 + §5.2 BP 专项前置）
-> **版本历史**: v1.0（2026-10-24，B0，🚧 Proposed）→ **v1.1（2026-10-24，B2 裁决完成，✅ Accepted）**
+> **Status**: ✅ **Accepted（v1.2，2026-10-24）** —— B0（`chmem-tlm-backend-freeze`，已归档）立冻结契约与治理锚；**B2 语义裁决已完成**（§3 五行正式表态 + §7 ADR-080 范围重定义 + §5.2 BP 专项前置）；**v1.2 追加 §5.3「性能门禁在 CH_MEM 后端的承接判据」**（实测驱动：CH_MEM DMIPS 1.24467 < 1.4 ⇒ 根因 = CH_MEM 数据通路缺 load-use 通路 ⇒ **不重校准判据**，改补能力）
+> **版本历史**: v1.0（2026-10-24，B0，🚧 Proposed）→ v1.1（2026-10-24，B2 裁决完成，✅ Accepted）→ **v1.2（2026-10-24，性能门禁承接裁决，✅ Accepted）**
 > **类别**: 架构治理 / 后端退役
 > **关联 ADR**: ADR-040 v3.0（TLM→HDL 移植性约束，§10.1 双后端语义必须一致 / §10.2 差异必须显式契约化）· ADR-083（Plugin-style 单一 source of truth，§2.3 CppTLM=legacy / §4.3 拒绝「TLM 模式作为长期模式」）· ADR-046（多周期协议引擎豁免）· ADR-087（ISA 声明真实性，§D4 护栏形态随 TLM 退役切换）
 > **关联变更**: `chmem-tlm-backend-freeze`（B0，已归档：冻结门禁 + 死代码清理 + 本 ADR）· `chmem-tlm-coverage-parity-ledger`（台账**内容**，已归档）· **B2 语义裁决（本 v1.1）** · B1 承载力 / B3 删除各自独立立项
@@ -147,6 +147,42 @@ ADR-083（Accepted 2026-10-08）已定性：
 3. **语义裁决完成** —— §3 表中该子系统的 B2 正式表态已给出。
 4. **CI 有可回归的自动测试** —— 对应能力在 CH_MEM 侧有回归锚（当前测试不进 CI ⇒ B3 需先解决 CI 盲区或提供等价门禁）。
 5. **三道前置缺一不可** —— ①②③ 任一未满足 ⇒ 不得删除。
+
+
+### 5.3 性能门禁在 CH_MEM 后端的承接判据（v1.2 裁决，2026-10-24）
+
+> **触发**：`chmem-verilator-perf-harness`（交付点 A，已归档）首次在 **CH_MEM/Verilator 后端**跑通 Dhrystone ⇒ 实测 **DMIPS/MHz = 1.24467 < 1.4 硬门禁**（TLM 侧同 workload = 1.43277）。**本节裁决该差距的性质与处置**。
+
+#### 5.3.1 根因（实测，非推断）
+
+| 证据 | 数据 | 结论 |
+|------|------|------|
+| 源码自述 | `ip/cpu/plugins/hazard_chmem.h:38`「**不实现数据前推 (forwarding) — 当前纯 stall 策略, 无旁路**」 | CH_MEM 侧 RAW 依赖**全用 stall 气泡** |
+| 简单 ELF 对照 | `rv32ui-p-add` 461→478（1.037）· `rv32ui-p-lw` 279→287（1.029）· `rv32ui-p-addi` 238→246（1.034） | 比率**恒为 ~1.03**（复位/启动固定开销）⇒ **非系统性 per-instruction 成本** |
+| 高依赖密度 workload | Dhrystone 794478 → 914544（**1.151**） | 差距**与依赖密度相关** ⇒ 与「纯 stall 策略」一致 |
+| 组合通路特性 | CH_MEM 无 stage 寄存器（`cpu_factory_chmem.h` 8-plugin 全组合）⇒ load 数据同拍组合可得；`dmem_chmem.h:156` 读口为 **async**（同拍可得） | load-use 在组合通路下**不需** stall ⇒ 怀疑对象转向 RAW 检测 |
+| ★PoC 证伪（2026-10-24 实施期） | 把 CH_MEM 侧 RAW stall 临时置为恒 false（`hazard_chmem.h` 的 `halt_when(result)` ⇒ `halt_when(ch_bool(false))`）后重建重测 | **cycles 完全不变（914544）** ⇒ **RAW stall 不是根因**，P-2 的前提被推翻（PoC 已撤销，代码复原） |
+| ★分支密度对照（2026-10-24） | 比率随分支密度单调上升：无分支 `add` 1.037 / `addi` 1.034 · `jal` 1.078 · `beq` 1.098 · `bne` 1.105 · **Dhrystone 1.151**；delta 120066 cycles ÷ 2000 iter = **60 拍/迭代** ≈ 30 分支 × 2 拍 flush 代价 | **根因 = CH_MEM 无分支预测**（TLM 侧有 BTB `branch_predictor.h` ⇒ 预测命中不 flush；CH_MEM 侧无 BP ⇒ 每条 taken 分支都要 flush 流水线）⇒ **与 B1 ② BP 同源** |
+
+⇒ **性质判定（v1.2 修订，2026-10-24 实施期 PoC 后）**：1.24467 的差距是 **CH_MEM 侧缺分支预测器的**能力缺失**（TLM 有 BTB ⇒ 预测命中不 flush；CH_MEM 无 BP ⇒ taken 分支逐条 flush）**，**不是**判据过时 ⇒ **P-1（不重校准判据）依然成立**；但 **P-2/P-4（补 load-use 通路）的前提已被 PoC 证伪 ⇒ 作废**。
+
+#### 5.3.2 裁决
+
+| # | 裁决 |
+|---|--------|
+| **P-1** | **不重校准 DMIPS ≥1.4 判据**。理由：重校准会把**架构缺陷伪装成判据变化** —— 这正是 §3 BP 行反对的「判『不做』= 门禁孤儿化」的同型错误。判据是产品承诺，CH_MEM 必须**达标**而非**改标** |
+| ~~**P-2**~~ | ~~**新增 change `chmem-load-use-bypass`**~~ → **★作废（2026-10-24 实施期 PoC 证伪）**：禁用 CH_MEM 侧 RAW stall 后 **cycles 完全不变（914544）** ⇒ load-use 通路**不是**差距根因 ⇒ 该 change **不立项**（plan 已标注作废并留证） |
+| **P-6** | **绝对值门禁的恢复条件 = ② `chmem-bp-btb-gshare` 落地**（差距根因 = CH_MEM 无 BP ⇒ 与 ② **同源**，非独立工作项）⇒ ① 的绝对值 1.4 判据**由 ② 的副产品恢复** ⇒ ② 的不可延后性**进一步增强**（既是 BP 门禁载体，又是性能门禁恢复的必要条件） |
+| **P-3** | **临时口径**（转发落地前）：CH_MEM 侧性能基线判据 = 「同 workload **cycle 比率 ≤ 1.15**（= 现状基线）」；**绝对值 1.4 判据保留**，并在基线 CSV notes 标注「**CH_MEM 后端未达标（缺 load-use 通路），绝对值判据待 P-2 落地后自动恢复**」⇒ 既不掩盖缺口，也不让 CI 长期红 |
+| ~~**P-4**~~ | ~~P-2 的修法选型（精确化 RAW vs 真旁路）~~ → **随 P-2 一并作废**（PoC 已给出答案：**两者都不是根因**）。★**方法论留存**：本节的「PoC 先行、不预设修法」流程**有效**（避免了一次基于错误根因的 change 立项） |
+| **P-5** | **交付点 B（CoreMark 移植）**的中间验收改用**分支 microbenchmark**（可控预测率的 pattern 循环 ⇒ 直接测「命中/未命中 ⇒ flush 与 cycle 差异」），CoreMark 保留为最终载体且**允许顺延**（D1 的补充）⇒ ② 不被 CoreMark 移植的不确定性阻塞 |
+
+#### 5.3.3 与既有裁决的关系
+
+- §3 M 扩展行「CH_MEM 组合式为规范（功能与 cycle 均是）」**不受影响** —— 本节裁决的是**性能门禁的达标路径**，不是 cycle 语义的可比性
+- §5.2 判据 4「CI 有可回归的自动测试」**已由交付点 A 部分满足**（新增 warn 级 CI 门禁 step；注：CI 不跑 ctest ⇒ 仅 ctest entry 不够）
+- **★ ② `chmem-bp-btb-gshare` 的地位升级**（v1.2 修订）：既是 §3 BP 行的门禁载体，又是 **P-6 的绝对值门禁恢复必要条件** ⇒ ② 同时解锁 **B3 删除判据 2（BP 专项）** 与 **判据 4（CI 可回归 + 绝对值达标）**
+- **★ `chmem-branch-microbench`（0c）保留**：它是 ② 的**中间验收**手段（可控预测率负载 ⇒ 增益可量化 + 单调性判据），**不依赖** ② 本身 ⇒ 可先行交付
 
 ### 6. ADR-087 v1.1 待办登记（**显式登记行**）
 
