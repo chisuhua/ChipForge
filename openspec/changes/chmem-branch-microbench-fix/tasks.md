@@ -25,7 +25,7 @@ status: in-progress
 ## Acceptance
 
 - [x] **AC-F1-1** `objdump` 证明 `branch_cond` **0 条条件分支**（纯 `sltiu/seqz/and/or`）+ `branch_sel` 两条路径**指令数相等**（★ 仅证**静态**一致；★ **计数口径**：以 objdump 的函数体为准，**含 `ret`**；★ MUST 报告两段 objdump 片段与各自的条数）
-- [x] **AC-F1-2** ★ **工作量一致性判据（★ 修正口径 —— critic B1 复核后）**：★ **承重证据 = AC-F1-1 的静态结构论证**：`branch_cond` **0 条条件分支** + `branch_sel` 两条路径**等长** ⇒ **4 档执行同一条指令序列** ⇒ 动态指令数**结构上必然相同**（无需测量）。★ **动态佐证（非承重，语义已核实）**：`--stats` 的 `pc_changes`（**前端取指地址流的变化点数**）4 档逐位相同 = 86034 ⇒ 前端取指活动的步数一致。⚠️ ★ **`pc_changes` MUST NOT 被称为「已执行/动态指令数」** —— 它包含**投机（错路）取指**（实测 `0x80000068`（`ret` 的 `pc+4`）/ `0x80000128`（`bne` 的 `pc+4`）各 2000 次，架构上不可达）⇒ 它是**前端活动量**，不是退休指令数（退休计数需 flush 信号 ⇒ host 不可见 ⇒ 归前置2）。★ **独立交叉验证（打破循环）**：`cycles − pc_changes` = 0/2000/500/1022，与**由源码语义独立算出的 taken 分支数**（`c1=1` ⇒ 2000；`i&7>=6` ⇒ 500；LCG `w&1` ⇒ 1022）**逐一相等** ⇒ 确认「**每条 taken 条件分支额外 1 拍**」。
+- [x] **AC-F1-2** ★ **工作量一致性判据（★ 修正口径 —— critic B1 复核后）**：★ **承重证据 = AC-F1-1 的静态结构论证**：`branch_cond` **0 条条件分支** + `branch_sel` 两条路径**等长** ⇒ **4 档执行同一条指令序列** ⇒ 动态指令数**结构上必然相同**（无需测量）。★ **动态佐证（非承重；★ 措辞收敛：其语义**未被核实**，仅与源码语义算出的 taken 数吻合）**：`--stats` 的 `pc_changes`（**前端取指地址流的变化点数**）4 档逐位相同 = 86034 ⇒ 前端取指活动的步数一致。⚠️ ★ **`pc_changes` MUST NOT 被称为「已执行/动态指令数」** —— 它包含**投机（错路）取指**（实测 `0x80000068`（`ret` 的 `pc+4`）/ `0x80000128`（`bne` 的 `pc+4`）各 2000 次，架构上不可达）⇒ 它是**前端活动量**，不是退休指令数（退休计数需 flush 信号 ⇒ host 不可见 ⇒ 归前置2）。★ **独立交叉验证（打破循环）**：`cycles − pc_changes` = 0/2000/500/1022，与**由源码语义独立算出的 taken 分支数**（`c1=1` ⇒ 2000；`i&7>=6` ⇒ 500；LCG `w&1` ⇒ 1022）**逐一相等** ⇒ 确认「**每条 taken 条件分支额外 1 拍**」。
 - [x] **AC-F1-3** ★ **4 档 `.text` sha256 MUST 逐档相同**（新值入册）—— ★ 改写 `branch_cond`/`branch_sel` 后**必须继续成立**（否则档间差异不再只是「data 段 1 个字」⇒ 判据地基失效）+ `bench_mode` 仍是唯一档间差异 + CSV 重录 + ★ **本地** `bash tools/measure_branchbench.sh --check-baseline` **exit 0**（★ CI 该 job 是 **warn-level** ⇒ 以本地为准）
 - [x] **AC-F1-4** ★ **档名与硬件方向一致** —— ★ **mode0 与 mode1 是「互换」不是单改名** ⇒ **强制互换重命名**（**删掉「修正注释」这个弱选项**）+ ★ **改名传播清单**（同 commit）。★ **下游指向须同步**：主体 AC-8b-1 / AC-8c / AC-8e 使用的 `always_taken` MUST 指「**重命名后**硬件方向恒 taken 的那一档」（⇒ 重命名前后同名异义 ⇒ 不钉死则 AC 会打在错误的档上 ⇒ 假 RED / 假绿）
 - [x] **AC-F1-5** ★ **留痕 + 替换失效断言**：0c 的 AC-2「`.text` sha256 一致」**事实仍成立**，其推论「`.text` 一致 ⇒ 动态指令数相同」**被证伪** ⇒ 写入本 change 的 proposal + CSV notes（**不得**改动归档产物）。★ **CSV notes MUST 替换/删除两条失效断言**：① 「`.text` 一致 ⇒ 指令数一致 ⇒ cycle 差只来自分支方向」（**已被证伪**）② 「预期本档收益最大/最小」（**按档名推断收益** ⇒ 档名反向使其失效）⇒ 否则 CSV 会继续向下游提供**反向证据**。★ 佐证：归档基线自身已记录档名反向（`always_taken` 33.017 c/iter **快于** `always_not_taken` 34.017 ⇒ 名为 always_taken 的档在硬件上从不 taken ⇒ 无气泡 ⇒ 最快）
@@ -40,7 +40,7 @@ status: in-progress
 | `tests/cpu/manual_elf/branchbench/branchbench.c` | ★ **前置1 owner** | 前置2 / 主体 ✗ | 主体 MUST NOT 触碰（硬门禁） |
 | `soc/cpu/docs/dse/branchbench-baseline-matrix.csv` | ★ **前置1 建列**（`workload_sha` / `build_id` / `bp_mode=off`）+ 改按表头取列 | 前置2 / 主体 **仅追加行** | 建列归前置1；追加归后两者 |
 | `tools/measure_branchbench.sh` | ★ **前置1 owner**（改名 / 按表头取列 / **捕获 stderr**） | 前置2 **仅追加** `--bp=on\|off` flag + 生效值断言；主体 ✗（硬门禁） | ★ **捕获 stderr 归前置1**（否则假绿通道开着）⇒ 前置2 只加 flag |
-| `tools/verilator_runner/*` | ★ **前置1 建 `--stats` 框架 + retired 计数** | 前置2 **补 FLUSH 计数**；主体 **补 BP flag + 回显** | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
+| `tools/verilator_runner/*` | ★ **前置1 建 `--stats` 框架 + `pc_changes`/PC 直方图**（★ **NOT** retired —— retired 需 flush ⇒ 归前置2） | 前置2 **补 FLUSH 计数**；主体 **补 BP flag + 回显** | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
 | `ip/cpu/plugins/branch_predictor_chmem.h` | ✗（禁 `ip/**`） | 前置2 **创建（最小版）**；主体 **重写（完整版）** | ★ 前置2 的 PoC 版 MUST NOT 被主体当作已完成 ⇒ 主体 AC-1 MUST 检查**完整功能**（非文件存在）；★ PoC 残留的**删除/重写责任归主体**；★ `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case 在主体后 MUST 仍绿（机制锚）⇒ ★ **该 8 case 只能依赖公开接口** |
 | `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | 前置2 **首次改**（5 臂 mux + FLUSH 门控 + FLUSH 计数）；主体 **二次改**（补完整语义 + 过时注释 #8） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**五臂 select 链**结构 |
 | `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 参数转发） | ✗ | 前置2 **首次注册**（BP 开关）；主体 **补全**（4 参数转发修复 #9 + 完整注册） | ★ 同上 ⇒ 增量扩展 |
@@ -100,10 +100,12 @@ $ cmake --build build --target branchbench_elfs        # 与手工编译产物�
 80000010: mv    a5,a1              <- not-taken 路径 (1/3)
 80000014: j     80000020           <- not-taken 路径 (2/3)
 80000018: mv    a5,a2              <- taken 路径 (1/3)
-8000001c: j     80000020           <- taken 路径 (2/3)  ★ 本 `j` 为修正新增 (目标 == pc+4)
+8000001c: j     80000020           <- taken 路径 (2/3)  ★ 本 `j` 为修正新增 (目标 0x80000020 == pc+4)
+# ★ 反例（★ MUST NOT 混淆）: 循环回边 80000124 `bne s2,s6,800000e8` 目标 = 0x800000e8 ≠ pc+4 = 0x80000128
+#   ⇒ 其 taken 1999 次但**不计入** cycles−pc_changes ⇒ 「目标==pc+4」**只**是 `branch_sel` 的 `j` 的性质，不是通则
 80000020: mv    a0,a5 ; ret        <- 共享尾
 ```
-⇒ taken/not-taken **各 3 条**（含 `ret` 口径下各 5 条）⇒ 等长 ✓
+⇒ ★ **含 `bnez`/`ret` 各 5 条**（`bnez` + `{mv,j}` + `mv` + `ret`）；★ 只数「路径专有指令」则各 3 条 —— **口径 MUST 写明**，否则复算会误判
 ⇒ ★ **由 AC-F1-1 直接推出**：4 档执行**同一条指令序列** ⇒ **动态指令数结构上必然相同**（这是**证明**，不是测量）
 
 **AC-F1-3** —— 证据（★ 区分两个产物，避免 conflate）：

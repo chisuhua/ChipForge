@@ -12,10 +12,15 @@
 //   cf_read_dmem(word)               — read the dmem ch_mem array (tohost)
 //   cf_read_pc                       — current PC (diagnostics)
 //   cf_run_sim                       — full reset+loop+verify+report
-//   cf_run_sim_stats                 — same, plus per-static-PC fetch histogram
-//                                      AND a pc_changes counter (= dynamic
-//                                      instruction count proxy; a bubble cycle
-//                                      holds PC, so it is excluded)
+//   cf_run_sim_stats                 — same, plus a per-cycle PC histogram and a
+//                                      pc_changes counter (number of cycles in
+//                                      which the PC value changed).
+//                                      ⚠️ NEITHER is "instructions executed":
+//                                      the PC stream includes SPECULATIVE fetches
+//                                      (empirically 0x80000068 / 0x80000128 are
+//                                      sampled 2000x although architecturally
+//                                      unreachable), and the histogram sums to
+//                                      CYCLES, not to a fetch count.
 //                                      (chmem-branch-microbench-fix: replaces the
 //                                       one-off "temporarily patch sim_main.cpp"
 //                                       measurement with a resident facility)
@@ -138,10 +143,12 @@ int cf_run_sim_stats(void* top, std::uint32_t max_cycles, const char* elf_name,
   std::uint32_t done_bit = 0;
   std::uint32_t cycles = 0;
   std::uint32_t dropped = 0;
-  // pc_changes counts cycles in which the fetch PC advanced. A bubble cycle
-  // holds PC unchanged, so pc_changes is the resident proxy for the dynamic
-  // instruction count (== fetched instructions); the histogram alone cannot
-  // provide it because it samples every cycle including bubbles.
+  // pc_changes counts cycles in which the PC value changed.
+  // ⚠️ This is FRONT-END ACTIVITY, not a retired/executed instruction count:
+  //    the PC stream includes speculative (wrong-path) fetches, and a taken
+  //    redirect whose target equals pc+4 still counts as a change. Do NOT use
+  //    it as "instructions executed"; a retired count needs the flush signal,
+  //    which is internal to the DUT (not host-visible).
   std::uint32_t pc_changes = 0;
   std::uint32_t prev_pc = vtop->rootp->top__DOT___pc;
   for (std::uint32_t i = 0; i < max_cycles && done_bit == 0; ++i) {

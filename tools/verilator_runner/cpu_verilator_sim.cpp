@@ -145,7 +145,8 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::printf("  --enable-mmu     emit plumbing-only no-op MMU hook (CH_MEM stub)\n");
       std::printf("  --mmu-mode <s>   mmu mode string for the log only (default \"bare\")\n");
       std::printf("  --enable-cache   fail-fast: L1Cache CH_MEM not implemented\n");
-      std::printf("  --stats          print PC_HIST lines (per static PC fetch counts)\n");
+      std::printf("  --stats          print PC_HIST lines (per-cycle PC value histogram,\n");
+      std::printf("                   INCLUDING speculative fetches - NOT a fetch/retire count)\n");
       std::printf("  --stats-base <h> histogram window base (default 0x80000000)\n");
       std::printf("  --stats-len <n>  histogram slots of 4 bytes (default 256)\n");
       std::printf("\n");

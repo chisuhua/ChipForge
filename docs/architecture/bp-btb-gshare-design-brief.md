@@ -422,7 +422,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 ### 4.1 前置1 `chmem-branch-microbench-fix` 的 AC（v2.1 修正）
 
 - [ ] **AC-F1-1** `objdump` 证明 `branch_cond` **0 条条件分支**（纯 `sltiu/seqz/and/or`）+ `branch_sel` 两条路径**指令数相等**（★ 仅证**静态**一致）
-- [ ] **AC-F1-2** ★ **改用计数器**证明 4 档**动态指令数相等**（★ `.text` 相同 + objdump **无法**证动态一致 ⇒ 需 CH_MEM 侧「已执行指令数」计数器 ⇒ 依赖 AC-15 的常驻可观测点）⇒ 并报告 4 档的 **taken 分支数/iter**
+- [ ] **AC-F1-2** ★ **承重证据 = 静态结构论证**（档位选择无分支 + 两路径等长 ⇒ 4 档执行同一指令序列 ⇒ 动态指令数**结构上必然相同**）+ 动态佐证 = **前端取指活动量**（`pc_changes`）4 档相同 ⇒ 并报告 4 档的 **taken 分支数/iter**（★ **MUST 由源码语义/独立计数导出**，**MUST NOT** 用 `(cycles − pc_changes)` 反推）
 - [ ] **AC-F1-3** 新 `.text` sha256 入册 + CSV 重录 + CI `branchbench_baseline` 仍绿
 - [ ] **AC-F1-4** ★ **档名与硬件方向一致** —— ⚠️ **mode0 与 mode1 是「互换」不是单改名**（源码 `c0 = 0` ⇒ mode0 永不 taken；`c1 = 1` ⇒ mode1 恒 taken，而 `branch_sel` 的 `bnez` 在 cond≠0 时 taken）⇒ ★ **强制互换重命名**（**删掉「修正注释」这个弱选项**）+ ★ **改名传播清单**（同 commit）：CSV `mode_name` 列 · `tools/measure_branchbench.sh` 的 `MODE_NAMES` 数组 · plan Task 6 Step 4 的档名引用 · 文档旧档名
 - [ ] **AC-F1-5** ★ **留痕**：0c 的 AC-2「`.text` sha256 一致」**事实仍成立**，但其推论「`.text` 一致 ⇒ 动态指令数相同」**被本次反汇编证伪** ⇒ 写入本 change 的 proposal + CSV notes（**不得**改动归档产物）
@@ -466,7 +466,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | **AC-12** | ★ **「不做什么」机检化**：★ **脚本化** —— `tools/check_plugin_portability.sh` 新增 **Check 14**（★ 该脚本已是 PR **阻塞**门禁 ⇒ **无需构建** ⇒ CI 可承担）：scope = `ip/cpu/plugins/branch_predictor_chmem.h`（文件不存在则 skip）+ 新增文件名匹配 `*gshare*`/`*ghr*`/`*ras*` ⇒ 违反 ⇒ exit 1。★ **MUST NOT** 做成 tree-wide grep（TLM 侧 `branch_predictor.h` 合法含 GHR/RAS ⇒ 必误报）⇒ ★ **MUST NOT** 只写手工 grep（域「变更集」无基线定义 ⇒ 等价自证；且防不住下一个 change） | ★ v2.2 改 |
 | **AC-13** | ★ **BP 必须可学**：同一分支**第二次**被取时预测命中（PHT 更新使能 = 分支已解析，任何方向；更新地址 = 分支解析处 `KT::PC`，与预测 `pc_reg` 同指一条分支） | ★ 新增 |
 | **AC-14** | ★ **`jalr` 不建 BTB 项** ⇒ 走 not-taken；无条件跳转不占 PHT 表项 | ★ 新增 |
-| **AC-15** | ★ **host 可见事件计数**：`已执行指令数` + `FLUSH 事件数`（两个计数器 + `cpu_verilator_sim --stats` 输出行）⇒ 供 AC-8b 与前置2 的机制判据使用 | ★ 新增（metis P0-3） |
+| **AC-15** | ★ **host 可见事件计数（5 个）**：① **已执行(retired)指令数**（★ **归前置2** —— 需 flush 信号；前置1 **不**交付它）② **FLUSH 事件数** ③ **BP 命中次数** ④ **误预测次数** ⑤ **taken 转移数** ⇒ 全部经 `cpu_verilator_sim --stats` 输出 ⇒ 供 AC-8b-2 与前置2 判据使用 | ★ 新增（metis P0-3） |
 | **AC-16** | ★★ **净收益率裁决点（两分支终局式）**：净收益率 := `Δcycles(bp=off − bp=on) / N_taken_total`（★ **不是命中率**；★ `N_false` 只计情形 A）⇒ **达标** ⇒ 恢复绝对值门禁（ADR-088 §5.3.2 落结论）；**不达标** ⇒ ★ **MUST NOT** 以「GShare 延后」结案 ⇒ **MUST** 把 GShare 拉回范围（或另立 change）⇒ 按 P-3 临时口径结案。★ **MUST NOT** 只写「MUST ≥ 84.5%」（不达标时 AC 恒 RED ⇒ 与「不恢复时结案」互斥 ⇒ 归档路径被自己的 AC 堵死） | ★ v2.2 新增 |
 | **AC-17** | ★ **无条件跳转的可预测性** —— 分支目标表项 MUST 带「无条件跳转」标志（无条件跳转不占方向表项 ⇒ 若无此标志则其方向**无来源** ⇒ 永不被预测 ⇒ call 气泡不可恢复）；`pred_taken = pred_valid && (is_unconditional \|\| pht_counter ≥ 2)`；★ 间接跳转 **MUST NOT** 建表项（目标随运行时变化 ⇒ 静态缓存必错 ⇒ 走顺序取指） | ★ v2.2 新增（oracle 复审发现 2） |
 | **AC-18** | ★ **陈旧目标自愈** —— 替换策略 MUST 为**直接覆盖** ⇒ 目标变化的分支再次 taken 时**同槽重写** ⇒ **天然自愈**；★ **MUST NOT** 另设误预测计数器 | ★ v2.2 新增 |
@@ -479,7 +479,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | # | 判据 | 说明 |
 |---|------|------|
 | **AC-8a**（功能，无阈值） | 4 档在 `bp=on` 与 `bp=off` 下**校验和逐位相等** | 保留 |
-| **AC-8b-1**（结构等式含暖机，★ v2.2 修正） | `always_taken` 档上 `Δcycles(bp=off − bp=on)` **逐位等于**「该档 bp=off 下的 **条件分支** taken 转移数 × 1 拍 **− W**」⇒ ★ **W = 2 × 该档静态条件分支数**（推导：迭代 1 = BTB miss、迭代 2 = 计数=1 预测不跳转）⇒ **MUST 实测并报告 W**（★ **MUST NOT** 写死魔数 `W ≤ 4` —— 档内静态分支数可能更多 ⇒ 正确实现会被判 RED）⇒ ★ **N MUST NOT 含 `jalr`**（不建 BTB 项 ⇒ 其气泡不可恢复 ⇒ 等式不可满足）⇒ ★★ **N 的口径 MUST 由源码语义 / 独立计数导出**（★ **MUST NOT** 用 `(cycles − pc_changes)` 反推 —— 那是恒等式，零信息；★ 前置1 的微基准里，`always_taken` 档的 N = 2000/2000 iter（含 `branch_sel` 的 `bnez`，**不含**循环回边 —— 回边的重定向目标 = `pc+4` ⇒ 表现为 PC 保持而非额外气泡））⇒ ★ **「零误预测档」的准确表述 = 「零*代价*误预测**」** | ★ 把「1 拍/taken」从**分类恒等式**升级为**实测等式** |
+| **AC-8b-1**（结构等式含暖机，★ v2.2 修正） | `always_taken` 档上 `Δcycles(bp=off − bp=on)` **逐位等于**「该档 bp=off 下的 **条件分支** taken 转移数 × 1 拍 **− W**」⇒ ★ **W = 2 × 该档静态条件分支数**（推导：迭代 1 = BTB miss、迭代 2 = 计数=1 预测不跳转）⇒ **MUST 实测并报告 W**（★ **MUST NOT** 写死魔数 `W ≤ 4` —— 档内静态分支数可能更多 ⇒ 正确实现会被判 RED）⇒ ★ **N MUST NOT 含 `jalr`**（不建 BTB 项 ⇒ 其气泡不可恢复 ⇒ 等式不可满足）⇒ ★★ **N 的口径 MUST 由源码语义 / 独立计数导出**（★ **MUST NOT** 用 `(cycles − pc_changes)` 反推 —— 该差值**不是** taken 总数：前置1 实测 `always_taken` 档的循环回边（目标 ≠ `pc+4`）taken 1999 次却**不计入**该差值 ⇒ 其语义**未确认**）。★ **本等式的成立性 MUST 在 ② 实施时用「BP 关态的 taken 数」独立验证**（前置1 只确认了 `branch_sel` 那条分支）⇒ ★ **「零误预测档」的准确表述 = 「零*代价*误预测**」** | ★ 把「1 拍/taken」从**分类恒等式**升级为**实测等式** |
 | **AC-8b-2**（净收益模型，★ v2.2 按情形 A/B 修正） | 其余档 `Δcycles(off − on) = N_correct×1 − N_false_A×1`（N 由 **BP 内部计数器**导出）⇒ ★ **符号修正**（v2 写成 `on − off`，方向反了）⇒ ★ **`N_false` MUST 只计情形 A**（预测 taken / 实际 not-taken，代价 **1 拍**）⇒ ★ **情形 B**（预测 not-taken / 实际 taken）代价 **0 拍**（与无 BP 行为相同）⇒ **MUST NOT** 计入 ⇒ ★ **MUST NOT** 用「2×命中率 − 1」推导门槛（该式仅在情形 B ≈ 0 时成立） |
 | **AC-8b-3**（有界替代，不引入计数器时） | 只断言 `0 ≤ Δcycles(off − on) ≤ N_taken×1`，精确净收益降级为 PoC 报告项 | 兜底 |
 | **AC-8c**（反证）★ **限定 `always_taken` 档** | `Δcycles(off − on) == 0` ⇒ **BP 未生效**。⚠️ v2 的写法对 `always_not_taken` 档**不成立**（该档预测 not-taken 与无 BP 等价 ⇒ Δ 合法地 ≈ 0） | ★ 修正 |

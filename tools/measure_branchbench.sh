@@ -5,16 +5,20 @@
 #   1) 跑 4 档**可控预测率**分支负载 (mode 0/1/2/3) => TOHOST(=校验和) / CYCLES
 #   2) **结果正确性**: TOHOST 携带 32-bit 校验和 (低 31 位, LSB 恒 1) =>
 #      必须与基线 CSV 的期望值**逐位相等** (结果错 => 立即失败, 绝不产出数值)
-#   3) **工作量一致性 (AC-F1-2)**: 常驻 `pc_changes` 计数 (取指地址变化的 cycle 数)
-#      4 档必须**逐位相同** => 指令数一致; cycles 与 pc_changes 之差 = 气泡拍数
+#   3) **工作量一致性 (AC-F1-2)**: 承重证据 = **静态结构** (档位选择无分支 + 分支两路径等长
+#      ⇒ 4 档执行同一指令序列 ⇒ 动态指令数结构上必然相同).
+#      常驻 `pc_changes` (PC 轨迹变化点数) 4 档相同 ⇒ **前端活动量**一致 (动态佐证).
+#      ⚠️ `pc_changes` **不是**已执行指令数 (含投机/错路取指); `cycles - pc_changes` 的
+#      语义**未确认** (实测回边 taken 不计入) ⇒ **MUST NOT** 作为任何结论的依据.
 #   4) --check-baseline: cycles 与基线**精确相等** (无容差) + workload_sha 匹配
 #
 # ★设计要点 (为什么可测):
 #   4 档的 .text **逐字节相同** (唯一差异 = 数据里的 mode 字) ⇒ 静态指令流一致.
-#   ★ 但 `.text 相同` **只**保证静态一致 —— 动态指令数一致性由 `pc_changes`
-#     常驻计数证明 (见 AC-F1-2), 不由 .text 推断 (原设计的该推论已被反汇编证伪).
+#   ★ 但 `.text 相同` **只**保证静态一致 —— 动态指令数一致性由 **AC-F1-1 的静态结构论证**
+#     证明 (无分支的档位选择 + 等长的两条路径), **不由** .text 推断
+#     (原设计的该推论已被反汇编证伪), 也**不由** `pc_changes` 推断.
 #   分支两条路径**等长** + `branch_cond` **无分支** (位运算 select) ⇒ 无论档位,
-#   每迭代执行的指令数恒等 ⇒ cycle 差**只**来自分支方向 (气泡), 不混入工作量差.
+#   每迭代执行的指令数恒等 ⇒ cycle 差**不**来自工作量差异 (方向/重定向机制待查).
 #
 # ★基线列访问 (修正): **按表头名取列** —— 原实现按**位置**取列 ($2/$3),
 #   而 notes 字段含逗号 ⇒ 一旦新增列或 notes 含逗号即**静默错位**.
@@ -115,7 +119,10 @@ IDX_BID=$(col_index build_id)
 #   (原实现静默跳过守卫 => 「基线属于另一份代码」的假绿通道开着)
 OBJCOPY="${BENCH_OBJCOPY:-}"
 if [ -z "$OBJCOPY" ]; then
-  for c in riscv32-unknown-elf-objcopy /workspace/main/opt/riscv/bin/riscv32-unknown-elf-objcopy; do
+  # ★ 兼容 CI (critic F1): .github 装的是 gcc-riscv64-unknown-elf (只提供 riscv64-* 工具);
+  #   提取 .text 段与 arch 无关 ⇒ riscv64-unknown-elf-objcopy 同样可用
+  for c in riscv32-unknown-elf-objcopy riscv64-unknown-elf-objcopy \
+           /workspace/main/opt/riscv/bin/riscv32-unknown-elf-objcopy; do
     if command -v "$c" >/dev/null 2>&1; then OBJCOPY="$c"; break; fi
     if [ -x "$c" ]; then OBJCOPY="$c"; break; fi
   done
@@ -160,6 +167,11 @@ for i in "${!MODES[@]}"; do
   cycles=$(printf '%s' "$out" | grep -oE 'CYCLES=[0-9]+' | cut -d= -f2)
   status=$(printf '%s' "$out" | grep -oE '(PASS|FAIL|TIMEOUT)' | head -1)
   pc_changes=$(printf '%s' "$raw" | grep -oE 'pc_changes=[0-9]+' | head -1 | cut -d= -f2)
+  dropped=$(printf '%s' "$raw" | grep -oE 'dropped=[0-9]+' | head -1 | cut -d= -f2)
+  # ★ (critic N2): 直方图窗口溢出 ⇒ 计数被丢弃 ⇒ 前端活动量断言不可信 ⇒ fail
+  if [ -n "$dropped" ] && [ "$dropped" -ne 0 ]; then
+    fail "mode $m ($name): 直方图窗口溢出 (dropped=$dropped) —— 提高 --stats-len"
+  fi
 
   # ---- 结果正确性 (硬闸): 校验和必须与基线期望值逐位相等 ----
   row=$(base_row "$name" "$BP_MODE")
@@ -184,7 +196,7 @@ for i in "${!MODES[@]}"; do
   # ---- build_id 记录 (★ critic B3: 原实现赋值后从未使用 => 注释为假;
   #      这里做**记录性输出**, 漂移判定交给 workload_sha (build_id 会随任何重建变化,
   #      硬比对会假红) ----
-  if [ -n "$IDX_BID" ] && [ -n "$CHECK_ONLY" ]; then
+  if [ -n "$IDX_BID" ] && [ "$CHECK_ONLY" -eq 1 ]; then
     base_bid=$(field "$row" "$IDX_BID")
     [ -n "$base_bid" ] && printf "  (基线 build_id=%s; 本 build 的仿真器 sha 见 git 记录 —— build_id 不作硬门禁, 仅记录)\n" "$base_bid"
   fi
@@ -198,17 +210,19 @@ for i in "${!MODES[@]}"; do
   fi
 
   bubbles=""
+  # ★ fail-closed (critic F2): 缺 pc_changes ⇒ 输出格式变了 ⇒ 静默跳过跨档断言会开假绿通道
+  [ -n "$pc_changes" ] || fail "mode $m ($name): 输出缺 pc_changes (★ fail-closed)"
   if [ -n "$pc_changes" ]; then
     # 工作量一致性: 4 档 pc_changes 必须相同 (AC-F1-2)
     if [ -z "$first_pc_changes" ]; then
       first_pc_changes="$pc_changes"
     elif [ "$pc_changes" != "$first_pc_changes" ]; then
-      fail "mode $m ($name): pc_changes=$pc_changes != $first_pc_changes ($(printf '%s' "${MODE_NAMES[0]}")) —— ★ 工作量不一致 (基准失效)"
+      fail "mode $m ($name): pc_changes=$pc_changes != $first_pc_changes ($(printf '%s' "${MODE_NAMES[0]}")) —— ★ 前端活动量跨档不一致 (承重证据 = 静态结构论证; 此项为动态佐证)"
     fi
     bubbles=$(( cycles - pc_changes ))
   fi
 
-  printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s pc_changes=%-8s bubbles=%-6s checksum-ok\n" \
+  printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s pc_changes=%-8s cycles-minus-pc=%-6s checksum-ok\n" \
     "$m" "$name" "$BP_MODE" "$tohost" "$cycles" "${pc_changes:-?}" "${bubbles:-?}"
 
   if [ "$CHECK_ONLY" -eq 1 ] && [ "$base_cycles" != "$cycles" ]; then
