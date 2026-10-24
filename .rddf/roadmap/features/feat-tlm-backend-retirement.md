@@ -90,10 +90,10 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 - [x] **B0**：ADR-088 Proposed（含冻结条款 + 语义裁决表 + 覆盖平价台账格式 + 删除判据）✅ 同上 change（`docs/architecture/adr/ADR-088-tlm-backend-retirement.md`；ADR-083 同步升 v1.1 补 §2.5 冻结条款 + §5.4 退役时间线）
 - [ ] **B0**：`ip/mmu/tlm/` + `ip/cpu/tlm/` 目录名误导消除（双模共享文件迁 `core/`，CH_MEM 编译 0 退化）—— ⏸ **未纳入 B0 change 的 In Scope**（目录重命名影响 include 路径，属独立 change；**建议归 B1**；`mmu_exception_handler.h` 经实测为 TLM-only 不迁）
 - [x] **B0**：覆盖平价台账建立 —— TLM 独占 case 三态标注 100% 覆盖，无批量"显式退役" ✅ **已完成**（内容由 change `chmem-tlm-coverage-parity-ledger` 交付，2026-10-24 归档；台账 = `docs/architecture/tlm-coverage-parity-ledger.md`，**463** 条（实测口径，草案 451 已因 A 的 13 增 1 删而修正）/ 46 族 / covered 154 · partial 292 · not-covered 17；格式由 ADR-088 §4 定稿）
-- [ ] **B1**：Dhrystone 在 `cpu_verilator_sim` 跑通 + 新基线 CSV 入库（**B3 的硬前置**）—— 建议 change `chmem-verilator-perf-harness`（**BP 验收的前置**）
-- [ ] **B1**：BP CH_MEM 版（`branch_predictor_chmem.h`）+ 工厂注册 —— 建议 change `chmem-bp-btb-gshare`（**必须与上一项同批**，否则 CoreMark ≥1.9 无法验证）
-- [ ] **B1**：L1Cache CH_MEM 本体 + `enable_cache=true` 解禁 —— 建议 change `chmem-l1cache-本体`（连带台账 4 条 `not-covered`）
-- [ ] **B1**：DBus / LSU CH_MEM 通路（宽度语义对齐）—— 建议 change `chmem-dbus-lsu`（依赖 L1Cache 本体）
+- [x] **B1**：Dhrystone 在 `cpu_verilator_sim` 跑通 + 新基线 CSV 入库（**B3 的硬前置**）✅ **已完成**（change `chmem-verilator-perf-harness` 交付点 A，2026-10-24 归档；`TOHOST=1 CYCLES=914544 PASS` —— **CH_MEM/Verilator 后端首次跑通**；新基线 `soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv`；根因 = **单 RWE LOAD 段** ⇒ CH_MEM 段路由落空（IBus 为空）⇒ 已改 PHDRS 双段；**实测 DMIPS 1.24467 < 1.4 硬门禁** ⇒ 判据重校准 ADR 必需（owner=architect））
+- [ ] **B1**：BP CH_MEM 版（`branch_predictor_chmem.h`）+ 工厂注册 —— change `chmem-bp-btb-gshare`（**硬前置已解除** ✅ ① 交付点 A 已归档；plan 迁入 `.rddf/plans/chmem-bp-btb-gshare.md`；**中间验收改用分支 microbenchmark**，CoreMark 为交付点 B 可顺延；**BP 相关台账 14 条**待重判）
+- [ ] **B1**：L1Cache CH_MEM 本体 + `enable_cache=true` 解禁 —— change **`chmem-l1cache-body`**（D3 定案改名；连带台账 `[cache]` 25 条 + `[MMUCacheIntegration]` 4 条；plan 迁入 `.rddf/plans/chmem-l1cache-body.md`；**方案 A** = 先只支持 Bare，不被 ⑤ 阻塞）
+- [ ] **B1**：DBus / LSU CH_MEM 通路 —— change `chmem-dbus-lsu`（**v2 重写**：CH_MEM 宽度语义**早已存在**于 `dmem_chmem.h:104-160` ⇒ 实质是**抽取重构 + 总线仲裁层**；Cache 接线归本 change 独占；plan 迁入 `.rddf/plans/chmem-dbus-lsu.md`）
 - [ ] **B1**：`ip/{mmu,cpu}/tlm/` 目录名治理（B0 剩余项；双模共享文件迁 `core/`）—— 小规模独立 change
 - [ ] **B1 决策定案**：6 个决策问题已由 architect 定案 ✅（2026-10-24）—— 详见 [`tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/tlm-retirement-b1-capacity-plan.md) §5（含 change 立项清单 + 顺序）
 - [ ] **B1**：CH_MEM 侧 LSU 全宽度 + MMU PTW walk FSM + MMU exception handler 注册 + BP CH_MEM 版 全部落地

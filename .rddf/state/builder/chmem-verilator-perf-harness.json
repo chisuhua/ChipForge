@@ -3,7 +3,7 @@
   "version": 1,
   "owner": "rdd-builder",
   "change_name": "chmem-verilator-perf-harness",
-  "current_phase": "phase-2",
+  "current_phase": "phase-3",
   "approval_status": "approved",
   "plan_quality_status": "reviewed",
   "p0_decision": {
@@ -39,7 +39,7 @@
   "worktree_path": "",
   "branch": "feature/chmem-verilator-perf-harness",
   "execution_status": "completed",
-  "review_status": "pending",
+  "review_status": "passed",
   "retry_count": 0,
   "max_retries": 3,
   "retry_history": [],
@@ -55,9 +55,30 @@
       "event": "executed",
       "at": "2026-10-24T13:25:00Z",
       "note": "Task 1-4 + 6 + 7 完成; TOHOST=1 CYCLES=914544 PASS (CH_MEM 侧首次跑通); DMIPS 1.24467 < 1.4; TLM 侧 794478/1.43277 逐位一致; 8 门禁全绿; 0 个 .h/.cpp 改动; 实施期修正 6 处已回写 plan"
+    },
+    {
+      "phase": "phase-2",
+      "event": "executed",
+      "at": "2026-10-24T13:35:00Z",
+      "note": "全量回归 743.36s: 5 entry, 失败集合恰 1 个 pre-existing (test_7stage_riscv.cpp:124); [dhrystone] 3/3 PASS (TLM 门禁未退化); 新 entry verilator_perf_baseline PASS (13.45s)"
+    },
+    {
+      "phase": "phase-2.5",
+      "event": "review-passed",
+      "at": "2026-10-24T13:40:00Z",
+      "note": "AC 12/12; 3 变异全检出; 6 项已知遗留已登记 (含 DMIPS 1.24467 < 1.4 => 判据重校准 ADR 必需)"
+    },
+    {
+      "phase": "phase-3",
+      "event": "archived",
+      "at": "2026-10-24T13:45:00Z",
+      "note": "openspec archive 完成; 交付点 B (CoreMark) 归独立 change"
     }
   ],
-  "archive_status": "pending",
+  "archive_status": "archived",
   "verifier_report_path": "",
-  "updated_at": "2026-10-24T13:25:00Z"
+  "updated_at": "2026-10-24T13:45:00Z",
+  "review_report": ".rddf/reviews/chmem-verilator-perf-harness-p2.5-review.md",
+  "archive_path": "openspec/changes/archive/2026-10-24-chmem-verilator-perf-harness",
+  "spec_path": "openspec/specs/chmem-verilator-perf-harness/spec.md"
 }
