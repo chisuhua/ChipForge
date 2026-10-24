@@ -1,0 +1,63 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "chmem-verilator-perf-harness",
+  "current_phase": "phase-2",
+  "approval_status": "approved",
+  "plan_quality_status": "reviewed",
+  "p0_decision": {
+    "case": 1,
+    "route": "full-p1-p3",
+    "decided_at": "2026-10-24T13:00:00Z",
+    "decided_by": "auto-decision (ADR-0049)",
+    "llm_assessment": "complex",
+    "planner_advisory": "unknown",
+    "agreement": "yes",
+    "ac_count": 12,
+    "concerns": [
+      "多文件 + CI 门禁 + 新基线产物 => 走完整 P1-P3",
+      "交付点拆分: A(Dhrystone 链路) 与 B(CoreMark 移植) 分离 => A 不被 B 阻塞",
+      "不改门禁判据值 => 判据重校准 ADR 的 owner 须登记 (architect)"
+    ]
+  },
+  "execution_mode_decision": {
+    "mode": "in-place",
+    "branch": "feature/chmem-verilator-perf-harness",
+    "rationale": "用户确认 in-place + feature branch"
+  },
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [
+      "chmem-bp-btb-gshare (②) 依赖本 change 的测量链路 (反向依赖, 非前置)"
+    ],
+    "cross_repo_pending": [],
+    "deps_analysis": {
+      "note": "本 change 无前置; 它是 ② 的前置"
+    }
+  },
+  "worktree_path": "",
+  "branch": "feature/chmem-verilator-perf-harness",
+  "execution_status": "completed",
+  "review_status": "pending",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "phase": "phase-0",
+      "event": "approved",
+      "at": "2026-10-24T13:00:00Z",
+      "note": "交付点 A 立项 (proposal + spec + tasks); 交付点 B (CoreMark) 独立 change"
+    },
+    {
+      "phase": "phase-2",
+      "event": "executed",
+      "at": "2026-10-24T13:25:00Z",
+      "note": "Task 1-4 + 6 + 7 完成; TOHOST=1 CYCLES=914544 PASS (CH_MEM 侧首次跑通); DMIPS 1.24467 < 1.4; TLM 侧 794478/1.43277 逐位一致; 8 门禁全绿; 0 个 .h/.cpp 改动; 实施期修正 6 处已回写 plan"
+    }
+  ],
+  "archive_status": "pending",
+  "verifier_report_path": "",
+  "updated_at": "2026-10-24T13:25:00Z"
+}
