@@ -79,22 +79,42 @@ grep -E '^\| `[^`]+` \| [^|]*\| `(covered|partial)` \|' "$LEDGER" \
 #     - 归一化 = 仅去首尾空白; 分组 = 完全相同的理由字符串 (字面口径)
 #     - 违规必须逐条列出该组条目名 (spec Scenario: 「脚本报错并列出违规条目」)
 grep -E '^\| `[^`]+` \| [^|]*\| `not-covered` \|' "$LEDGER" \
-  | awk -F'|' 'NF>=7 {
+  | awk -F'|' '
+      # 解析护栏: 条目行 NF 必为 7 (5 内容列 + 两端空串). NF!=7 => 理由列含 "|"
+      # (markdown 合法写法是 \|) => $6 会静默错位 => 显式报出, 不静默污染分组
+      NF!=7 { print "__PARSE__\t" $2 "\t" $0; next }
+      NF>=7 {
       name=$2; reason=$6;
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", name);
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", reason);
+      gsub(/\xE3\x80\x80/, " ", reason);   # U+3000 全角空格 -> 半角 (归一化仅外沿 trim)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", reason);
       print reason "\t" name;
     }' > "$tmp/nc_reasons"
 
-awk -F'\t' -v max="$MAX_SAME_REASON" -v vf="$tmp/v3b" '
-  function viol(msg) { print msg; print msg > vf; bad=1 }
-  function viol_missing(msg) { print msg; print msg > vf; bad=1; missing++ }
+awk -F'\t' -v max="$MAX_SAME_REASON" -v vf="$tmp/v3b" -v ann="::warning file=docs/architecture/tlm-coverage-parity-ledger.md::" '
+  function viol(msg) { print ann " " msg; print ann " " msg > vf; bad=1 }
+  function viol_missing(msg) { print ann " " msg; print ann " " msg > vf; bad=1; missing++ }
   {
     r=$1; n=$2;
+    if (r == "__PARSE__") { viol("PARSE-VIOLATION: 条目行列数异常 (NF!=7, 理由列疑似含 |): " n); print $3; print $3 > vf; next }
     if (r == "") { viol_missing("VIOLATION: not-covered 条目缺显式理由: " n); next }
     if (r ~ /^继承/) { viol_missing("VIOLATION: not-covered 条目缺显式理由 (继承标记): " n); next }
     if (!(r in cnt)) { ord[++k]=r }
     cnt[r]++; lst[r]=lst[r] "\n    - " n
+    # 尾部观察键: 最后一个含 "ADR-" 的括号子句 (无则取末 20 字符)
+    #   => 用于暴露「字面各改一字、实则同一裁决」的批量退役逃逸形态 (非阻塞观察项)
+    tail=""
+    if (match(r, /（[^（）]*ADR-[^（）]*）/)) {
+      s2=substr(r, RSTART)
+      # 取最后一个匹配: 反向扫描
+      p=0; q=0
+      while (match(s2, /（[^（）]*ADR-[^（）]*）/)) { p=RSTART; q=RLENGTH; s2=substr(s2, RSTART+RLENGTH) }
+      tail = (p>0) ? substr(r, length(r)-q+1) : ""
+    }
+    if (tail == "") tail = substr(r, length(r)-19)
+    if (!(tail in tcnt)) { tord[++tk]=tail }
+    tcnt[tail]++; tlst[tail]=tlst[tail] "\n    - " n
   }
   END {
     for (i=1;i<=k;i++) {
@@ -108,6 +128,14 @@ awk -F'\t' -v max="$MAX_SAME_REASON" -v vf="$tmp/v3b" '
     mx=0; for (i=1;i<=k;i++) if (cnt[ord[i]]>mx) mx=cnt[ord[i]]
     dup=0; for (i=1;i<=k;i++) if (cnt[ord[i]]>1) dup++
     printf "  理由分组数 %d | 最大组 %d 次 | 重复(>1)组 %d 个 | 显式理由缺失 %d 条\n", k, mx, dup, missing+0
+    # 非阻塞观察: 同一「裁决引用尾巴」的条目数达到红线阈值 => WARN (不置 VIOL)
+    for (i=1;i<=tk;i++) {
+      t=tord[i]
+      if (tcnt[t] >= max) {
+        printf "  WARN (non-blocking): 同一裁决引用/尾部出现在 %d 条 not-covered 理由 (红线阈值 %d), 请人工确认非批量退役: %s\n", tcnt[t], max, t
+        printf "%s\n", tlst[t]
+      }
+    }
   }' "$tmp/nc_reasons"
 [ -s "$tmp/v3b" ] && VIOL=1
 
@@ -117,6 +145,7 @@ if grep -qE '按族(求和|汇总)' "$LEDGER" && ! grep -q '禁止按族求和' 
   VIOL=1
 fi
 
+echo "注: CI 层为 warn 级 (architecture-gates.yml continue-on-error) —— 脚本 exit 1 不阻塞 PR; 违规已带 ::warning annotation"
 if [ "$VIOL" -ne 0 ]; then echo "check_coverage_parity_ledger: FAILED"; exit 1; fi
 echo "check_coverage_parity_ledger: PASS (覆盖 ${n_ledger} / 闭合 OK / 红线 OK)"
 exit 0
