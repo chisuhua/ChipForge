@@ -40,7 +40,7 @@ next_pc = select( trap_redirect,        trap_target,     ← 最高（protocol r
 | 2 | ★ **本 change** 在其基础上**插入** `bp_predict` 项 | 必须**基于**已落地的 5 项 mux 扩展 |
 | — | ★ 若本 change 先于 trap 项落地 ⇒ **必须预留 trap 插入位**（否则后续 trap 项无法插入 ⇒ 返工） |
 
-⇒ ★ **登记**：本 change 的实现**MUST** 在 `update_pc` 中留下 trap 项的可插入位（注释 + 结构预留）。
+⇒ ★ **登记（本 change 实现 MUST 满足的可判定形式）**：`update_pc` 的 `next_pc` MUST 是**可 grep 的多层 select 链**，且**源码中 MUST 出现一个具名的 trap 项**（例如 `trap_redirect` / `trap_target` 标识）⇒ 这样后续 `csr-chmem-trap-pc-jump` 落地时有**可插入的位置**（★ **MUST NOT** 只写「注释 + 结构预留」—— 注释不可机检 ⇒ 后续 trap 项无处插入 ⇒ 返工）
 
 ---
 
@@ -56,7 +56,10 @@ next_pc = select( trap_redirect,        trap_target,     ← 最高（protocol r
 
 ★ **关键**：BTB 在 fetch NORMAL(N) 查的是 `pc_reg(N)`，而 branch LATE(N) 的 actual 是 `pc_reg(N-1)` ⇒ **两者不是同一条分支**；但**两者都作用于 `pc_reg(N+1)`** ⇒ 可以放在同一个 mux（优先级 `actual` > `BTB 预测` > `pc+4`）。
 
-### 2.2 完整时序
+### 2.2 完整时序（★ 实施者必须照此实现；★ v2.2 修正纠错作用域）
+
+> ★★ **v2.2 关键修正**：旧版把「预测不一致 ⇒ 纠错到 `pc_lag+4`」**不分情形** ⇒ ★ **情形 B（预测 not-taken / 实际 taken）是暖机主路径**（PHT counter=1 ⇒ 预测 not-taken，而分支恒 taken）⇒ 照旧实现会**走错路径** ⇒ **校验和不等 ⇒ AC-7/AC-8a 必 RED**。
+> ⇒ ★ **纠错 MUST 分情形**。
 
 ```
 ── cycle N ──────────────────────────────────────────────────────────
@@ -70,33 +73,54 @@ branch NORMAL(N):
     解析 instr[pc_lag(N)] = instr[pc_reg(N-1)] => actual_taken(N), actual_target(N)
 
 branch LATE(N):
-    ★ 写 pc_reg(N+1):
-        select( actual_taken(N), actual_target(N),            <- instr[pc_reg(N-1)] 的结果 (优先)
-          select( pred_valid && pred_taken, pred_target,       <- instr[pc_reg(N)] 的投机预测
+    ★ 写 pc_reg(N+1)  —— ★★ **4 项显式 select 链**（可逐字实现 / 可 grep 断言）:
+        select( actual_taken(N), actual_target(N),          <- instr[pc_reg(N-1)] 的结果 (优先)
+          select( pred_valid && pred_taken, pred_target,     <- instr[pc_reg(N)] 的投机预测
                    pc_reg(N) + 4 ) )
-    ★ 记 1 拍预测记录 (ch_reg 组): pred_taken / pred_target / pred_valid
 
 ── cycle N+1 ────────────────────────────────────────────────────────
 branch NORMAL(N+1):
     解析 instr[pc_lag(N+1)] = instr[pc_reg(N)] => actual_taken(N+1), actual_target(N+1)
     ★ 与 1 拍前的预测记录比对:
-        预测一致 (pred_valid && pred_taken == actual_taken && pred_target == actual_target)
-            => 该分支自身 redirect **必须被抑制**  (否则 target 被取两次)
-        预测不一致 (误预测)
-            => 纠错目标 = pc_lag(N+1) + 4   (真正的 fall-through, 不是 pc_reg+4)
-            => flush (抑制错路指令的副作用)
+
+    ★★ 情形 A（预测 taken / 实际 not-taken）—— **唯一需要「纠回 fall-through」的情形**
+        pred_valid && pred_taken && !actual_taken(N+1)
+          => 纠错目标 = pc_lag(N+1) + 4   (真正的 fall-through, 不是 pc_reg+4)
+          => flush (抑制错路指令的副作用)
+
+    ★★ 情形 B（预测 not-taken / 实际 taken）—— **★ MUST NOT 纠到 fall-through!**
+        pred_valid && !pred_taken && actual_taken(N+1)
+          => 纠错目标 = actual_target(N+1)   (跳到真实目标)
+          => 无需 flush（fall-through 本身是合法路径，无副作用发生）
+          => ★ 这条是**暖机主路径**（PHT counter=1 ⇒ 预测 not-taken）
+
+    ★★ 情形 C（预测 taken / 实际 taken 且 target 一致）—— **必须抑制自身 redirect**
+        pred_valid && pred_taken && actual_taken(N+1) && pred_target == actual_target(N+1)
+          => 抑制该分支自身 redirect  (否则 target 被取两次 ⇒ Δcycles≈0 ⇒ 误判「机制不成立」)
+
+    ★★ 情形 D（预测 not-taken / 实际 not-taken）
+        => 无需任何动作（顺序取指本就正确）
 
 branch LATE(N+1):
-    ★ 写 pc_reg(N+2):
-        select( 预测一致 ? 抑制 : actual_taken(N+1), actual_target(N+1),
-          select( pred_valid && pred_taken, pred_target, pc_reg(N+1) + 4 ) )
+    ★ 写 pc_reg(N+2)  —— ★★ **4 项显式 select 链**:
+        select( 情形A, pc_lag(N+1) + 4,                        <- 纠回 fall-through
+          select( 情形B, actual_target(N+1),                   <- 跳到真实目标 (暖机主路径!)
+            select( 情形C, pc_reg(N+1) + 4,                    <- 抑制自身 redirect (顺序推进)
+              select( actual_taken(N+1), actual_target(N+1),   <- 无预测时的正常行为
+                      pc_reg(N+1) + 4 ) ) ) )
 ```
 
-⇒ ★ **收益**：正确预测的 taken 转移 ⇒ `pc_reg(N+1)` 直接 = target ⇒ **fall-through 那一拍根本不被取出** ⇒ **气泡完全消除**（实测每条 taken 转移 1 拍气泡）。
+⇒ ★ **收益**：正确预测的 taken 转移（情形 C）⇒ `pc_reg(N+1)` 直接 = target ⇒ **fall-through 那一拍根本不被取出** ⇒ **气泡完全消除**（实测每条 taken 转移 1 拍气泡）。
 
-★ **抑制自身 redirect 是硬要求**：不抑制 ⇒ 目标指令被取两次 ⇒ `Δcycles ≈ 0` ⇒ **误判「机制不成立」**。
+⇒ ★ **误预测代价**：
 
----
+| 情形 | 描述 | 相对无 BP 的代价 |
+|------|------|----------------|
+| **A** | 预测 taken / 实际 not-taken | **1 拍**（多取了一拍错误 target；纠错回到 fall-through 该拍本来就要取） |
+| **B** | 预测 not-taken / 实际 taken | **0 拍**（与无 BP 行为相同） |
+
+⇒ ★ **净收益模型**：`Δcycles(off − on) = N_correct×1 − N_false_A×1`（★ **N_false 只计情形 A**）
+
 
 ## 3. Payload 契约
 

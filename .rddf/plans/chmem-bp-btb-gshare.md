@@ -51,7 +51,7 @@
 ### ★ 引用
 
 - **架构方案简报（权威）**：`docs/architecture/bp-btb-gshare-design-brief.md`（v2.1）
-- **实施边界简报**：`docs/architecture/bp-btb-gshare-brief.md`（⚠️ 其 §1.3「BP 开关面用 `optional<bool>`」与 §3.3「ch_mem 深度编译期 ⇒ 建议固定容量」**已被 v2.1 覆盖** ⇒ 以 v2.1 为准）
+- **实施边界简报**：`.rddf/plans/chmem-bp-btb-gshare-brief.md`（⚠️ 其 §1.3「BP 开关面用 `optional<bool>`」与 §3.3「ch_mem 深度编译期 ⇒ 建议固定容量」**已被 v2.2 覆盖** ⇒ 以 v2.2 为准）
 - **Task 1 的 PoC 与机制结论**：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（8 case / 51 assertions 全绿）· 本文件 §Task 1.5
 
 
@@ -169,8 +169,8 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
       ★ 依据：**CH_MEM 只解 32 位指令**（`decode_chmem.h:82` 的 `instr_format` 无 16 位格式）⇒ `PC[1:0]=0`、target 4 字节对齐 ⇒ 低位恒 0 ⇒ 可安全裁掉。
       ★ **物理深度 256 编译期固定**；**逻辑条目数 M 运行期 mask**（`bits<7,0>(pc) & literal(M-1)`，M ∈ 16/32/64/128/256）。
       ★ **`is_unconditional` 位**：无条件跳转（`jal`）不占 PHT 表项 ⇒ 若无此位则 `jal` 的方向无来源 ⇒ **永不被预测** ⇒ call 气泡不可恢复（oracle 复审发现 2）。
-- [ ] **Step 2: 索引函数** —— PC 相关位（对齐/折叠）⇒ 4K entry ⇒ 12-bit 索引；tag = 更高位
-- [ ] **Step 3: 命中判定 + fallback** —— 未命中 ⇒ **static predict fallback**（feature 明写「BTB miss 走 static predict fallback」）⇒ 方向恒 not-taken
+- [ ] **Step 2: 索引函数（★v3）** —— ★ **256 entry（编译期物理深度）** ⇒ 索引取 PC 低 **8 bit** 后再 **AND `literal(M-1)`**（M = 运行期逻辑条目数，M ∈ 16/32/64/128/256）⇒ ★ **MUST NOT** 用 `bits<N-1,0>(PC)` 且 N 运行时可变（`bits<>` 边界是**编译期**模板参数 ⇒ 不可实例化）；tag = `PC[31:2]`（30b）
+- [ ] **Step 3: 命中判定 + 未命中行为（★v3）** —— 命中 = `valid && tag30 == PC[31:2]`；★ **未命中 ⇒ 不预测**（不跳转、不 flush、不改 PC）⇒ ★ **MUST NOT** 写成「static predict fallback」—— v1 的该措辞与主体 tasks AC-4（「BTB miss ⇒ **不预测**」）**直接矛盾**
 - [ ] **Step 4: payload key 模态** —— 预测结果（target / direction）用 `cf::plugin::uint_t<N>` key；方向信号必须是**活节点**（`ch_uint<1>(<ch_bool 表达式>)`）⇒ **不得** `static_cast<bool>`
 - [ ] **Step 5: 单元测试（★v2：AC-3 出口写死，避免 agent 编造 case）** —— CH_MEM 是**静态 elaboration**（无运行时重配置面）⇒ `custom_btb_size` / `btb_runtime_{16,64,256}` 这类「运行时改表项数」判据在 CH_MEM 侧**无对应物**。**出口二选一（必须显式选一个，不得含糊）**：
   - (a) **不适用** —— 判「CH_MEM 静态 elaboration 无运行时重配置面」⇒ 台账标 `not-covered` + **显式手写理由**（⚠️ 台账红线：`check_coverage_parity_ledger.sh` 要求 not-covered 必须有显式理由、不得为继承标记、**同一理由 ≤10 次** ⇒ 这 4 条共享 1 个理由 = 4 ≤ 10 ✓ 合规）
@@ -187,12 +187,12 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 ### Task 5: misprediction recovery（CtrlLink 消费）
 
 - [ ] **Step 1: 接线** —— 预测错误 ⇒ 走 `CtrlLink::flush_when` 真实消费（feature 明写）
-- [ ] **Step 2: ADR-040 §10.6 顺序契约** —— 生产者/消费者顺序：同一 stage 内 EARLY(生产者) 先于 NORMAL(消费者) ⇒ **不得依赖 plugin 注册顺序** ⇒ 用 `declare_substage` 或同 stage 名
+- [ ] **Step 2: ADR-040 §10.6 顺序契约（★v3）** —— ★ **跨 stage**（生产者 fetch NORMAL → 消费者 branch LATE）⇒ 保序机制 = **`elaborate()` 按 `canonical_stage_order()` 执行**（`pipe_builder.h:413-424` + `:215-224`：stage 首现序 × EARLY→NORMAL→LATE）⇒ fetch ≺ branch 且 NORMAL ≺ LATE ⇒ **与插件注册顺序无关** ⇒ ★ **MUST NOT** 注册新 stage 名（复用既有 `fetch` / `branch`）
 - [ ] **Step 3: 验证** —— `check_plugin_portability.sh` 13/13 仍绿；新增 case 覆盖「预测错误 ⇒ flush 发生」
 
 ### Task 5.5: 容量与体积预算（★v2：oracle 补充，实施前必做）
 
-- [ ] **Step 1: 先量 baseline** —— BTB 4K entry + PHT 2^13×2bit ⇒ `ch_mem` 阵列规模约 **16Kbit + tag 阵列** ⇒ 直接影响**生成 Verilog 的体积**与**verilator 编译耗时**（`dmem` 靠 `--public-flat-rw` 访问，`sim_main.cpp:16-25`）⇒ **实施前先量当前（无 BP）**的 Verilog 体积 + verilator 编译耗时作为 baseline
+- [ ] **Step 1: 先量 baseline（★v3）** —— ★ **BTB 256×64b（16KB）+ PHT 256×2b（512B）** ⇒ `ch_mem` 阵列规模 ≈ **16.5KB** ⇒ 影响**生成 Verilog 的体积**与**verilator 编译耗时**（`dmem` 靠 `--public-flat-rw` 访问，`sim_main.cpp:16-25`）⇒ ★ **实施前先量当前（无 BP）**的 Verilog 体积 + verilator 编译耗时作为 baseline
 - [ ] **Step 2: 估算与判定** —— 加上 BP 阵列后的估算体积/耗时 vs baseline ⇒ 若超出可接受范围（**阈值由 Step 1 实测确定**，不预设）⇒ **上报 architect**（选项：减 PHT 表项 / 改 1-bit PHT / 分 Bank）
 
 ### Task 6: 工厂注册
@@ -200,19 +200,13 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 - [ ] **Step 1: 注册** —— `ip/cpu/cpu_factory_chmem.h` 加 `BranchPredictorPluginChmem<T>`（**canonical ordering 位置须过 ADR-048 断言**）
 - [ ] **Step 2: 无静默退化** —— 若某配置下 BP 不可用 ⇒ **fail-fast throw**（对齐 `enable_cache=true` 的既有风格），**不得**静默关掉
 - [ ] **Step 3: ELF 级回归** —— `[chmem] chmem_vendored_elf_tohost1`（47 ELF）+ `[verilator]`（48 ELF）**0 退化**
-- [ ] **Step 4: 性能验收（★v4：依 0c 微基准实测形态修订判据方向）** ——
-  - **中间验收（不依赖 CoreMark）**：用 `chmem-branch-microbench` 的四档负载测「启用 BP vs 禁用 BP」的 **cycles/iter 降幅**
-  - **★判据方向（0c 实测纠正）**：CH_MEM 侧的分支代价与**方向变化次数**相关（0c 基线：方向恒定的 m0=66034 / m1=68034 **最少**，方向变化的 m2=79534 **最多**，伪随机 m3=73012 居中）⇒ **BP 的收益空间在「方向变化」档** ⇒ 判据 = 「**方向变化频繁**的档（m2/m3）Δcycles **显著大于**方向恒定档（m0/m1）」；**不是** v1 假设的「恒 taken 收益最大」
-  - **★对外接口需求**：本 change **必须提供「可关闭 BP 的配置面」**（如 `CPUConfig` 字段）⇒ 否则「启用/禁用 BP 对比」无法做
-  - **落地后重录 0c 基线** —— 0c 的 CSV 是**无 BP 参照值** ⇒ ② 落地后须用同一脚本重测并**显式重录**（附 commit 说明）
-  - **绝对值判据**（「CoreMark/MHz ≥1.9」）属**交付点 B** ⇒ 本 change **不宣告绝对值达标**；且依 **P-6**，CH_MEM 的绝对值达标还须先有 ② 本身
-  - **中间验收（不依赖 CoreMark）**：用 `chmem-branch-microbench` 的**四档可控预测率负载**测「启用 BP vs 禁用 BP」的 **cycles/iter 降幅** ⇒ 判据 = 「`pattern_6of8` 档降幅显著（阈值由 microbench 基线实测确定）」+「**四档单调性成立**（`always_taken` 收益最大 → `pseudo_random` 最小）」⇒ **单调性破坏 ⇒ BP 实现有 bug**（这是本 change 的核心验收锚）
-  - **★对外接口需求**：本 change **必须提供「可关闭 BP 的配置面」**（如 `CPUConfig` 字段）⇒ 否则「启用/禁用 BP 对比」无法做（microbench plan R3 已登记此依赖）
-  - **绝对值判据**（「CoreMark/MHz ≥1.9」）⇒ 属**交付点 B**（`chmem-verilator-coremark-harness`）⇒ 本 change **不宣告绝对值达标**；且依 **P-2**，CH_MEM 的绝对值达标还须先补 load-use 通路（DMIPS 1.24467 → ≥1.4）
-  - ⇒ 本 change 的性能 AC = 「**中间验收（microbench 增益 + 单调性）**」⇒ **不被 CoreMark 移植的不确定性阻塞**（P-5 的目的）
-  - **开工前置**：① 必须**已合入并入库基线 CSV**（D4「两个 change + 硬依赖」）⇒ ① 未合入则**本 Task 不得开工**（Task 1–5 可先做）
-  - **测量**：用 ① 的 harness 跑 CoreMark ⇒ `CoreMark/MHz` **实测值**记入基线 CSV（mode=`verilator+bp`）⇒ 与**无 BP** 的同条件实测对比 ⇒ 记录增益
-  - **达标判定**：**「CoreMark/MHz ≥ 1.9」在 CH_MEM 后端不成立为默认判据**（cycle 不可比 ⇒ ADR-088 §3 M 扩展行同源裁决）⇒ 本 Task 的判据是「**产出可比实测值 + 增益可量化**」，而**不是**「≥1.9」；「≥1.9 是否仍作为门禁」由**判据重校准 ADR**（owner = architect，窗口 = ① 合入后、本 change 开工前）裁决 ⇒ ADR 未出时**只登记实测值，不宣告达标**（AC-8 的可判定性由此保证）
+- [ ] **Step 4: 性能验收（★v4 —— 以主体 tasks.md 的 AC-8a…AC-8e 为准，本段已作废）** ——
+  - ★ **作废**：v1 的「方向变化频繁的档降幅显著更大」+「四档单调性 always_taken→pseudo_random」⇒ **已由 0c 实测证伪**（微基准有工作量污染 ⇒ 档间不可比）⇒ 改由前置1 修正后的基线 + **差值判据**（`Δ(mode) − Δ(always_not_taken)`，扣掉各档共有的循环回边）
+  - ★ **作废**：v1 的「必须提供可关闭 BP 的配置面（如 `CPUConfig` 字段）」⇒ **CH_MEM 工厂不接 `CPUConfig`**（ADR-088 §9.1 NG1-3）⇒ 照做**会挂** ⇒ 改「**工厂参数 + CLI flag 双层**」（详见主体 tasks.md 的开工须知 #6 与 §5.3）
+  - ★ **作废**：v1 的「依 P-2 CH_MEM 绝对值达标还须先补 load-use 通路」⇒ **P-2 已作废**（PoC 证伪 load-use 非根因）⇒ 绝对值门禁的恢复条件 = **本 change 落地**（ADR-088 v1.2 §5.3.2 **P-6**）
+  - ★ **作废**：v1 的「绝对值判据（CoreMark/MHz ≥1.9）」⇒ 属**交付点 B** `chmem-verilator-coremark-harness` ⇒ 本 change **不宣告**绝对值达标
+  - ⇒ ★ **本 Step 的唯一有效内容**：性能验收以 **主体 `tasks.md` 的 AC-8a … AC-8e** 为准；**落地后须重录 0c 基线**（`branchbench-baseline-matrix.csv` 扩充 `bp_mode` / `workload_sha` / `build_id` 列，保留无 BP 参照行作历史锚）
+
 
 ### Task 7: 收口
 
@@ -221,7 +215,7 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 - [ ] **Step 3: 台账更新（★v2：条数修正 + 族级同步）** —— **14 条** BP 相关条目逐条重判（10 条 `not-covered` + 4 条 `partial`）：10 条 → `covered`（CH_MEM 锚 = `branch_predictor_chmem.h` + 新 case + 实测）；4 条 `partial` → `covered`/`partial`（视 CH_MEM 是否实现对应语义）；3 条 TID → `not-covered` + 「CH_MEM 侧无框架级多线程 TID 机制」显式理由。
   - ⚠️ **必须同时改台账 §2 族级表**（`cpu` 族判定行）—— 条目级三态是**从族级继承**的（台账 §2 注记）⇒ 只改条目不改族级 ⇒ 台账自相矛盾，且 `check_coverage_parity_ledger.sh` **只查条目不查族级** ⇒ 漂移会静默通过
   - ⇒ 重判判据：**14 条条目态 + §2 族级判定行** 同时更新，且 `check_coverage_parity_ledger.sh` 仍 PASS
-- [ ] **Step 4: ADR-088 §5.2 BP 双前置状态** —— 记录「① 已达成 / ② 已达成」⇒ B3 删除门禁的 BP 阻塞解除
+- [ ] **Step 4: ADR-088 §5.2 BP 双前置状态（★v3）** —— 记录「**① 已达成**；**② 未达成**（CoreMark harness 属**交付点 B** `chmem-verilator-coremark-harness`）⇒ **B3 的 BP 阻塞未解除**」+ 登记「**CI 判据 4 未满足**（CI 不构建项目 ⇒ 测量 step 恒 SKIP）」⇒ ★ **MUST NOT** 写成「① ② 已达成 ⇒ B3 阻塞解除」（= **假完工声明**）
 - [ ] **Step 5: commit** —— 分批：① CH_MEM BP 组件 ② 工厂注册 ③ 测试 ④ 台账/ADR 同步
 
 ---
@@ -231,13 +225,13 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 - [ ] AC-1: `ip/cpu/plugins/branch_predictor_chmem.h` 存在且实现 **BTB（256×64b，62b 打包：tag30+target30+valid+is_unconditional）+ Bimodal 2-bit PHT（256×2b）**；★ **GShare / RAS 明确不在范围内**（依架构简报 v2.1 §3.1）
 - [ ] AC-2: `cpu_factory_chmem.h` **已注册** `BranchPredictorPluginChmem`（`grep` 可验），且 canonical ordering 断言 PASS
 - [ ] AC-3: ★**BP 相关 14 条台账条目全部重判完毕**（10 条 `not-covered` + 4 条 `partial`：`not_taken_returns_zero` / `multiple_addresses` / `reset` / `per_thread_ghr_isolation`）⇒ 每条有明确态 + CH_MEM 锚点 + 显式理由；且台账 **§2 族级判定行同步更新**（族级继承规则）
-- [ ] AC-4: BTB miss ⇒ static predict fallback（未命中不崩、方向恒 not-taken）
+- [ ] AC-4: ★ **BTB miss ⇒ 不预测**（不跳转、不 flush、不改 PC）⇒ ★ **MUST NOT** 用「static predict fallback」措辞（与主体 tasks AC-4 冲突；且 v1 该措辞隐含「miss 也改 PC」⇒ 语义错误）
 - [ ] AC-5: 预测方向与目标为**活节点**（cell `impl()->is_const() == false`）⇒ 不得 `static_cast<bool>`（ADR-040 §10.5）
 - [ ] AC-6: misprediction ⇒ CtrlLink flush **真实消费**（有 case 证明 flush 发生）
 - [ ] AC-7: `[chmem]` + `[verilator]` 全量 **0 退化**（47 + 48 ELF）
-- [ ] AC-8: ★**中间验收**（`chmem-branch-microbench` 四档）：① **方向变化频繁**的两档（`pattern_6of8` / `pseudo_random`）的 cycles/iter 降幅**可量化**（阈值由 0c 微基准基线确定）② **方向恒定**的两档（`always_taken` / `always_not_taken`）降幅**显著更小**（★**机制化判据**—— 0c 实测证明：方向恒定档本就无「方向变化惩罚」⇒ BP 的收益空间小；**0c 实测的基线形态**：恒定档 66034/68034 cycles 反而**最少**，变化档 79534 最多 ⇒ **v1 的「恒 taken 收益最大」是错的**）③ 若 BP 无效，四档降幅应 ≈0 ④ 本 change **提供「可关闭 BP 的配置面」**。**绝对值判据（CoreMark ≥1.9）不属本 change**（交付点 B + ADR-088 v1.2 P-6）⇒ 本 change **不宣告绝对值达标**
+- [ ] AC-8: ★ **已作废**（v1 的「方向变化频繁的档降幅显著更大」+「阈值由 0c 微基准基线确定」+「四档单调性」三处均已被证伪/循环定义）⇒ ★ **以主体 `openspec/changes/chmem-bp-btb-gshare/tasks.md` 的 AC-8a … AC-8e 为准**（含：校验和逐位相等 / 结构等式含暖机 W / 净收益模型只计情形 A / 反证限定 always_taken 档 / 跨档用差值形式）
 - [ ] AC-9: 8 门禁全 PASS + 全量回归 0 退化
-- [ ] AC-10: 台账 **14 条** BP 条目重判完毕 + **§2 族级判定行同步** + ADR-088 §5.2 BP 双前置状态更新
+- [ ] AC-10: ★ **以主体 tasks.md 的 AC-3 / AC-10 为准**（★ 含**台账 §7 裁决行同步** + **计数二义澄清**（`:16` 的 463 = TLM 独占 case 数 MUST 不变；`:80` 的 463 = 条目级条目数，本 change 全部保留行 ⇒ 仍 463）+ **`check_coverage_parity_ledger.sh` exit 0**）
 - [ ] AC-11: **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，且需双前置）
 
 ## 风险与未知
@@ -245,9 +239,9 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 | # | 风险 | 缓解 |
 |---|------|------|
 | R1 | ~~CH_MEM 组合通路下 BTB/GShare 的「跨拍状态」语义不同~~ → **已关闭（oracle 取证 + PoC P-1 通过）**：框架先例 `csr_chmem.h:499` 的 `mcycle_ <<= mcycle_+1` 就写在 at_stage(fetch,NORMAL) 闭包内 ⇒ CH_MEM 下 at_stage 闭包在 `elaborate()` 期**执行一次**建立 DAG 边 ⇒ **天然满足**「`<<=` 须在 Simulator 创建前」⇒ **PoC P-1 实测 `ch_reg` 跨拍保持成立（1→3→7）** | ✅ 已验证；★ 本期不含 GHR ⇒ 无需再 PoC |
-| R2 | PHT 2^13 × 2-bit 在 Verilator 生成后**规模**（≈16Kbit）⇒ 仿真速度与 Verilog 体积 | 规模可接受（PHT 2-bit × 8192 = 16Kbit）⇒ 但需在 harness 上量仿真耗时；若过慢 ⇒ 与 architect 议（减表项 or 改 1-bit） |
+| R2 | ~~PHT 2^13 × 2-bit 在 Verilator 生成后**规模**（≈16Kbit）⇒ 仿真速度与 Verilog 体积~~ → ★ **已关闭**（v2.1 裁决：PHT 改 256×2b ⇒ ≈512B，不再是规模风险；BTB 256×64b = 16KB ⇒ 由 Task 5.5 实测 baseline 判定） | ⇒ 落点 = Task 5.5 的 baseline 实测报告；★ **触发阈值** = 实测 Verilator 编译耗时相对 baseline 增幅 > 50% ⇒ **落点** = `ADR-088 §5.3` 追加一行 + 本 change Task 记录；★ **时限** = **≤ 2 个工作日**，不得挂起等回复 |
 | R3 | 预测错误的 recovery 需要「真实方向」信号 ⇒ 与 hazard/branch 的数据流耦合可能踩 ADR-040 §10.6 顺序契约 | Task 5 Step 2 显式核对；生产者用同 stage 名 EARLY、消费用 NORMAL |
-| R4 | **CoreMark/MHz 可能达不到 1.9**（CH_MEM 全组合的 cycle 数与 TLM 不可比 ⇒ 数值不可直接对标） | AC-8 已设计为「记录实测值，达标判定依 ADR」⇒ 避免用不可比的数值下结论 |
+| R4 | ~~**CoreMark/MHz 可能达不到 1.9**（CH_MEM 全组合的 cycle 数与 TLM 不可比 ⇒ 数值不可直接对标）~~ → ★ **已关闭**：绝对值判据属**交付点 B** ⇒ 本 change **不宣告**绝对值达标；★ 本 change 的性能判据是 **microbench 中间验收**（主体 AC-8a…8e） | ⇒ 绝对值门禁的恢复条件 = 本 change 落地（ADR-088 v1.2 §5.3.2 **P-6**）⇒ 由主体 **AC-16**（两分支终局式）在实测点裁决 |
 | R5 | 3 条 TID 条目（+ 同族 6 条 `partial`）在 CH_MEM 侧无对应（**无框架级多线程 TID 机制**） | 显式标注 + 台账写明差异 ⇒ **不静默丢弃**；⚠️ 台账红线「同一理由 ≤10 次」⇒ 这批共享 1 个理由（≤9 条）合规，但**不得**扩大化 |
 | R6 | **兜底句会诱发 AI 静默挂起**（v1 常见：「登记为决策」「报 architect」「与 architect 议」） | ★每处兜底补**触发阈值 + 落点 + 可判定时限**（简报 §5.4）：★ **本期不含 GShare** ⇒ 原「GShare PoC 不可行」触发条件**已作废**；★ 现行触发条件 = **机制 PoC 的 FLUSH 事件数不降** ⇒ 落点 = **ADR-088 §5.3.2 落结论**（恢复/不恢复绝对值门禁）⇒ 时限 = **≤ 2 个工作日**，不得挂起 |
 | R7 | ~~**CH_MEM 的 load-use 通路缺失**（原假设：纯 stall 无旁路 ⇒ DMIPS 1.24467 < 1.4）⇒ 绝对值性能验收受阻~~ → **★前提已被 PoC 证伪（2026-10-24）**：禁用 CH_MEM 侧 RAW stall 后 **cycles 完全不变（914544）** ⇒ load-use **不是**根因 ⇒ **P-2 `chmem-load-use-bypass` 已作废，不立项**。**真根因 = CH_MEM 无分支预测**（ADR-088 v1.2 §5.3.1：比率随分支密度单调升 add 1.037 / jal 1.078 / beq 1.098 / Dhrystone 1.151）⇒ **与本 change 同源** | **本 change 即根因的解法** ⇒ 绝对值 1.4 门禁的恢复条件 = **本 change 落地**（ADR-088 v1.2 §5.3.2 **P-6**）⇒ 性能 AC 走 **microbench 中间验收**（P-5，绝对值由本 change 的副产品恢复）
@@ -263,11 +257,37 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 
 | # | plan v1 的设计 | 实测问题 | 修正 |
 |---|---|---|---|
-| 1 | Task 2 Step 5「单元测试出口二选一：(a) 不适用 / (b) 编译期多实例」 | **`ch_mem` depth 是编译期模板参数** ⇒ (b) 的「不同容量模板实例」在 `ch_mem<...,N>` 上**可行但代价 = 每实例一份数组**；而台账条目 `custom_btb_size` / `btb_runtime_*` 的语义是「**运行时**改表项数」⇒ 即便 (b) 也**不满足**「运行时」语义 | 出口定为 **(a) 不适用** + **显式手写理由**（`ch_mem` 编译期固定 ⇒ CH_MEM 静态 elaboration 无运行时重配置面）⇒ 4 条 `not-covered`（10 条中的 `custom_btb_size`/`btb_runtime_{16,64,256}` 实为 3 条 + `not_taken_returns_zero` 等另计）⇒ 台账红线「同一理由 ≤10 次」：BP 的 10 条按 4 组差异化理由写 |
+| 1 | Task 2 Step 5「单元测试出口二选一：(a) 不适用 / (b) 编译期多实例」 | ★ **v2.2 裁决 = (b)**：物理深度 **256 编译期固定** + **运行期 mask**（`& literal(M-1)`，M ∈ 16/32/64/128/256）⇒ 「运行时可配 BTB 尺寸」**成立** ⇒ 台账 `custom_btb_size` / `btb_runtime_{16,64,256}` **4 条升 covered**（★ 须有 **M=16/64/256 三档分别实例化**的 CH_MEM 侧 case ⇒ 主体 AC-18）⇒ ★ **MUST NOT** 保留 (a)（那会把「运行时可配」误判为不适用 ⇒ 与 v2.2 §3.2 矛盾） |
 | 2 | Task 6 Step 4「提供『可关闭 BP 的配置面』（**如 `CPUConfig` 字段**）」 | **CH_MEM 工厂不接 `CPUConfig`**（`cpu_factory_chmem.h:95-107` 显式「不读 cfg, 不引 CpuConfig 依赖」= ADR-088 §9.1 NG1-3）⇒ **照抄会挂** | 改为**工厂参数 + CLI flag 双层**（`build_cpu(..., std::optional<bool> enable_bp)` + `cpu_verilator_sim --enable-bp/--no-bp`），且**用普通 `bool` 不用 `optional<bool>`**（避免 nullopt 与「显式关闭」语义撞车） |
 | 3 | Task 3 Step 1「GHR 用 `ch_reg`（跨拍保持）」 | 未验证 | **PoC P-1 通过**（1→3→7）⇒ 结论成立，**无需降级** |
 | 4 | Task 5 Step 1「misprediction ⇒ `CtrlLink::flush_when`」 | CH_MEM 的 `flush_when(Condition)` **无有状态重载**（`ctrl_link.h:110` 只有 `Condition` 版；有状态版只有 `halt_when_stateful`）⇒ misprediction flush 信号若需跨拍保持**无对应 API** | misprediction 的 flush 信号按**组合路径**设计（misprediction 当拍即知）⇒ 不需要跨拍保持 ⇒ 用 `flush_when(ch_bool)` 即可 |
 | 5 | Task 5.5「先量 baseline（Verilog 体积 + verilator 编译耗时）」 | 未执行 | **Task 1.5 已查 `ch_mem` 是真数组存储**（`memimpl.h:27` `init_data_` vector + depth）⇒ Verilog 里是 `reg [N-1:0] mem [depth-1:0]` ⇒ **4096×32bit = 16Kbit reg array，体积可控**（不展开成 mux）⇒ 预算风险等级从「高」降为「中」（仍需实测编译耗时） |
+
+
+### ★★ per-file × per-symbol owner 表（★ v2.2 新增 —— metis 三审 S4/4a：三个 change 同改同一批文件而无 owner 表 ⇒ 边界实际不存在）
+
+| 文件 / 符号 | 前置1 | 前置2 | 主体 | ★ 约定 |
+|---|---|---|---|---|
+| `tests/cpu/manual_elf/branchbench/branchbench.c` | ✓ owner | ✗ | ✗（硬门禁） | ✅ 闭合 |
+| `soc/cpu/docs/dse/branchbench-baseline-matrix.csv` | ✓ **建列**（`workload_sha` / `build_id` / `bp_mode=off`）+ 改按表头取列 | ✓ **追加** BP 行 | ✓ **追加** BP 行 | ★ 建列归前置1；追加归后两者 |
+| `tools/measure_branchbench.sh` | ✓ owner（改名 / 按表头取列 / 捕获 stderr） | ✓ **仅追加** `--bp=on\|off` flag 行 + 生效值断言 | ✗（硬门禁） | ★ **捕获 stderr 归前置1**（否则假绿通道开着）⇒ 前置2 只加 flag |
+| `tools/verilator_runner/*` | ✓ `--stats` 框架 + **retired 计数** | ✓ **FLUSH 计数** + BP flag | ✓ `--no-bp` / `--btb-entries` + 回显 | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
+| `ip/cpu/plugins/branch_predictor_chmem.h` | ✗（禁 `ip/**`） | ✓ **创建**（最小版） | ✓ **重写**（完整版） | ★ 前置2 的 PoC 版 **MUST NOT** 被主体当作已完成 ⇒ 主体 AC-1 MUST 检查**完整功能**（非文件存在）；★ PoC 残留的**删除/重写责任归主体**；★ `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case **在主体后 MUST 仍绿**（机制锚） |
+| `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | ✓ **首次改**（五级 mux + flush 双分量 + FLUSH 计数） | ✓ **二次改**（补完整语义 + 过时注释 #8） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**四情形 select 链**结构 |
+| `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 参数转发） | ✗ | ✓ **首次注册**（BP 开关） | ✓ **补全**（4 参数转发修复 #9 + 完整注册） | ★ 同上 ⇒ 增量扩展 |
+| `docs/architecture/tlm-coverage-parity-ledger.md` | ✗（硬禁） | ✗（硬禁） | ✓ owner | ✅ 闭合 |
+| `ip/cpu/plugins/branch_predictor.{h,cpp}`（TLM 侧） | — | — | ✓ **全程保留**（AC-11） | ✅ 闭合 |
+
+### ★★ FLUSH 计数归属定案（★ v2.2 —— metis 三审 A7/4b：前置1 spec 要求输出 FLUSH 计数 vs 前置1 禁 `ip/**` ⇒ 互斥）
+
+⇒ ★ **裁决**：**FLUSH 事件数归前置2**。
+- 理由：FLUSH 是 DUT 内部 payload（`ibus_chmem.h:167` 的 `br_taken_buf`），**host 不可直接见** ⇒ 要计数须改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **违反前置1 的「不得触碰 `ip/**`」边界** ⇒ 前置1 **只交付 host 可导出的 retired 计数**（由 PC 轨迹导出）
+- ⇒ ★ **前置1 spec 的「已执行指令数须可观测」场景 MUST 改写**为「**取指次数**」口径（★ retired 需要 flush 数，在前置1 语境下不可得）⇒ 4 档的判据 = 「**除分支 PC 与其两个后继外**，各静态 PC 的取指次数逐档相同」
+- ⇒ ★ **前置2** 交付 FLUSH 计数（首个可改 `ip/` 的 change）⇒ 主体复用
+
+### ★★ 「归档时必须完成」归属（★ v2.2 —— metis 三审 3c：该 H2 不在 `## Acceptance` 下 ⇒ verifier 不查）
+
+⇒ ★ **已改为 AC-19 / AC-20 / AC-21**（在主体的 `## Acceptance` 内）⇒ verifier 会核。
 
 ### Task 1 实测留证（2026-10-24，branch `feature/chmem-bp-btb-gshare`）
 

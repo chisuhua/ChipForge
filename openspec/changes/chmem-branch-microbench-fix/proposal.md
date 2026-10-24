@@ -4,7 +4,7 @@ priority: P1
 version_target: v0.11.0
 status: ready
 created_from: docs/architecture/bp-btb-gshare-design-brief.md
-created_from_version: v2.1
+created_from_version: v2.2
 adr:
   - ADR-088
 depends_on: []

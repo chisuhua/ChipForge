@@ -16,13 +16,13 @@
 
 #### Scenario: 动态指令数相等须可证
 
-- **WHEN** 在 CH_MEM/Verilator 后端测量 4 档的**已执行指令数**
-- **THEN** 4 档的已执行指令数 MUST **相等**
+- **WHEN** 在 CH_MEM/Verilator 后端测量 4 档的**取指次数**
+- **THEN** ★ **除分支 PC 及其两个后继外**，各静态地址的取指次数 MUST **逐档相同**（★ **MUST NOT** 要求「全部取指次数相等」—— 方向本来就不同 ⇒ taken 档不取 fall-through 后继 ⇒ 该等式本就不成立）
 
 #### Scenario: 已执行指令数须可观测
 
 - **WHEN** 运行测量脚本
-- **THEN** MUST 输出**已执行指令数**与**FLUSH 事件数**两个计数（host 可见）⇒ 动态指令数相等与气泡计数 MUST 可复核（不得依赖「临时改 harness」的一次性测量）
+- **THEN** MUST 输出**取指次数**计数（host 可见，由 PC 轨迹导出）⇒ 工作量一致性 MUST 可复核（不得依赖「临时改 harness」的一次性测量）。★ **「已执行(retired)指令数」与「FLUSH 事件数」归前置2** —— FLUSH 是 DUT 内部 payload（`ibus_chmem.h:167` 的 `br_taken_buf`）⇒ **host 不可直接见** ⇒ 计数须改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **违反本 change 的「不得触碰 `ip/**`」边界**；★ 且 retired = 取指 − flush ⇒ **在本 change 语境下不可得**
 
 ### Requirement: branchbench-mode-name-direction
 

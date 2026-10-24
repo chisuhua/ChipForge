@@ -111,7 +111,7 @@ CH_MEM 侧与 TLM 侧的**注册差距 = 10 处**（TLM 工厂 19 处 `register_
 | **0a** | `chmem-verilator-perf-harness`（**交付点 A**） | Dhrystone harness + 测量脚本 + 基线 CSV + CI 门禁 | 无 | 中 | ✅ **已归档 2026-10-24** |
 | ~~0b~~ | ~~`chmem-load-use-bypass`~~ | **已作废**（实施期 PoC 证伪：禁用 RAW stall 后 cycles 不变 ⇒ 非根因）⇒ **不立项**（plan 留证） | — | — | ⛔ 作废 |
 | **0c** | `chmem-branch-microbench` | **分支微基准**（四档可控预测率）⇒ ② 的**中间验收**与 BP 增益量化（ADR-088 v1.2 P-5） | 无 | 小-中 | 📋 plan 已起草 |
-| 1 | `chmem-bp-btb-gshare` | `branch_predictor_chmem.h`（BTB 4K + GShare 13-bit + RAS 8-entry）+ 工厂注册。★**地位升级**（ADR-088 v1.2 §5.3.2 **P-6**）：既是 §3 BP 行的门禁载体，**又是 CH_MEM 绝对值 1.4 门禁恢复的必要条件**（差距根因 = 无 BP ⇒ 与本项同源） | **#0c**（中间验收）✅ 已归档 | 大 | 📋 plan + **实施边界简报**已起草（`chmem-bp-btb-gshare.md` + `chmem-bp-btb-gshare-brief.md`）|
+| 1 | `chmem-bp-btb-gshare` | `branch_predictor_chmem.h`（**BTB 256×64b（62b 编码）+ Bimodal 2-bit PHT**；★ **GShare / RAS 延后**，依架构简报 v2.2 §3.1）+ 工厂注册 + 五级 next_pc 嵌套。★**地位升级**（ADR-088 v1.2 §5.3.2 **P-6**）：既是 §3 BP 行的门禁载体，**又是 CH_MEM 绝对值 1.4 门禁恢复的必要条件**（差距根因 = 无 BP ⇒ 与本项同源） | **#0c**（中间验收）✅ 已归档 | 大 | 📋 plan + **实施边界简报**已起草（`chmem-bp-btb-gshare.md` + `chmem-bp-btb-gshare-brief.md`）|
 | 2 | `chmem-l1cache-body`（D3 改名） | L1CachePlugin CH_MEM 本体 + 工厂 `enable_cache=true` 解禁 + 容量参数表 + refill FSM 存废裁决 | 本体无前置；**接 Cache（阶段 B）需 #3 阶段 A 就位**（★原写「需 #0b」已作废 —— #0b PoC 证伪） | 大 | 📋 plan 已起草 |
 | 3 | `chmem-dbus-lsu` | **抽取重构** `dmem_chmem.h` 的宽度语义 + **总线仲裁层**（宽度语义**早已存在** ⇒ 非「补齐」） | 阶段 A 无前置；阶段 B 需 #2（★原写「需 #0b」已作废 —— #0b PoC 证伪） | 中 | 📋 plan 已重写 |
 | 4a | `chmem-ptw-walk-core` | PTW **单元级**：`FsmBase` 封装 + `MMU_TLB` 两级 + `MMU_PTW` walk + `PTWCache` + D16 变更面 | **无**（不依赖 C.x）⇒ **现在可启动** | 中大 | 📋 plan 已起草（`.rddf/plans/chmem-ptw-walk-core.md`）|

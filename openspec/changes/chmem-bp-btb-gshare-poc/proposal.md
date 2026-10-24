@@ -4,7 +4,7 @@ priority: P1
 version_target: v0.11.0
 status: ready
 created_from: docs/architecture/bp-btb-gshare-design-brief.md
-created_from_version: v2.1
+created_from_version: v2.2
 adr:
   - ADR-088
 depends_on:
@@ -70,7 +70,7 @@ depends_on:
 
 ## Acceptance
 
-见 `tasks.md` 的 AC-F2-1 … AC-F2-11（**逐条对应架构简报 §4.2**）。
+见 `tasks.md` 的 AC-F2-1 … AC-F2-15（★ 逐条对应架构简报 v2.2 §4.2；★ **AC-F2-12…15 为三审新增**）。
 
 ## References
 

@@ -4,7 +4,7 @@ priority: P1
 version_target: v1.0.0
 status: ready
 created_from: docs/architecture/bp-btb-gshare-design-brief.md
-created_from_version: v2.1
+created_from_version: v2.2
 adr:
   - ADR-088
   - ADR-040
@@ -94,7 +94,11 @@ depends_on:
 
 ## Acceptance
 
-见 `tasks.md` 的 AC-1 … AC-15（**逐条对应架构简报 §4.3**）。
+见 `tasks.md` 的 AC-1 … AC-25（★ 逐条对应架构简报 v2.2 §4.3；★ **AC-16/19/20/21/22/23/24/25 为 v2.2 新增**）。
+
+## ★ per-file owner 表
+
+见架构简报 v2.2 §「per-file × per-symbol owner 表」⇒ ★ **三个 change 同改同一批文件时的归属**（尤其 `branch_predictor_chmem.h` / `ibus_chmem.h` / `cpu_factory_chmem.h` / `tools/verilator_runner/*` / `measure_branchbench.sh`）⇒ ★ 前置2 的 PoC 版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ PoC 残留的**删除/重写责任归主体**，且 `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case **在主体后 MUST 仍绿**（机制锚）
 
 ## References
 
