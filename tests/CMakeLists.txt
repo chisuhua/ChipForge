@@ -154,6 +154,9 @@ set(CHMEM_TEST_SOURCES
     # CPU/CSR payload key 模式化 + 拆 csr_chmem 常量折叠 (Phase C.1 硬前置)
     # — openspec change chmem-cpu-keys-modality
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_keys_modality.cpp
+    # chmem-bp-btb-gshare Task 1 可行性 PoC (硬门禁: 全绿才允许进 Task 2)
+    # — ch_reg 跨拍 / ch_mem 动态索引 / 2-bit PHT / 越界读=0 / 活节点
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_bp_poc.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES

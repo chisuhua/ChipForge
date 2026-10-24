@@ -50,13 +50,54 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 
 ### Task 1: 事实复核 + TLM 版语义提取（不写 CH_MEM 代码）
 
-- [ ] **Step 1: 读 TLM 版** —— `ip/cpu/plugins/branch_predictor.h`（319 行）+ `.cpp`（23 行）⇒ 提取**可测语义**：BTB 索引/替换策略/tag 比较、GShare 13-bit 历史移位与 PHT 2-bit 饱和计数、RAS 8-entry push/pop、misprediction 时的恢复动作
-- [ ] **Step 2: 提取 BP 判据全集（★v2 修正：v1 误引台账 §7 且漏 4 条）** —— BP 相关条目共 **14 条**，分布在台账 **§4 条目区**（不是 §7 裁决表）：
+- [x] **Step 1: 读 TLM 版** —— `ip/cpu/plugins/branch_predictor.h`（319 行）+ `.cpp`（23 行）⇒ 提取**可测语义**：BTB 索引/替换策略/tag 比较、GShare 13-bit 历史移位与 PHT 2-bit 饱和计数、RAS 8-entry push/pop、misprediction 时的恢复动作
+- [x] **Step 2: 提取 BP 判据全集（★v2 修正：v1 误引台账 §7 且漏 4 条）** —— BP 相关条目共 **14 条**，分布在台账 **§4 条目区**（不是 §7 裁决表）：
   - **10 条 `not-covered`**（§4 行 264–266, 271–274 + 行 349, 351, 357）：`no_predict_initially` · `predict_after_update` · `btb_entry` · `custom_btb_size` · `btb_runtime_16` · `btb_runtime_64` · `btb_runtime_256` · `d2_branch_predictor_multi_thread` · `d4_branch_predictor_tid_param` · `branch_predictor_set_tid_stores_tid`
   - **4 条 `partial`**（§4 行 267–270，**v1 完全漏掉**）：`not_taken_returns_zero` · `multiple_addresses` · `reset` · `per_thread_ghr_isolation`
   - ⇒ **14 条全部要重判**（10 条降级 + 4 条升级方向）；行号以台账实际为准，实施时 grep 复核（pattern: `^\| \`(btb_|predict|no_predict|not_taken|multiple_addresses|reset|per_thread_ghr|d2_branch_predictor|d4_branch_predictor|branch_predictor_set_tid)`）
-- [ ] **Step 3: 确认 canonical ordering** —— BP 在 fetch 路径 ⇒ 查 ADR-048 的注册规范序 + `cpu_factory_chmem.h` 现有 8-plugin 顺序 ⇒ 定 BP 的注册位（**必须**用 `tools/verify_plugin_decision.sh` 验证）
-- [ ] **Step 4: 确认 ① 已归档** —— ①（`chmem-verilator-perf-harness`）✅ 已归档 2026-10-24（基线 CSV 入库 + harness ctest PASS）⇒ **本 change 的功能实现可立即开工**；★但 **性能验收（Task 6 Step 4）另需**：`chmem-branch-microbench` 基线（增益度量）+ P-2 落地（绝对值判据）
+- [x] **Step 3: 确认 canonical ordering** —— BP 在 fetch 路径 ⇒ 查 ADR-048 的注册规范序 + `cpu_factory_chmem.h` 现有 8-plugin 顺序 ⇒ 定 BP 的注册位（**必须**用 `tools/verify_plugin_decision.sh` 验证）
+- [x] **Step 4: 确认 ① 已归档** —— ①（`chmem-verilator-perf-harness`）✅ 已归档 2026-10-24（基线 CSV 入库 + harness ctest PASS）⇒ **本 change 的功能实现可立即开工**；★但 **性能验收（Task 6 Step 4）另需**：`chmem-branch-microbench` 基线（增益度量）+ P-2 落地（绝对值判据）
+
+### Task 1.5: ★实施期差距表 + 机制结论（2026-10-24 实测产出）
+
+> **本节是 Task 1 的交付物**（plan 要求「输出一张表… 无表 ⇒ 不进实施」）。
+> PoC 代码：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（**7 case / 40 assertions 全绿**，
+> 归属 `chipforge_tests_chmem` binary）。
+
+#### 差距表（现有 `PtWalkFsmPlugin` / `branch_predictor.h` → ADR-085/086 目标架构）
+
+| 现有实现位置 | ADR-085/086 条款 | 差距描述 | 处置 | 落到 Task |
+|---|---|---|---|---|
+| `ip/cpu/plugins/mmu_ptw_chmem.h`（**不在 BP 范围**，仅记录） | D01/D04/D10/D18 | 裸 `ch_state_machine` DSL / 违规目录 / 无 PTWCache | **不属本 change** | ⑤ 批 1/2 |
+| `ip/cpu/plugins/branch_predictor.h:150` `BranchPredictorPlugin`（**TLM 侧**，319 行） | ADR-088 §3 BP 行 | CH_MEM 侧**完全不存在**（符号数 0）⇒ **不是「移植」而是「CH_MEM-only 新写」** | **新写** `branch_predictor_chmem.h`（不复用 TLM 类的私有成员结构） | Task 2/3/4 |
+| `branch_predictor.h:85` `kNumThreads`（TLM 模板参数） | ADR-040 §10.5 | CH_MEM 侧**无框架级多线程 TID 机制** ⇒ 3 条 TID 台账条目**无对应物** | **不实现**（台账显式 `not-covered` + 理由「CH_MEM 侧无框架级多线程 TID 机制」） | Task 7 Step 3 |
+| `branch_predictor.h:48` `btb_entries`（运行时构造参数） | brief §3.3 | `ch_mem` depth 是**编译期模板参数** ⇒ 运行时改表项数**无载体** | **固定容量 + 运行时逻辑条目数**（读 0 ⇒ 未命中，PoC P-4 已证） | Task 2 Step 1 |
+| —（新） | ADR-040 §10.6 | 生产者/消费者顺序契约 | BTB/PHT 更新走 **payload 驱动**（生产者写 payload，消费者 `bits<>` 派生地址） | Task 2/3 |
+| —（新） | ADR-046 | 多周期协议引擎豁免 | **不需要**：BTB/GShare/RAS 全是**组合读 + 状态存储**，**无 FSM** ⇒ **不写 `CF_PLUGIN_USE_FSM_EXEMPT`** | Task 2/3/4 |
+
+#### ★ PoC 机制结论（7 条，**对实现的硬约束**）
+
+| # | 结论 | PoC 锚 | 对实现的约束 |
+|---|---|---|---|
+| 1 | **C++ 侧常量 ⇒ elaboration 期常量**（ADR-040 §10.5 的机制根源） | P-5 / P-5b | 预测方向/目标/写使能**必须**是 ch 节点，**禁** `static_cast<bool>` |
+| 2 | **mem 写地址必须是「payload 派生的组合表达式」**；用 `ch_reg` proxy 直接当地址 ⇒ 索引被解析成 **0**（写到**错误表项** ⇒ 静默错乱） | **P-2N（负例，已钉死）** / P-2 | BTB/PHT 写地址 = `bits<...>(payload PC)`；**禁** proxy 直接作地址 |
+| 3 | **读/写共用同一地址表达式** | P-2 | BTB 读端口与写端口用同一 `bits<>` 表达式 |
+| 4 | **enable 可以是 reg proxy**（与 addr 限制不同） | P-2B | 写使能可用 payload 里的真实 `BRANCH_TAKEN` |
+| 5 | **2-bit PHT 可行** | P-3 | `ch_mem<ch_uint<2>, N>` 承载 2-bit 饱和计数器 ⇒ 体积不膨胀 |
+| 6 | **越界索引读 = 0** | P-4 | 「固定容量 + 运行时逻辑条目数」成立 |
+| 7 | **`ch_reg` 跨拍保持成立**（1→3→7） | P-1 | GHR 13-bit 全局历史用 `ch_reg` 可行（brief §5.2 P-1 待验项**通过**） |
+
+#### ★ 分支信号源已核实（BP 更新的 payload 输入全部存在）
+
+| BP 需要 | CH_MEM 现成来源 | 出处 |
+|---|---|---|
+| 分支 PC | `KT::PC`（branch stage） | `branch_chmem.h:167` `pc_val = n->operator()(KeyType::PC)` |
+| 真实方向 | `BranchPlugin::BRANCH_TAKEN` | `branch_chmem.h:236` |
+| 目标地址 | `RvKey::BRANCH_TARGET` | `branch_chmem.h:237` |
+| PC-mux 接入点 | `pc_reg <<= select(br_taken, br_target, pc+4)` | `ibus_chmem.h` `update_pc`（`branch` LATE） |
+
+⇒ **BP 可落地**：在 fetch 期用 BTB 预测目标，产出 `predicted_target` / `predicted_taken`
+payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB/PHT 更新。
 
 ### Task 2: BTB 实现（CH_MEM）
 
@@ -154,3 +195,26 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 ## 迁移说明
 
 落地为 `.rddf/plans/chmem-bp-btb-gshare.md`；建议**完整 rdd-builder P1–P3**（规模大 + 触及 CH_MEM 组合通路的架构假设 + 需 architect 参与 R1/R2 判定），不走 rdd-quick。
+
+---
+
+## 实施期修正（2026-10-24，Task 1 产出）
+
+| # | plan v1 的设计 | 实测问题 | 修正 |
+|---|---|---|---|
+| 1 | Task 2 Step 5「单元测试出口二选一：(a) 不适用 / (b) 编译期多实例」 | **`ch_mem` depth 是编译期模板参数** ⇒ (b) 的「不同容量模板实例」在 `ch_mem<...,N>` 上**可行但代价 = 每实例一份数组**；而台账条目 `custom_btb_size` / `btb_runtime_*` 的语义是「**运行时**改表项数」⇒ 即便 (b) 也**不满足**「运行时」语义 | 出口定为 **(a) 不适用** + **显式手写理由**（`ch_mem` 编译期固定 ⇒ CH_MEM 静态 elaboration 无运行时重配置面）⇒ 4 条 `not-covered`（10 条中的 `custom_btb_size`/`btb_runtime_{16,64,256}` 实为 3 条 + `not_taken_returns_zero` 等另计）⇒ 台账红线「同一理由 ≤10 次」：BP 的 10 条按 4 组差异化理由写 |
+| 2 | Task 6 Step 4「提供『可关闭 BP 的配置面』（**如 `CPUConfig` 字段**）」 | **CH_MEM 工厂不接 `CPUConfig`**（`cpu_factory_chmem.h:95-107` 显式「不读 cfg, 不引 CpuConfig 依赖」= ADR-088 §9.1 NG1-3）⇒ **照抄会挂** | 改为**工厂参数 + CLI flag 双层**（`build_cpu(..., std::optional<bool> enable_bp)` + `cpu_verilator_sim --enable-bp/--no-bp`），且**用普通 `bool` 不用 `optional<bool>`**（避免 nullopt 与「显式关闭」语义撞车） |
+| 3 | Task 3 Step 1「GHR 用 `ch_reg`（跨拍保持）」 | 未验证 | **PoC P-1 通过**（1→3→7）⇒ 结论成立，**无需降级** |
+| 4 | Task 5 Step 1「misprediction ⇒ `CtrlLink::flush_when`」 | CH_MEM 的 `flush_when(Condition)` **无有状态重载**（`ctrl_link.h:110` 只有 `Condition` 版；有状态版只有 `halt_when_stateful`）⇒ misprediction flush 信号若需跨拍保持**无对应 API** | misprediction 的 flush 信号按**组合路径**设计（misprediction 当拍即知）⇒ 不需要跨拍保持 ⇒ 用 `flush_when(ch_bool)` 即可 |
+| 5 | Task 5.5「先量 baseline（Verilog 体积 + verilator 编译耗时）」 | 未执行 | **Task 1.5 已查 `ch_mem` 是真数组存储**（`memimpl.h:27` `init_data_` vector + depth）⇒ Verilog 里是 `reg [N-1:0] mem [depth-1:0]` ⇒ **4096×32bit = 16Kbit reg array，体积可控**（不展开成 mux）⇒ 预算风险等级从「高」降为「中」（仍需实测编译耗时） |
+
+### Task 1 实测留证（2026-10-24，branch `feature/chmem-bp-btb-gshare`）
+
+| 项 | 实测 |
+|---|---|
+| PoC 文件 | `tests/cpu/test_cpu_chmem_bp_poc.cpp`（**7 case / 40 assertions 全绿**） |
+| PoC 归属 | `chipforge_tests_chmem` binary（CH_MEM 专属 ⇒ 需 `#ifdef CF_PLUGIN_USE_CH_MEM` **整体 guard**，且 guard 必须在**所有 include 之前**，否则 TLM binary 会编译 CppHDL 头 ⇒ 符号重复定义） |
+| 探索规模 | 实施期共跑 **20 个对照 case**（含 A/B/C 三变体 + 3 决定性对照 + 逐拍观测 + 全 entry 扫描）⇒ 收敛为最终 **7 个**（保留有决策价值的 + 钉死 1 个负例） |
+| 机制结论 | **7 条**（见 Task 1.5 表）⇒ 核心 = **mem 写地址必须 payload 派生**（proxy 作地址 ⇒ 索引解析成 0 ⇒ 写到错误表项） |
+| 分支信号源 | 已核实齐备（`KT::PC` / `BRANCH_TAKEN` / `BRANCH_TARGET` / `update_pc` 的 PC-mux） |
+| 差错误判（已更正） | 实施中曾判定「套件内存在测试间干扰」⇒ **该判断错误**（行号映射错误）；事实 = **套件失败集合 == 单跑失败集合** ⇒ 无干扰 |
