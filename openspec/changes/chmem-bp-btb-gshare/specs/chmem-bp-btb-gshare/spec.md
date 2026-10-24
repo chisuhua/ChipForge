@@ -1,8 +1,5 @@
 ## ADDED Requirements
 
-> Capability topic: `chmem-bp-btb-gshare`（CH_MEM 后端的分支预测器）。
-> 上游 = ADR-088 v1.2 §3 BP 行 + 架构简报 `docs/architecture/bp-btb-gshare-design-brief.md` v2.1。
-
 ### Requirement: chmem-branch-predictor-structure
 
 CH_MEM 后端 MUST 具备分支预测器结构：**分支目标缓冲（BTB）** + **方向预测（2-bit 饱和计数器）**，并 MUST 已被 CH_MEM 工厂注册。
@@ -38,6 +35,11 @@ BTB 表项 MUST 在**单个 64 位字**内编码分支地址与目标，且 MUST
 
 #### Scenario: 间接跳转不建表项
 
+#### Scenario: 无条件跳转可预测
+
+- **WHEN** 某条无条件跳转被建立表项
+- **THEN** 表项 MUST 记录「该跳转是无条件跳转」的标志 ⇒ 预测方向 MUST 为「跳转」（MUST NOT 依赖方向表项 —— 无条件跳转不占方向表项）
+
 - **WHEN** 遇到间接跳转
 - **THEN** MUST **不**为其建立 BTB 表项（目标随运行时变化，静态缓存必然错误）⇒ 该跳转 MUST 走顺序取指
 
@@ -60,6 +62,11 @@ BTB 表项 MUST 在**单个 64 位字**内编码分支地址与目标，且 MUST
 方向预测器 MUST 从**已解析的分支**学习，无论该分支实际是否跳转。
 
 #### Scenario: 未跳转的分支也被学习
+
+#### Scenario: 饱和计数器语义
+
+- **WHEN** 方向计数器的值被更新
+- **THEN** 计数 MUST 按「0→1→2→3（饱和，不回退）」演化；★ 预测为「跳转」的阈值 MUST 为「计数 ≥ 2」
 
 - **WHEN** 一个未跳转的条件分支被解析
 - **THEN** 方向预测表 MUST 被更新（MUST NOT 仅在跳转时更新 ⇒ 否则预测器学不到「不跳转」⇒ 在以不跳转为主的负载上产生净负收益）

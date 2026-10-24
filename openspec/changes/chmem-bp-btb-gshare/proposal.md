@@ -4,6 +4,7 @@ priority: P1
 version_target: v1.0.0
 status: ready
 created_from: docs/architecture/bp-btb-gshare-design-brief.md
+created_from_version: v2.1
 adr:
   - ADR-088
   - ADR-040
@@ -41,14 +42,26 @@ depends_on:
 | 可消除的气泡总量 | 120065 |
 | ⇒ **净命中率门槛** | **≥ 84.5%** |
 
-⇒ ★ 「GShare 延后」**不是低风险决定** —— 它把 1.4 门禁押在「Bimodal（无全局历史）能否达到 84.5%」这个**未验证**的假设上 ⇒ ★ **若前置2 报告的可达命中率下界 < 84.5% ⇒ 不得以「GShare 延后」结案**。
+⇒ ★ 「GShare 延后」**不是低风险决定** —— 它把 1.4 门禁押在「**Bimodal（无全局历史）能否在 Dhrystone 的分支混合上达到 84.5% 净收益率**」这个**未验证**的假设上。
+⇒ ★ **裁决 C-2（范围）须由前置2 的实测数据触发复核**：若前置2 报告的**可达净收益率下界 < 84.5%** ⇒ **不得以「GShare 延后」结案** ⇒ 须回 ② 补 GShare（或另立 change）。
+
+#### ★★ oracle 复审发现 2：**`jal` 的方向无来源 ⇒ call 气泡可能不可恢复**（architect 待追认项）
+
+| 项 | 内容 |
+|---|---|
+| **问题** | `jal`（无条件跳转）**不占 PHT 表项**（简报 §3.3）⇒ 其 PHT 项恒 0 ⇒ 若 `pred_taken = hit && (pht ≥ 2)` ⇒ ★ **`jal` 永不被预测** ⇒ call 气泡不可恢复 |
+| **叠加** | `jalr`（含 `ret`）**不建 BTB 项**（间接跳转目标每次不同）⇒ 同样不可预测 ⇒ Dhrystone 的 call/ret 气泡**双重不可恢复** |
+| **对 84.5% 门槛的影响** | 若 call+ret 占 120065 次 taken 转移的比例 **> 15.5%** ⇒ ★ **84.5% 门槛在构造上不可达** ⇒ 「GShare 延后」结案不成立 |
+| **★ 已采纳的处置** | BTB 表项**增加 `is_unconditional` 位** ⇒ `pred_taken = hit && (is_unconditional \|\| pht ≥ 2)` ⇒ `jal` **可预测**（`jalr` 仍不可预测，因其目标本质上运行时决定） |
+| **★ 待 architect 追认** | ① `is_unconditional` 位是否采纳（本 change 已按采纳设计，**需 architect 追认**）② 前置2 **MUST 报告** `jal` / `jalr` / taken 转移数的比例 ⇒ 若 `jalr` 占比使 84.5% 构造上不可达 ⇒ architect 须重裁绝对值门禁路径（**不得**由实施者自裁） |
+| 落点 | 本 proposal + 主体 `design.md` §4.1 + 主体 `tasks.md` **AC-17** + 前置2 `tasks.md` **AC-F2-15** |
 
 ## What Changes
 
 ### In Scope（7 项）
 
 1. **`ip/cpu/plugins/branch_predictor_chmem.h`（新）** —— **BTB（256×64b）+ Bimodal 2-bit PHT（256×2b）**
-2. **BTB 布局** —— **全 32b PC 作 tag + 32b target，valid 偷 target 的 `[1:0]`**（RV32 无 C 扩展 ⇒ target 4 字节对齐 ⇒ `[1:0]` 恒 0 ⇒ 恰好 64b ⇒ 天然消除「tag=0 假命中」）
+2. **BTB 布局** —— ★ **62b 打包**：`{tag30 = PC[31:2], target30 = target[31:2], valid(1b), is_unconditional(1b)}`（余 2 bit）⇒ 依据：**CH_MEM 只解 32 位指令**（`decode_chmem.h:82` 的 `instr_format` 无 16 位格式）⇒ `PC[1:0]=0`、target 4 字节对齐 ⇒ 低位恒 0 ⇒ 可安全裁掉。★ **`is_unconditional` 位是必需的**（见下「oracle 复审发现 2」）
 3. **逻辑条目数 M** —— 物理 256 固定（编译期）+ **运行期 mask** `& literal(M-1)`，M ∈ {16,32,64,128,256}
 4. **fetch NORMAL 预测 + branch LATE 接入** —— ★ **五级 mux 嵌套**（`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
 5. **flush 语义改写** —— `br_taken_buf` 分量替换为 `mispredict_buf`，**`hold_z` 保留**
@@ -89,3 +102,8 @@ depends_on:
 - 执行文件：`.rddf/plans/chmem-bp-btb-gshare.md`（★ 顶部有 **v2.1 覆盖声明**，逐条作废旧 Goal/Task/AC）
 - 前置：`chmem-branch-microbench-fix` · `chmem-bp-btb-gshare-poc`
 - 机制结论：`tests/cpu/test_cpu_chmem_bp_poc.cpp`
+
+## 规格来源（spec preamble 的归档副本）
+
+> Capability topic: `chmem-bp-btb-gshare`（CH_MEM 后端的分支预测器）。
+> 上游 = ADR-088 v1.2 §3 BP 行 + 架构简报 `docs/architecture/bp-btb-gshare-design-brief.md` v2.1。

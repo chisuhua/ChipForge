@@ -1,8 +1,5 @@
 ## ADDED Requirements
 
-> Capability topic: `chmem-bp-btb-gshare-poc`（CH_MEM 分支预测的**机制可行性 PoC**）。
-> 上游 = `docs/architecture/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §4.2。
-
 ### Requirement: bp-speculative-fetch-mechanism
 
 CH_MEM 侧 MUST 存在**提前一拍**的分支预测机制：预测结果 MUST 作用于**下一次取指地址**的选择，使正确预测的 taken 控制转移 MUST **不产生 fall-through 取指**。

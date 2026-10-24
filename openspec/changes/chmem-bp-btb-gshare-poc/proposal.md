@@ -4,6 +4,7 @@ priority: P1
 version_target: v0.11.0
 status: ready
 created_from: docs/architecture/bp-btb-gshare-design-brief.md
+created_from_version: v2.1
 adr:
   - ADR-088
 depends_on:
@@ -64,7 +65,7 @@ depends_on:
 ## Impact
 
 - **代码**：`ip/cpu/plugins/branch_predictor_chmem.h`（最小版）· `ip/cpu/plugins/ibus_chmem.h`（PC-mux + flush）· `ip/cpu/cpu_factory_chmem.h`（注册 + 开关）
-- **工具**：`tools/verilator_runner/`（`--stats`）· `tools/measure_branchbench.sh`（`--bp=on|off`）
+- **工具**：`tools/verilator_runner/`（`--stats`；★ **FLUSH 事件数计数器归本 change** —— FLUSH 是 DUT 内部 payload，host 不可见 ⇒ 需改 `ip/cpu/plugins/ibus_chmem.h`）· `tools/measure_branchbench.sh`（★ **仅追加** BP flag（`--bp=on|off`）与生效值断言相关行；★ **MUST NOT** 触碰 `MODE_NAMES` 数组与表头解析逻辑 —— 前置1 的范围）
 - **下游**：② 主体依赖本 change 的机制结论 + 命中率数据
 
 ## Acceptance
@@ -76,3 +77,8 @@ depends_on:
 - 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §3.4.2 / §4.2
 - 前置：`chmem-branch-microbench-fix`
 - 机制结论：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（8 case / 51 assertions 全绿）
+
+## 规格来源（spec preamble 的归档副本）
+
+> Capability topic: `chmem-bp-btb-gshare-poc`（CH_MEM 分支预测的**机制可行性 PoC**）。
+> 上游 = `docs/architecture/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §4.2。

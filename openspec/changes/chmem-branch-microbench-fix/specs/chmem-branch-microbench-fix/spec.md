@@ -1,8 +1,5 @@
 ## ADDED Requirements
 
-> Capability topic: `chmem-branch-microbench-fix`（分支微基准的**工作量污染修正** + **档名方向修正**）。
-> 上游 = `docs/architecture/bp-btb-gshare-design-brief.md` §2.4 / §4.1。
-
 ### Requirement: branchbench-dynamic-instruction-parity
 
 分支微基准的各档 MUST 具备**相同的动态指令数**。`.text` 逐字节相同**仅**保证静态代码一致，MUST NOT 被当作动态指令数相同的证据。
