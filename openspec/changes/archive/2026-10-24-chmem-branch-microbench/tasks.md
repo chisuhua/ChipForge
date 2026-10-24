@@ -36,6 +36,7 @@ status: in-progress
 - [x] AC-3 4 档均跑完（`TOHOST` = 校验和|1，LSB=1 ⇒ done 位成立 ⇒ cycle 计数 = 真实完成时刻）+ **宿主侧校验和与基线逐位相等**（不符 ⇒ exit 1 且不产出数值）
 - [x] AC-4 基线 CSV 入库（4 档 = **无 BP 参照值**）+ `--check-baseline` **精确相等**漂移检测（负例实测 exit 1）
 - [x] AC-5 ctest entry `branchbench_baseline`（LABELS `verilator;perf;e2e`，TIMEOUT 300，实测 82.16s）+ CI 门禁 step（warn 级，steps 12 → **13**；缺 binary/elf 显式 SKIP）
+      - ⚠️ **诚实更正**：CI **不构建项目** ⇒ 该 step 在 CI 中**恒 SKIP** ⇒ **挂载点 ≠ 已生效门禁** ⇒ 判据 4 仍未满足（「CI 具备 build 能力」= B3 前置）
 - [x] AC-6 8 架构门禁全 PASS + 全量回归 0 退化 + **零 `ip/` 改动**
 - [x] AC-7 **不依赖 CoreMark** ⇒ ② 的中间验收不被交付点 B 阻塞
 

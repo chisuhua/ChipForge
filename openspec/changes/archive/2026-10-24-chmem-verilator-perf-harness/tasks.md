@@ -41,6 +41,8 @@ status: in-progress
 - [x] AC-5 **程序结果正确性**：判据 = **TOHOST==1 且非 TIMEOUT**（`dhrystone.c:283 tohost_pass()` 写 1 后死循环 ⇒ 等价于 2000 迭代全部完成）；测量脚本在结果错误/超时时**失败且不产出数值**（负例实测：缺 elf ⇒ exit 1；基线漂移 ⇒ exit 1）
 - [x] AC-6 **cycles 口径**：来自 `sim_main.cpp` 计数器（`CYCLES=%u`），**不含** wall-clock / elaboration / 编译时间
 - [x] AC-7 **基线未漂移 = 精确相等**（无容差）；CI 门禁 step（warn 级）已接入 `architecture-gates.yml`（steps 11 → **12**）
+      - ⚠️ **诚实更正（2026-10-24 实施后自查）**：CI 的 `architecture-gates.yml` **不构建项目**（其唯一的 cmake 是从源码构建 **Verilator 本身**）⇒ 该 step 在 CI 中**恒走 SKIP 分支**（缺 `build/bin/cpu_verilator_sim`）⇒ **目前零实际保护** ⇒ 本 step 是**挂载点（hook）**，**不是**已生效的门禁
+      - ⇒ **ADR-088 §5.2 判据 4「CI 有可回归的自动测试」仍【未满足】**（既非 ctest，也非本 step）⇒ 「CI 具备 build 能力」登记为 **B3 前置**
 - [x] AC-8 新基线 CSV `soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv` 存在且**只含** `mode=verilator` 行；既有 `dhrystone-baseline-matrix.csv` **零改动**（TLM 侧实测 794478/1.43277 逐位一致 ⇒ 旧基线仍有效）
 - [x] AC-9 CSV 数值由脚本实跑产出；notes 标注「裁剪版 workload」+「cycle 与 TLM 不可比（ADR-088 §3）」+「旧单 RWE 段 elf 不可比」
 - [x] AC-10 8 架构门禁全 PASS + 全量回归 0 退化 + **`ip/**` 零改动**

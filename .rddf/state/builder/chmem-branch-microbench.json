@@ -1,0 +1,75 @@
+{
+  "schema": "builder-handoff-v1",
+  "version": 1,
+  "owner": "rdd-builder",
+  "change_name": "chmem-branch-microbench",
+  "current_phase": "phase-3",
+  "approval_status": "approved",
+  "plan_quality_status": "reviewed",
+  "p0_decision": {
+    "case": 1,
+    "route": "full-p1-p3",
+    "decided_at": "2026-10-24T19:05:00Z",
+    "decided_by": "auto-decision (ADR-0049)",
+    "llm_assessment": "complex",
+    "planner_advisory": "unknown",
+    "agreement": "yes",
+    "ac_count": 7,
+    "concerns": [
+      "7 文件 + CI 门禁 => 完整 P1-P3",
+      "0 ip/ 改动 => 与业务代码解耦",
+      "不依赖 CoreMark => 不被交付点 B 阻塞 (ADR-088 v1.2 P-5)"
+    ]
+  },
+  "execution_mode_decision": {
+    "mode": "in-place",
+    "branch": "feature/chmem-branch-microbench",
+    "rationale": "用户确认 in-place + feature branch"
+  },
+  "deps_status": {
+    "blockers": [],
+    "manual_deps": [],
+    "cross_repo_pending": [],
+    "deps_analysis": {
+      "note": "无前置; 是 ② chmem-bp-btb-gshare 的中间验收前置"
+    }
+  },
+  "worktree_path": "",
+  "branch": "feature/chmem-branch-microbench",
+  "execution_status": "completed",
+  "review_status": "passed",
+  "retry_count": 0,
+  "max_retries": 3,
+  "retry_history": [],
+  "phase_pause_history": [
+    {
+      "phase": "phase-0",
+      "event": "approved",
+      "at": "2026-10-24T19:05:00Z",
+      "note": "0c 立项 (proposal + spec + tasks); 4 档可控预测率负载"
+    },
+    {
+      "phase": "phase-2",
+      "event": "executed",
+      "at": "2026-10-24T19:35:00Z",
+      "note": "4 档 .text sha256 一致 (5a7c0b2c4265c156); 无 BP 参照 66034/68034/79534/73012; 变异 2/2 检出; 实施期 5 处纠正 (golden/mode 移出编译期常量等); 8 门禁全绿; 0 个 ip/ 改动"
+    },
+    {
+      "phase": "phase-2.5",
+      "event": "review-passed",
+      "at": "2026-10-24T19:50:00Z",
+      "note": "AC 7/7; 含 CI 诚实更正 (CI 不构建项目 => 测量 step 恒 SKIP => 判据 4 仍未满足, 登记 B3 前置)"
+    },
+    {
+      "phase": "phase-3",
+      "event": "archived",
+      "at": "2026-10-24T19:55:00Z",
+      "note": "openspec archive 完成; 全量回归 1496.46s: 6 entry, 失败集合恰 1 个 pre-existing"
+    }
+  ],
+  "archive_status": "archived",
+  "archive_path": "openspec/changes/archive/2026-10-24-chmem-branch-microbench",
+  "spec_path": "openspec/specs/chmem-branch-microbench/spec.md",
+  "verifier_report_path": ".rddf/reviews/chmem-branch-microbench-p2.5-review.md",
+  "updated_at": "2026-10-24T19:55:00Z"
+}

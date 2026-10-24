@@ -47,6 +47,7 @@ Dhrystone 的可执行 ELF MUST 以**恰好两个** `PT_LOAD` 段交付：段 0 
 ### Requirement: chmem-perf-harness-ci-gate
 
 MUST 提供 CI 门禁步骤（warn 级）调用测量脚本执行「基线未漂移」校验并接入架构门禁 workflow。**仅新增 ctest entry 不满足该要求**（CI 不运行 ctest）。
+⚠️ **生效前提**: 该步骤在 CI 中需要 `build/bin/cpu_verilator_sim` 与 `build/dhrystone.elf` 存在; 而当前 `architecture-gates.yml` **不构建项目**（其唯一的 cmake 是构建 Verilator 本身）⇒ 步骤会走 SKIP 分支 ⇒ **挂载点 ≠ 已生效门禁**; 步骤 MUST 在缺产物时显式 SKIP 并成功退出（不得误判为通过）。
 
 #### Scenario: CI 可见违规
 
