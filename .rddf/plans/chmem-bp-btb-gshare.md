@@ -96,7 +96,12 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 - [ ] **Step 1: 注册** —— `ip/cpu/cpu_factory_chmem.h` 加 `BranchPredictorPluginChmem<T>`（**canonical ordering 位置须过 ADR-048 断言**）
 - [ ] **Step 2: 无静默退化** —— 若某配置下 BP 不可用 ⇒ **fail-fast throw**（对齐 `enable_cache=true` 的既有风格），**不得**静默关掉
 - [ ] **Step 3: ELF 级回归** —— `[chmem] chmem_vendored_elf_tohost1`（47 ELF）+ `[verilator]`（48 ELF）**0 退化**
-- [ ] **Step 4: 性能验收（★v3：依 ADR-088 v1.2 §5.3.2 P-5 + P-2 修订）** ——
+- [ ] **Step 4: 性能验收（★v4：依 0c 微基准实测形态修订判据方向）** ——
+  - **中间验收（不依赖 CoreMark）**：用 `chmem-branch-microbench` 的四档负载测「启用 BP vs 禁用 BP」的 **cycles/iter 降幅**
+  - **★判据方向（0c 实测纠正）**：CH_MEM 侧的分支代价与**方向变化次数**相关（0c 基线：方向恒定的 m0=66034 / m1=68034 **最少**，方向变化的 m2=79534 **最多**，伪随机 m3=73012 居中）⇒ **BP 的收益空间在「方向变化」档** ⇒ 判据 = 「**方向变化频繁**的档（m2/m3）Δcycles **显著大于**方向恒定档（m0/m1）」；**不是** v1 假设的「恒 taken 收益最大」
+  - **★对外接口需求**：本 change **必须提供「可关闭 BP 的配置面」**（如 `CPUConfig` 字段）⇒ 否则「启用/禁用 BP 对比」无法做
+  - **落地后重录 0c 基线** —— 0c 的 CSV 是**无 BP 参照值** ⇒ ② 落地后须用同一脚本重测并**显式重录**（附 commit 说明）
+  - **绝对值判据**（「CoreMark/MHz ≥1.9」）属**交付点 B** ⇒ 本 change **不宣告绝对值达标**；且依 **P-6**，CH_MEM 的绝对值达标还须先有 ② 本身
   - **中间验收（不依赖 CoreMark）**：用 `chmem-branch-microbench` 的**四档可控预测率负载**测「启用 BP vs 禁用 BP」的 **cycles/iter 降幅** ⇒ 判据 = 「`pattern_6of8` 档降幅显著（阈值由 microbench 基线实测确定）」+「**四档单调性成立**（`always_taken` 收益最大 → `pseudo_random` 最小）」⇒ **单调性破坏 ⇒ BP 实现有 bug**（这是本 change 的核心验收锚）
   - **★对外接口需求**：本 change **必须提供「可关闭 BP 的配置面」**（如 `CPUConfig` 字段）⇒ 否则「启用/禁用 BP 对比」无法做（microbench plan R3 已登记此依赖）
   - **绝对值判据**（「CoreMark/MHz ≥1.9」）⇒ 属**交付点 B**（`chmem-verilator-coremark-harness`）⇒ 本 change **不宣告绝对值达标**；且依 **P-2**，CH_MEM 的绝对值达标还须先补 load-use 通路（DMIPS 1.24467 → ≥1.4）
@@ -126,7 +131,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 - [ ] AC-5: 预测方向与目标为**活节点**（cell `impl()->is_const() == false`）⇒ 不得 `static_cast<bool>`（ADR-040 §10.5）
 - [ ] AC-6: misprediction ⇒ CtrlLink flush **真实消费**（有 case 证明 flush 发生）
 - [ ] AC-7: `[chmem]` + `[verilator]` 全量 **0 退化**（47 + 48 ELF）
-- [ ] AC-8: ★**中间验收**（`chmem-branch-microbench` 四档）：① `pattern_6of8` 档「启用 BP vs 禁用 BP」的 cycles/iter 降幅**可量化**（阈值由 microbench 基线确定）② **四档单调性成立**（`always_taken` 收益最大 → `pseudo_random` 最小）③ 本 change **提供「可关闭 BP 的配置面」**。**绝对值判据（CoreMark ≥1.9）不属本 change**（交付点 B + P-2）⇒ 本 change **不宣告绝对值达标**
+- [ ] AC-8: ★**中间验收**（`chmem-branch-microbench` 四档）：① **方向变化频繁**的两档（`pattern_6of8` / `pseudo_random`）的 cycles/iter 降幅**可量化**（阈值由 0c 微基准基线确定）② **方向恒定**的两档（`always_taken` / `always_not_taken`）降幅**显著更小**（★**机制化判据**—— 0c 实测证明：方向恒定档本就无「方向变化惩罚」⇒ BP 的收益空间小；**0c 实测的基线形态**：恒定档 66034/68034 cycles 反而**最少**，变化档 79534 最多 ⇒ **v1 的「恒 taken 收益最大」是错的**）③ 若 BP 无效，四档降幅应 ≈0 ④ 本 change **提供「可关闭 BP 的配置面」**。**绝对值判据（CoreMark ≥1.9）不属本 change**（交付点 B + ADR-088 v1.2 P-6）⇒ 本 change **不宣告绝对值达标**
 - [ ] AC-9: 8 门禁全 PASS + 全量回归 0 退化
 - [ ] AC-10: 台账 **14 条** BP 条目重判完毕 + **§2 族级判定行同步** + ADR-088 §5.2 BP 双前置状态更新
 - [ ] AC-11: **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，且需双前置）
