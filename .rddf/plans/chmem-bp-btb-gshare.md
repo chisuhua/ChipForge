@@ -61,7 +61,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 ### Task 1.5: ★实施期差距表 + 机制结论（2026-10-24 实测产出）
 
 > **本节是 Task 1 的交付物**（plan 要求「输出一张表… 无表 ⇒ 不进实施」）。
-> PoC 代码：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（**7 case / 40 assertions 全绿**，
+PoC 代码：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（**8 case / 51 assertions 全绿**，
 > 归属 `chipforge_tests_chmem` binary）。
 
 #### 差距表（现有 `PtWalkFsmPlugin` / `branch_predictor.h` → ADR-085/086 目标架构）
@@ -80,7 +80,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 | # | 结论 | PoC 锚 | 对实现的约束 |
 |---|---|---|---|
 | 1 | **C++ 侧常量 ⇒ elaboration 期常量**（ADR-040 §10.5 的机制根源） | P-5 / P-5b | 预测方向/目标/写使能**必须**是 ch 节点，**禁** `static_cast<bool>` |
-| 2 | **mem 写地址必须是「payload 派生的组合表达式」**；用 `ch_reg` proxy 直接当地址 ⇒ 索引被解析成 **0**（写到**错误表项** ⇒ 静默错乱） | **P-2N（负例，已钉死）** / P-2 | BTB/PHT 写地址 = `bits<...>(payload PC)`；**禁** proxy 直接作地址 |
+| 2 | **mem 端口地址必须来自「已被驱动」的信号** —— payload 派生**正确**（含逐拍变化）；**未被驱动**的 `ch_reg` proxy ⇒ 索引解析成 **0**（写到**错误表项** ⇒ 静默错乱）；★但**被 op 节点 `<<=` 驱动**的 reg（生产 `pc_reg <<= select(...)` 正是此形）**完全可行** | **P-2N（负例，已钉死）** / **P-2P（补测，关键）** / P-2 | BTB/PHT **写**地址 = `bits<...>(payload PC)`（payload 驱动）；BTB **读**地址 = `bits<...>(pc_reg)`（`pc_reg` 被驱动 ⇒ 可用）|
 | 3 | **读/写共用同一地址表达式** | P-2 | BTB 读端口与写端口用同一 `bits<>` 表达式 |
 | 4 | **enable 可以是 reg proxy**（与 addr 限制不同） | P-2B | 写使能可用 payload 里的真实 `BRANCH_TAKEN` |
 | 5 | **2-bit PHT 可行** | P-3 | `ch_mem<ch_uint<2>, N>` 承载 2-bit 饱和计数器 ⇒ 体积不膨胀 |
@@ -95,6 +95,7 @@ C++23 · CppHDL（`ch_uint` / `ch_reg` / `ch_mem` / `ch_state_machine`）· Catc
 | 真实方向 | `BranchPlugin::BRANCH_TAKEN` | `branch_chmem.h:236` |
 | 目标地址 | `RvKey::BRANCH_TARGET` | `branch_chmem.h:237` |
 | PC-mux 接入点 | `pc_reg <<= select(br_taken, br_target, pc+4)` | `ibus_chmem.h` `update_pc`（`branch` LATE） |
+| **预测路径的 PC** | `pc_reg`（**被 op 节点 `<<=` 驱动** ⇒ proxy 正常跟踪 ⇒ 可作 mem 读地址） | PoC **P-2P 通过** |
 
 ⇒ **BP 可落地**：在 fetch 期用 BTB 预测目标，产出 `predicted_target` / `predicted_taken`
 payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB/PHT 更新。
@@ -212,9 +213,9 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 
 | 项 | 实测 |
 |---|---|
-| PoC 文件 | `tests/cpu/test_cpu_chmem_bp_poc.cpp`（**7 case / 40 assertions 全绿**） |
+| PoC 文件 | `tests/cpu/test_cpu_chmem_bp_poc.cpp`（**8 case / 51 assertions 全绿**） |
 | PoC 归属 | `chipforge_tests_chmem` binary（CH_MEM 专属 ⇒ 需 `#ifdef CF_PLUGIN_USE_CH_MEM` **整体 guard**，且 guard 必须在**所有 include 之前**，否则 TLM binary 会编译 CppHDL 头 ⇒ 符号重复定义） |
-| 探索规模 | 实施期共跑 **20 个对照 case**（含 A/B/C 三变体 + 3 决定性对照 + 逐拍观测 + 全 entry 扫描）⇒ 收敛为最终 **7 个**（保留有决策价值的 + 钉死 1 个负例） |
-| 机制结论 | **7 条**（见 Task 1.5 表）⇒ 核心 = **mem 写地址必须 payload 派生**（proxy 作地址 ⇒ 索引解析成 0 ⇒ 写到错误表项） |
+| 探索规模 | 实施期共跑 **21 个对照 case**（含 A/B/C 三变体 + 4 决定性对照 + 逐拍观测 + 全 entry 扫描 + 驱动边界补测）⇒ 收敛为最终 **8 个**（保留有决策价值的 + 钉死 1 个负例） |
+| 机制结论 | **7 条**（见 Task 1.5 表）⇒ 核心 = **mem 端口地址必须来自「已被驱动」的信号**（payload 派生 ✓；未被驱动的 reg ⇒ 索引 0 ⇒ 静默错；**被 op 节点驱动的 reg ✓**） |
 | 分支信号源 | 已核实齐备（`KT::PC` / `BRANCH_TAKEN` / `BRANCH_TARGET` / `update_pc` 的 PC-mux） |
 | 差错误判（已更正） | 实施中曾判定「套件内存在测试间干扰」⇒ **该判断错误**（行号映射错误）；事实 = **套件失败集合 == 单跑失败集合** ⇒ 无干扰 |
