@@ -1,7 +1,8 @@
 # P2.5 Review 报告 — chmem-branch-microbench
 
 > **change**: `chmem-branch-microbench`（B1 的 **0c** 项：② 的中间验收载体 + 无 BP 参照值）
-> **分支**: `feature/chmem-branch-microbench`（base `4ce43f6`）
+> **分支**: ⚠️ **实施直接在 `main` 上完成**（builder 疏漏：建 change 时**忘记 `git checkout -b`**，与 2026-10-24 早先那次 C change 同型疏漏）
+> —— 已补建 ref `feature/chmem-branch-microbench` 指向实施终态 `ca53fa9` 供追溯；4 个 commit 线性落在 main（无分叉）⇒ 技术无害，但**工作流惯例未遵守**
 > **审查时间**: 2026-10-24 · **审查方式**: AC 逐条机械复核 + 变异对照证据 + commit 卫生 + 变更面核对 + 计划一致性核对
 
 ---

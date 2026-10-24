@@ -40,7 +40,9 @@ status: in-progress
 - [x] AC-6 8 架构门禁全 PASS + 全量回归 0 退化 + **零 `ip/` 改动**
 - [x] AC-7 **不依赖 CoreMark** ⇒ ② 的中间验收不被交付点 B 阻塞
 
-### 实测留证（2026-10-24，branch `feature/chmem-branch-microbench`）
+### 实测留证（2026-10-24）
+
+> ⚠️ **分支事实**：本 change 的实施**直接在 `main` 上完成**（builder 疏漏：建 change 时忘记 `git checkout -b`，与早先 C change 同型）⇒ 4 个 commit 线性落在 main；已补建 ref `feature/chmem-branch-microbench` 指向终态供追溯。
 
 | 项 | 实测 |
 |---|---|
