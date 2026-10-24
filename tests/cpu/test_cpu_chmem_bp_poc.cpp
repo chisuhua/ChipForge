@@ -204,16 +204,18 @@ TEST_CASE("bp_poc_P2_payload_driven_varying_addr", "[cpu][chmem][bp][poc]") {
 }
 
 // =========================================================================
-// P-2N: ★**负例**★ —— 用 `ch_reg` proxy 直接作写地址 ⇒ 数据落到 **entry 0**
+// P-2N: ★**负例**★ —— 用「**未被驱动**的 `ch_reg`」proxy 作写地址
+//   ⇒ 数据落到 **entry 0**（proxy 初值是 5）
 //
-//   实施期扫描全部 8 个 entry 的诊断结果：命中的是 **entry 0**（而 proxy 的
-//   初值是 5）⇒ **索引被解析成 0** ⇒ 写入**确实发生**但**写错了表项**
+//   实施期扫描全部 8 个 entry 的诊断结果：命中的是 **entry 0**
+//   ⇒ **索引被解析成 0** ⇒ 写入**确实发生**但**写错了表项**
 //   ⇒ 对 BTB/PHT 而言是**静默错乱**（表项污染）⇒ 比「不写」更危险
-//   ⇒ **禁止**把 `ch_reg` proxy 直接当 mem 端口地址
 //
-//   本 case 把该负例**钉死**：期望 hit == 0。
-//   ★ 若上游行为变化（proxy 变得可用且索引正确 ⇒ hit == 5），
-//     本 case 会 FAIL ⇒ 提醒实现者重新评估约束 ④（可能是好消息）。
+//   ★ **边界（P-2P 补测）**: 这**不是**「reg 不能作 mem 地址」——
+//     若该 reg 被 op 节点 `<<=` 驱动（P-2P），则完全可行。
+//     本负例针对的是「**未被驱动**的 reg」。
+//   ★ 本 case 把该负例**钉死**：期望 hit == 0。
+//     若上游行为变化 ⇒ 本 case FAIL ⇒ 提醒实现者重新评估约束 ④。
 // =========================================================================
 TEST_CASE("bp_poc_P2N_reg_proxy_addr_never_writes", "[cpu][chmem][bp][poc]") {
   ch::core::context ctx("bp_poc_p2n");
@@ -424,6 +426,70 @@ TEST_CASE("bp_poc_P5b_cpp_value_cond_is_const", "[cpu][chmem][bp][poc]") {
 
   REQUIRE(payload_cell->impl() != nullptr);
   REQUIRE(payload_cell->impl()->is_const() == true);
+}
+
+// =========================================================================
+// P-2P: ★★★决定性★★★ —— **被 `<<=` 驱动**的 reg 作 mem 地址
+//
+//   修正 P-2N 的结论边界:
+//     P-2N 的 reg **从未被 `<<=` 驱动** ⇒ 其 proxy 运行时读到 0
+//     ⇒ 数据落到 entry 0
+//     而生产代码 `ibus_chmem.h` 的 `pc_reg <<= select(...)` 是
+//     **用 op 节点驱动**的 ⇒ proxy 正常跟踪 PC
+//
+//   ⇒ 本 case 验证: reg 用 **op 节点** `<<=` 驱动后, 可正常作 mem 地址
+//   ⇒ **BP 的预测路径（读 BTB@PC）因此可行**（PC 来自 pc_reg）
+// =========================================================================
+TEST_CASE("bp_poc_P2P_driven_reg_as_mem_addr", "[cpu][chmem][bp][poc]") {
+  ch::core::context ctx("bp_poc_p2p");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cfc::PipeBuilder pb(&ctx);
+
+  using Mem = ch_mem<ch_uint<32>, kPocBtbEntries>;
+  auto btb = std::make_unique<Mem>(
+      std::vector<std::uint32_t>(kPocBtbEntries, 0u), "btb");
+
+  auto rp = std::make_shared<std::optional<Mem::read_port>>();
+  auto wp = std::make_shared<std::optional<Mem::write_port>>();
+
+  // ★ 这个 reg 会被 op 节点驱动（模拟 pc_reg <<= select(...)）
+  auto widx = std::make_unique<ch_reg<ch_uint<3>>>(ch_uint<3>(ch_literal<5, 3>{}), "widx");
+  auto* widx_raw = widx.get();
+
+  pb.at_stage("fetch", cfc::Phase::EARLY,
+              [btb_raw = btb.get(), rp, wp, widx_raw]() {
+    ch_uint<3> waddr = ch_uint<3>(widx_raw->impl());
+    ch_uint<32> wdata(ch_literal<0x12345678, 32>{});
+    ch_bool en(true);
+    *wp = btb_raw->write(waddr, wdata, en, "btb_write");
+    *rp = btb_raw->aread(waddr, "btb_read");   // ★ 同一表达式
+  });
+
+  // ★ 用 op 节点驱动 widx（与 pc_reg <<= select(...) 同形）
+  pb.at_stage("fetch", cfc::Phase::NORMAL, [widx_raw]() {
+    auto cur = ch_uint<3>(widx_raw->impl());
+    auto nxt = cur + ch_uint<3>(ch_literal<1, 3>{});
+    *widx_raw <<= nxt;      // ★ op 节点
+  });
+
+  pb.build();
+  auto exp = pb.elaborate();
+  REQUIRE(exp.has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+
+  bool seen = false;
+  for (int cycle = 1; cycle <= 8; ++cycle) {
+    REQUIRE_NOTHROW(sim->tick());
+    auto v = static_cast<std::uint64_t>(sim->get_signal_value(ch_uint<32>(rp->value().impl())));
+    CAPTURE(cycle);
+    INFO("cycle " << cycle << " read=" << v);
+    if (v == 0x12345678u) { seen = true; break; }
+  }
+  REQUIRE(seen);
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM
