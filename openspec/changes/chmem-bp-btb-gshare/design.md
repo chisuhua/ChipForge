@@ -1,6 +1,6 @@
 # Design — chmem-bp-btb-gshare
 
-> 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` v2.1
+> 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` v2.2
 > ★ 本文件是简报 §3.4.2 的**明文义务**落地：五级 mux 嵌套契约 + 三步时序 + payload 契约。
 
 ---
@@ -91,15 +91,21 @@ branch NORMAL(N+1):
     ★★ 情形 B（预测 not-taken / 实际 taken）—— **★ MUST NOT 纠到 fall-through!**
         pred_valid && !pred_taken && actual_taken(N+1)
           => 纠错目标 = actual_target(N+1)   (跳到真实目标)
-          => 无需 flush（fall-through 本身是合法路径，无副作用发生）
+          => ★★ **flush：MUST 抑制！**（★ v2.2 修正：此处的 fall-through 是「分支实际 taken ⇒ 被跳过的非法路径」⇒ store/写回 MUST 被抑制）
           => ★ 这条是**暖机主路径**（PHT counter=1 ⇒ 预测 not-taken）
 
     ★★ 情形 C（预测 taken / 实际 taken 且 target 一致）—— **必须抑制自身 redirect**
         pred_valid && pred_taken && actual_taken(N+1) && pred_target == actual_target(N+1)
           => 抑制该分支自身 redirect  (否则 target 被取两次 ⇒ Δcycles≈0 ⇒ 误判「机制不成立」)
+          => ★ **flush：MUST NOT 抑制**（投机 taken 臂生效 ⇒ fall-through 根本没被取 ⇒ `bp_spec_taken_buf` 拉高 ⇒ taken 分量被门控掉）
 
     ★★ 情形 D（预测 not-taken / 实际 not-taken）
-        => 无需任何动作（顺序取指本就正确）
+        => 无需任何动作（顺序取指本就正确）；★ **flush：MUST NOT 抑制**（分支未 taken ⇒ fall-through 是合法路径）
+
+    ★★ 情形 E（BTB miss ⇒ 未投机 / 分支实际 taken）—— ★★ **MUST 抑制！**
+        !pred_valid && actual_taken(N+1)
+          => fall-through **确实被取了**（顺序取指）且它是错路 ⇒ store/写回 MUST 被抑制
+          => ★ 这是「BTB miss 时不得破坏程序语义」的关键情形
 
 branch LATE(N+1):
     ★ 写 pc_reg(N+2)  —— ★★ **4 项显式 select 链**:

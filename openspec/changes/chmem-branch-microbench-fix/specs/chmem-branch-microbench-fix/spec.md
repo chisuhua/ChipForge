@@ -54,7 +54,7 @@
 
 #### Scenario: 跨档信号不足时的判据出口
 
-- **WHEN** 跨档 taken 分支数差 **< 1 拍/iter**
+- **WHEN** 跨档 taken 转移数差 **≤ 1 拍/iter**（★ **含恰好 1.0** —— 本基准每 iter 恰 1 条条件分支 ⇒ 跨档差恰好 = 1.0 ⇒ 该条件对本基准恒真 ⇒ 跨档判据结构性不可用 ⇒ 下游性能判据 MUST 退化为「单档绝对差值 + 解析模型」）
 - **THEN** MUST 明确采用「**单档绝对差值 + 解析模型**」判据 ⇒ **不得**以「增加负载以制造信号」的方式回避
 
 ### Requirement: branchbench-partial-falsification-record

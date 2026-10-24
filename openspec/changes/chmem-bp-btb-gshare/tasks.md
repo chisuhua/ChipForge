@@ -15,13 +15,13 @@ depends_on:
 # Tasks — chmem-bp-btb-gshare
 
 > **定位**: B1 ② 主体。实现 **BTB + Bimodal 2-bit PHT**（★ GShare / RAS **不在本期**，见架构简报 §3.1）。
-> **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` v2.1 §2.1 / §3.2 / §3.3 / §3.4 / §4.3 / §5.1 / §5.5
+> **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` v2.2 §2.1 / §3.2 / §3.3 / §3.4 / §4.3 / §5.1 / §5.5
 > ★ **两个前置 MUST 先完成**（`chmem-branch-microbench-fix` + `chmem-bp-btb-gshare-poc`）⇒ **前置未完成前本 change 的实现 MUST NOT 开工**。
-> ★ **执行文件** `.rddf/plans/chmem-bp-btb-gshare.md` 顶部有 **v2.1 覆盖声明**（逐条作废旧 Goal / Task 3 / Task 4 / Task 5.5 / AC-1 / AC-8 / Task 6 Step 4 / Task 7 Step 3-4 / 实施期修正 #1）⇒ **以覆盖声明为准**。
+> ★ **执行文件** `.rddf/plans/chmem-bp-btb-gshare.md` 顶部有 **v2.2 覆盖声明**（逐条作废旧 Goal / Task 3 / Task 4 / Task 5.5 / AC-1 / AC-8 / Task 6 Step 4 / Task 7 Step 3-4 / 实施期修正 #1）⇒ **以覆盖声明为准**。
 
 ## Implementation
 
-- [ ] **Task 1** BP 插件骨架 + BTB 表（256×64b：全 32b PC tag + 32b target + valid 偷 target[1:0]）+ 逻辑条目数 M 的运行期 mask
+- [ ] **Task 1** BP 插件骨架 + BTB 表（256×64b，**62b 编码**：`tag30=PC[31:2]` + `target30=target[31:2]` + `valid(1b)` + `is_unconditional(1b)`；★ 依据 CH_MEM 只解 32 位指令 ⇒ `PC[1:0]=0`、target 4 字节对齐 ⇒ 低位恒 0）+ 逻辑条目数 M 的运行期 mask（`& literal(M-1)`）+ **替换策略 = 直接覆盖**（⇒ 陈旧目标天然自愈，★ **MUST NOT** 另设误预测计数器）+ **key = vaddr**
 - [ ] **Task 2** Bimodal 2-bit PHT（256×2b）+ 更新使能（★ **分支已解析，任何方向**）+ 更新地址（★ 分支解析处 `KT::PC`）
 - [ ] **Task 3** fetch NORMAL 预测（BTB **0 拍**查表）+ payload 输出（`pred_target`/`pred_taken`/`pred_valid`）
 - [ ] **Task 4** branch LATE 接入（★ **五级嵌套**）+ 正确预测**抑制自身重定向** + 误预测纠错（`pc_lag+4`）+ flush 语义改写（双分量）
@@ -35,7 +35,11 @@ depends_on:
 - [ ] **AC-3** ★ **台账逐条表**（架构简报 §5.1，14 条）：每条有明确态 + CH_MEM 锚点 + 显式理由 + 是否删除该行；★ **CH_MEM 侧 case 名与 TLM-only case 名零交集**；★ **台账 §7 的 BP 裁决行同步**
 - [ ] **AC-4** **BTB miss ⇒ 不预测**（不跳转、不 flush）
 - [ ] **AC-5** 预测方向/目标为**活节点**（`impl()->is_const() == false`）⇒ 禁 `static_cast<bool>`
-- [ ] **AC-6** ★ **预测错误 ⇒ 只在预测错误时抑制错路指令**；flush 双分量语义正确（`br_taken_buf` 分量替换为 `mispredict_buf`，**`hold_z` 保留**）
+- [ ] **AC-6** ★ **错路指令副作用抑制** —— ★ **flush 判据（v2.2 唯一权威）**：`flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf`
+      - ★ `bp_spec_taken_buf` = 上一拍 BP 的投机跳转臂**确实生效**了 ⇒ fall-through **根本没被取** ⇒ 不需抑制
+      - ★ **BP 关闭时 `bp_spec_taken_buf` 恒 false ⇒ `flush == taken_buf` ⇒ 与现状逐位相同 ⇒ 零退化**
+      - ★ **MUST NOT** 把 `br_taken_buf` 分量「替换」为 `mispredict_buf` 分量 ⇒ 那会让「未投机而实际跳转」（BTB miss / 情形 B / `jalr`）的 fall-through **副作用泄漏**（store / 写回）⇒ 校验和不等 ⇒ AC-7/AC-8a RED
+      - ⇒ 三个消费方（分支决策 `branch_chmem.h:233` / 存储写回 `dmem_chmem.h:129` / 寄存器写回 `reg_file_chmem.h:222`）MUST 全部按此判据
 - [ ] **AC-6b** ★★ **正确预测 ⇒ 该分支自身的 redirect 被抑制**（目标指令**只被取一次**）⇒ 验证：host 侧 PC 轨迹**按迭代边界切分后，每段内任一静态地址的取指次数 ≤ 1**；★ **迭代边界的判定规则**：以「循环回边 PC（取指次数最多的转移源地址）」为段起点。★ **MUST NOT** 写成「全程无重复 PC」（循环回边使同一地址合法重复上千次）或「无连续重复」（自指分支在正确预测下产生合法的连续重复）
 - [ ] **AC-7** `[chmem]` 47 ELF + `[verilator]` 48 ELF **0 退化**；★ **双跑**（BP 关一遍 + BP 开一遍，两套全绿）；★ **BP on/off 的 4 档校验和逐位相等**
 - [ ] **AC-8a** 4 档在 BP 开/关下**校验和逐位相等**（功能，无阈值）
@@ -48,7 +52,7 @@ depends_on:
 - [ ] **AC-9** ★ **具名门禁清单**：8 个门禁脚本（`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / `check_xlen_hygiene` / `check_tlm_freeze` / `check_coverage_parity_ledger`）全 PASS + `bash tools/run_chipforge_tests.sh --all`。★ **失败集合判据**：失败集合 MUST **⊆ 已登记的 pre-existing 清单**（`tests/README.md` §已知问题 + 本仓库基线）且 ★ **新增失败 MUST = 0** ⇒ ★ **MUST NOT** 硬编码「恰 1 个」作为期望集合（清单会变 ⇒ 硬编码会假 RED，或让 builder 把额外失败「认领」为已知 ⇒ **掩盖回归**）
 - [ ] **AC-10** 台账重判完毕 + **§2 族级判定行同步** + ★ **计数同步（注意二义）**：台账 `:16` 的 **463 = TLM 独占 case 数**（**本 change MUST 保持 463 不变**）· 台账 `:80` 的 **463 = 条目级台账条目数**（= 463 − 被删行数；★ 本 change 的 14 条**全部保留行**（不删）⇒ 仍为 463）⇒ ★ **MUST 写明本 change 采用哪种口径** + ★ **`check_coverage_parity_ledger.sh` exit 0**（CI warn 级 ⇒ 无强制力 ⇒ 须本地跑 + 输出贴 PR）
 - [ ] **AC-11** **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，需双前置）
-- [ ] **AC-12** ★ **「不做什么」机检化**（非散文）：★ **本 change 的 `ip/` + `tests/` 变更集内** **MUST NOT** 出现 `GShare` / `GHR` / `RAS` 标识、**MUST NOT** 出现 `ch_reg<ch_uint<13>>`，且 **MUST NOT** 新增文件名匹配 `*gshare*` / `*ghr*` / `*ras*` 的文件 ⇒ grep 门禁（★ 扩域到变更集，否则换个文件名即绕过）
+- [ ] **AC-12** ★ **「不做什么」机检化** —— ★ **与 AC-25 同口径**（★ **MUST NOT** 写「变更集 grep」：变更集无基线定义 ⇒ 等价自证；且 tree-wide grep 必误报（TLM 侧 `branch_predictor.h` 合法含 GHR/RAS））⇒ 判据 = **AC-25 的脚本化门禁**：scope = `ip/cpu/plugins/branch_predictor_chmem.h`（不存在则 skip）+ 新增文件名匹配 `*gshare*`/`*ghr*`/`*ras*`
 - [ ] **AC-13** ★ **BP 必须可学**：★ **同向连续两次解析后**，该分支**下一次**被取时预测命中（PHT 更新使能 = 分支已解析，**任何方向**；更新地址 = 分支解析处 `KT::PC`，与预测 `pc_reg` **同指一条分支**）。★ **MUST NOT** 写成「第二次被取即命中」—— PHT 饱和阈值是 2 ⇒ 首次解析后 counter=1 ⇒ 仍预测 not-taken
 - [ ] **AC-14** ★ **`jalr` 不建 BTB 项** ⇒ 走顺序取指；无条件跳转不占 PHT 表项
 - [ ] **AC-16** ★★ **净收益率裁决点（两分支终局式，★ v2.2 修正）**：实测 **净收益率** := `Δcycles(bp=off − bp=on) / N_taken_total`（★ **不是命中率**；★ `N_false` **只计情形 A**，情形 B 代价 0 ⇒ **MUST NOT** 计入）⇒ **两分支**：
@@ -66,6 +70,23 @@ depends_on:
 - [ ] **AC-25** ★ **scope 机检须脚本化**（★ 非手工 grep）—— `tools/check_plugin_portability.sh` 新增 **Check 14**（★ 该脚本已是 PR **阻塞**门禁 ⇒ **无需构建** ⇒ CI 可承担）：scope = `ip/cpu/plugins/branch_predictor_chmem.h`（文件不存在则 skip）+ 新增文件名匹配 `*gshare*`/`*ghr*`/`*ras*` ⇒ 违反 ⇒ exit 1。★ **MUST NOT** 做成 tree-wide grep（TLM 侧 `branch_predictor.h` 合法含 GHR/RAS ⇒ 必误报）
 - [ ] **AC-15** ★ **host 可见事件计数（5 个）**：① **已执行(retired)指令数** ② **FLUSH 事件数** ③ **BP 命中次数**（N_correct）④ **误预测次数**（N_false）⑤ **taken 转移数**（BP 关态测得）⇒ 全部经 `cpu_verilator_sim --stats` 输出。★ **「取指数」≠「已执行数」** —— 前者 ≈ cycles ⇒ 用它证明「工作量相等」是**循环论证** ⇒ MUST 用 **retired**（被 flush 抑制的不计）
 
+
+## ★★ per-file × per-symbol owner 表（★ 逐条抄进本 change —— 跨 change 引用会被漏读）
+
+| 文件 / 符号 | 本 change | 其它 change | ★ 约定 |
+|---|---|---|---|
+| `tests/cpu/manual_elf/branchbench/branchbench.c` | ★ **前置1 owner** | 前置2 / 主体 ✗ | 主体 MUST NOT 触碰（硬门禁） |
+| `soc/cpu/docs/dse/branchbench-baseline-matrix.csv` | ★ **前置1 建列**（`workload_sha` / `build_id` / `bp_mode=off`）+ 改按表头取列 | 前置2 / 主体 **仅追加行** | 建列归前置1；追加归后两者 |
+| `tools/measure_branchbench.sh` | ★ **前置1 owner**（改名 / 按表头取列 / **捕获 stderr**） | 前置2 **仅追加** `--bp=on\|off` flag + 生效值断言；主体 ✗（硬门禁） | ★ **捕获 stderr 归前置1**（否则假绿通道开着）⇒ 前置2 只加 flag |
+| `tools/verilator_runner/*` | ★ **前置1 建 `--stats` 框架 + retired 计数** | 前置2 **补 FLUSH 计数**；主体 **补 BP flag + 回显** | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
+| `ip/cpu/plugins/branch_predictor_chmem.h` | ✗（禁 `ip/**`） | 前置2 **创建（最小版）**；主体 **重写（完整版）** | ★ 前置2 的 PoC 版 MUST NOT 被主体当作已完成 ⇒ 主体 AC-1 MUST 检查**完整功能**（非文件存在）；★ PoC 残留的**删除/重写责任归主体**；★ `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case 在主体后 MUST 仍绿（机制锚）⇒ ★ **该 8 case 只能依赖公开接口** |
+| `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | 前置2 **首次改**（5 臂 mux + FLUSH 门控 + FLUSH 计数）；主体 **二次改**（补完整语义 + 过时注释 #8） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**五臂 select 链**结构 |
+| `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 参数转发） | ✗ | 前置2 **首次注册**（BP 开关）；主体 **补全**（4 参数转发修复 #9 + 完整注册） | ★ 同上 ⇒ 增量扩展 |
+| `docs/architecture/adr/ADR-088-*.md` | ✗ | 前置2 写 **§5.3.2 的「机制结论」段**；主体 写 **「绝对值门禁结论」段** | ★ **主体 MUST NOT 覆盖前置2 的机制结论段**（否则「机制不成立」的结论会被主体的「达标」结论抹掉） |
+| `docs/architecture/tlm-coverage-parity-ledger.md` | ★ **前置1 MUST NOT 触碰** | 前置2 MUST NOT 触碰；主体 owner | ★ 台账重判只归主体 |
+| `ip/cpu/plugins/branch_predictor.{h,cpp}`（TLM 侧） | — | — | ★ **全程保留**（主体 AC-11） |
+
+★ **本 change 的角色**：主体 ⇒ 本表列出的「主体」项**归本 change**；★ **前置2 已建的版本 MUST 增量扩展**（MUST NOT 重写）。
 ## ★ 兜底句纪律
 
 任何「上报 architect / 待裁决」句 MUST 同句给出 **① 触发阈值 ② 落点文件 ③ 可判定时限**（「≤ N 个工作日」或「本 change 内闭环」）；MUST NOT 以「等待回复」结束本 change。

@@ -1,4 +1,11 @@
 # chmem-branch-microbench — 执行文件（planner 起草，2026-10-24）
+>
+> ⚠️ **ARCHIVED（归档件）—— MUST NOT 作为前置1 `chmem-branch-microbench-fix` 的执行依据**
+> ★ 本文件是 0c（已归档 change `chmem-branch-microbench`）的旧计划，内含**已被证伪**的判据
+> （如「四档单调性 always_taken→pseudo_random」）⇒ ★ 前置1 的执行依据 MUST 以
+> `.rddf/plans/chmem-branch-microbench-fix.md` 与架构简报 v2.2 为准。
+> ★ 旧基线数值（66034 / 68034 / 79534 / 73012）亦已作废（工作量污染 + 档名反向）⇒ 前置1 MUST 重录。
+
 
 > **change**: `chmem-branch-microbench`
 > **来源**: ADR-088 **v1.2 §5.3.2 P-5**（architect 批准：交付点 B 的中间验收改用**分支 microbenchmark**，CoreMark 允许顺延 ⇒ ② 不被 CoreMark 移植的不确定性阻塞）

@@ -177,6 +177,38 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
   - (b) **改成编译期多实例** —— 4 个不同容量参数的模板实例各测一次 ⇒ 判 `covered`
   - ⇒ **建议 (b)**（保留可测性）；若 (b) 与 `ch_uint<N>` 静态宽度冲突 ⇒ 选 (a) 并显式登记。**无论哪种，都必须同步台账 §4 与 §2 族级表**
 
+### Task 2b: ★ Bimodal 2-bit PHT 实现（v2.2 新增 —— v1 缺此实施步骤）
+
+- [ ] **Step 1: 表结构** —— `ch_mem<ch_uint<2>, 256>`（PoC P-3 已验证 2-bit 可行 ⇒ 体积 512B）
+- [ ] **Step 2: 索引** —— `bits<7,0>(PC) & literal(M-1)`（★ **Bimodal 语义，无全局历史 XOR** ⇒ GShare 不在本期）
+- [ ] **Step 3: 饱和语义** —— 计数 **0→1→2→3（不回退）**；预测跳转阈值 = **计数 ≥ 2**
+- [ ] **Step 4: 写使能（★关键）** —— ★ **「分支已解析」（任何方向）**，MUST NOT 仅在实际跳转时更新（否则学不到「不跳转」⇒ 在以不跳转为主的负载上恒预测跳转 ⇒ **净负收益**）
+- [ ] **Step 5: 更新地址（★关键）** —— ★ **分支解析处的 `KT::PC`**（= 预测时的 `pc_reg`）⇒ 二者必须**同指一条分支**（off-by-one ⇒ 学到错误表项）
+- [ ] **Step 6: 无条件跳转不占表项** —— `jal`/`jalr` 不更新 PHT（恒跳转 ⇒ 无需方向学习）
+
+### Task 2c: ★ fetch NORMAL 预测 + payload 产出（v2.2 新增）
+
+- [ ] **Step 1: BTB 0 拍查表** —— ★ **必须 `aread`（0 拍），MUST NOT 用 `sread`**（sread ⇒ 预测与真实分支结果同拍到达 ⇒ 价值归零）；★ 读地址 = `bits<7,0>(pc_reg) & literal(M-1)`（`pc_reg` 被 `<<=` 驱动 ⇒ proxy 可用，PoC P-2P 已证）
+- [ ] **Step 2: 产出 payload** —— `pred_target`(32b) / `pred_taken`(1b) / `pred_valid`(1b) ⇒ mode-aware `uint_t<N>`（禁裸 `bool`，ADR-040 §10.5）
+- [ ] **Step 3: 方向合成** —— `pred_taken = pred_valid && (is_unconditional || pht_counter ≥ 2)`（★ `is_unconditional` 位必需 ⇒ `jal` 才可预测）
+- [ ] **Step 4: 存预测记录** —— `ch_reg` 组（pred_taken / pred_target / pred_valid）⇒ 跨拍保持（PoC P-1 已证）
+
+### Task 2d: ★ branch LATE mux + FLUSH 判据改写（v2.2 新增 —— ★ **v1 完全缺失 ⇒ 不做则功能必坏**）
+
+- [ ] **Step 1: `ibus_chmem.h` 的 PC-mux** —— ★ **5 臂显式 select 链**（情形 A/B/C + actual + seq），完整伪码见 `openspec/changes/chmem-bp-btb-gshare/design.md` §2.2 ⇒ ★ **MUST NOT** 只写 3 臂（照抄会让 actual 优先于情形判定 ⇒ 正确预测的 target 被取两次 ⇒ Δcycles≈0 ⇒ 误判「机制未生效」）
+- [ ] **Step 2: 情形臂用「存预测」，投机臂用「fresh payload」** —— ★ 两者 MUST NOT 混用（存预测是 1 拍前的 ⇒ 用于情形判定；fresh 是本拍的 ⇒ 用于投机）
+- [ ] **Step 3: ★ FLUSH 判据（`ibus_chmem.h:167`）** —— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）** ⇒ ★ **MUST NOT** 把 `br_taken_buf` 分量替换为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用泄漏 ⇒ 校验和不等）
+- [ ] **Step 4: `bp_spec_taken_buf` 的产生** —— 投机跳转臂**确实生效**时置位（1 拍延迟 ⇒ `ch_reg`）⇒ ★ **MUST NOT** 用「组合路径（当拍即知）」：错路指令的副作用发生在**下一拍**
+- [ ] **Step 5: 三个消费方一致** —— 分支决策 `branch_chmem.h:233` / 存储写回 `dmem_chmem.h:129` / 寄存器写回 `reg_file_chmem.h:222` MUST 全部按新判据
+
+### Task 2e: ★ BP 开关面（v2.2 新增）
+
+- [ ] **Step 1: 工厂参数** —— `bool enable_bp = true`（★ **普通 bool**，不用 `optional<bool>`：与 `enable_mmu`/`enable_cache` 的三态语义不同，避免 nullopt 与「显式关闭」撞车）+ `optional<uint32_t> btb_entries = nullopt`
+- [ ] **Step 2: CLI flag** —— `--no-bp`（默认开）+ `--btb-entries N`；★ **MUST NOT** 保留 `--enable-bp`（与默认开语义冗余 ⇒ 消除「两者同给」的优先级歧义）
+- [ ] **Step 3: 生效值回显** —— runner 在 **stderr** 回显 `BP=on/off` + `btb_entries=N` ⇒ 测量脚本据此断言与请求一致（否则「flag 未生效却测出无差异」的假绿通道开着）
+- [ ] **Step 4: 参数转发完整** —— `build_cpu_with_elaborate`（`cpu_factory_chmem.h:451-458`）MUST 转发**全部 4 个**参数（现状已丢 3 个）⇒ ★ **MUST NOT** 用「登记为 known gap」当逃生口
+
+
 ### Task 3 / Task 4: ★**已作废**（不再实施）
 
 > ★ **本 plan v1 的 Task 3（GShare 13-bit 全局历史 + 2^13 PHT）与 Task 4（RAS 8-entry）已作废**

@@ -98,16 +98,16 @@ depends_on:
 
 ## ★ per-file owner 表
 
-见架构简报 v2.2 §「per-file × per-symbol owner 表」⇒ ★ **三个 change 同改同一批文件时的归属**（尤其 `branch_predictor_chmem.h` / `ibus_chmem.h` / `cpu_factory_chmem.h` / `tools/verilator_runner/*` / `measure_branchbench.sh`）⇒ ★ 前置2 的 PoC 版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ PoC 残留的**删除/重写责任归主体**，且 `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case **在主体后 MUST 仍绿**（机制锚）
+见 **本 change 的 `tasks.md` §「per-file × per-symbol owner 表」**（★ 已逐条抄进三个 change 的 tasks.md ⇒ 跨 change 引用会被漏读 ⇒ 不引用外部文档）⇒ ★ **三个 change 同改同一批文件时的归属**（尤其 `branch_predictor_chmem.h` / `ibus_chmem.h` / `cpu_factory_chmem.h` / `tools/verilator_runner/*` / `measure_branchbench.sh`）⇒ ★ 前置2 的 PoC 版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ PoC 残留的**删除/重写责任归主体**，且 `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case **在主体后 MUST 仍绿**（机制锚）
 
 ## References
 
-- 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` v2.1
-- 执行文件：`.rddf/plans/chmem-bp-btb-gshare.md`（★ 顶部有 **v2.1 覆盖声明**，逐条作废旧 Goal/Task/AC）
+- 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` v2.2
+- 执行文件：`.rddf/plans/chmem-bp-btb-gshare.md`（★ 顶部有 **v2.2 覆盖声明**，逐条作废旧 Goal/Task/AC）
 - 前置：`chmem-branch-microbench-fix` · `chmem-bp-btb-gshare-poc`
 - 机制结论：`tests/cpu/test_cpu_chmem_bp_poc.cpp`
 
 ## 规格来源（spec preamble 的归档副本）
 
 > Capability topic: `chmem-bp-btb-gshare`（CH_MEM 后端的分支预测器）。
-> 上游 = ADR-088 v1.2 §3 BP 行 + 架构简报 `docs/architecture/bp-btb-gshare-design-brief.md` v2.1。
+> 上游 = ADR-088 v1.2 §3 BP 行 + 架构简报 `docs/architecture/bp-btb-gshare-design-brief.md` v2.2。
