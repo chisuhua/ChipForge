@@ -45,7 +45,7 @@ depends_on:
 1. **最小 BTB**（`branch_predictor_chmem.h` 的**最小版**：BTB + Bimodal PHT，只为验证机制）
 2. **fetch NORMAL 的预测** —— BTB `aread`（0-cycle）+ payload 输出
 3. **branch LATE 的 PC-mux 接入** —— ★ **五级嵌套**（`trap > branch-actual/mispredict > freeze > bp-predict > seq`，见架构简报 §3.4.2）
-4. **flush 语义改写** —— `br_taken_buf` 分量替换为 `mispredict_buf`，**`hold_z` 分量保留**
+4. **flush 判据改写（★ 门控，非「替换分量」）** —— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）** ⇒ ★ **MUST NOT** 用「替换分量」写法
 5. **测量设施** —— 「已执行指令数」+「FLUSH 事件数」+ **host 侧 PC 序列**（查重复 PC）+ TLM 侧 cycle 数同时输出
 
 ### Out of Scope（5 项）

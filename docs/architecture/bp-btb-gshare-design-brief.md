@@ -85,7 +85,7 @@ cycle N     fetch  NORMAL: pc_reg(=P_N) ──► imem.sread(word_addr)   ← �
 | **分支结果与当前取指错开一拍** | `ibus_chmem.h:64-69` 注释（target in lag(N+2), fall-through occupies lag(N+1)） | ★ **这是「提前一拍预测」有机会消除气泡的根据** |
 | **PC-mux 在 `branch` LATE** | `ibus_chmem.h:171` `update_pc` | BP 的预测结果喂给**同拍** branch LATE 的 `next_pc` mux（fetch 期查表 ⇒ 同拍消费） |
 | **flush 机制已存在** | `ibus_chmem.h:167` `n->operator()(FLUSH) = br_taken_buf` | misprediction ⇒ **复用**该通道 |
-| **flush 的消费者（3 个）** | `branch_chmem.h:233` · `dmem_chmem.h:129` · `reg_file_chmem.h:222` | ★ **flush 语义必须从「上拍 taken」改为「预测错误」** —— 否则正确预测后 FLUSH 仍为 1 ⇒ 会把**目标指令**的写回/存储/分支决策一起抑制 ⇒ 静默功能错误 |
+| **flush 的消费者（3 个）** | `branch_chmem.h:233` · `dmem_chmem.h:129` · `reg_file_chmem.h:222` | ★ **判据必须改为门控**（§3.4.2）：`flush = hold_z \| (taken_buf && !bp_spec_taken_buf) \| mispredict_A_buf` —— ★ **MUST NOT** 简单替换为「预测错误」（那会让未投机的 taken 分支的 fall-through 副作用**泄漏**）；★ BP 关闭时该式 ≡ `taken_buf` ⇒ 零退化 |
 | **无 stage 寄存器**（全组合） | `cpu_factory_chmem.h`；`pc_reg`/`pc_lag`/`br_taken_buf` 是**唯一**的 `ch_reg` | BP 的表状态**必须**用 `ch_mem`/`ch_reg` 承载（**不需要** ADR-046 FSM 豁免） |
 
 ### 1.2 CH_MEM 的分支惩罚（**★ 已实测，替换 v1 的推断**）
@@ -265,7 +265,7 @@ BTB 只回答「这个 PC **曾经**是分支、目标在哪」，**不回答方
 
 ### 2.6 ⇒ 裁决 A-5：flush 语义变更的**影响面**（★必须显式登记）
 
-flush 从「上拍 taken」改为「**预测错误**」是**语义变更**，波及 **3 个消费者**：
+flush 判据从「上拍 taken」改为**门控式**（§3.4.2 唯一权威：`flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf`）是**语义变更**，波及 **3 个消费者**（★ **MUST NOT** 简化成「改为预测错误」⇒ 未投机的 taken 分支会泄漏副作用）：
 
 | 消费者 | 现状 | 变更后的要求 |
 |--------|------|-------------|
@@ -456,7 +456,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | **AC-3** | ★ **台账逐条表**（§5.1）：14 条**逐条**给出「目标态 + CH_MEM 锚点 + 显式理由 + 是否删除该行」；★ **CH_MEM 侧 case 名与 TLM-only case 名零交集**；★ **台账 §7 的 BP 裁决行同步**（`tlm-coverage-parity-ledger.md:742`） | ★ 补 §7 同步项 |
 | **AC-4** | **BTB miss ⇒ 不预测**（不跳转、不 flush） | 保留 |
 | **AC-5** | 预测方向/目标为**活节点**（`impl()->is_const() == false`）⇒ 禁 `static_cast<bool>` | 保留 |
-| **AC-6** | ★ **预测错误 ⇒ 只在预测错误时抑制错路指令**；且 flush 双分量语义正确（`br_taken_buf` 分量替换为 `mispredict_buf`，**`hold_z` 保留**，protocol §2.2） | ★ 补双分量 |
+| **AC-6** | ★ **错路指令副作用抑制** —— ★ **flush 判据（v2.2 唯一权威，§3.4.2 门控规则）**：`flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时 `bp_spec_taken_buf` 恒 false ⇒ `flush == taken_buf` ⇒ 与现状逐位相同（零退化）** ⇒ ★ **MUST NOT** 把 `br_taken_buf` 分量「替换」为 `mispredict_buf` 分量（那会让「未投机而实际跳转」的 fall-through 副作用**泄漏** ⇒ 校验和不等 ⇒ AC-7/AC-8a RED） | ★ v2.2 改（原「替换分量」写法**是错的**） |
 | **AC-6b** | ★★ **正确预测 ⇒ 该分支自身的 redirect 被抑制**（目标指令**只被取一次**）⇒ 验证：host 侧 PC 轨迹**按迭代边界切分后，每段内任一静态地址的取指次数 ≤ 1**（★ **迭代边界** = 循环回边 PC；★ **MUST NOT** 写成「全程无重复 PC」—— 循环回边使同一地址合法重复上千次；★ **MUST NOT** 写成「无连续重复」—— 自指分支在正确预测下产生合法的连续重复） |
 | **AC-7** | `[chmem]` 47 ELF + `[verilator]` 48 ELF **0 退化**；★ **双跑**：BP 关一遍 + BP 开一遍，两套全绿；★ **BP on/off 的 4 档校验和逐位相等** | ★ 双跑 |
 | **AC-8** | ★ **拆三条**（见下） | ★ 重写 |

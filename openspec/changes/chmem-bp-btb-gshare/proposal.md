@@ -64,7 +64,7 @@ depends_on:
 2. **BTB 布局** —— ★ **62b 打包**：`{tag30 = PC[31:2], target30 = target[31:2], valid(1b), is_unconditional(1b)}`（余 2 bit）⇒ 依据：**CH_MEM 只解 32 位指令**（`decode_chmem.h:82` 的 `instr_format` 无 16 位格式）⇒ `PC[1:0]=0`、target 4 字节对齐 ⇒ 低位恒 0 ⇒ 可安全裁掉。★ **`is_unconditional` 位是必需的**（见下「oracle 复审发现 2」）
 3. **逻辑条目数 M** —— 物理 256 固定（编译期）+ **运行期 mask** `& literal(M-1)`，M ∈ {16,32,64,128,256}
 4. **fetch NORMAL 预测 + branch LATE 接入** —— ★ **五级 mux 嵌套**（`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
-5. **flush 语义改写** —— `br_taken_buf` 分量替换为 `mispredict_buf`，**`hold_z` 保留**
+5. **flush 判据改写（★ 门控，非「替换分量」）** —— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）** ⇒ ★ **MUST NOT** 把 `br_taken_buf` 分量「替换」为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用**泄漏** ⇒ 校验和不等 ⇒ AC-7/AC-8a RED）
 6. **BP 开关面** —— 工厂参数（普通 `bool enable_bp = true` + `optional<uint32_t> btb_entries`）+ CLI `--no-bp` / `--btb-entries N`（★ **不是** `CPUConfig` 字段 —— CH_MEM 工厂不接它）
 7. **台账 14 条重判 + ADR-088 §5.3.1 根因修订**（★ 修订**纳入本 change 的归档范围**）
 
