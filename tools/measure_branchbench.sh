@@ -325,6 +325,15 @@ for i in "${!MODES[@]}"; do
   else
     exp_tohost=$(field "$row" "$IDX_TOHOST")
     base_cycles=$(field "$row" "$IDX_CYCLES")
+    # ★★ off 侧也钉住 `flush_count`（critic 十三轮 SHOULD_FIX-2）—— 与 `cycles`
+    #   列**同等待遇**：否则「有人改了 off 路径的 flush 计数口径（cycles 不变 ⇒
+    #   --check-baseline 照绿）」会让 bpdir 的 ΔFLUSH 判据**误红**且消息指向
+    #   DUT/门控（排障方向被误导）⇒ ★ 基线列陈旧 MUST 在 off 路径就被抓住。
+    base_flush=$(field "$row" "$IDX_FLUSH")
+    [ -n "$base_flush" ] \
+      || fail_plain "mode $m ($name): 基线行缺 flush_count 值 (★ fail-closed: 无法钉住 off 侧 flush 口径)"
+    [ "$flush_count" = "$base_flush" ] \
+      || fail "mode $m ($name): BP=off 的 FLUSH_COUNT $flush_count != 基线 $base_flush (★ off 侧 flush 口径已变 ⇒ 基线列陈旧, 须显式重录)"
     compared_rows=$(( compared_rows + 1 ))
     [ "$tohost" = "$exp_tohost" ] \
       || fail "mode $m ($name): 校验和不符 —— 实测 $tohost != 基线 $exp_tohost (结果错, 不得产出数值)"
@@ -393,6 +402,11 @@ for i in "${!MODES[@]}"; do
     fi
 
     # ★★ 「ΔFLUSH == Δcycles」判据（critic 十二轮 SF-4）—— ★ **阈值无关**的
+    #   ★ **已知盲区登记**（critic 十三轮 NIT-3）：本判据**抓不到**「on/off
+    #     **同口径**的加性常数偏移」（如计数器多计一个固定启动 flush ⇒ Δ 不变
+    #     ⇒ 仍绿）⇒ ★ 该偏移**不影响**决策证据（决策只用 Δ）⇒ 无害；
+    #     ★ 但「flush **时刻**偏移一拍（计数不变）」本判据不抓 ⇒ 那由单元锚
+    #       R1~R11 的**逐拍 FLUSH 序列**兜住 ⇒ 分工合理。
     #   机制证据：**每个被消除的 taken 气泡 = 恰好 1 拍** ⇒ 同时钉住
     #   ① `flush_count` 计数器的口径（off-by-one ⇒ ΔFLUSH ≠ Δcycles ⇒ RED）
     #   ② 门控式 flush 的正确性（少 flush / 多 flush ⇒ 两侧不等 ⇒ RED）

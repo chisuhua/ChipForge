@@ -574,7 +574,11 @@ TEST_CASE("ibus_bp_pcmux_R12_missing_branch_flushed_fails_fast",
                         .pred_target = 0}},
       /*with_bp=*/true, /*write_flushed=*/false));
   pb->build();
-  REQUIRE_THROWS(pb->elaborate());
+  // ★★ MUST 断言**消息内容**（critic 十三轮 SHOULD_FIX-1）：裸 `REQUIRE_THROWS`
+  //   允许「因**别的原因**抛而绿」⇒ fail-fast 锚会静默失效 ⇒ 断言消息含
+  //   `BRANCH_FLUSHED`（与 BP 插件侧的 `lacks <KEY> payload` 同款纪律）。
+  REQUIRE_THROWS_WITH(pb->elaborate(),
+                       Catch::Matchers::ContainsSubstring("BRANCH_FLUSHED"));
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM

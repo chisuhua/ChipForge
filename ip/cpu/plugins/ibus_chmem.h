@@ -280,6 +280,9 @@ class IBusPlugin : public PluginBase {
     //   ⇒ ★ 不可静默降级成 `flushed=false`（critic 十二轮 NIT-1：那样会让
     //   「错路指令维度」整条判定失效而无人察觉）。
     //   ⇒ 生产配置下 branch plugin **恒写**该 key ⇒ 不可达。
+    // ★ 注（critic 十三轮 NIT-4）：`brn == nullptr`（无 branch 节点）⇒
+    //   `flushed=false` —— 与 `br_taken` / `br_target` 的**同款 pre-existing**
+    //   降级路径 ⇒ 生产配置下 branch 节点恒在 ⇒ **不可达** ⇒ 仅登记，不强求处理。
     ch::core::ch_bool flushed(false);
     if (brn) {
       if (!brn->payloads().has(BrPlugin::BRANCH_FLUSHED)) {
