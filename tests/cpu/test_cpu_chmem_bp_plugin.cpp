@@ -5,13 +5,19 @@
 // ★★ 覆盖强度 (critic 第四轮 B-1): 上一版 6 case / 52 assertions 对它们声称的
 //   性质**零鉴别力** —— critic 实测: 同时施加「BTB 永不写」+「方向学习改回
 //   恒 +1」两个变异后, 上一版仍输出「All tests passed (52 assertions in
-//   6 test cases)」。⇒ 本版全部断言**断值**（不只断「是活节点」）:
+//   6 test cases)」。⇒ 本版的机制类断言全部**断 payload 的运行期值**
+//   （R1/R2/R3/R7/R8/R9/R10; R4/R5/R6 断的是标量/helper 语义）:
 //   1) R1 注册位 + BTB 真被写 ⇒ 断 `BP_PRED_VALID` **值** == 1
 //      + 反序注册 ⇒ elaborate **抛异常**（fail-fast, 不静默降级）
 //   2) R2 BTB 表项内容 ⇒ 断 `BP_PRED_TARGET` **值** == 0x80000118
 //   3) R3 方向学习 ⇒ 先 taken 建项, 再灌 not-taken ⇒ pred_taken 由 1 翻 0
 //   4) R7 flush 门控 ⇒ 错路指令**不污染 PHT** ⇒ pred_taken 保持 1
-//   5) R4 索引 = PC[9:2] · R5 合法域 fail-fast · R6 62b 编码往返
+//   5) R8 PHT 饱和 ⇒ 连续 taken 逐拍断言恒 taken（禁 3→0 回绕）
+//   6) R9 branch payload 缺失 ⇒ **branch 侧** fail-fast（critic B-2: R1(b)
+//      撞的是 fetch 侧的 BP_PC ⇒ branch 侧 5 个 fail-fast 原本零覆盖）
+//   7) R10 取指地址活 ⇒ 换 PC ⇒ 命中随之变（critic SHOULD_FIX-4: 原 fetch PC
+//      是常量 ⇒ 「BP 忽略 BP_PC」这个变异抓不住）
+//   8) R4 索引 = PC[9:2] · R5 合法域 fail-fast · R6 62b 编码往返
 //
 // ★ 驱动器的「方向 / 错路标记」是**随 tick 变化的活表达式**（由 tick 计数寄存器
 //   驱动）—— CH_MEM 里 at_stage 闭包**只在 elaboration 跑一次** ⇒ 想在运行期
@@ -85,11 +91,22 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
     std::uint32_t end_tick;  ///< 本段结束 tick（含）；tick < end_tick 属于本段
     bool taken;               ///< 本段内分支的**原始**方向
     bool flushed;             ///< 本段内指令是否是「错路指令」
+    std::uint32_t fetch_pc = 0;  ///< 本段的取指地址（0 = 用 br_pc_）
   };
 
   FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target,
                 std::vector<Phase> phases)
       : br_pc_(br_pc), br_target_(br_target), phases_(std::move(phases)) {
+    if (phases_.empty()) {
+      throw std::runtime_error("FakeCpuDriver: phases must not be empty");
+    }
+  }
+
+  /// ★ 只写 BP_PC、**不写** branch payload（用于验证 BP 的 branch 侧 fail-fast）
+  FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target,
+                std::vector<Phase> phases, bool write_branch_payloads)
+      : br_pc_(br_pc), br_target_(br_target), phases_(std::move(phases)),
+        write_branch_payloads_(write_branch_payloads) {
     if (phases_.empty()) {
       throw std::runtime_error("FakeCpuDriver: phases must not be empty");
     }
@@ -101,14 +118,18 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("fetch").get();
       if (!n) return;
+      // ★ 取指地址 = **随 tick 变化的活表达式**（R10 的锚：BP 必须消费活的 BP_PC）
       ch::core::ch_uint<32> pc(ch::core::ch_literal<0, 32>{});
-      pc = ch::core::ch_uint<32>(ch::core::ch_uint<32>(pc_));
+      pc = ch::core::ch_uint<32>(ch::core::ch_uint<32>(phase_fetch_pc()));
       n->operator()(BP_PC) = cf::plugin::uint_t<32>(pc);
     });
     // ★ 注册在 **branch NORMAL** —— 必须**早于** BP 的 branch 回调（同上）
     pb.at_stage("branch", cf::plugin::Phase::NORMAL, [this, &pb]() {
       auto* n = pb.node_of_logic_stage("branch").get();
       if (!n) return;
+      // ★ 只写 BP_PC 的形态 ⇒ **不写**任何 branch payload ⇒ BP 的 branch 侧
+      //   fail-fast MUST 被触发（R9 的锚）
+      if (!write_branch_payloads_) return;
       using KT = cf::cpu::core::payload::keys<ch::core::ch_uint<32>, 32>;
       using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<ch::core::ch_uint<32>>;
       using BrPlugin = cf::cpu::plugins::BranchPlugin<ch::core::ch_uint<32>>;
@@ -156,10 +177,25 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
     return acc;
   }
 
-  std::uint32_t pc_ = 0x8000010cu;
+  /// 取「当前 tick 的取指地址」的**活**表达式（0 ⇒ 用 br_pc_）
+  ch::core::ch_uint<32> phase_fetch_pc() const {
+    ch::core::ch_uint<32> acc(static_cast<std::uint32_t>(
+        phases_.back().fetch_pc ? phases_.back().fetch_pc : br_pc_));
+    for (std::size_t i = phases_.size() - 1; i-- > 0;) {
+      const ch::core::ch_uint<32> c(tick_count_);
+      const ch::core::ch_uint<32> thresh(
+          static_cast<std::uint32_t>(phases_[i].end_tick));
+      const ch::core::ch_uint<32> v(static_cast<std::uint32_t>(
+          phases_[i].fetch_pc ? phases_[i].fetch_pc : br_pc_));
+      acc = select(c < thresh, v, acc);
+    }
+    return acc;
+  }
+
   std::uint32_t br_pc_;
   std::uint32_t br_target_;
   std::vector<Phase> phases_;
+  bool write_branch_payloads_ = true;
   ch::core::ch_reg<ch::core::ch_uint<32>> tick_count_{
       ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_test_tick"};
 };
@@ -390,17 +426,19 @@ TEST_CASE("bp_plugin_R7_flushed_branch_does_not_pollute_pht",
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 8) PHT 饱和**不回头**（ADR-040 §10.5 那一族的回归锚）
-//    ★ 场景: 连续 taken 16 拍 ⇒ 计数器 MUST 饱和在 3（**不得** 3→0 回绕）
+// 8) PHT 饱和**不发生 3→0 回绕**（ADR-040 §10.5 那一族的回归锚）
+//    ★ 措辞说明: PHT 语义是「taken ⇒ 饱和 +1 / not-taken ⇒ 饱和 −1」
+//      （★ **可回退**）⇒ 本 case 断的是**另一件事**: 饱和判定被写成 C++ 三目
+//      `?:`（elaboration 期折常量 ⇒ 饱和分支成死代码）⇒ 写入值恒为 (cur+1)&3
+//      ⇒ 计数器 0→1→2→3→0→1… ⇒ 每 4 拍出现一次 0 ⇒ 预测翻 0 ⇒ RED。
 //    ★ 判据: 饱和后**每一拍**的预测方向 MUST 是 taken
-//      —— 若饱和判定被写成 C++ 三目 `?:`（elaboration 期折常量 ⇒ 饱和分支成
-//         死代码）⇒ 写入值恒为 (cur+1)&3 ⇒ 计数器 0→1→2→3→0→1… ⇒ 每 4 拍
-//         出现一次 0 ⇒ 预测翻 0 ⇒ RED
 //    ★ 系统级对应指纹 = `pred_taken ≈ hit/2`（实测 m1: 3996 → 2000）
 //    ★ MUST 逐拍采样（只在相位末尾采一次 ⇒ 采样点可能恰好落在饱和值上 ⇒
 //      零鉴别力 —— 这正是 critic B-1 的同型陷阱）
+//    ★ 采样窗口从 i>=4 起: 前 3 拍用于建 BTB 项 + 让计数器爬到饱和;
+//      回绕最早出现在第 4 拍（写序列 1,2,3,0）⇒ 窗口起点留 1 拍余量。
 // ═════════════════════════════════════════════════════════════════════════════
-TEST_CASE("bp_plugin_R8_pht_saturates_without_wraparound", "[cpu][chmem][bp][plugin]") {
+TEST_CASE("bp_plugin_R8_pht_saturation_does_not_wrap_around", "[cpu][chmem][bp][plugin]") {
   ch::core::context ctx("bp_r8");
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
@@ -427,6 +465,76 @@ TEST_CASE("bp_plugin_R8_pht_saturates_without_wraparound", "[cpu][chmem][bp][plu
       REQUIRE(read_u1(*sim, taken_cell) == 1u);
     }
   }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 9) branch 侧 payload 缺失 ⇒ **fail-fast**（critic B-2）
+//    ★ R1(b) 撞的是 **fetch 侧** 的 `BP_PC` fail-fast（BP 先注册 ⇒ fetch stage
+//      先跑）⇒ BP 的 branch 侧 5 个 fail-fast（BRANCH_TAKEN / BRANCH_TAKEN_RAW
+//      / BRANCH_FLUSHED / IS_BRANCH / BRANCH_TARGET）**零断言覆盖**。
+//    ★ 本 case: 生产者**先注册**且**只写 BP_PC** ⇒ fetch 侧正常 ⇒ 撞 branch 侧
+//      ⇒ 断言异常消息含 "branch node lacks BRANCH_TAKEN"。
+// ═════════════════════════════════════════════════════════════════════════════
+TEST_CASE("bp_plugin_R9_branch_payloads_fail_fast_when_missing",
+          "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r9");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  // ★ 生产者先注册，但**不写** branch payload
+  pb.register_plugin(std::make_unique<FakeCpuDriver>(
+      0x8000010cu, 0x80000118u,
+      std::vector<FakeCpuDriver::Phase>{{1000u, true, false}}, /*write_branch_payloads=*/false));
+  pb.register_plugin(std::make_unique<Btb>(256u));
+  pb.build();
+
+  bool threw = false;
+  std::string msg;
+  try {
+    (void)pb.elaborate();
+  } catch (const std::exception& e) {
+    threw = true;
+    msg = e.what();
+  }
+  // ★ MUST 抛异常（否则 = 静默降级为 false ⇒ 表不更新却无报错）
+  REQUIRE(threw);
+  // ★ 且必须落在 **branch 侧**（不是 fetch 侧的 BP_PC）
+  REQUIRE(msg.find("branch node lacks BRANCH_TAKEN") != std::string::npos);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 10) 取指地址必须是**活**信号（critic SHOULD_FIX-4）
+//     ★ 场景: 前 4 拍取指地址 = 0x8000010c（BTB 有项 ⇒ 命中），之后切到
+//       0x80000140（**无表项** ⇒ tag 不匹配 ⇒ 必须 miss）
+//     ★ 判据: 换 PC 后 `BP_PRED_VALID` 值 MUST 由 1 变 0
+//       —— 若 BP 用常量地址查表 / 忽略 BP_PC ⇒ 值恒 1 ⇒ RED
+// ═════════════════════════════════════════════════════════════════════════════
+TEST_CASE("bp_plugin_R10_lookup_follows_live_fetch_pc", "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r10");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto sim = make_sim(pb, {{8u, /*taken=*/true, /*flushed=*/false, /*fetch_pc=*/0x8000010cu},
+                            {1000u, /*taken=*/true, /*flushed=*/false, /*fetch_pc=*/0x80000140u}});
+
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+  REQUIRE(valid.impl() != nullptr);
+  REQUIRE_FALSE(valid.impl()->is_const());
+
+  // ---- 阶段 1: 取指地址 = 有 BTB 项的 PC ⇒ 命中 ----
+  //   ★ 相位窗口取 **8 拍**（而非 4）⇒ 对「tick 计数器相位偏移 1」留足余量
+  //     （实测: `sim->reset()` 也会产生一拍 ⇒ 相位边界比直觉早 1 拍）
+  for (int i = 0; i < 4; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, valid) == 1u);
+
+  // ---- 阶段 2: 取指地址换成**无表项**的 PC ⇒ 必须 miss ----
+  //   （多跑几拍确保已越过相位边界）
+  for (int i = 0; i < 6; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, valid) == 0u);
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM

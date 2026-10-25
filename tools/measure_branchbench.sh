@@ -46,15 +46,6 @@ ELF_DIR="${BENCH_ELF_DIR:-build}"
 BP_MODE="${BENCH_BP:-off}"
 CHECK_ONLY=0
 CHECK_BP_DIR=0
-case "${1:-}" in
-  --check-baseline) CHECK_ONLY=1 ;;
-  --check-bp-direction)
-    # ★ BP 方向性判据（critic B-2: 机制指纹 MUST 有**自动化**锚，不能只活在
-    #   commit message / 手工表格里）。★ 强制 BP=on（方向性判据只在 BP 开态有意义）。
-    CHECK_BP_DIR=1
-    BP_MODE=on
-    ;;
-esac
 
 MODES=(0 1 2 3)
 # ★ 档名与**硬件分支方向**一致 (chmem-branch-microbench-fix 互换重命名):
@@ -63,6 +54,21 @@ MODES=(0 1 2 3)
 MODE_NAMES=(always_not_taken always_taken pattern_6of8 pseudo_random)
 
 fail() { echo "::warning file=soc/cpu/docs/dse/branchbench-baseline-matrix.csv::FAIL: $*"; exit 1; }
+
+# ★ 参数解析 **fail-closed** (critic SHOULD_FIX-1): 未知参数 MUST 报错 ——
+#   否则「参数拼错」⇒ 脚本静默降级为「测量并打印」并 exit 0
+#   ⇒ ctest entry 变成**假绿通道**（判据一条都没跑却报 PASS）。
+case "${1:-}" in
+  ""|--measure) ;;
+  --check-baseline) CHECK_ONLY=1 ;;
+  --check-bp-direction)
+    # ★ BP 方向性判据（critic B-2: 机制指纹 MUST 有**自动化**锚，不能只活在
+    #   commit message / 手工表格里）。★ 强制 BP=on（方向性判据只在 BP 开态有意义）。
+    CHECK_BP_DIR=1
+    BP_MODE=on
+    ;;
+  *) fail "未知参数: '$1' (支持: 空 | --measure | --check-baseline | --check-bp-direction)" ;;
+esac
 
 [ -x "$SIM" ] || fail "缺少可执行 $SIM (先 cmake --build build)"
 [ -f "$BASELINE" ] || fail "缺少基线 $BASELINE"
@@ -165,6 +171,7 @@ fi
 
 rc=0
 first_pc_changes=""
+bp_dir_judges=0
 for i in "${!MODES[@]}"; do
   m="${MODES[$i]}"; name="${MODE_NAMES[$i]}"
   elf="$ELF_DIR/branchbench_m${m}.elf"
@@ -207,11 +214,9 @@ for i in "${!MODES[@]}"; do
   fi
 
   # ---- BP 统计 (critic B-2: 方向性判据的承重数据) ----
-  # ★ fail-closed: 缺 BP_STATS ⇒ 输出格式变了 ⇒ 静默跳过方向性判据会开假绿通道
-  bp_stats=$(printf '%s' "$raw" | grep -oE 'BP_STATS hit=[0-9]+ miss=[0-9]+ pred_taken=[0-9]+' | head -1)
-  [ -n "$bp_stats" ] || fail "mode $m ($name): 输出缺 BP_STATS (★ fail-closed: 无法做 BP 方向性判据)"
-  bp_hit=$(printf '%s' "$bp_stats" | grep -oE 'hit=[0-9]+' | cut -d= -f2)
-  bp_pred=$(printf '%s' "$bp_stats" | grep -oE 'pred_taken=[0-9]+' | cut -d= -f2)
+  # ★ 只在方向性判据模式解析（critic SHOULD_FIX-3: 把「BP 模式承重数据」的
+  #   fail-closed 检查绑到 BP=off 路径上没有必要；将来 runner 改成「BP 关时
+  #   不打印 BP_STATS」会**误杀** baseline entry）
 
   # ---- 结果正确性 (硬闸): 校验和必须与基线期望值逐位相等 ----
   row=$(base_row "$name" "$BP_MODE")
@@ -269,6 +274,12 @@ for i in "${!MODES[@]}"; do
   #          (退化成「任何方向都 +1」⇒ pred == hit ⇒ RED)
   # ═══════════════════════════════════════════════════════════════════════════
   if [ "$CHECK_BP_DIR" -eq 1 ]; then
+    # ★ fail-closed: 缺 BP_STATS ⇒ 输出格式变了 ⇒ 静默跳过方向性判据会开假绿通道
+    bp_stats=$(printf '%s' "$raw" | grep -oE 'BP_STATS hit=[0-9]+ miss=[0-9]+ pred_taken=[0-9]+' | head -1)
+    [ -n "$bp_stats" ] || fail "mode $m ($name): 输出缺 BP_STATS (★ fail-closed: 无法做 BP 方向性判据)"
+    bp_hit=$(printf '%s' "$bp_stats" | grep -oE 'hit=[0-9]+' | cut -d= -f2)
+    bp_pred=$(printf '%s' "$bp_stats" | grep -oE 'pred_taken=[0-9]+' | cut -d= -f2)
+
     [ "$bp_hit" -gt 0 ] \
       || fail "mode $m ($name): BTB 命中数 = 0 (AC-F2-14 命中自证失败 ⇒ 查表/写路径坏了)"
 
@@ -276,6 +287,9 @@ for i in "${!MODES[@]}"; do
     [ -n "$off_row" ] \
       || fail "mode $m ($name): 基线无 (${name}, bp_mode=off) 行 ⇒ 无法做 BP=on 的校验和对照"
     off_tohost=$(field "$off_row" "$IDX_TOHOST")
+    # ★★ 校验和判据: **当前恒真**（BP 的三个输出 payload 本 change 内**无消费者**
+    #   ⇒ BP=on 与 BP=off 必然同校验和）⇒ 它是 **S3 接入 PC-mux 后才激活**的
+    #   承重判据（那时若 BP 改变了架构可见结果 ⇒ 这里 RED）。
     [ "$tohost" = "$off_tohost" ] \
       || fail "mode $m ($name): BP=on 校验和 $tohost != BP=off 基线 $off_tohost ⇒ BP 改变了架构可见结果 (结果错, 不得产出数值)"
     if [ -n "$IDX_WSHA" ] && [ -n "$cur_wsha" ]; then
@@ -288,6 +302,7 @@ for i in "${!MODES[@]}"; do
       always_taken)
         # (3) PHT 学得到 taken ⇒ 预测率 MUST ≥ 90% (实测 3996/3998 = 99.95%)
         #   ★ 饱和判定被折常量 (?: ⇒ 3→0 回绕) ⇒ 实测 2000/3998 = 50% ⇒ RED
+        bp_dir_judges=$(( bp_dir_judges + 1 ))
         min_pred=$(( bp_hit * 9 / 10 ))
         [ "$bp_pred" -ge "$min_pred" ] \
           || fail "mode $m ($name): pred_taken=$bp_pred < 0.9×hit=$min_pred ⇒ PHT 学不到 taken (饱和判定被折常量? 或 PHT 未更新?)"
@@ -298,9 +313,16 @@ for i in "${!MODES[@]}"; do
         #     3991/3992 = 99.97% ⇒ RED
         #   ★ MUST 用**比值 + 余量**, 不可用「pred < hit」这种严格不等式 ——
         #     99.97% < 100% 也会成立 ⇒ 零鉴别力 (同型陷阱: 只差 1 也是「<」)
+        bp_dir_judges=$(( bp_dir_judges + 1 ))
         max_pred=$(( bp_hit * 9 / 10 ))
         [ "$bp_pred" -le "$max_pred" ] \
           || fail "mode $m ($name): pred_taken=$bp_pred > 0.9×hit=$max_pred ⇒ 方向学习失效 (退化成「任何方向都 +1」?)"
+        ;;
+      *)
+        # ★ m0 / m3 档**本来就没有**方向性判据（m0 的命中全来自恒 taken 的回边、
+        #   m3 的伪随机方向 ⇒ 比值判据不适用）⇒ 此处**不** fail；
+        #   ★ 覆盖完整性由**判据计数**（循环结束 MUST == 2）兜住 ——
+        #   档名一旦改名 ⇒ 判据静默失效 ⇒ 计数不足 ⇒ fail（critic SHOULD_FIX-2）
         ;;
     esac
     printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s bp_hit=%-6s bp_pred_taken=%-6s bp-direction-ok\n" \
@@ -312,10 +334,17 @@ for i in "${!MODES[@]}"; do
   [ -n "$pc_changes" ] || fail "mode $m ($name): 输出缺 pc_changes (★ fail-closed)"
   if [ -n "$pc_changes" ]; then
     # 工作量一致性: 4 档 pc_changes 必须相同 (AC-F1-2)
-    if [ -z "$first_pc_changes" ]; then
-      first_pc_changes="$pc_changes"
-    elif [ "$pc_changes" != "$first_pc_changes" ]; then
-      fail "mode $m ($name): pc_changes=$pc_changes != $first_pc_changes ($(printf '%s' "${MODE_NAMES[0]}")) —— ★ 前端活动量跨档不一致 (承重证据 = 静态结构论证; 此项为动态佐证)"
+    # ★★ 仅在 **BP=off** 模式下断言 (critic B-3 暗雷 1): S3 接入 PC-mux 后,
+    #   不同档的预测正确性不同 ⇒ 采样 PC 轨迹**必然**不同 (m0 恒 not-taken ⇒
+    #   预测必错 ⇒ 采样流多出错路 PC) ⇒ 该断言会在 S3 **假红**, 且与
+    #   「BP 是否健康」无关 ⇒ MUST NOT 用它给 BP 路径判生死。
+    #   ⇒ BP=on 模式只保留「字段存在」检查 (fail-closed), 不做跨档相等断言。
+    if [ "$CHECK_BP_DIR" -eq 0 ]; then
+      if [ -z "$first_pc_changes" ]; then
+        first_pc_changes="$pc_changes"
+      elif [ "$pc_changes" != "$first_pc_changes" ]; then
+        fail "mode $m ($name): pc_changes=$pc_changes != $first_pc_changes ($(printf '%s' "${MODE_NAMES[0]}")) —— ★ 前端活动量跨档不一致 (承重证据 = 静态结构论证; 此项为动态佐证)"
+      fi
     fi
     cycles_minus_pc=$(( cycles - pc_changes ))
   fi
@@ -341,6 +370,9 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   echo "branchbench: 基线一致 (4 档, bp_mode=$BP_MODE) => PASS"
 fi
 if [ "$CHECK_BP_DIR" -eq 1 ]; then
-  echo "branchbench: BP 方向性判据通过 (4 档, bp_mode=on) => PASS"
+  # ★ 判据覆盖数必须 == 2 (critic SHOULD_FIX-2: 档名改名 ⇒ 判据静默失效)
+  [ "$bp_dir_judges" -eq 2 ] \
+    || fail "方向性判据只应用了 $bp_dir_judges/2 条 ⇒ 判据覆盖不完整 (档名改动后 MUST 同步本段)"
+  echo "branchbench: BP 方向性判据通过 (4 档, bp_mode=on, 判据 2/2) => PASS"
 fi
 exit 0

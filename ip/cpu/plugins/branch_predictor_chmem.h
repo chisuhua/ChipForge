@@ -105,6 +105,9 @@ namespace plugins {
 //   (2) **类作用域**的 static 数据成员（如 `BranchPlugin<T>::BRANCH_TAKEN`、
 //       `IBusPlugin<T>::FLUSH`）⇒ **天然全程序唯一**（模板静态成员 = vague
 //       linkage，链接期合并为一份）⇒ **无** (1) 的隐患。
+//       ★ 但**按特化唯一**：`BranchPlugin<uint32_t>::BRANCH_TAKEN` 与
+//         `BranchPlugin<uint64_t>::BRANCH_TAKEN` 是**两个不同的 cell**（key 名相同）
+//         ⇒ 跨 T 混用会静默串味 ⇒ 本仓当前只用 32b 特化（`kXlenBits = 32`）。
 //       ⇒ 本轮已把 `branch_chmem.h` / `ibus_chmem.h` 的相关 key 显式写成
 //         `inline static` —— 语义不变（本就唯一），但把「唯一性」写进源码而非
 //         依赖模板规则。
@@ -363,8 +366,8 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
         ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_FLUSHED));
     const ch::core::ch_bool is_branch =
         ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH));
-    ch::core::ch_uint<32> br_target(ch::core::ch_literal<0, 32>{});
-    br_target = ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
+    const ch::core::ch_uint<32> br_target =
+        ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
 
     // ── 索引（与读路径**同一表达式** —— PoC 结论 3）──
     auto idx8 = ch::core::bits<kBtbAddrWidth + 1, 2>(br_pc);

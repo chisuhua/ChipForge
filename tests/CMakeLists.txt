@@ -256,14 +256,24 @@ if(TARGET cpu_verilator_sim AND EXISTS "${CMAKE_BINARY_DIR}/branchbench_m0.elf")
     # ★ BP 方向性判据 (chmem-bp-btb-gshare-poc, critic B-2)
     #
     # Why: BP 的机制指纹 (PHT 方向学习 / 饱和判定) 在本 change 之前**没有任何
-    #   自动锚** —— CI 的 branchbench_baseline 跑的是 bp_mode=off ⇒ BP 路径整体
-    #   不在 CI 内 ⇒ 有人再写出一个 `?:` 折常量或把方向学习改回「恒 +1」⇒
-    #   CI 全绿而机制被判「不成立」⇒ 误杀 ② (以及 CoreMark ≥1.9 的前置)。
+    #   自动锚** —— 4 档指纹只活在 commit message 里, 开发者手测一次就没有第二份
+    #   ⇒ 有人再写出一个 `?:` 折常量或把方向学习改回「恒 +1」⇒ 判据失效而
+    #   **无人察觉** ⇒ 机制被判「不成立」⇒ 误杀 ② (以及 CoreMark ≥1.9 的前置)。
     # 判据 (4 档, BP=on): BTB 命中 > 0 · 校验和与 BP=off 基线逐位相等 ·
     #   always_taken 预测率 ≥ 90% (PHT 学得到 taken) ·
     #   pattern_6of8 预测率 ≤ 90% (方向学习生效).
     # ★ 已用**变异对照**验证判据有牙: 「BTB 永不写」/「方向学习恒 +1」/
     #   「饱和判定三目折常量」三个变异分别让本 entry 判红.
+    #
+    # ★★ **本 entry 是「本地锚」, 不是「CI 保护」** (critic B-1 —— 上一轮 commit
+    #   message 写的「BP 路径进入 CI」是**事实错误**, 已更正):
+    #   CI **不跑 ctest**、且 **不构建项目** ⇒ `.github/workflows/architecture-gates.yml`
+    #   的 branchbench step 恒走 SKIP (ADR-088 已明载「该 step 恒走 SKIP ⇒ 目前零
+    #   实际保护」; brief AC-9 / ADR-088 §5.2 判据 4 同款: 仅加 ctest entry
+    #   **不满足**该判据) ⇒ 本 entry 由 **PR 提交者本地手动跑**
+    #   (`bash tools/run_chipforge_tests.sh --all`) 兑现。
+    #   ★ 真正「让 BP 路径进入 CI」的前置 = ADR-088 的「CI 具备 build 能力」项
+    #   ⇒ 归 ADR-088, **不在本 change** (已在 tasks.md 缺口表登记)。
     # TIMEOUT 300: 实测单跑 4 档 ~60s (BP=on, 含 verilator 运行时编译).
     # ----------------------------------------------------------------------------
     add_test(
