@@ -333,7 +333,7 @@ for i in "${!MODES[@]}"; do
     [ -n "$base_flush" ] \
       || fail_plain "mode $m ($name): 基线行缺 flush_count 值 (★ fail-closed: 无法钉住 off 侧 flush 口径)"
     [ "$flush_count" = "$base_flush" ] \
-      || fail "mode $m ($name): BP=off 的 FLUSH_COUNT $flush_count != 基线 $base_flush (★ off 侧 flush 口径已变 ⇒ 基线列陈旧, 须显式重录)"
+      || fail "mode $m ($name): BP=$BP_MODE 的 FLUSH_COUNT $flush_count != 基线 $base_flush (★ 该 BP 模式下的 flush 口径已变 ⇒ 基线列陈旧, 须显式重录)"
     compared_rows=$(( compared_rows + 1 ))
     [ "$tohost" = "$exp_tohost" ] \
       || fail "mode $m ($name): 校验和不符 —— 实测 $tohost != 基线 $exp_tohost (结果错, 不得产出数值)"
