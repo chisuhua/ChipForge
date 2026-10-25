@@ -40,7 +40,11 @@ class IBusPlugin : public PluginBase {
   // Phase 6d.4: branch flush signal — when the PREVIOUS cycle's branch was
   // taken, the currently-fetched fall-through instruction is bogus and its
   // register writes / store / branch decision must be suppressed.
-  static inline Payload<ch::core::ch_bool> FLUSH{"cpu.flush"};
+  // ★ `inline static` ⇒ **全程序唯一**（类作用域静态成员 = vague linkage,
+  //   链接期合并为一份）; `PayloadStore` 按 key 的**地址**索引 ⇒ 唯一性是硬要求。
+  //   ★ 对照: **命名空间作用域**的 `static inline` key 才是 per-TU 副本 ⇒
+  //   跨 TU 断链（见 `branch_predictor_chmem.h` 的 doctrine 注释）。
+  inline static Payload<ch::core::ch_bool> FLUSH{"cpu.flush"};
   IBusPlugin() = default;
   ~IBusPlugin() override = default;
   IBusPlugin(const IBusPlugin&) = delete;

@@ -28,6 +28,7 @@
 # 用法:
 #   bash tools/measure_branchbench.sh                    # 测量并打印
 #   bash tools/measure_branchbench.sh --check-baseline   # 与基线比对, 不一致则 exit 1
+#   bash tools/measure_branchbench.sh --check-bp-direction  # ★ BP 方向性判据 (BP=on)
 #
 # 环境变量: BENCH_SIM / BENCH_BASELINE / BENCH_MAX_CYCLES / BENCH_ELF_DIR / BENCH_BP
 set -uo pipefail
@@ -44,7 +45,16 @@ ELF_DIR="${BENCH_ELF_DIR:-build}"
 #   BP **默认开** ⇒ 「关闭」用 `--no-bp` ⇒ 不保留 `--enable-bp`（冗余且有歧义）
 BP_MODE="${BENCH_BP:-off}"
 CHECK_ONLY=0
-[ "${1:-}" = "--check-baseline" ] && CHECK_ONLY=1
+CHECK_BP_DIR=0
+case "${1:-}" in
+  --check-baseline) CHECK_ONLY=1 ;;
+  --check-bp-direction)
+    # ★ BP 方向性判据（critic B-2: 机制指纹 MUST 有**自动化**锚，不能只活在
+    #   commit message / 手工表格里）。★ 强制 BP=on（方向性判据只在 BP 开态有意义）。
+    CHECK_BP_DIR=1
+    BP_MODE=on
+    ;;
+esac
 
 MODES=(0 1 2 3)
 # ★ 档名与**硬件分支方向**一致 (chmem-branch-microbench-fix 互换重命名):
@@ -196,23 +206,35 @@ for i in "${!MODES[@]}"; do
     fail "mode $m ($name): 直方图窗口溢出 (dropped=$dropped) ⇒ 计数被丢弃 ⇒ 前端活动量断言不可信 —— 提高 --stats-len (或检查 --stats-base 覆盖范围)"
   fi
 
+  # ---- BP 统计 (critic B-2: 方向性判据的承重数据) ----
+  # ★ fail-closed: 缺 BP_STATS ⇒ 输出格式变了 ⇒ 静默跳过方向性判据会开假绿通道
+  bp_stats=$(printf '%s' "$raw" | grep -oE 'BP_STATS hit=[0-9]+ miss=[0-9]+ pred_taken=[0-9]+' | head -1)
+  [ -n "$bp_stats" ] || fail "mode $m ($name): 输出缺 BP_STATS (★ fail-closed: 无法做 BP 方向性判据)"
+  bp_hit=$(printf '%s' "$bp_stats" | grep -oE 'hit=[0-9]+' | cut -d= -f2)
+  bp_pred=$(printf '%s' "$bp_stats" | grep -oE 'pred_taken=[0-9]+' | cut -d= -f2)
+
   # ---- 结果正确性 (硬闸): 校验和必须与基线期望值逐位相等 ----
   row=$(base_row "$name" "$BP_MODE")
   if [ -z "$row" ]; then
     if [ "$BP_MODE" = "off" ]; then
       fail "基线 $BASELINE 无 (${name}, bp_mode=${BP_MODE}) 行 (mode $m)"
-    else
+    elif [ "$CHECK_BP_DIR" -eq 0 ]; then
       # BP 档尚无基线 => 打印但不做比对 (前置2 / ② 追加基线行后生效)
       printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s pc_changes=%-8s (无基线行 => 仅打印)\n" \
         "$m" "$name" "$BP_MODE" "$tohost" "$cycles" "${pc_changes:-?}"
       continue
+    else
+      # ★ --check-bp-direction: 无 (name,bp=on) 基线行 ⇒ 跳过基线比对,
+      #   但**继续**跑下面的方向性判据（判据不依赖基线行）
+      exp_tohost=""
+      base_cycles=""
     fi
+  else
+    exp_tohost=$(field "$row" "$IDX_TOHOST")
+    base_cycles=$(field "$row" "$IDX_CYCLES")
+    [ "$tohost" = "$exp_tohost" ] \
+      || fail "mode $m ($name): 校验和不符 —— 实测 $tohost != 基线 $exp_tohost (结果错, 不得产出数值)"
   fi
-  exp_tohost=$(field "$row" "$IDX_TOHOST")
-  base_cycles=$(field "$row" "$IDX_CYCLES")
-
-  [ "$tohost" = "$exp_tohost" ] \
-    || fail "mode $m ($name): 校验和不符 —— 实测 $tohost != 基线 $exp_tohost (结果错, 不得产出数值)"
   [ "$status" != "TIMEOUT" ] \
     || fail "mode $m ($name): TIMEOUT (cycles>=$MAX_CYCLES) —— 程序未跑完, 不得产出数值"
 
@@ -230,6 +252,59 @@ for i in "${!MODES[@]}"; do
     if [ -n "$base_wsha" ] && [ "$base_wsha" != "$cur_wsha" ]; then
       fail "mode $m ($name): workload_sha 不符 —— 基线 $base_wsha != 当前 .text $cur_wsha (基线属于另一份代码, 须显式重录)"
     fi
+  fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ★ BP 方向性判据 (critic B-2: 机制指纹 MUST 有**自动化**锚)
+  #   —— 背景: BP 的 B-2 修正 (PHT 方向学习) / B-1 修正 (饱和判定用 select)
+  #      在修复前**没有任何自动锚**: 4 档指纹只活在 commit message 里,
+  #      CI 的 branchbench_baseline 跑的是 bp_mode=off ⇒ BP 路径整体不在 CI 内
+  #      ⇒ 有人再写出一个 `?:` 折常量 ⇒ CI 全绿而机制被判「不成立」⇒ 误杀 ②。
+  #   —— 判据 (全部是**方向性**不等式, 对 S3 的 PC-mux 接入不敏感):
+  #      (1) 4 档 hit > 0            ⇒ BTB 查表/写路径活着 (AC-F2-14 命中自证)
+  #      (2) BP=on 的校验和 == BP=off 基线 ⇒ BP 不改变架构可见结果
+  #      (3) always_taken: pred >= 0.9×hit ⇒ PHT 学得到 taken
+  #          (饱和判定被折常量 ⇒ 计数器 3→0 回绕 ⇒ pred ≈ hit/2 ⇒ RED)
+  #      (4) pattern_6of8: pred < hit ⇒ 方向学习生效
+  #          (退化成「任何方向都 +1」⇒ pred == hit ⇒ RED)
+  # ═══════════════════════════════════════════════════════════════════════════
+  if [ "$CHECK_BP_DIR" -eq 1 ]; then
+    [ "$bp_hit" -gt 0 ] \
+      || fail "mode $m ($name): BTB 命中数 = 0 (AC-F2-14 命中自证失败 ⇒ 查表/写路径坏了)"
+
+    off_row=$(base_row "$name" "off")
+    [ -n "$off_row" ] \
+      || fail "mode $m ($name): 基线无 (${name}, bp_mode=off) 行 ⇒ 无法做 BP=on 的校验和对照"
+    off_tohost=$(field "$off_row" "$IDX_TOHOST")
+    [ "$tohost" = "$off_tohost" ] \
+      || fail "mode $m ($name): BP=on 校验和 $tohost != BP=off 基线 $off_tohost ⇒ BP 改变了架构可见结果 (结果错, 不得产出数值)"
+    if [ -n "$IDX_WSHA" ] && [ -n "$cur_wsha" ]; then
+      off_wsha=$(field "$off_row" "$IDX_WSHA")
+      [ -z "$off_wsha" ] || [ "$off_wsha" = "$cur_wsha" ] \
+        || fail "mode $m ($name): workload_sha 不符 —— BP=off 基线 $off_wsha != 当前 .text $cur_wsha (基线属于另一份代码, 须显式重录)"
+    fi
+
+    case "$name" in
+      always_taken)
+        # (3) PHT 学得到 taken ⇒ 预测率 MUST ≥ 90% (实测 3996/3998 = 99.95%)
+        #   ★ 饱和判定被折常量 (?: ⇒ 3→0 回绕) ⇒ 实测 2000/3998 = 50% ⇒ RED
+        min_pred=$(( bp_hit * 9 / 10 ))
+        [ "$bp_pred" -ge "$min_pred" ] \
+          || fail "mode $m ($name): pred_taken=$bp_pred < 0.9×hit=$min_pred ⇒ PHT 学不到 taken (饱和判定被折常量? 或 PHT 未更新?)"
+        ;;
+      pattern_6of8)
+        # (4) 方向学习生效 ⇒ 该档真实 taken 率仅 2/8 ⇒ 预测 taken 率 MUST ≤ 90%
+        #   ★ 实测(正确) 2247/3992 = 56.3% ✓ ; 实测(退化成「任何方向都 +1」)
+        #     3991/3992 = 99.97% ⇒ RED
+        #   ★ MUST 用**比值 + 余量**, 不可用「pred < hit」这种严格不等式 ——
+        #     99.97% < 100% 也会成立 ⇒ 零鉴别力 (同型陷阱: 只差 1 也是「<」)
+        max_pred=$(( bp_hit * 9 / 10 ))
+        [ "$bp_pred" -le "$max_pred" ] \
+          || fail "mode $m ($name): pred_taken=$bp_pred > 0.9×hit=$max_pred ⇒ 方向学习失效 (退化成「任何方向都 +1」?)"
+        ;;
+    esac
+    printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s bp_hit=%-6s bp_pred_taken=%-6s bp-direction-ok\n" \
+      "$m" "$name" "$BP_MODE" "$tohost" "$cycles" "$bp_hit" "$bp_pred"
   fi
 
   cycles_minus_pc=""
@@ -264,5 +339,8 @@ done
 if [ "$rc" -ne 0 ]; then exit 1; fi
 if [ "$CHECK_ONLY" -eq 1 ]; then
   echo "branchbench: 基线一致 (4 档, bp_mode=$BP_MODE) => PASS"
+fi
+if [ "$CHECK_BP_DIR" -eq 1 ]; then
+  echo "branchbench: BP 方向性判据通过 (4 档, bp_mode=on) => PASS"
 fi
 exit 0

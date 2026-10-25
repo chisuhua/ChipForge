@@ -251,6 +251,30 @@ if(TARGET cpu_verilator_sim AND EXISTS "${CMAKE_BINARY_DIR}/branchbench_m0.elf")
         TIMEOUT 300
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
+
+    # ----------------------------------------------------------------------------
+    # ★ BP 方向性判据 (chmem-bp-btb-gshare-poc, critic B-2)
+    #
+    # Why: BP 的机制指纹 (PHT 方向学习 / 饱和判定) 在本 change 之前**没有任何
+    #   自动锚** —— CI 的 branchbench_baseline 跑的是 bp_mode=off ⇒ BP 路径整体
+    #   不在 CI 内 ⇒ 有人再写出一个 `?:` 折常量或把方向学习改回「恒 +1」⇒
+    #   CI 全绿而机制被判「不成立」⇒ 误杀 ② (以及 CoreMark ≥1.9 的前置)。
+    # 判据 (4 档, BP=on): BTB 命中 > 0 · 校验和与 BP=off 基线逐位相等 ·
+    #   always_taken 预测率 ≥ 90% (PHT 学得到 taken) ·
+    #   pattern_6of8 预测率 ≤ 90% (方向学习生效).
+    # ★ 已用**变异对照**验证判据有牙: 「BTB 永不写」/「方向学习恒 +1」/
+    #   「饱和判定三目折常量」三个变异分别让本 entry 判红.
+    # TIMEOUT 300: 实测单跑 4 档 ~60s (BP=on, 含 verilator 运行时编译).
+    # ----------------------------------------------------------------------------
+    add_test(
+        NAME branchbench_bp_direction
+        COMMAND bash "${CMAKE_SOURCE_DIR}/tools/measure_branchbench.sh" --check-bp-direction
+    )
+    set_tests_properties(branchbench_bp_direction PROPERTIES
+        LABELS "verilator;perf;e2e;bp"
+        TIMEOUT 300
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 endif()
 
 # ----------------------------------------------------------------------------

@@ -313,8 +313,8 @@ flush 判据从「上拍 taken」改为**门控式**（§3.4.2 唯一权威：`f
 | 索引 | ★ **Bimodal 语义**：`bits<7,0>(PC) & literal(M-1)`（**不用**全局历史 XOR）⇒ GShare 延后 |
 | 饱和 | ★ **taken ⇒ 饱和 +1（0→1→2→3）；not-taken ⇒ 饱和 −1（3→2→1→0）**；**≥2 ⇒ 预测 taken**。★ 与 TLM 侧 `branch_predictor.h:274-286` 语义一致。★ **原措辞「0→1→2→3（不回退）」有歧义** —— 标准 bimodal 在 not-taken 时**要递减**；若不递减 ⇒ PHT 只增不减 ⇒ 恒 3 ⇒ **零方向信息** ⇒ 退化成「净负收益」的 BTB-only |
 | 冷启动 | 初值 0（弱 not-taken）⇒ 冷启动语义由 `no_predict_initially` 条目覆盖 |
-| ★ **PHT 更新使能** | ★ **「分支已解析」（任何方向）** —— ★ **不是**「仅 taken」！若只在 taken 时更新 ⇒ PHT 学不到 not-taken ⇒ 在 not-taken 分支上恒预测 taken ⇒ **净负收益**（§2.2 的老问题换个入口回来） |
-| ★ **BTB 更新使能** | ★ **taken**（目标此时才已知） |
+| ★ **PHT 更新使能** | ★ **「分支已解析」（任何方向）** —— ★ **不是**「仅 taken」！若只在 taken 时更新 ⇒ PHT 学不到 not-taken ⇒ 在 not-taken 分支上恒预测 taken ⇒ **净负收益**（§2.2 的老问题换个入口回来）。★ **且「不是错路指令」**（★ 前置2 实现轮追加：错路指令的 taken 结果已被 flush 抑制 ⇒ 用它学方向会学错 ⇒ 表项被污染 ⇒ 同样净负收益）⇒ **使能 = `is_branch & !flushed`** |
+| ★ **BTB 更新使能** | ★ **taken**（目标此时才已知）★ **且「不是错路指令」** ⇒ **使能 = `taken & is_branch & !flushed`**（`taken` 取**未抑制**的原始方向时，还须再与 `!flushed` 合取） |
 | ★ **更新地址** | ★ **分支解析处的 `KT::PC`**（= 预测时的 `pc_reg`）⇒ ★ **二者必须同指一条分支**（索引对齐不变量）；若误用 branch 阶段的当前 `pc_reg`（下一条 PC）⇒ **off-by-one ⇒ 学到错误表项** |
 | ★ **无条件跳转不占 PHT 表项** | `jal`/`jalr` 恒 taken ⇒ 不需要方向预测 ⇒ 不更新 PHT（只更新 BTB） |
 | ★ **不变量的可测性** | 需一条 AC：「**同一分支第二次被取时预测命中**」（覆盖 update 路径） |
@@ -328,6 +328,7 @@ flush 判据从「上拍 taken」改为**门控式**（§3.4.2 唯一权威：`f
 | BP 的**输入** | fetch 期的 `pc_reg`（**被 op 节点 `<<=` 驱动** ⇒ 可作 mem 读地址，PoC 结论 2 + P-2P） |
 | BP 的**输出** | ① `pred_target`（32b）② `pred_taken`（1b）③ `pred_valid`（1b）⇒ **写入 payload**（mode-aware `uint_t<N>`，禁裸 `bool`，ADR-040 §10.5） |
 | 误预测记录 | `ch_reg` 组（pred_taken / pred_target / pred_valid）⇒ 跨拍保持（PoC 结论 7） |
+| ★ **BP 的表更新输入（branch plugin 导出）** | ★ **前置2 实现轮追加**（原简报未列 ⇒ 新契约无权威依据 ⇒ 主体重写时易丢失）：<br>① `BRANCH_TAKEN_RAW`（1b）—— **未被 flush 抑制**的分支方向（★ `BRANCH_TAKEN` 是**被抑制后**的值 ⇒ 错路指令的 taken 已被抹掉 ⇒ 用它做方向学习会学错）<br>② `BRANCH_FLUSHED`（1b）—— 「本拍指令是错路指令」⇒ **表更新门控**（PHT / BTB 均 MUST NOT 让错路指令写表）<br>③ `IS_BRANCH`（1b）—— 「本条指令是条件分支」（B-type）<br>★ 三者由 `branch_chmem.h` 在 branch NORMAL 写；★ BP 侧**缺失即 fail-fast**（MUST NOT 静默降级为 false ⇒ 表不更新 / 方向学错却无报错） |
 | 纠错目标 | 「预测 taken、实际 not-taken」⇒ **`pc_lag + 4`**（§2.1.2） |
 | ★ **顺序契约** | ★ **跨 stage**（生产者 fetch NORMAL → 消费者 branch LATE）⇒ 保序机制 = **`elaborate()` 按 `canonical_stage_order()` 执行**（`pipe_builder.h:413-424` + `:215-224`：stage 首现序 × EARLY→NORMAL→LATE）⇒ fetch ≺ branch 且 NORMAL ≺ LATE ⇒ **与插件注册顺序无关** ⇒ v2 简报写的「同 stage 名 / EARLY→LATE」**表述错误，已更正** |
 | ★ **pc_reg 单驱动纪律** | BP **只写 payload**，**禁止**自身 `<<= pc_reg`（`pc_reg` 的唯一写者是 `update_pc`） |
@@ -464,7 +465,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | **AC-10** | 台账重判完毕 + **§2 族级判定行同步** + **「涉及 case 数」与头部「463 条」计数同步** + ★ **`check_coverage_parity_ledger.sh` exit 0**（CI warn 级 ⇒ 无强制力 ⇒ 须本地跑 + 贴 PR） | ★ 保留 |
 | **AC-11** | **TLM 侧 `branch_predictor.{h,cpp}` 全程保留**（删除属 B3，需双前置） | 保留 |
 | **AC-12** | ★ **「不做什么」机检化**：★ **脚本化** —— `tools/check_plugin_portability.sh` 新增 **Check 14**（★ 该脚本已是 PR **阻塞**门禁 ⇒ **无需构建** ⇒ CI 可承担）：scope = `ip/cpu/plugins/branch_predictor_chmem.h`（文件不存在则 skip）+ 新增文件名匹配 `*gshare*`/`*ghr*`/`*ras*` ⇒ 违反 ⇒ exit 1。★ **MUST NOT** 做成 tree-wide grep（TLM 侧 `branch_predictor.h` 合法含 GHR/RAS ⇒ 必误报）⇒ ★ **MUST NOT** 只写手工 grep（域「变更集」无基线定义 ⇒ 等价自证；且防不住下一个 change） | ★ v2.2 改 |
-| **AC-13** | ★ **BP 必须可学**：同一分支**第二次**被取时预测命中（PHT 更新使能 = 分支已解析，任何方向；更新地址 = 分支解析处 `KT::PC`，与预测 `pc_reg` 同指一条分支） | ★ 新增 |
+| **AC-13** | ★ **BP 必须可学**：同一分支**第二次**被取时预测命中（PHT 更新使能 = 分支已解析，任何方向，**且非错路指令**；更新地址 = 分支解析处 `KT::PC`，与预测 `pc_reg` 同指一条分支） | ★ 新增 |
 | **AC-14** | ★ **`jalr` 不建 BTB 项** ⇒ 走 not-taken；无条件跳转不占 PHT 表项 | ★ 新增 |
 | **AC-15** | ★ **host 可见事件计数（5 个）**：① **已执行(retired)指令数**（★ **归前置2** —— 需 flush 信号；前置1 **不**交付它）② **FLUSH 事件数** ③ **BP 命中次数** ④ **误预测次数** ⑤ **taken 转移数** ⇒ 全部经 `cpu_verilator_sim --stats` 输出 ⇒ 供 AC-8b-2 与前置2 判据使用 | ★ 新增（metis P0-3） |
 | **AC-16** | ★★ **净收益率裁决点（两分支终局式）**：净收益率 := `Δcycles(bp=off − bp=on) / N_taken_total`（★ **不是命中率**；★ `N_false` 只计情形 A）⇒ **达标** ⇒ 恢复绝对值门禁（ADR-088 §5.3.2 落结论）；**不达标** ⇒ ★ **MUST NOT** 以「GShare 延后」结案 ⇒ **MUST** 把 GShare 拉回范围（或另立 change）⇒ 按 P-3 临时口径结案。★ **MUST NOT** 只写「MUST ≥ 84.5%」（不达标时 AC 恒 RED ⇒ 与「不恢复时结案」互斥 ⇒ 归档路径被自己的 AC 堵死） | ★ v2.2 新增 |

@@ -85,7 +85,7 @@ depends_on:
 | 挂钩点 | `at_stage("fetch", NORMAL)` ⇒ 查表 0 拍（`aread`）⇒ 与 branch LATE 同拍可消费 |
 | PC 来源 | ★ `ibus_chmem.h` 在 fetch NORMAL 写 **`BP_PC` payload**（= `pc_reg` **本拍值**）—— ★ `KT::PC` 是 `pc_lag`（上一拍地址）⇒ 预测需要本拍值 |
 | 预测信号 | ★ 全部为**活节点**（`ch_uint<1>(ch_bool)` 走上游 `bool_to_uint` 分支 ⇒ 复用同一 `impl()` 指针）⇒ **MUST NOT** 转 C++ 标量（否则折成 elaboration 期常量 ⇒ 假阴性） |
-| 注册位 | ★ BP 注册在 **IBusPlugin 之后**（同 stage "fetch" 同 phase NORMAL ⇒ 生产者先写 `BP_PC`） |
+| 注册位 | ★ BP 注册在 **`Branch` plugin 之后**（★ 决定性约束 = 同 stage "branch" 同 phase NORMAL ⇒ 生产者(Branch) 先于 消费者(BP)；fetch stage 排在 branch 之前 ⇒ fetch NORMAL 的 `BP_PC` 生产者(IBus) 仍先于 BP ⇒ 两约束交集 = Branch 之后） |
 | **零退化验证** | ★ BP 注册后 4 档 cycles **逐位不变**（86034/88034/86534/87056）· checksum 不变 |
 
 ### ★★ 关键发现：BP 的**注册位**是「BP 惰性」的根因（critic B1 追问后的实测定位）
@@ -151,6 +151,51 @@ depends_on:
 ⇒ m0 的基线 12000 = 6 × 2000 iter ⇒ 每 iter **固定 6 次 flush**（来自 `branch_sel` 内的
    `j` 等与方向无关的固定结构）⇒ ★ 这解释了为何「绝对差值」不等于 taken 数。
 
+### ★★ BP 行为指纹（4 档，BP=on）—— ★ 机制指纹的 SSOT 落点（critic B-2）
+
+★ **本表是「BP 机制是否活着」的指纹表**。上一轮这组数字**只活在 commit message 里**
+  ⇒ 不在 SSOT ⇒ 不可复核 ⇒ 本轮**抄进本文件**并**配了自动化判据**（见下）。
+
+| mode (档名) | hit | pred_taken | 预测率 (pred/hit) | FLUSH_COUNT |
+|---|---|---|---|---|
+| 0 always_not_taken | 1999 | 1998 | 99.9% | 12000 |
+| 1 always_taken | 3998 | 3996 | **99.95%** | 14000 |
+| 2 pattern_6of8 | 3992 | **2247** | **56.3%** | 12500 |
+| 3 pseudo_random | 3998 | 3089 | 77.3% | 13022 |
+
+★ **复现命令**（从仓库根；`--cycles 200000` ⇒ 跑满 200k 拍，程序未跑完但计数有效）：
+```bash
+for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}.elf \
+    --cycles 200000 --stats 2>&1 | grep -E "BP_STATS|FLUSH_COUNT"; done
+```
+
+★ **为什么 m0（恒 not-taken）的预测率反而是 99.9%**（★ 别误读成「PHT 没学 not-taken」）：
+  BTB 写使能 = `taken & is_branch` ⇒ **not-taken 的分支永远不建 BTB 项** ⇒ m0 里那条
+  方向性分支**恒 miss** ⇒ m0 的 1999 次命中**全部**来自**恒 taken 的循环回边**
+  ⇒ 回边的 PHT 槽学到 taken ⇒ 预测率 99.9% ✓ **与方向学习一致**。
+  ⇒ ★ **「方向学习」的承重指纹在 m2**（该档方向性分支 2/8 taken ⇒ 预测率 56.3%）。
+
+### ★★ 自动化判据（critic B-2：机制指纹 MUST 有自动锚，不能只活在文档里）
+
+★ **两处锚**（互相独立、变异对照验证过）：
+
+| 锚 | 位置 | 判据 | 抓得住 |
+|---|---|---|---|
+| **单元级** | `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（`[bp][plugin]`，8 case / 131 assertions） | 直接打**真实插件**，断言 **payload 的值** | BTB 写路径 / 方向学习 / flush 门控 / 饱和不回头 |
+| **系统级** | `tools/measure_branchbench.sh --check-bp-direction` ⇒ ctest `branchbench_bp_direction` | 4 档 BP=on：hit>0 · 校验和与 BP=off 基线**逐位相等** · m1 预测率 ≥90% · m2 预测率 ≤90% | BTB 惰性 / 方向学习失效 / 饱和折常量 |
+
+★ **变异对照（判据「有牙」的证据，2026-10-25 实测）**：
+
+| 变异 | 单元级 (8 case) | 系统级 (脚本) | 指纹变化 |
+|---|---|---|---|
+| A: BTB 写使能恒 false | **5 断言 RED** | **RED**（hit=0） | m1 hit 3998→**0** |
+| B: 方向学习改回「恒 +1」 | **RED**（R3 方向翻转） | **RED**（m2 预测率 99.97% > 90%） | m2 pred 2247→**3991** |
+| C: 去掉 PHT 的 flush 门控 | **RED**（R7） | —（系统级不敏感） | — |
+| D: 饱和判定改回 C++ 三目 `?:` | **RED**（R8 逐拍采样） | **RED**（m1 预测率 50% < 90%） | m1 pred 3996→**2000**（3→0 回绕） |
+
+★ **上一版测试对 A/B/D 三个变异全部零鉴别力**（critic B-1 实测：三个变异叠加后仍
+  「All tests passed (52 assertions in 6 test cases)」）⇒ 本版**全部断言断值**。
+
 
 
 ## ★ builder 开工须知（★ **逐条抄进本 change**，不跨 change 引用）
@@ -173,37 +218,56 @@ depends_on:
 | 3 | **`jalr` 不建项** | ✅ 已实现（保守） | `jalr` 目标随运行时变化 ⇒ 不建 BTB 项 ⇒ 走顺序取指（台账 #9 的终态） |
 | 4 | **M 运行期 mask 的效果无测试** | ⚠️ 缺测 | `index_of_scalar` 用 `kBtbEntries`(256) 做 mask，而运行期路径用 `logical_entries_−1` ⇒ **M<256 时二者不等价**；现有断言只覆盖 M=256 语义 ⇒ 「M 运行期可配」**无端到端证据** |
 | 5 | **`pack_entry` / `unpack_entry` 与运行路径并行** | ⚠️ 双实现 | 运行路径（`update()`）用**内联 shl/or** 拼 62b；`pack_entry` 是**影子 API**（仅测试用）⇒ 两者一旦分叉，测试发现不了（测试只测 helper） |
-| 6 | **门禁漏网：`?:` 形式** | ⚠️ **已知缺口** | `check_plugin_portability.sh` 的 Check 5 只查 `if (ch_bool)`；**C++ 三目 `?:` 的条件位同样做 contextual conversion** ⇒ 同样会在 elaboration 期折成常量（★ 本轮 PHT 饱和 bug 正是这个形态：Verilog 里 `ge_ge_2` dangling ⇒ 计数器 3→0 **回绕**而非饱和）。★ 曾尝试加 Check 5b，但**误报/漏报都难以做到既零噪音又可靠**（本仓库的真实逻辑写在 `predict()`/`update()` 等**被 at_stage 调用的方法**里，而「at_stage 闭包内」的范围抓不到）⇒ **撤销该门禁，改为在此登记为已知缺口** ⇒ 后续应由 ADR-040 的门禁专项处理 |
+| 6 | **门禁漏网：`?:` 形式** | ⚠️ **已知缺口**（★ 本轮**缩小**但未闭合） | `check_plugin_portability.sh` 的 Check 5 只查 `if (ch_bool)`；**C++ 三目 `?:` 的条件位同样做 contextual conversion** ⇒ 同样会在 elaboration 期折成常量（★ 本轮 PHT 饱和 bug 正是这个形态：Verilog 里 `ge_ge_2` dangling ⇒ 计数器 3→0 **回绕**而非饱和）。★ 曾尝试加 Check 5b，但**误报/漏报都难以做到既零噪音又可靠**（本仓库的真实逻辑写在 `predict()`/`update()` 等**被 at_stage 调用的方法**里，而「at_stage 闭包内」的范围抓不到）⇒ **撤销该门禁，改为在此登记为已知缺口** ⇒ 后续应由 ADR-040 的门禁专项处理。★ **本轮补上的只是「这一处」**：R8（逐拍采样）+ 系统级 m1 预测率判据 ⇒ **PHT 饱和这一处**再有 `?:` 会被抓住；★ 但**其它**站点（如未来的 ALU/CSR/流水线逻辑）仍无静态护栏 ⇒ 缺口**未闭合** |
 | 7 | **「提前一拍」的证明** | ⏳ 待 Task 2 | 本 change 内 BP 的三个输出 payload **无消费者** ⇒ 「提前一拍」**没有任何行为后果** ⇒ 证明 MUST 留到 Task 2 接入 PC-mux 后用 Δcycles |
+| 8 | **方向性门禁的阈值需在 S3 复评** | ⏳ 待主体 | `branchbench_bp_direction` 的判据是**方向性/比值**（m1 预测率 ≥90% · m2 预测率 ≤90%）⇒ 设计上对 S3 的 PC-mux 接入不敏感；★ 但 S3 接入后 hit/pred 的**绝对值**必然变化 ⇒ **主体 MUST 复评这两个 90% 阈值是否仍成立**（若不成立 ⇒ **显式重录**并在本表登记理由，★ MUST NOT 直接放宽） |
 
 ### 测试覆盖（critic B3：此前该插件 **0 case** ⇒ `[chmem]` binary 无回归锚）
 
-新增 `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（**点名** `branch_predictor_chmem.h`），
-**6 case / 52 assertions 全绿**（★ 相对上一版 5 case / 30 assertions：**R1/R2/R3 三个新 case 直接实例化真实插件**
-⇒ 锚在**插件的真实输出**上，而非影子 helper）：
+`tests/cpu/test_cpu_chmem_bp_plugin.cpp`（**点名** `branch_predictor_chmem.h`），
+**8 case / 131 assertions 全绿**（★ 断言**全部断值**（payload 的运行期值），不只断「是活节点」）：
 
-| case | 覆盖 | 抓得住哪类回归 |
-|---|---|---|
-| `bp_plugin_R1_btb_is_written_when_producer_comes_first` | ★ **注册位顺序**（真实插件 + 真实生产者替身）⇒ 断言插件产出的 payload cell **是活节点** | ★ **注册位回退**（BP 早于生产者 ⇒ 读到陈旧值 ⇒ BTB 永不写 ⇒ RED） |
-| `bp_plugin_R2_btb_entry_readable_after_update` | ★ 插件产出的 `BP_PRED_TARGET` / `BP_PRED_VALID` 是**活节点**（AC-F2-12 **真测插件输出**） | ★ **预测被折成常量** |
-| `bp_plugin_R3_pht_learns_not_taken` | ★ not-taken 分支 ⇒ 预测方向 MUST NOT 恒 taken | ★ **方向学习失效**（任何方向都 +1 ⇒ 恒 3 ⇒ 恒预测 taken） |
-| `bp_plugin_R4_index_is_pc9_to_2` | 索引 = **PC[9:2]** + M 运行期 mask | 索引退化 |
-| `bp_plugin_R5_invalid_entries_fail_fast` | 合法域 = **精确集合** {16,32,64,128,256} | ctor fail-open 回退 |
-| `bp_plugin_R6_entry_pack_unpack_roundtrip` | 62b 编码往返 + 「MUST NOT 用 `target[1:0]!=0` 判有效」 | 编码 helper 分叉 |
+| case | 覆盖 | 抓得住哪类回归 | ★ 变异验证 |
+|---|---|---|---|
+| `bp_plugin_R1_btb_is_written_when_producer_comes_first` | ★ **注册位顺序**（真实插件 + 真实生产者替身）⇒ 断 `BP_PRED_VALID` **值** == 1；★ **反序注册 ⇒ elaborate 抛异常**（fail-fast） | ★ **注册位回退**（BP 早于生产者 ⇒ BTB 永不写 ⇒ 值恒 0 ⇒ RED） | 变异 A ⇒ RED |
+| `bp_plugin_R2_btb_entry_readable_after_update` | ★ 断 `BP_PRED_TARGET` **值** == 0x80000118（表项内容逐位相等） | ★ BTB 写路径坏 / 打包错 | 变异 A ⇒ RED |
+| `bp_plugin_R3_pht_learns_not_taken` | ★ **先 taken 建项 → 再灌 not-taken** ⇒ 断 pred_taken 由 **1 翻 0** | ★ **方向学习失效**（恒 +1 ⇒ 停在 1 ⇒ RED） | 变异 B ⇒ RED |
+| `bp_plugin_R4_index_is_pc9_to_2` | 索引 = **PC[9:2]** + M 运行期 mask | 索引退化 | — |
+| `bp_plugin_R5_invalid_entries_fail_fast` | 合法域 = **精确集合** {16,32,64,128,256} | ctor fail-open 回退 | — |
+| `bp_plugin_R6_entry_pack_unpack_roundtrip` | 62b 编码往返 + 「MUST NOT 用 `target[1:0]!=0` 判有效」 | 编码 helper 分叉 | — |
+| `bp_plugin_R7_flushed_branch_does_not_pollute_pht` | ★ **flush 门控**（B-7）：错路 + not-taken ⇒ PHT **不被污染** ⇒ 预测方向保持 taken | ★ **错路指令污染 PHT** | 变异 C ⇒ RED |
+| `bp_plugin_R8_pht_saturates_without_wraparound` | ★ **饱和不回头**（ADR-040 §10.5 族）：连续 taken 16 拍 ⇒ **逐拍**断言预测恒 taken | ★ **饱和判定被三目折常量**（3→0 回绕 ⇒ 每 4 拍出现 0） | 变异 D ⇒ RED |
 
-★ **★ 关键修正：payload key MUST 是跨 TU 唯一的单例**（`inline` 变量，**不可** `static inline`）——
-  `static inline` 在头文件里 ⇒ **每个 TU 各有一份实例** ⇒ `PayloadStore` 按 `&key` 索引
-  ⇒ 不同 TU 的同名 key 是**不同 cell**。★ 实测症状: BP 内部读回自己的 cell 非空，
-  但**测试 TU** 读同一 key 得空（测试 TU 包含该头文件 ⇒ 持有另一个实例）
-  ⇒ 真实流水线里 IBus 与 BP 同属一个 TU（`cpu_factory_chmem.h` 包含两者）⇒ **侥幸能通**；
-  但任何**跨 TU** 的读写（测试、工具）都会断链。
-  ★ 参照: `branch_chmem.h` 的 `BRANCH_TAKEN` 等也是 `static inline` ⇒ **同类隐患**
-  （目前读写方恰好同 TU ⇒ 未暴露）⇒ ★ **建议后续 change 把既有 key 也统一为 `inline`**。
+★ **驱动器的「方向 / 错路标记」是随 tick 变化的活表达式**（tick 计数寄存器驱动）——
+  CH_MEM 里 at_stage 闭包**只在 elaboration 跑一次** ⇒ 想在运行期改变分支方向，MUST 让
+  payload 的值是**活节点**（写成常量则只在 elaboration 定值 ⇒ 变不了）⇒ 本套测试同时
+  验证 BP 消费的是**活**信号（ADR-040 §10.5）。
+
+★ **payload key 唯一性（★ 本轮更正上一轮的一处**不实陈述**）**：
+  `PayloadStore` 按 key 的**地址**索引（`include/cf/plugin/payload.h`: `cells_[&key]`）⇒
+  同名 key 若有**两份实例** ⇒ 两个不同 cell ⇒ 跨 TU 读写**静默断链**（`has()` 返 false）。
+  - ★ **命名空间作用域**的 key（本 change 新增的 4 个 `BP_*`）⇒ MUST 用 C++17 **`inline` 变量**
+    （全程序唯一）；★ MUST NOT 用 `static inline` —— 命名空间作用域的 `static` 是**内部链接**
+    ⇒ **每个 TU 各有一份实例** ⇒ 断链。★ 上一轮实测症状：插件所在 TU 读回自己的 cell 非空，
+    而**另一个 TU**（测试 TU）读同一 key 得空。
+  - ★ **类作用域**的 static 数据成员（`BranchPlugin<T>::BRANCH_TAKEN` / `IS_BRANCH` /
+    `BRANCH_TAKEN_RAW` / `BRANCH_FLUSHED` / `IBusPlugin<T>::FLUSH`）⇒ **天然全程序唯一**
+    （模板静态成员 = vague linkage，链接期合并为一份）⇒ **无**上述隐患。
+    ★ 上一轮把它们误列为「同类隐患」⇒ **本轮更正**；本轮仍把它们显式写成 `inline static`
+    （语义不变，但把「唯一性」写进源码而非依赖模板规则）。
+  - ★ 证据路径（critic S-4：上一轮的「实测症状」不可复现 ⇒ 本轮登记来源）：
+    上一轮 symptom 是在**测试 TU 与插件 TU 分离**的临时验证形态下观察到的；
+    **当前形态**（测试文件同时 include 插件头 ⇒ 同一 TU）下**不复现** ⇒
+    ★ 该 symptom **只证明「命名空间作用域 static key 跨 TU 会断链」这一机理**，
+    **不**证明当前仓库里有活跃的跨 TU 断链（当前读写方恰好同 TU）。
+
 
 ### 回归（★ 用**重 build 后**的 binary —— 修正 critic B5 指出的「binary 过期」）
 
 - 8 架构门禁全 PASS
-- `ctest -R chipforge_tests_chmem` **PASS**（1006s，**新** binary `10-25 10:55`）
-- `ctest -R "branchbench_baseline|verilator|cpu_verilator"` **3/3 PASS**
+- `ctest -R chipforge_tests_chmem` **PASS**（★ 本轮 binary；`[bp][plugin]` 8 case / 131 assertions 全绿）
+- `ctest -R "branchbench_baseline|branchbench_bp_direction|verilator|cpu_verilator"` **5/5 PASS**
+  （★ 新增 `branchbench_bp_direction` = `measure_branchbench.sh --check-bp-direction`）
 - `measure_branchbench.sh --check-baseline` exit 0（`bp_mode=off` ⇒ 传 `--no-bp` ⇒
   cycles 与基线**逐位相同** ⇒ **BP 关闭时零影响** ✓）
+- `measure_branchbench.sh --check-bp-direction` exit 0（BP=on 4 档方向性判据 ✓）

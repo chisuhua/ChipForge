@@ -135,6 +135,7 @@ branch LATE(N+1):
 | BP 的**输入** | fetch 期的 `pc_reg`（**被 op 节点 `<<=` 驱动** ⇒ 可作 mem 读地址） |
 | BP 的**输出** | ① `pred_target`（32b）② `pred_taken`（1b）③ `pred_valid`（1b）⇒ **写入 payload**（mode-aware `uint_t<N>`，禁裸 `bool`） |
 | 误预测记录 | `ch_reg` 组（pred_taken / pred_target / pred_valid）⇒ 跨拍保持 |
+| ★ **BP 的表更新输入（branch plugin 导出）** | ★ **前置2 实现轮追加**（原契约未列 ⇒ 主体重写时易丢失）：① `BRANCH_TAKEN_RAW`（1b，未被 flush 抑制的原始方向）② `BRANCH_FLUSHED`（1b，错路标记 ⇒ 表更新门控）③ `IS_BRANCH`（1b，条件分支标志）⇒ ★ BP 侧**缺失即 fail-fast**（MUST NOT 静默降级为 false ⇒ 表不更新却无报错） |
 | 纠错目标 | 「预测 taken、实际 not-taken」⇒ **`pc_lag + 4`** |
 | ★ **顺序契约** | ★ **跨 stage**（生产者 fetch NORMAL → 消费者 branch LATE）⇒ 保序机制 = **`elaborate()` 按 `canonical_stage_order()` 执行**（stage 首现序 × EARLY→NORMAL→LATE）⇒ fetch ≺ branch 且 NORMAL ≺ LATE ⇒ **与插件注册顺序无关** |
 | ★ **pc_reg 单驱动纪律** | BP **只写 payload**，**禁止**自身 `<<= pc_reg`（`pc_reg` 的唯一写者是 `update_pc`） |
@@ -162,7 +163,7 @@ word = { tag30 = PC[31:2], target30 = target[31:2], valid(1b), is_unconditional(
 | 目标恢复 | `target30 << 2` |
 | key | ★ **vaddr**（分支 PC payload 本身是 vaddr ⇒ MMU on/off 间一致） |
 | 替换策略 | ★ **直接覆盖**（同槽直接写） |
-| 写使能 | ★ **taken**（目标此时才已知） |
+| 写使能 | ★ **taken**（目标此时才已知）★ **且「不是错路指令」** ⇒ **使能 = `taken & is_branch & !flushed`**（★ 前置2 实现轮追加：`flushed` = branch plugin 导出的 `BRANCH_FLUSHED`） |
 | ★ **`is_unconditional`** | ★ 无条件跳转（`jal`）**不占 PHT 表项** ⇒ 若无此位则 `jal` 的方向**无来源** ⇒ **永不被预测** ⇒ call 气泡不可恢复 ⇒ 此位是**必需**的 |
 | ★ **`jalr` 不建项** | 间接跳转目标每次可能不同 ⇒ 静态缓存必错 ⇒ `jalr` 走顺序取指 |
 | ★ **陈旧目标自愈** | 直接覆盖策略下，目标变化的分支再次 taken 时**同槽重写** ⇒ **天然自愈**，不设误预测计数器 |
@@ -174,7 +175,7 @@ word = { tag30 = PC[31:2], target30 = target[31:2], valid(1b), is_unconditional(
 | 索引 | `bits<7,0>(PC) & literal(M-1)`（**无全局历史 XOR** —— GShare 不在本期） |
 | 饱和 | ★ **taken ⇒ 饱和 +1（0→1→2→3）；not-taken ⇒ 饱和 −1（3→2→1→0）**（★ 与 TLM 侧 `branch_predictor.h:274-286` 一致；★ 原「不回退」措辞有歧义 ⇒ 不递减 ⇒ 零方向信息 ⇒ 净负收益） |
 | 预测 taken 阈值 | ★ **counter ≥ 2** |
-| 写使能 | ★ **「分支已解析」（任何方向）** —— 若只在 taken 时更新 ⇒ 学不到 not-taken ⇒ 在 not-taken 密集的负载上**净负收益** |
+| 写使能 | ★ **「分支已解析」（任何方向）** —— 若只在 taken 时更新 ⇒ 学不到 not-taken ⇒ 在 not-taken 密集的负载上**净负收益**。★ **且「不是错路指令」**（★ 前置2 实现轮追加）⇒ **使能 = `is_branch & !flushed`**（`flushed` = branch plugin 导出的 `BRANCH_FLUSHED`）⇒ 错路指令的 taken 已被抑制 ⇒ 用它学方向会学错 ⇒ 表项被污染 |
 | 更新地址 | ★ **分支解析处的 `KT::PC`**（= 预测时的 `pc_reg`）⇒ 二者必须**同指一条分支**（off-by-one ⇒ 学到错误表项） |
 | 无条件跳转 | ★ **不更新 PHT**（恒 taken ⇒ 无需方向学习）⇒ 不占表项 |
 

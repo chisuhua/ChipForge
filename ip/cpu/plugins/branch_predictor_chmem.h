@@ -33,9 +33,12 @@
 //
 // ③ **PHT: Bimodal 2-bit 饱和计数器**
 //    索引 = `PC[31:2] & (M-1)` (★ **无全局历史 XOR** —— GShare 不在本期)
-//    饱和 0→1→2→3 (不回退); 预测 taken 阈值 = **count >= 2**
-//    ★ 写使能 = **「分支已解析」（任何方向）** —— 若只在 taken 时更新
-//      ⇒ 学不到 not-taken ⇒ 在以 not-taken 为主的负载上**净负收益**
+//    饱和计数 0..3: taken ⇒ 饱和 +1 / not-taken ⇒ 饱和 −1（**可回退**）;
+//    预测 taken 阈值 = **count >= 2**
+//    ★ 与 TLM 侧语义一致（branch_predictor.h:274-286: taken⇒饱和+1 / not⇒饱和-1）
+//    ★ 写使能 = **「分支已解析」（任何方向）且「不是错路指令」** —— 若只在 taken
+//      时更新 ⇒ 学不到 not-taken ⇒ 在以 not-taken 为主的负载上**净负收益**;
+//      若错路指令也更新 ⇒ 学到错路方向 ⇒ 同样**净负收益**
 //
 // ④ **key = vaddr**（分支 PC payload 本身是 vaddr ⇒ MMU on/off 间表项一致）
 //
@@ -91,18 +94,27 @@ namespace plugins {
 //   ⇒ 预测信号会被折成 elaboration 期常量 ⇒ Δcycles ≈ 0 而 FLUSH 不变
 //   ⇒ **假阴性**（机制被判「不成立」⇒ 误关 ②）。故 MUST 用 uint_t<N>。
 
-// ★★★ payload key 必须是**跨 TU 唯一**的单例 ⇒ 用 **`inline` 变量**
-//   （C++17 起 inline 变量有唯一实例），**不可**用 `static inline`
-//   （`static inline` 在头文件里 ⇒ **每个 TU 各有一份实例** ⇒
-//     `PayloadStore` 按 `&key` 索引 ⇒ 不同 TU 的同名 key 是**不同 cell**）。
-//   ★ 实测症状: BP 内部读回自己的 cell 非空，但**测试 TU** 读同一 key 得空
-//     （测试 TU 包含本头文件 ⇒ 它持有**另一个** `BP_PRED_VALID` 实例）。
+// ★★★ payload key 必须是**跨 TU 唯一**的单例 —— `PayloadStore` 按 **key 的地址**
+//   索引（`include/cf/plugin/payload.h`: `cells_[&key]`）⇒ 同名 key 若有两份实例
+//   ⇒ 是**两个不同的 cell** ⇒ 跨 TU 读写**静默断链**（`has()` 返回 false）。
+//
+// ★ 两类 key 的唯一性**不同**（★ 别混为一谈）:
+//   (1) **命名空间作用域**的 key（本文件的 4 个）⇒ MUST 用 C++17 **`inline` 变量**
+//       （全程序唯一实例）。★ MUST NOT 用 `static inline` —— 命名空间作用域的
+//       `static` 是**内部链接** ⇒ **每个 TU 各有一份实例** ⇒ 上面的断链场景。
+//   (2) **类作用域**的 static 数据成员（如 `BranchPlugin<T>::BRANCH_TAKEN`、
+//       `IBusPlugin<T>::FLUSH`）⇒ **天然全程序唯一**（模板静态成员 = vague
+//       linkage，链接期合并为一份）⇒ **无** (1) 的隐患。
+//       ⇒ 本轮已把 `branch_chmem.h` / `ibus_chmem.h` 的相关 key 显式写成
+//         `inline static` —— 语义不变（本就唯一），但把「唯一性」写进源码而非
+//         依赖模板规则。
+//
+// ★ 实测症状（2026-10-25 前置2 修复轮）: 本文件的 key 原为 `static inline`
+//   ⇒ 命名空间作用域 ⇒ 逐 TU 复制 ⇒ **插件所在 TU** 读回自己的 cell 非空，
+//   而**另一个 TU**（如测试 TU）读同一 key 得空。
 //   ⇒ 真实流水线里 IBus 与 BP 同属一个 TU（`cpu_factory_chmem.h` 包含两者）
 //      ⇒ 侥幸能通；但任何**跨 TU** 的读写（测试、工具）都会断链。
-//   ⇒ 修法: 全部 key 改 `inline`（C++17 inline 变量 ⇒ 跨 TU 唯一）。
-//
-// ★ 参照: `branch_chmem.h` 的 `BRANCH_TAKEN` 等也是 `static inline` ⇒ 同类隐患
-//   （目前读写方恰好同 TU ⇒ 未暴露）。★ 本 change 至少对自己的 key 修对。
+//   ⇒ 修法: 本文件的 key 全部改 `inline`（C++17 inline 变量 ⇒ 跨 TU 唯一）。
 
 /// 预测目标地址 (32b) —— BTB 命中的分支目标
 inline cf::plugin::Payload<cf::plugin::uint_t<32>> BP_PRED_TARGET{
@@ -242,8 +254,15 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> taken_count_;
 
   // 读端口 (每拍重绑到当前地址 —— PoC P-2P 证明: 地址来自**已被驱动**的信号)
+  // ★ BTB 读端口 (fetch 路径, 唯一)
   std::shared_ptr<std::optional<typename BtbMem::read_port>> btb_rp_;
-  std::shared_ptr<std::optional<typename PhtMem::read_port>> pht_rp_;
+  // ★ PHT 读端口: **fetch 与 update 分开** —— 原先两者共用一个 `pht_rp_`
+  //   ⇒ 同一端口被**两种地址语义**复用（fetch 查 pc_reg / update 改 pc_lag）
+  //   ⇒ 后写者覆写前者（现在能工作**纯属侥幸**：fetch 先跑且已抓住 impl() 指针）
+  //   ⇒ 且两次 aread **同名** ⇒ 生成 Verilog 里出现两个同名 proxy 节点。
+  //   ⇒ 拆成两个独立端口 + 不同 name（critic S-2）。
+  std::shared_ptr<std::optional<typename PhtMem::read_port>> pht_rp_fetch_;
+  std::shared_ptr<std::optional<typename PhtMem::read_port>> pht_rp_update_;
   // ★ 写端口 (B1: 无写路径 ⇒ valid≡0 ⇒ hit≡false ⇒ BP 永远惰性)
   std::shared_ptr<std::optional<typename BtbMem::write_port>> btb_wp_;
   std::shared_ptr<std::optional<typename PhtMem::write_port>> pht_wp_;
@@ -292,7 +311,7 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
   // ── 更新 (branch NORMAL) ──────────────────────────────────────────────
   // ★ B1 写路径:
   //   BTB: **taken 时**写 (PC → target) —— 目标此时才已知
-  //   PHT: **「分支已解析」（任何方向）**时更新 2-bit 饱和计数
+  //   PHT: **「分支已解析」（任何方向）且「不是错路指令」**时更新 2-bit 饱和计数
   //        ★ MUST NOT 仅在 taken 时更新 —— 否则学不到 not-taken
   //          ⇒ 在以 not-taken 为主的负载上恒预测 taken ⇒ **净负收益**
   //   ★ 更新地址 = **分支解析处的 PC**（= 预测时用的 PC）⇒ 二者必须**同指一条分支**
@@ -314,27 +333,38 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     //   conversion ⇒ 运行期语义丢失（ADR-040 §10.5 那一族）。★ 这里条件是
     //   `has()`（elaboration 期的 map 查询）⇒ 三目本可行，但为让
     //   `check_plugin_portability.sh` Check 5b 能**零误报**地检查全仓 ⇒ 统一用 if。
-    ch::core::ch_bool taken(ch::core::ch_literal<0, 1>{});
-    ch::core::ch_bool taken_raw(ch::core::ch_literal<0, 1>{});
-    ch::core::ch_bool flushed(ch::core::ch_literal<0, 1>{});
-    if (brn->payloads().has(BrPlugin::get_branch_taken_key())) {
-      taken = ch::core::ch_bool(brn->operator()(BrPlugin::get_branch_taken_key()));
-    }
+    //
+    // ★★ fail-fast (critic B-3): BP 消费的 branch payload **MUST** 存在 ——
+    //   缺失时若静默降级为 false ⇒ 「表不更新」/「方向学错」且**无任何报错**
+    //   ⇒ 又一个「全绿但语义为零」的通道。★ 与 `BP_PC` 缺失的处理保持一致
+    //   （同一个文件里一半 fail-fast、一半 fail-open 本身就是隐患）。
+    //   ★ 生产者 = BranchPlugin（branch NORMAL 写）⇒ BP 注册在 Branch 之后
+    //   ⇒ 必然存在 ⇒ fail-fast 不会误伤正常路径。
+    auto require_payload = [&](const char* what, bool present) {
+      if (!present) {
+        throw std::runtime_error(
+            std::string("BranchPredictorPluginChmem: branch node lacks ") + what +
+            " payload (the Branch plugin must write it in branch NORMAL; the "
+            "BP plugin MUST be registered AFTER the Branch plugin)");
+      }
+    };
+    require_payload("BRANCH_TAKEN", brn->payloads().has(BrPlugin::get_branch_taken_key()));
+    require_payload("BRANCH_TAKEN_RAW", brn->payloads().has(BrPlugin::BRANCH_TAKEN_RAW));
+    require_payload("BRANCH_FLUSHED", brn->payloads().has(BrPlugin::BRANCH_FLUSHED));
+    require_payload("IS_BRANCH", brn->payloads().has(BrPlugin::IS_BRANCH));
+    require_payload("BRANCH_TARGET", brn->payloads().has(RvKey::BRANCH_TARGET));
+
+    const ch::core::ch_bool taken =
+        ch::core::ch_bool(brn->operator()(BrPlugin::get_branch_taken_key()));
     // ★ **未抑制**的方向（供 PHT 方向学习）+ 错路标记（供表更新门控）
-    if (brn->payloads().has(BrPlugin::BRANCH_TAKEN_RAW)) {
-      taken_raw = ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_TAKEN_RAW));
-    }
-    if (brn->payloads().has(BrPlugin::BRANCH_FLUSHED)) {
-      flushed = ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_FLUSHED));
-    }
-    ch::core::ch_bool is_branch(ch::core::ch_literal<0, 1>{});
-    if (brn->payloads().has(BrPlugin::IS_BRANCH)) {
-      is_branch = ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH));
-    }
+    const ch::core::ch_bool taken_raw =
+        ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_TAKEN_RAW));
+    const ch::core::ch_bool flushed =
+        ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_FLUSHED));
+    const ch::core::ch_bool is_branch =
+        ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH));
     ch::core::ch_uint<32> br_target(ch::core::ch_literal<0, 32>{});
-    if (brn->payloads().has(RvKey::BRANCH_TARGET)) {
-      br_target = ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
-    }
+    br_target = ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
 
     // ── 索引（与读路径**同一表达式** —— PoC 结论 3）──
     auto idx8 = ch::core::bits<kBtbAddrWidth + 1, 2>(br_pc);
@@ -360,7 +390,6 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
       // ★ B7: **错路指令 MUST NOT 写 BTB**（否则把错路 target 写进表项）
       const ch::core::ch_bool write_en = taken & is_branch & (!flushed);
       ch::core::ch_uint<64> wdata(ch::core::ch_literal<0, 64>{});
-      // ★ 打包必须是**活**表达式（tag 来自 br_pc，target 来自 br_target）
       // ★ 打包必须是**活**表达式 (tag 来自 br_pc, target 来自 br_target)
       //   ⇒ 全部用 ch 表达式拼装, **MUST NOT** 转 C++ 标量 (会折成常量)
       //
@@ -387,22 +416,24 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
       *btb_wp_ = btb.write(idx, wdata, write_en, "btb_write");
     }
 
-    // ── PHT 更新（分支已解析，任何方向）──
+    // ── PHT 更新（分支已解析，任何方向，且非错路）──
     {
       auto& pht = get_pht();
       if (!pht_wp_) {
         pht_wp_ = std::make_shared<std::optional<typename PhtMem::write_port>>();
       }
-      // ★ 读当前计数（读端口与写端口**同一地址**）⇒ 饱和 +1
-      if (!pht_rp_) {
-        pht_rp_ = std::make_shared<std::optional<typename PhtMem::read_port>>();
+      // ★ 读当前计数（读端口与写端口**同一地址**）⇒ 饱和 ±1
+      //   ★ 独立的 update 读端口（不与 fetch 路径共用 —— critic S-2）
+      if (!pht_rp_update_) {
+        pht_rp_update_ =
+            std::make_shared<std::optional<typename PhtMem::read_port>>();
       }
       ch::core::ch_uint<kPhtAddrWidth> pidx(
           ch::core::ch_literal<0, kPhtAddrWidth>{});
       pidx = ch::core::ch_uint<kPhtAddrWidth>(idx);
-      *pht_rp_ = pht.aread(pidx, "pht_read");
+      *pht_rp_update_ = pht.aread(pidx, "pht_read_update");
 
-      const ch::core::ch_uint<2> cur((*pht_rp_)->impl());
+      const ch::core::ch_uint<2> cur((*pht_rp_update_)->impl());
       const auto cur2 = ch::core::bits<1, 0>(cur);
       const auto one = ch::core::ch_uint<2>(ch::core::ch_literal<1, 2>{});
       const auto sat3 = ch::core::ch_uint<2>(ch::core::ch_literal<3, 2>{});
@@ -473,14 +504,16 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     *btb_rp_ = btb.aread(idx, "btb_read");
 
     // ── PHT 读 (0 拍 aread) ────────────────────────────────────────────
+    //   ★ 独立的 fetch 读端口（不与 update 路径共用 —— critic S-2）
     auto& pht = get_pht();
-    if (!pht_rp_) {
-      pht_rp_ = std::make_shared<std::optional<typename PhtMem::read_port>>();
+    if (!pht_rp_fetch_) {
+      pht_rp_fetch_ =
+          std::make_shared<std::optional<typename PhtMem::read_port>>();
     }
     ch::core::ch_uint<kPhtAddrWidth> pidx(
         ch::core::ch_literal<0, kPhtAddrWidth>{});
     pidx = ch::core::ch_uint<kPhtAddrWidth>(idx);
-    *pht_rp_ = pht.aread(pidx, "pht_read");
+    *pht_rp_fetch_ = pht.aread(pidx, "pht_read_fetch");
 
     // ── 表项解码 (全部用**活**表达式) ──────────────────────────────────
     // ★ BTB word = { target30[63:34], tag30[33:4], is_uncond[3], valid[2], rsvd[1:0] }
@@ -494,19 +527,22 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     const auto pc_tag = ch::core::bits<31, 2>(pc);
     const auto tag_eq = (tag30 == pc_tag);
 
-    // ★ 命中 = valid && tag_eq  (两者都是活表达式 ⇒ 命中判定是活节点)
-    const ch::core::ch_bool hit = ch::core::ch_bool(valid_bit) && ch::core::ch_bool(tag_eq);
+    // ★ 命中 = valid & tag_eq  (两者都是活表达式 ⇒ 命中判定是活节点)
+    //   ★ 用 `&`（1-bit AND）而非已废弃的 `&&`（上游 operators_logic.h:161）
+    const ch::core::ch_bool hit = ch::core::ch_bool(valid_bit) & ch::core::ch_bool(tag_eq);
 
     // ── 方向 ────────────────────────────────────────────────────────────
-    // ★ 2-bit 饱和计数器: 0→1→2→3 (不回退); >= 2 ⇒ 预测 taken
+    // ★ 2-bit 饱和计数器: 0..3 饱和, taken ⇒ +1 / not-taken ⇒ −1（**可回退**）;
+    //   >= 2 ⇒ 预测 taken
     // ★ `bits<>` 需要硬件类型 ⇒ 先把 read_port 的 impl() 包成 ch_uint<2>
-    const ch::core::ch_uint<2> pht_word((*pht_rp_)->impl());
+    const ch::core::ch_uint<2> pht_word((*pht_rp_fetch_)->impl());
     const auto counter = ch::core::bits<1, 0>(pht_word);
     const ch::core::ch_bool pht_taken = (counter >= ch::core::ch_uint<2>(
         ch::core::ch_literal<2, 2>{}));
 
     // ★ 合成: 无条件跳转恒 taken; 条件跳转看 PHT
-    const ch::core::ch_bool pred_taken = hit && (ch::core::ch_bool(uncond_bit) || pht_taken);
+    const ch::core::ch_bool pred_taken =
+        hit & (ch::core::ch_bool(uncond_bit) | pht_taken);
 
     // ── 产出 payload (mode-aware uint_t<N> —— 禁裸 bool) ────────────────
     // ★ 值全部是**活** ch 节点 ⇒ 写入 payload 后仍是活节点

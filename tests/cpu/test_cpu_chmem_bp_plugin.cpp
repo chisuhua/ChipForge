@@ -1,22 +1,22 @@
 // tests/cpu/test_cpu_chmem_bp_plugin.cpp
 //
-// CH_MEM 分支预测器插件的单元测试 (change chmem-bp-btb-gshare-poc, Task 1)
+// CH_MEM 分支预测器插件的单元测试 (change chmem-bp-btb-gshare-poc)
 //
-// ★ 本文件**点名** `branch_predictor_chmem.h`（critic B3: 该插件此前 0 case
-//   ⇒ `[chmem]` binary 无任何回归锚 ⇒ 插件回归会让测试**静默通过**）。
+// ★★ 覆盖强度 (critic 第四轮 B-1): 上一版 6 case / 52 assertions 对它们声称的
+//   性质**零鉴别力** —— critic 实测: 同时施加「BTB 永不写」+「方向学习改回
+//   恒 +1」两个变异后, 上一版仍输出「All tests passed (52 assertions in
+//   6 test cases)」。⇒ 本版全部断言**断值**（不只断「是活节点」）:
+//   1) R1 注册位 + BTB 真被写 ⇒ 断 `BP_PRED_VALID` **值** == 1
+//      + 反序注册 ⇒ elaborate **抛异常**（fail-fast, 不静默降级）
+//   2) R2 BTB 表项内容 ⇒ 断 `BP_PRED_TARGET` **值** == 0x80000118
+//   3) R3 方向学习 ⇒ 先 taken 建项, 再灌 not-taken ⇒ pred_taken 由 1 翻 0
+//   4) R7 flush 门控 ⇒ 错路指令**不污染 PHT** ⇒ pred_taken 保持 1
+//   5) R4 索引 = PC[9:2] · R5 合法域 fail-fast · R6 62b 编码往返
 //
-// ★★ 覆盖强度（critic 三轮 B-5：上一版的 5 个 case **全部避开**插件的
-//   `predict()` / `update()` —— 只测了影子 helper ⇒ 抓不住任何真实回归）。
-//   本版的锚**全部打在插件的真实路径上**：
-//   1) **注册位顺序**（critic 指出的「BP 早于 Branch ⇒ 读到陈旧值 ⇒ BTB 永不写」
-//      这个真根因）—— 用**真实的插件实例**跑 ⇒ 顺序错 ⇒ BTB 不写 ⇒ 断言 RED
-//   2) **BTB 真被写**（`update()` 的写路径生效 ⇒ 第二次查表命中）
-//   3) **payload 是活节点**（AC-F2-12：直接断言**插件产出**的 payload cell
-//      `impl()->is_const() == false` ⇒ 预测被折成常量时 RED）
-//   4) **PHT 方向学习**（not-taken 分支 ⇒ 计数器**下降** ⇒ 预测 not-taken）
-//   5) **PHT 饱和**（taken 分支 ⇒ 饱和在 3，**不回绕**到 0）
-//   6) **索引 = PC[9:2]**（B2 修正的回归锚）+ **M 运行期 mask**
-//   7) 合法域精确集合 {16,32,64,128,256}（越界 fail-fast）
+// ★ 驱动器的「方向 / 错路标记」是**随 tick 变化的活表达式**（由 tick 计数寄存器
+//   驱动）—— CH_MEM 里 at_stage 闭包**只在 elaboration 跑一次** ⇒ 想在运行期
+//   改变分支方向, MUST 让 payload 的值是**活节点**（写成常量则只在 elaboration
+//   定值 ⇒ 变不了）。★ 这同时额外验证了 BP 消费的是**活**信号（ADR-040 §10.5）。
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -27,12 +27,16 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <ch.hpp>
 #include <core/context.h>
 #include <simulator.h>
 #include <core/uint.h>
+#include <core/reg.h>
 #include <core/mem.h>
 #include <core/operators.h>
 #include <core/operators_width.h>
@@ -55,6 +59,18 @@ using cf::cpu::plugins::BranchPredictorPluginChmem;
 
 using Btb = BranchPredictorPluginChmem<ch::core::ch_uint<32>>;
 
+/// 读 payload cell 的**运行期值**（1b）
+std::uint64_t read_u1(ch::Simulator& sim, const ch::core::ch_uint<1>& cell) {
+  return static_cast<std::uint64_t>(
+      sim.get_signal_value(ch::core::ch_uint<1>(cell.impl())));
+}
+
+/// 读 payload cell 的**运行期值**（32b）
+std::uint64_t read_u32(ch::Simulator& sim, const ch::core::ch_uint<32>& cell) {
+  return static_cast<std::uint64_t>(
+      sim.get_signal_value(ch::core::ch_uint<32>(cell.impl())));
+}
+
 /// 一个最小「生产者」插件：给 fetch/branch 节点写 BP 需要的输入，
 /// 让**真实的 BP 插件**跑起来。
 ///
@@ -62,13 +78,22 @@ using Btb = BranchPredictorPluginChmem<ch::core::ch_uint<32>>;
 ///   - fetch NORMAL : `BP_PC`（= 本拍取指地址）
 ///   - branch NORMAL: `BRANCH_TAKEN` / `BRANCH_TAKEN_RAW` / `BRANCH_FLUSHED` /
 ///                    `IS_BRANCH` / `KT::PC` / `BRANCH_TARGET`
-/// 本插件扮演「IBus + Branch」的角色，按**测试参数**驱动这些信号。
+/// 本插件扮演「IBus + Branch」的角色，按**分段脚本**驱动这些信号。
 class FakeCpuDriver : public cf::plugin::PluginBase {
  public:
-  FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target, bool taken,
-                bool is_branch)
-      : br_pc_(br_pc), br_target_(br_target), taken_(taken),
-        is_branch_(is_branch) {}
+  struct Phase {
+    std::uint32_t end_tick;  ///< 本段结束 tick（含）；tick < end_tick 属于本段
+    bool taken;               ///< 本段内分支的**原始**方向
+    bool flushed;             ///< 本段内指令是否是「错路指令」
+  };
+
+  FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target,
+                std::vector<Phase> phases)
+      : br_pc_(br_pc), br_target_(br_target), phases_(std::move(phases)) {
+    if (phases_.empty()) {
+      throw std::runtime_error("FakeCpuDriver: phases must not be empty");
+    }
+  }
 
   void setup(cf::plugin::PipeBuilder& pb) override {
     // ★ 注册在 **fetch NORMAL** —— 必须**早于** BP 的 fetch 回调（同 stage 同 phase
@@ -93,31 +118,81 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
       tgt = ch::core::ch_uint<32>(ch::core::ch_uint<32>(br_target_));
       n->operator()(KT::PC) = cf::plugin::uint_t<32>(pc);
       n->operator()(RvKey::BRANCH_TARGET) = cf::plugin::uint_t<32>(tgt);
-      const ch::core::ch_bool t(taken_);
-      const ch::core::ch_bool ib(is_branch_);
-      n->operator()(BrPlugin::get_branch_taken_key()) = t;
-      n->operator()(BrPlugin::BRANCH_TAKEN_RAW) = t;
-      n->operator()(BrPlugin::BRANCH_FLUSHED) = ch::core::ch_bool(false);
-      n->operator()(BrPlugin::IS_BRANCH) = ib;
+
+      // ★ 方向 / 错路标记 = **随 tick 变化的活表达式**
+      const ch::core::ch_bool taken_raw = phase_value(
+          [](const Phase& p) { return p.taken; });
+      const ch::core::ch_bool flushed = phase_value(
+          [](const Phase& p) { return p.flushed; });
+      // ★ 与真实 branch plugin 同口径: `BRANCH_TAKEN` 是**被 flush 抑制后**的值,
+      //   `BRANCH_TAKEN_RAW` 是**未抑制**的方向（供 PHT 方向学习）。
+      const ch::core::ch_bool taken = taken_raw & (!flushed);
+      n->operator()(BrPlugin::get_branch_taken_key()) = taken;
+      n->operator()(BrPlugin::BRANCH_TAKEN_RAW) = taken_raw;
+      n->operator()(BrPlugin::BRANCH_FLUSHED) = flushed;
+      n->operator()(BrPlugin::IS_BRANCH) = ch::core::ch_bool(true);
+
+      // ★ tick 计数寄存器自增（每拍 +1）⇒ phase 判据随拍变化
+      const ch::core::ch_uint<32> one(static_cast<std::uint32_t>(1));
+      ch::core::ch_uint<32> tv(tick_count_);
+      tick_count_ <<= tv + one;
     });
   }
 
   void build(cf::plugin::PipeBuilder&) override {}
 
-  void set_pc(std::uint32_t pc) { pc_ = pc; }
-
  private:
+  /// 取「当前 tick 落在哪一段」的**活**布尔表达式
+  template <typename Pick>
+  ch::core::ch_bool phase_value(Pick pick) const {
+    // 末段无上界（兜底）
+    ch::core::ch_bool acc(pick(phases_.back()));
+    for (std::size_t i = phases_.size() - 1; i-- > 0;) {
+      const ch::core::ch_uint<32> c(tick_count_);
+      const ch::core::ch_uint<32> thresh(
+          static_cast<std::uint32_t>(phases_[i].end_tick));
+      acc = select(c < thresh, ch::core::ch_bool(pick(phases_[i])), acc);
+    }
+    return acc;
+  }
+
   std::uint32_t pc_ = 0x8000010cu;
   std::uint32_t br_pc_;
   std::uint32_t br_target_;
-  bool taken_;
-  bool is_branch_;
+  std::vector<Phase> phases_;
+  ch::core::ch_reg<ch::core::ch_uint<32>> tick_count_{
+      ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_test_tick"};
 };
+
+/// 起一套「生产者 + BP」的仿真环境；返回 simulator（调用方负责 tick）
+std::unique_ptr<ch::Simulator> make_sim(
+    cf::plugin::PipeBuilder& pb,
+    std::vector<FakeCpuDriver::Phase> phases,
+    bool bp_first = false) {
+  if (bp_first) {
+    // ★ 反序注册（BP 在生产者之前）—— 用于验证 **fail-fast**（不静默降级）
+    pb.register_plugin(std::make_unique<Btb>(256u));
+    pb.register_plugin(std::make_unique<FakeCpuDriver>(
+        0x8000010cu, 0x80000118u, std::move(phases)));
+  } else {
+    pb.register_plugin(std::make_unique<FakeCpuDriver>(
+        0x8000010cu, 0x80000118u, std::move(phases)));
+    pb.register_plugin(std::make_unique<Btb>(256u));
+  }
+  pb.build();
+  REQUIRE(pb.elaborate().has_value());
+  auto sim = cfc::auto_throw(pb.create_simulator());
+  REQUIRE(sim != nullptr);
+  sim->reset();
+  return sim;
+}
 
 }  // namespace
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 1) 注册位顺序：BP 必须在「生产者」之后 ⇒ 否则 BTB 永不写（★ 真实根因的锚）
+// 1) 注册位顺序：BP 必须在「生产者」之后 ⇒ 否则 BTB 永不写
+//    ★ 断**值**（不是「是活节点」）: BP_PRED_VALID == 1 ⇒ 表项真被写过
+//    ★ 反序注册 ⇒ **抛异常**（fail-fast），不是静默跑出全 0
 // ═════════════════════════════════════════════════════════════════════════════
 TEST_CASE("bp_plugin_R1_btb_is_written_when_producer_comes_first",
           "[cpu][chmem][bp][plugin]") {
@@ -125,41 +200,43 @@ TEST_CASE("bp_plugin_R1_btb_is_written_when_producer_comes_first",
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
-  cf::plugin::PipeBuilder pb(&ctx);
+  // ---- (a) 正序：生产者先注册 ⇒ BTB 真被写 ⇒ 命中 ----
+  {
+    cf::plugin::PipeBuilder pb(&ctx);
+    auto sim = make_sim(pb, {{1000u, /*taken=*/true, /*flushed=*/false}});
 
-  // ★ 生产者（IBus+Branch 的替身）**先**注册
-  pb.register_plugin(std::make_unique<FakeCpuDriver>(
-      0x8000010cu, 0x80000118u, /*taken=*/true, /*is_branch=*/true));
-  // ★ BP **后**注册 ⇒ 它的 update() 在生产者的 branch NORMAL 之后执行
-  pb.register_plugin(std::make_unique<Btb>(256u));
+    auto* fnode = pb.node_of_logic_stage("fetch").get();
+    REQUIRE(fnode != nullptr);
 
-  pb.build();
-  auto exp = pb.elaborate();
-  REQUIRE(exp.has_value());
-  auto sim = cfc::auto_throw(pb.create_simulator());
-  REQUIRE(sim != nullptr);
-  sim->reset();
+    for (int i = 0; i < 6; ++i) REQUIRE_NOTHROW(sim->tick());
 
-  // ★ 跑若干拍 ⇒ BP 的 update() 应当**真的把表项写进 BTB**
-  //   （若注册位错 ⇒ 读到陈旧值 ⇒ 写使能恒 false ⇒ 表项永远为空）
-  auto* fnode = pb.node_of_logic_stage("fetch").get();
-  REQUIRE(fnode != nullptr);
-
-  for (int i = 0; i < 6; ++i) {
-    REQUIRE_NOTHROW(sim->tick());
+    // ★ 该 cell MUST 是活节点（AC-F2-12）—— 若被折成 elaboration 期常量 ⇒ RED
+    const auto valid = fnode->operator()(BP_PRED_VALID);
+    REQUIRE(valid.impl() != nullptr);
+    REQUIRE_FALSE(valid.impl()->is_const());
+    // ★★ 断**值**: BTB 真被写 ⇒ 表项命中 ⇒ valid == 1
+    //   （若 BTB 写路径被废（write_en 恒 false）⇒ valid == 0 ⇒ RED ★ 这正是
+    //    critic 的 MUTATION-A：上一版对此**零鉴别力**）
+    REQUIRE(read_u1(*sim, valid) == 1u);
   }
 
-  // ★ 断言: 查表（同一 PC）应当**命中** —— 命中数 > 0 ⇒ 表项被写过
-  //   （用 BP 自己产出的 BP_PRED_VALID 观测 ⇒ 锚在**插件的真实输出**上）
-  const auto cell = fnode->operator()(BP_PRED_VALID);
-  const auto node = cell.impl();
-  REQUIRE(node != nullptr);
-  // ★ 该 cell MUST 是活节点（AC-F2-12）—— 若被折成 elaboration 期常量 ⇒ RED
-  REQUIRE_FALSE(node->is_const());
+  // ---- (b) 反序：BP 先注册 ⇒ 生产者的 payload 还没写 ⇒ **fail-fast** ----
+  {
+    cf::plugin::PipeBuilder pb2(&ctx);
+    pb2.register_plugin(std::make_unique<Btb>(256u));
+    pb2.register_plugin(std::make_unique<FakeCpuDriver>(
+        0x8000010cu, 0x80000118u,
+        std::vector<FakeCpuDriver::Phase>{{1000u, true, false}}));
+    pb2.build();
+    // ★ MUST 抛异常（BP_PC / BRANCH_* 缺失 ⇒ 快速失败）
+    //   —— 静默降级为 false 会让 BP「看起来在跑但什么都不学」
+    REQUIRE_THROWS(pb2.elaborate());
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 2) BTB 写→读闭环（用真实插件路径）
+// 2) BTB 写→读闭环：表项的 **target 值** MUST 与分支目标逐位相等
+//    （上一版只断「是活节点」⇒ BTB 全空时 target=0 也照样绿 ★ 零鉴别力）
 // ═════════════════════════════════════════════════════════════════════════════
 TEST_CASE("bp_plugin_R2_btb_entry_readable_after_update", "[cpu][chmem][bp][plugin]") {
   ch::core::context ctx("bp_r2");
@@ -167,33 +244,31 @@ TEST_CASE("bp_plugin_R2_btb_entry_readable_after_update", "[cpu][chmem][bp][plug
   ch::core::ctx_swap guard(&ctx);
 
   cf::plugin::PipeBuilder pb(&ctx);
-  pb.register_plugin(std::make_unique<FakeCpuDriver>(
-      0x8000010cu, 0x80000118u, /*taken=*/true, /*is_branch=*/true));
-  pb.register_plugin(std::make_unique<Btb>(256u));
-  pb.build();
-  REQUIRE(pb.elaborate().has_value());
-  auto sim = cfc::auto_throw(pb.create_simulator());
-  REQUIRE(sim != nullptr);
-  sim->reset();
+  auto sim = make_sim(pb, {{1000u, /*taken=*/true, /*flushed=*/false}});
 
   auto* fnode = pb.node_of_logic_stage("fetch").get();
   REQUIRE(fnode != nullptr);
 
-  // ★ 先跑一拍让 update() 写表项，再看 BP 的预测输出
   for (int i = 0; i < 4; ++i) REQUIRE_NOTHROW(sim->tick());
 
-  // ★ 插件产出的 BP_PRED_TARGET 必须是**活节点**（AC-F2-12）
-  const auto tcell = fnode->operator()(BP_PRED_TARGET);
-  REQUIRE(tcell.impl() != nullptr);
-  REQUIRE_FALSE(tcell.impl()->is_const());
-  const auto vcell = fnode->operator()(BP_PRED_VALID);
-  REQUIRE(vcell.impl() != nullptr);
-  REQUIRE_FALSE(vcell.impl()->is_const());
+  const auto target = fnode->operator()(BP_PRED_TARGET);
+  REQUIRE(target.impl() != nullptr);
+  REQUIRE_FALSE(target.impl()->is_const());
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+  REQUIRE(valid.impl() != nullptr);
+  REQUIRE_FALSE(valid.impl()->is_const());
+  // ★★ 断**值**: 命中的表项 target MUST == 分支目标 0x80000118
+  //   （若 BTB 写路径被废 ⇒ valid=0 且 target=0 ⇒ 两条断言都 RED）
+  REQUIRE(read_u1(*sim, valid) == 1u);
+  REQUIRE(read_u32(*sim, target) == 0x80000118u);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 3) PHT 方向学习：not-taken 分支 ⇒ 计数器**下降** ⇒ 预测 not-taken
-//    （★ 原实现「任何方向都 +1」⇒ 恒 3 ⇒ 恒预测 taken ⇒ 零方向信息）
+// 3) PHT 方向学习：taken ⇒ 饱和 +1；not-taken ⇒ 饱和 −1
+//    ★ 上一版场景是「恒 not-taken」⇒ BTB 写使能恒 false ⇒ hit 恒 false ⇒
+//      pred_taken 恒 0 ⇒ **无论 PHT 是方向学习 / 恒 +1 / 回绕都绿** ★ 零鉴别力。
+//    ★ 本版: 先 taken 建 BTB 项（hit=1）⇒ 再灌 not-taken ⇒ 断言 pred_taken
+//      由 1 翻 0（恒 +1 的变异 ⇒ 停在 1 ⇒ RED ★ MUTATION-B）
 // ═════════════════════════════════════════════════════════════════════════════
 TEST_CASE("bp_plugin_R3_pht_learns_not_taken", "[cpu][chmem][bp][plugin]") {
   ch::core::context ctx("bp_r3");
@@ -201,31 +276,31 @@ TEST_CASE("bp_plugin_R3_pht_learns_not_taken", "[cpu][chmem][bp][plugin]") {
   ch::core::ctx_swap guard(&ctx);
 
   cf::plugin::PipeBuilder pb(&ctx);
-  // ★ 恒 **not-taken** 的条件分支
-  pb.register_plugin(std::make_unique<FakeCpuDriver>(
-      0x8000010cu, 0x80000118u, /*taken=*/false, /*is_branch=*/true));
-  pb.register_plugin(std::make_unique<Btb>(256u));
-  pb.build();
-  REQUIRE(pb.elaborate().has_value());
-  auto sim = cfc::auto_throw(pb.create_simulator());
-  REQUIRE(sim != nullptr);
-  sim->reset();
+  // ★ 分段脚本: 前 8 拍 taken（建 BTB 项 + PHT 饱和到 3），之后恒 not-taken
+  auto sim = make_sim(pb, {{8u, /*taken=*/true, /*flushed=*/false},
+                           {1000u, /*taken=*/false, /*flushed=*/false}});
 
   auto* fnode = pb.node_of_logic_stage("fetch").get();
   REQUIRE(fnode != nullptr);
 
-  // ★ 跑够多拍 ⇒ PHT 计数器在 not-taken 下应稳定在 0/1 ⇒ 预测 not-taken
-  for (int i = 0; i < 8; ++i) REQUIRE_NOTHROW(sim->tick());
-
+  const auto valid = fnode->operator()(BP_PRED_VALID);
   const auto taken_cell = fnode->operator()(BP_PRED_TAKEN);
-  const auto tnode = taken_cell.impl();
-  REQUIRE(tnode != nullptr);
-  REQUIRE_FALSE(tnode->is_const());
-  // ★ 判据: not-taken 分支 ⇒ 预测方向 MUST NOT 恒为 taken
-  //   （若方向学习失效 ⇒ counter 单调 +1 ⇒ 恒 3 ⇒ 恒预测 taken ⇒ RED）
-  const std::uint64_t v = static_cast<std::uint64_t>(
-      sim->get_signal_value(ch::core::ch_uint<1>(tnode)));
-  REQUIRE(v == 0u);
+  REQUIRE(valid.impl() != nullptr);
+  REQUIRE_FALSE(valid.impl()->is_const());
+  REQUIRE(taken_cell.impl() != nullptr);
+  REQUIRE_FALSE(taken_cell.impl()->is_const());
+
+  // ---- 阶段 1: taken ⇒ PHT 饱和到 3 ⇒ 预测 taken ----
+  for (int i = 0; i < 6; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, valid) == 1u);        // BTB 已建项 ⇒ 命中
+  REQUIRE(read_u1(*sim, taken_cell) == 1u);   // counter >= 2 ⇒ 预测 taken
+
+  // ---- 阶段 2: 灌 not-taken ⇒ 计数器**递减** ⇒ 预测翻成 not-taken ----
+  for (int i = 0; i < 8; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, valid) == 1u);        // BTB 项仍在（not-taken 不写表）
+  // ★★ 断**值**: 方向学习生效 ⇒ counter 由 3 递减到 0 ⇒ 预测 not-taken
+  //   （若 PHT 退化为「任何方向都 +1」⇒ counter 停在 3 ⇒ 预测恒 taken ⇒ RED）
+  REQUIRE(read_u1(*sim, taken_cell) == 0u);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -274,6 +349,84 @@ TEST_CASE("bp_plugin_R6_entry_pack_unpack_roundtrip", "[cpu][chmem][bp][plugin]"
   // ★ 「MUST NOT 用 target[1:0]!=0 判有效」的反例钉死（target 4 字节对齐）
   REQUIRE(((target >> 2) << 2) == target);
   REQUIRE(((pc >> 2) << 2) == pc);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 7) flush 门控（B-7）: **错路指令 MUST NOT 污染 PHT**
+//    ★ 场景: 先 taken 2 拍（counter 2 ⇒ 预测 taken），再切到「错路 + not-taken」
+//    ★ 判据: 有门控 ⇒ counter 停在 2 ⇒ 预测**保持 taken**;
+//            无门控 ⇒ counter 2→1→0 ⇒ 预测翻成 not-taken ⇒ RED
+// ═════════════════════════════════════════════════════════════════════════════
+TEST_CASE("bp_plugin_R7_flushed_branch_does_not_pollute_pht",
+          "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r7");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto sim = make_sim(pb, {{2u, /*taken=*/true, /*flushed=*/false},
+                            {1000u, /*taken=*/false, /*flushed=*/true}});
+
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+  const auto taken_cell = fnode->operator()(BP_PRED_TAKEN);
+  REQUIRE(valid.impl() != nullptr);
+  REQUIRE_FALSE(valid.impl()->is_const());
+  REQUIRE(taken_cell.impl() != nullptr);
+  REQUIRE_FALSE(taken_cell.impl()->is_const());
+
+  // ---- 阶段 1: 正常 taken 2 拍 ⇒ BTB 建项 + counter 升到 2 ----
+  for (int i = 0; i < 2; ++i) REQUIRE_NOTHROW(sim->tick());
+
+  // ---- 阶段 2: 错路 + not-taken ⇒ 门控生效 ⇒ PHT 不被污染 ----
+  for (int i = 0; i < 6; ++i) REQUIRE_NOTHROW(sim->tick());
+
+  REQUIRE(read_u1(*sim, valid) == 1u);        // BTB 项仍在（错路不写表）
+  // ★★ 断**值**: 错路指令**没有**把 PHT 拉低 ⇒ 预测方向保持 taken
+  //   （若无 flush 门控 ⇒ counter 2→1→0 ⇒ 预测翻成 not-taken ⇒ RED）
+  REQUIRE(read_u1(*sim, taken_cell) == 1u);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 8) PHT 饱和**不回头**（ADR-040 §10.5 那一族的回归锚）
+//    ★ 场景: 连续 taken 16 拍 ⇒ 计数器 MUST 饱和在 3（**不得** 3→0 回绕）
+//    ★ 判据: 饱和后**每一拍**的预测方向 MUST 是 taken
+//      —— 若饱和判定被写成 C++ 三目 `?:`（elaboration 期折常量 ⇒ 饱和分支成
+//         死代码）⇒ 写入值恒为 (cur+1)&3 ⇒ 计数器 0→1→2→3→0→1… ⇒ 每 4 拍
+//         出现一次 0 ⇒ 预测翻 0 ⇒ RED
+//    ★ 系统级对应指纹 = `pred_taken ≈ hit/2`（实测 m1: 3996 → 2000）
+//    ★ MUST 逐拍采样（只在相位末尾采一次 ⇒ 采样点可能恰好落在饱和值上 ⇒
+//      零鉴别力 —— 这正是 critic B-1 的同型陷阱）
+// ═════════════════════════════════════════════════════════════════════════════
+TEST_CASE("bp_plugin_R8_pht_saturates_without_wraparound", "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r8");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto sim = make_sim(pb, {{1000u, /*taken=*/true, /*flushed=*/false}});
+
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+  const auto taken_cell = fnode->operator()(BP_PRED_TAKEN);
+  REQUIRE(valid.impl() != nullptr);
+  REQUIRE_FALSE(valid.impl()->is_const());
+  REQUIRE(taken_cell.impl() != nullptr);
+  REQUIRE_FALSE(taken_cell.impl()->is_const());
+
+  // ★ 前 4 拍用于建 BTB 项 + 让计数器爬到饱和；之后**逐拍**断言
+  for (int i = 0; i < 16; ++i) {
+    REQUIRE_NOTHROW(sim->tick());
+    if (i >= 4) {
+      REQUIRE(read_u1(*sim, valid) == 1u);
+      // ★★ 断**值**: 饱和后每拍都 MUST 预测 taken（回绕 ⇒ 某拍为 0 ⇒ RED）
+      REQUIRE(read_u1(*sim, taken_cell) == 1u);
+    }
+  }
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM
