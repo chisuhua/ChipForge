@@ -289,5 +289,18 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 - `ctest -R "branchbench_baseline|branchbench_bp_direction|verilator|cpu_verilator"` **5/5 PASS**
   （★ 新增 `branchbench_bp_direction` = `measure_branchbench.sh --check-bp-direction`）
 - `measure_branchbench.sh --check-baseline` exit 0（`bp_mode=off` ⇒ 传 `--no-bp` ⇒
-  cycles 与基线**逐位相同** ⇒ **BP 关闭时零影响** ✓）
-- `measure_branchbench.sh --check-bp-direction` exit 0（BP=on 4 档方向性判据 ✓）
+  cycles 与基线**逐位相同** ⇒ **BP 关闭时零影响** ✓；★ 收尾会断言**实际比对档数 == 4**）
+- `measure_branchbench.sh --check-bp-direction` exit 0（BP=on 4 档方向性判据 ✓，判据 2/2）
+- ★ **脚本 fail-closed 行为矩阵**（critic 六/七轮逐步收紧，均已实测）：
+
+  | 输入 | 期望 | 说明 |
+  |---|---|---|
+  | `--check-baseline`（CSV 有 4 行 off） | **PASS** | 比对 4 档 |
+  | `--bp=on --check-baseline`（CSV **无** bp=on 行） | **exit 1** | ★ 0 行比对 MUST NOT 报 PASS（critic 七轮 SF-1 前它静默 PASS） |
+  | `BENCH_BP=oon` | **exit 1** | ★ 取值 MUST 校验（critic 七轮 BLOCKER：原来 0 比对却 PASS + 生效值断言被跳过） |
+  | `--bp=off --check-bp-direction` | **exit 1** | 矛盾输入 MUST fail-closed（不静默取 on） |
+  | `--check-baseline --check-bp-direction` | **exit 1** | 模式只接受一个（原会给出**不含方向性判据的 PASS**） |
+  | `--bp=on --bp=off` | **exit 1** | 重复 `--bp`（原「后者静默生效」） |
+  | `--foo` / `--bp=` / `--BP=on` | **exit 1** | 未知参数 / 非法值 |
+  | `--help` | exit 0 | 有意短路（忽略其后参数） |
+  | runner 未回显 `BP=` | **exit 1**（check 模式） | 生效值断言 MUST NOT 静默跳过 |

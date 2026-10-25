@@ -78,6 +78,8 @@ for arg in "$@"; do
     ""|--measure)
       [ -z "$MODE_ARG" ] || fail_plain "模式重复: '$*' (模式只接受一个)"
       MODE_ARG=measure ;;
+    # ★ 有意短路（critic 七轮 NIT-1）: help 立即退出、**忽略**其后的参数
+    #   （惯例; 与脚本其余 fail-closed 教义不同 —— 此处显式声明是有意为之）
     -h|--help) usage; exit 0 ;;
     --check-baseline)
       [ -z "$MODE_ARG" ] || fail_plain "模式重复: '$*' (模式只接受一个)"
@@ -100,9 +102,24 @@ case "$MODE_ARG" in
   bpdir)
     # ★ BP 方向性判据（critic B-2: 机制指纹 MUST 有**自动化**锚，不能只活在
     #   commit message / 手工表格里）。★ 强制 BP=on（方向性判据只在 BP 开态有意义）。
+    # ★ critic 七轮 NIT-2: **矛盾输入**（显式 `--bp=off` + 本模式）MUST fail-closed,
+    #   不可静默取其一（否则「我明明给了 --bp=off」变成跑了 on）
+    [ "$BP_ARG_SET" -eq 0 ] || [ "$BP_MODE" = "on" ] \
+      || fail_plain "--check-bp-direction 强制 BP=on, 与 --bp=$BP_MODE 矛盾 (去掉 --bp 或写 --bp=on)"
     CHECK_BP_DIR=1
     BP_MODE=on
     ;;
+esac
+
+# ★★ BP_MODE 取值 MUST 校验（critic 七轮 BLOCKER）—— `--bp=on|off` 走 case 匹配
+#   （非法值 fail-closed），但**环境变量渠道**原来不校验 ⇒ `BENCH_BP=oon` 会：
+#   ① 4 档全走「无基线行 ⇒ 仅打印」⇒ **0 条比对却报 PASS**；
+#   ② sim 只认 `off` ⇒ `oon` 不传 `--no-bp`（实际跑 BP=on）而标签写 `oon`；
+#   ③ `eff_bp` 生效值断言两个分支都要求精确 on/off ⇒ **断言被跳过**。
+#   ⇒ 与「flag 拼错 fail-closed」必须对称。
+case "$BP_MODE" in
+  on|off) ;;
+  *) fail_plain "BP 模式取值非法: '$BP_MODE' (只接受 on|off; 来自 BENCH_BP 或 --bp=)" ;;
 esac
 
 [ -x "$SIM" ] || fail_plain "缺少可执行 $SIM (先 cmake --build build)"
@@ -207,6 +224,9 @@ fi
 rc=0
 first_pc_changes=""
 bp_dir_judges=0
+# ★ critic 七轮 SF-1: **实际比对的行数** —— 0 行却报「基线一致 => PASS」是假绿
+#   （`--bp=on --check-baseline` 在 CSV 尚无 bp_mode=on 行时的真实现状）
+compared_rows=0
 for i in "${!MODES[@]}"; do
   m="${MODES[$i]}"; name="${MODE_NAMES[$i]}"
   elf="$ELF_DIR/branchbench_m${m}.elf"
@@ -224,8 +244,14 @@ for i in "${!MODES[@]}"; do
   fi
   # ★ 生效值断言: runner 在 stderr 回显 `BP=on/off` ⇒ MUST 与请求一致
   #   （否则「flag 未生效却测出无差异」的假绿通道是开着的）
+  # ★ critic 七轮 SF-2: **检查模式下缺回显 MUST fail-closed**（原来 `eff_bp` 为空
+  #   就静默跳过 ⇒ 与同文件 BP_STATS / pc_changes / dropped 的 fail-closed 教义不一致）
   eff_bp=$(printf '%s' "$raw" | grep -oE 'BP=(on|off)' | head -1 | cut -d= -f2)
-  if [ -n "$eff_bp" ]; then
+  if [ -z "$eff_bp" ]; then
+    if [ "$CHECK_ONLY" -eq 1 ] || [ "$CHECK_BP_DIR" -eq 1 ]; then
+      fail_plain "mode $m ($name): runner 未回显 BP= 生效值 (★ fail-closed: 无法确认 flag 生效)"
+    fi
+  else
     if [ "$BP_MODE" = "off" ] && [ "$eff_bp" != "off" ]; then
       fail "mode $m ($name): 请求 bp_mode=off 但 runner 回报 BP=$eff_bp (flag 未生效)"
     fi
@@ -272,6 +298,7 @@ for i in "${!MODES[@]}"; do
   else
     exp_tohost=$(field "$row" "$IDX_TOHOST")
     base_cycles=$(field "$row" "$IDX_CYCLES")
+    compared_rows=$(( compared_rows + 1 ))
     [ "$tohost" = "$exp_tohost" ] \
       || fail "mode $m ($name): 校验和不符 —— 实测 $tohost != 基线 $exp_tohost (结果错, 不得产出数值)"
   fi
@@ -338,6 +365,7 @@ for i in "${!MODES[@]}"; do
         || fail "mode $m ($name): workload_sha 不符 —— BP=off 基线 $off_wsha != 当前 .text $cur_wsha (基线属于另一份代码, 须显式重录)"
     fi
 
+    compared_rows=$(( compared_rows + 1 ))
     case "$name" in
       always_taken)
         # (3) PHT 学得到 taken ⇒ 预测率 MUST ≥ 90% (实测 3996/3998 = 99.95%)
@@ -410,7 +438,15 @@ done
 
 if [ "$rc" -ne 0 ]; then exit 1; fi
 if [ "$CHECK_ONLY" -eq 1 ]; then
-  echo "branchbench: 基线一致 (4 档, bp_mode=$BP_MODE) => PASS"
+  # ★ critic 七轮 SF-1: **0 行比对 MUST NOT 报 PASS** ——
+  #   原实现在「该 bp_mode 尚无基线行」时 4 档全走「仅打印」却仍打
+  #   「基线一致 (4 档) => PASS」（0 条比对却声称一致 ⇒ 假绿；② 追加基线行前
+  #   任何人把它接进 ctest/脚本都会被骗）。
+  [ "$compared_rows" -gt 0 ] \
+    || fail_plain "0 行比对 (bp_mode=$BP_MODE 无基线行) —— MUST NOT 报 PASS (基线行待 ② 追加)"
+  [ "$compared_rows" -eq "${#MODES[@]}" ] \
+    || fail_plain "只比对了 $compared_rows/${#MODES[@]} 档 (bp_mode=$BP_MODE 部分基线行缺失)"
+  echo "branchbench: 基线一致 ($compared_rows 档, bp_mode=$BP_MODE) => PASS"
 fi
 if [ "$CHECK_BP_DIR" -eq 1 ]; then
   # ★ 判据覆盖数必须 == 2 (critic SHOULD_FIX-2: 档名改名 ⇒ 判据静默失效)

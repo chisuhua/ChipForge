@@ -506,7 +506,10 @@ namespace {
 using Skip = FakeCpuDriver::SkipPayload;
 
 void expect_missing_branch_payload(Skip skip, const char* key) {
-  ch::core::context ctx(std::string("bp_r9_") + key);
+  // ★ context 名 MUST 唯一（critic 七轮 NIT-4: `Skip::All` 与 `Skip::BranchTaken`
+  //   都用 "bp_r9_BRANCH_TAKEN" ⇒ 重名 ⇒ 隐性依赖上游对重名 context 的容忍）
+  ch::core::context ctx(std::string("bp_r9_") + std::to_string(static_cast<int>(skip)) +
+                        "_" + key);
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
