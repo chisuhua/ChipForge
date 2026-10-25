@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 #include <ch.hpp>
@@ -275,8 +276,17 @@ class IBusPlugin : public PluginBase {
     //   （branch plugin：`taken = taken & !flush` ⇒ **`BRANCH_TAKEN` 是掩码后的值**
     //     ⇒ 错路指令的 taken 恒读作 0 ⇒ ★ 情形判定 MUST 显式排除错路指令，
     //     否则 `case_a = pv & pt & !br_taken` 会在错路指令上**误触发**。）
+    // ★★ **fail-fast**（与 BP 插件读 `BP_PC` 的做法同口径）：payload 缺失 ⇒ 抛异常
+    //   ⇒ ★ 不可静默降级成 `flushed=false`（critic 十二轮 NIT-1：那样会让
+    //   「错路指令维度」整条判定失效而无人察觉）。
+    //   ⇒ 生产配置下 branch plugin **恒写**该 key ⇒ 不可达。
     ch::core::ch_bool flushed(false);
-    if (brn && brn->payloads().has(BrPlugin::BRANCH_FLUSHED)) {
+    if (brn) {
+      if (!brn->payloads().has(BrPlugin::BRANCH_FLUSHED)) {
+        throw std::runtime_error(
+            "IBusPlugin: branch node lacks BRANCH_FLUSHED payload "
+            "(★ fail-fast: 错路指令维度无法判定 ⇒ MUST NOT 静默降级)");
+      }
       flushed = brn->operator()(BrPlugin::BRANCH_FLUSHED);
     }
 
@@ -314,6 +324,9 @@ class IBusPlugin : public PluginBase {
     //     ② `mispredict_a_buf` 被置位 ⇒ **过度 flush** ⇒ 抑制**正确路径**的
     //        指令 ⇒ 双向副作用泄漏。
     //   ⇒ ★ `case_b` / `case_c` 要求 `br_taken=1` ⇒ 掩码后恒 0 ⇒ 自动安全。
+    //   ⇒ ★★ 与「读掩码后的 `BRANCH_TAKEN` 还是 `BRANCH_TAKEN_RAW`」**无关**
+    //     （critic 十二轮 NIT-2）：`live=0` 时三个情形恒 false ⇒ 源的选择不影响结果
+    //     ⇒ ★ 未来若误换源（如改读 RAW）**也不会**回归 ⇒ 该隐患已被门控消解。
     const ch::core::ch_bool live = !flushed;
     const ch::core::ch_bool case_a = live & pv & pt & (!br_taken);
     // 情形 B: 预测 not-taken / 实际 taken ⇒ 跳到实际目标（★ 暖机主路径）

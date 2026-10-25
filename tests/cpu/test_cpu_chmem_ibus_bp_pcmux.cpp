@@ -96,8 +96,8 @@ class ScriptDriver : public cf::plugin::PluginBase {
  public:
   /// ★ `with_bp=false` ⇒ **不写** `BP_PRED_*` ⇒ 等价于「BP 插件未注册」
   ///   （IBus 侧 `payloads().has(BP_PRED_VALID)` 为 false ⇒ 预测臂恒不生效）
-  ScriptDriver(std::vector<Seg> segs, bool with_bp)
-      : segs_(std::move(segs)), with_bp_(with_bp) {
+  ScriptDriver(std::vector<Seg> segs, bool with_bp, bool write_flushed = true)
+      : segs_(std::move(segs)), with_bp_(with_bp), write_flushed_(write_flushed) {
     if (segs_.empty()) throw std::runtime_error("ScriptDriver: empty segs");
   }
 
@@ -126,8 +126,10 @@ class ScriptDriver : public cf::plugin::PluginBase {
       // ★★ `BRANCH_FLUSHED` —— 「本拍指令是错路指令（副作用已被抑制）」
       //   ★ 真实 branch plugin 会写它；IBus 的情形判定**依赖**它排除错路指令
       //     （critic 十一轮 B-2）⇒ 夹具 MUST 提供，否则测不到那条路径。
-      n->operator()(BrPlugin::BRANCH_FLUSHED) =
-          pick_bool([](const Seg& s) { return s.flushed; });
+      if (write_flushed_) {
+        n->operator()(BrPlugin::BRANCH_FLUSHED) =
+            pick_bool([](const Seg& s) { return s.flushed; });
+      }
       // ── tick 计数自增 ──
       const ch_uint<32> tv(tick_);
       tick_ <<= tv + ch_uint<32>(static_cast<std::uint32_t>(1));
@@ -164,6 +166,7 @@ class ScriptDriver : public cf::plugin::PluginBase {
 
   std::vector<Seg> segs_;
   bool with_bp_ = true;
+  bool write_flushed_ = true;
   ch::core::ch_reg<ch_uint<32>> tick_{
       ch_uint<32>(ch::core::ch_literal<0, 32>{}), "pcmux_test_tick"};
 };
@@ -188,12 +191,14 @@ struct Trace {
 };
 
 /// 起一套「真实 IBusPlugin + fake 生产者」的环境并跑 `n` 拍
-Trace run(ch::core::context& ctx, std::vector<Seg> segs, bool with_bp, int n) {
+Trace run(ch::core::context& ctx, std::vector<Seg> segs, bool with_bp, int n,
+          bool write_flushed = true) {
   auto pb = std::make_unique<cf::plugin::PipeBuilder>(&ctx);
   auto ibus = std::make_unique<IBus>();
   ibus->set_initial_pc(ch_uint<32>(static_cast<std::uint32_t>(kInitPc)));
   pb->register_plugin(std::move(ibus));
-  pb->register_plugin(std::make_unique<ScriptDriver>(std::move(segs), with_bp));
+  pb->register_plugin(
+      std::make_unique<ScriptDriver>(std::move(segs), with_bp, write_flushed));
   pb->build();
   if (!pb->elaborate().has_value()) {
     throw std::runtime_error("elaborate failed");
@@ -527,8 +532,14 @@ TEST_CASE("ibus_bp_pcmux_R11_flushed_instruction_excluded_from_case_a",
                 {{.end_tick = 1u, .br_taken = true, .br_target = kActTgt,
                   .flushed = false, .pred_valid = true, .pred_taken = true,
                   .pred_target = kPredTgt},
-                 {.end_tick = 1000u, .br_taken = false, .br_target = 0,
+                 {.end_tick = 2u, .br_taken = false, .br_target = 0,
                   .flushed = true, .pred_valid = false, .pred_taken = false,
+                  .pred_target = 0},
+                 // ★ 第 2 拍起 flush 恢复（**单脉冲** ⇒ 鉴别力强于「持续 flush」；
+                 //   ★ 且这一拍会抓住「预测记录写入被 `flushed` 门控」这类变异：
+                 //   若记录在错路拍没写 ⇒ 第 2 拍仍读到旧的 (valid,taken) ⇒ case_a 误触发）
+                 {.end_tick = 1000u, .br_taken = false, .br_target = 0,
+                  .flushed = false, .pred_valid = false, .pred_taken = false,
                   .pred_target = 0}},
                 /*with_bp=*/true, 4);
   // next_pc(0)=T（实际 taken）；next_pc(1)=T+4（★ 错路指令 MUST NOT 触发 case_a
@@ -537,6 +548,33 @@ TEST_CASE("ibus_bp_pcmux_R11_flushed_instruction_excluded_from_case_a",
              "R11 pc");
   // 第 1 拍 flush=1（实际 taken 而未被投机）；第 2 拍起 MUST NOT 过度 flush
   expect_seq(tr.flush, {1, 0, 0, 0}, "R11 flush");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R12 | ★★ `BRANCH_FLUSHED` 缺失 ⇒ **fail-fast**（critic 十二轮 NIT-1）
+//     ★ IBus 的情形判定**依赖** `BRANCH_FLUSHED` 排除错路指令 ⇒ 若该 payload
+//       缺失而静默降级成 `flushed=false` ⇒ **整条「错路指令维度」判定失效**
+//       且无人察觉 ⇒ MUST 抛异常（与 BP 插件读 `BP_PC` 同口径）。
+// ═══════════════════════════════════════════════════════════════════════════
+TEST_CASE("ibus_bp_pcmux_R12_missing_branch_flushed_fails_fast",
+          "[cpu][chmem][bp][pcmux]") {
+  ch::core::context ctx("ibus_bp_pcmux_r12");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  // ★ 夹具**不写** BRANCH_FLUSHED ⇒ elaborate MUST 抛异常（不是静默降级）
+  auto pb = std::make_unique<cf::plugin::PipeBuilder>(&ctx);
+  auto ibus = std::make_unique<IBus>();
+  ibus->set_initial_pc(ch_uint<32>(static_cast<std::uint32_t>(kInitPc)));
+  pb->register_plugin(std::move(ibus));
+  pb->register_plugin(std::make_unique<ScriptDriver>(
+      std::vector<Seg>{{.end_tick = 1000u, .br_taken = true,
+                        .br_target = kActTgt, .flushed = false,
+                        .pred_valid = false, .pred_taken = false,
+                        .pred_target = 0}},
+      /*with_bp=*/true, /*write_flushed=*/false));
+  pb->build();
+  REQUIRE_THROWS(pb->elaborate());
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM

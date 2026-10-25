@@ -205,6 +205,8 @@ IDX_CYCLES=$(col_index cycles)
 IDX_BPMODE=$(col_index bp_mode)
 IDX_WSHA=$(col_index workload_sha)
 IDX_BID=$(col_index build_id)
+# ★ flush_count 列（BP=off 基线的 FLUSH 事件数）—— 用于「ΔFLUSH == Δcycles」判据
+IDX_FLUSH=$(col_index flush_count)
 [ -n "$IDX_NAME" ] && [ -n "$IDX_TOHOST" ] && [ -n "$IDX_CYCLES" ] \
   || fail "基线表头缺少必需列 (mode_name / expected_tohost / cycles)"
 
@@ -289,6 +291,8 @@ for i in "${!MODES[@]}"; do
   cycles=$(printf '%s' "$out" | grep -oE 'CYCLES=[0-9]+' | cut -d= -f2)
   status=$(printf '%s' "$out" | grep -oE '(PASS|FAIL|TIMEOUT)' | head -1)
   pc_changes=$(printf '%s' "$raw" | grep -oE 'pc_changes=[0-9]+' | head -1 | cut -d= -f2)
+  # ★ FLUSH 事件数（DUT 内部 flush 信号的累计值；host 经 --stats 读）
+  flush_count=$(printf '%s' "$raw" | grep -oE 'FLUSH_COUNT=[0-9]+' | head -1 | cut -d= -f2)
   dropped=$(printf '%s' "$raw" | grep -oE 'dropped=[0-9]+' | head -1 | cut -d= -f2)
   # ★ fail-closed (critic SHOULD_FIX-6): 缺 dropped 字段 ⇒ 输出格式变了 ⇒ 静默跳过
   #   溢出检查会开假绿通道 ⇒ 与 pc_changes 同等对待
@@ -387,6 +391,30 @@ for i in "${!MODES[@]}"; do
       [ -z "$off_wsha" ] || [ "$off_wsha" = "$cur_wsha" ] \
         || fail "mode $m ($name): workload_sha 不符 —— BP=off 基线 $off_wsha != 当前 .text $cur_wsha (基线属于另一份代码, 须显式重录)"
     fi
+
+    # ★★ 「ΔFLUSH == Δcycles」判据（critic 十二轮 SF-4）—— ★ **阈值无关**的
+    #   机制证据：**每个被消除的 taken 气泡 = 恰好 1 拍** ⇒ 同时钉住
+    #   ① `flush_count` 计数器的口径（off-by-one ⇒ ΔFLUSH ≠ Δcycles ⇒ RED）
+    #   ② 门控式 flush 的正确性（少 flush / 多 flush ⇒ 两侧不等 ⇒ RED）
+    #   ⇒ ★ 此前「ΔFLUSH 与 Δcycles 逐位相等 4/4」只是**一次性手工测量**
+    #     ⇒ 任何人在 flush 路径引入偏差都会**静默**让决策级证据失效。
+    if [ -z "$flush_count" ]; then
+      fail_plain "mode $m ($name): 输出缺 FLUSH_COUNT (★ fail-closed: 无法做 ΔFLUSH==Δcycles 判据)"
+    fi
+    off_flush=$(field "$off_row" "$IDX_FLUSH")
+    off_cycles=$(field "$off_row" "$IDX_CYCLES")
+    # ★★ fail-closed: 基线缺 flush_count 列 / 该行缺值 ⇒ **必须失败**
+    #   （否则「ΔFLUSH == Δcycles」判据被**静默跳过** ⇒ 决策级证据链失效而 0 测试变红）
+    [ -n "$off_flush" ] \
+      || fail_plain "mode $m ($name): 基线行缺 flush_count 值 (★ fail-closed: 无法做 ΔFLUSH==Δcycles 判据)"
+    [ -n "$off_cycles" ] \
+      || fail_plain "mode $m ($name): 基线行缺 cycles 值 (★ fail-closed: 无法做 ΔFLUSH==Δcycles 判据)"
+    d_flush=$(( off_flush - flush_count ))
+    d_cycles=$(( off_cycles - cycles ))
+    [ "$d_flush" -gt 0 ] \
+      || fail "mode $m ($name): ΔFLUSH = $off_flush - $flush_count = $d_flush ≤ 0 (★ BP 开启后 flush 事件数 MUST 下降)"
+    [ "$d_flush" -eq "$d_cycles" ] \
+      || fail "mode $m ($name): ΔFLUSH ($d_flush) != Δcycles ($d_cycles) (★ 每个被消除的 taken 气泡 MUST 恰为 1 拍 ⇒ flush 计数口径或门控有偏)"
 
     # ★ 这里**不**累加 `compared_rows`（critic 八轮 NIT-3）：该变量只在
     #   `CHECK_ONLY` 收尾被读，而 bpdir 与 CHECK_ONLY 互斥 ⇒ 累加是死代码；
