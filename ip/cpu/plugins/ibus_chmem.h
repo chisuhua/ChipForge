@@ -271,6 +271,14 @@ class IBusPlugin : public PluginBase {
                         : ch::core::ch_bool(false);
     auto br_target = brn ? brn->operator()(RvKey::BRANCH_TARGET)
                          : ch::core::ch_uint<32>(ch::core::ch_literal<0, 1>{});
+    // ★★ 「本拍被解析的指令是否**被 flush 抑制**（= 错路指令）」
+    //   （branch plugin：`taken = taken & !flush` ⇒ **`BRANCH_TAKEN` 是掩码后的值**
+    //     ⇒ 错路指令的 taken 恒读作 0 ⇒ ★ 情形判定 MUST 显式排除错路指令，
+    //     否则 `case_a = pv & pt & !br_taken` 会在错路指令上**误触发**。）
+    ch::core::ch_bool flushed(false);
+    if (brn && brn->payloads().has(BrPlugin::BRANCH_FLUSHED)) {
+      flushed = brn->operator()(BrPlugin::BRANCH_FLUSHED);
+    }
 
     // ── 本拍的预测（BP 在 fetch NORMAL 写；fetch ≺ branch ⇒ 此处可见）──────
     // ★ BP 未注册（`--no-bp`）⇒ payload 缺失 ⇒ 默认 false/0 ⇒ 预测臂恒不生效
@@ -299,7 +307,15 @@ class IBusPlugin : public PluginBase {
     const ch::core::ch_uint<32> ptg(get_pred_target_buf());
 
     // 情形 A: 预测 taken / 实际 not-taken ⇒ 纠回 **fall-through**（pc_lag + 4）
-    const ch::core::ch_bool case_a = pv & pt & (!br_taken);
+    // ★★ MUST 排除「被 flush 抑制的错路指令」（critic 十一轮 B-2）:
+    //   `BRANCH_TAKEN` 是**掩码后**的值 ⇒ 错路指令的 taken 恒读作 0 ⇒
+    //   若不排除，`!br_taken` 恒真 ⇒ `case_a` 在错路指令上**误触发** ⇒
+    //     ① PC 跳到**错路的 fall-through**（pc_lag+4）⇒ PC 出轨；
+    //     ② `mispredict_a_buf` 被置位 ⇒ **过度 flush** ⇒ 抑制**正确路径**的
+    //        指令 ⇒ 双向副作用泄漏。
+    //   ⇒ ★ `case_b` / `case_c` 要求 `br_taken=1` ⇒ 掩码后恒 0 ⇒ 自动安全。
+    const ch::core::ch_bool live = !flushed;
+    const ch::core::ch_bool case_a = live & pv & pt & (!br_taken);
     // 情形 B: 预测 not-taken / 实际 taken ⇒ 跳到实际目标（★ 暖机主路径）
     const ch::core::ch_bool case_b = pv & (!pt) & br_taken;
     // 情形 C: 预测 taken / 实际 taken / **目标一致** ⇒ 投机正确（抑制自身 redirect）

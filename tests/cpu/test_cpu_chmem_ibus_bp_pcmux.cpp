@@ -74,8 +74,11 @@ constexpr std::uint32_t kActTgt = 0x3000;   ///< 实际分支目标 T（P≠T �
 /// 一段脚本：tick < end_tick 时用本段的取值（末段无上界）
 struct Seg {
   std::uint32_t end_tick = 1000;
-  bool br_taken = false;         ///< 本拍「实际」分支方向
+  bool br_taken = false;         ///< 本拍「实际」分支方向（★ **已被 flush 掩码后**的值，
+                                  ///<   与真实 branch plugin 的 `BRANCH_TAKEN` 同口径）
   std::uint32_t br_target = 0;   ///< 本拍「实际」分支目标
+  bool flushed = false;          ///< ★ 本拍指令**是否被 flush 抑制**（= 错路指令）
+                                  ///<   （真实 branch plugin 写 `BRANCH_FLUSHED`）
   bool pred_valid = false;       ///< 本拍 BP 预测「有效」
   bool pred_taken = false;       ///< 本拍 BP 预测「方向 = taken」
   std::uint32_t pred_target = 0; ///< 本拍 BP 预测「目标」
@@ -120,6 +123,11 @@ class ScriptDriver : public cf::plugin::PluginBase {
           pick_bool([](const Seg& s) { return s.br_taken; });
       n->operator()(RvKey::BRANCH_TARGET) = cf::plugin::uint_t<32>(
           pick_u32([](const Seg& s) { return s.br_target; }));
+      // ★★ `BRANCH_FLUSHED` —— 「本拍指令是错路指令（副作用已被抑制）」
+      //   ★ 真实 branch plugin 会写它；IBus 的情形判定**依赖**它排除错路指令
+      //     （critic 十一轮 B-2）⇒ 夹具 MUST 提供，否则测不到那条路径。
+      n->operator()(BrPlugin::BRANCH_FLUSHED) =
+          pick_bool([](const Seg& s) { return s.flushed; });
       // ── tick 计数自增 ──
       const ch_uint<32> tv(tick_);
       tick_ <<= tv + ch_uint<32>(static_cast<std::uint32_t>(1));
@@ -233,7 +241,9 @@ TEST_CASE("ibus_bp_pcmux_R1_bp_off_not_taken_is_zero_regression",
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
-  auto tr = run(ctx, {{1000u, false, kActTgt, false, false, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = false, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = false, .pred_taken = false,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/false, 6);
   // R_k = next_pc(k-1) = pc_reg(k) = init + 4k
   expect_seq(tr.pc,
@@ -253,7 +263,9 @@ TEST_CASE("ibus_bp_pcmux_R2_bp_off_taken_is_zero_regression",
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
-  auto tr = run(ctx, {{1000u, true, kActTgt, false, false, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = true, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = false, .pred_taken = false,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/false, 6);
   expect_seq(tr.pc, {kActTgt, kActTgt, kActTgt, kActTgt, kActTgt, kActTgt},
              "R2 pc");
@@ -273,7 +285,9 @@ TEST_CASE("ibus_bp_pcmux_R3_case_A_falls_back_and_flushes",
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
-  auto tr = run(ctx, {{1000u, false, kActTgt, true, true, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = false, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/true, 6);
   // next_pc(0)=P（投机）; next_pc(1)=init+4（情形 A 纠回）; next_pc(2)=P+4 …
   expect_seq(tr.pc,
@@ -297,7 +311,9 @@ TEST_CASE("ibus_bp_pcmux_R4_case_B_redirects_to_actual_target",
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
-  auto tr = run(ctx, {{1000u, true, kActTgt, true, false, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = true, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = false,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/true, 6);
   expect_seq(tr.pc, {kActTgt, kActTgt, kActTgt, kActTgt, kActTgt, kActTgt},
              "R4 pc");
@@ -324,7 +340,9 @@ TEST_CASE("ibus_bp_pcmux_R5_case_C_speculation_correct_no_flush",
   ch::core::ctx_swap guard(&ctx);
 
   // 预测目标 == 实际目标 ⇒ 情形 C
-  auto tr = run(ctx, {{1000u, true, kPredTgt, true, true, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = true, .br_target = kPredTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/true, 6);
   expect_seq(tr.pc,
              {kPredTgt, kPredTgt, kPredTgt, kPredTgt, kPredTgt, kPredTgt},
@@ -348,7 +366,9 @@ TEST_CASE("ibus_bp_pcmux_R6_case_F_target_mismatch_flushes",
   ch::core::ctx_swap guard(&ctx);
 
   // 预测目标 P ≠ 实际目标 T ⇒ 情形 F
-  auto tr = run(ctx, {{1000u, true, kActTgt, true, true, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = true, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/true, 6);
   expect_seq(tr.pc, {kActTgt, kActTgt, kActTgt, kActTgt, kActTgt, kActTgt},
              "R6 pc");
@@ -372,8 +392,12 @@ TEST_CASE("ibus_bp_pcmux_R7_spec_ok_is_case_c_only",
   ch::core::ctx_swap guard(&ctx);
 
   auto tr = run(ctx,
-                {{2u, true, kPredTgt, true, true, kPredTgt},
-                 {1000u, true, kPredTgt, true, false, kPredTgt}},
+                {{.end_tick = 2u, .br_taken = true, .br_target = kPredTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kPredTgt},
+                 {.end_tick = 1000u, .br_taken = true, .br_target = kPredTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = false,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/true, 6);
   // next_pc(0)=P; next_pc(1)=P（case_c ⇒ 保留 bp_next；本夹具的预测是常量
   //   ⇒ bp_next=P）；next_pc(2)=P+4（case_c，但本拍 pred_eff=0 ⇒ bp_next=pc+4）；
@@ -399,6 +423,11 @@ TEST_CASE("ibus_bp_pcmux_R7_spec_ok_is_case_c_only",
 //        `case_c` 使 `spec_ok=1` ⇒ 错路指令**不被 flush** ⇒ 副作用泄漏。
 //     ★ 该场景在 branchbench 4 档与 vendored ELF 上**结构性不可达**
 //       （每 iter 只 1 条条件分支、其 target 非分支）⇒ MUST 有单元锚。
+//     ★★ **保真度边界（critic 十一轮 NIT）**：本夹具的预测是**按 tick 分段的常量
+//       脚本**、**不按 PC 查表** ⇒ R8 复现的是「链式投机的**时序形状** + 恰好对齐
+//       的常量预测」⇒ ★ 它**鉴别不了**「BP 按 PC 查错表」类变异（那是 `[bp][plugin]`
+//       侧的职责）⇒ 但它对目标变异 M12（`case_c` 退回 `pc_plus_4`）的鉴别力
+//       **实测成立**（RED）⇒ 作为 B-1 的锚**合格**。
 // ═══════════════════════════════════════════════════════════════════════════
 TEST_CASE("ibus_bp_pcmux_R8_chained_speculation_keeps_bp_next",
           "[cpu][chmem][bp][pcmux]") {
@@ -407,11 +436,19 @@ TEST_CASE("ibus_bp_pcmux_R8_chained_speculation_keeps_bp_next",
   ch::core::ctx_swap guard(&ctx);
 
   auto tr = run(ctx,
-                {{1u, false, 0, true, true, kPredTgt},        // tick0: 预测 init 处 taken→P
-                 {2u, true, kPredTgt, true, true, kActTgt},  // tick1: B1 实际 taken→P（情形 C）
-                                                               //        + 预测 P 处 taken→Q
-                 {3u, true, kActTgt, false, false, 0},       // tick2: B2 实际 taken→Q
-                 {1000u, false, 0, false, false, 0}},
+                {{.end_tick = 1u, .br_taken = false, .br_target = 0,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kPredTgt},   // tick0: 预测 init 处 taken→P
+                 {.end_tick = 2u, .br_taken = true, .br_target = kPredTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kActTgt},   // tick1: B1 实际 taken→P（情形 C）
+                                               //        + 预测 P 处 taken→Q
+                 {.end_tick = 3u, .br_taken = true, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = false, .pred_taken = false,
+                  .pred_target = 0},         // tick2: B2 实际 taken→Q
+                 {.end_tick = 1000u, .br_taken = false, .br_target = 0,
+                  .flushed = false, .pred_valid = false, .pred_taken = false,
+                  .pred_target = 0}},
                 /*with_bp=*/true, 4);
   // next_pc(0)=P（投机）；next_pc(1)=**Q**（case_c ⇒ 保留 bp_next）；
   // next_pc(2)=Q+4（B2 已解析 ⇒ 顺序推进）
@@ -434,7 +471,9 @@ TEST_CASE("ibus_bp_pcmux_R9_case_E_btb_miss_still_flushes",
   ch::core::ctx_swap guard(&ctx);
 
   // ★ BP 已注册（with_bp=true ⇒ payload 存在）但 `pred_valid=0` ⇒ 未投机
-  auto tr = run(ctx, {{1000u, true, kActTgt, false, false, 0}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = true, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = false, .pred_taken = false,
+                  .pred_target = 0}},
                 /*with_bp=*/true, 6);
   expect_seq(tr.pc, {kActTgt, kActTgt, kActTgt, kActTgt, kActTgt, kActTgt},
              "R9 pc");
@@ -454,12 +493,50 @@ TEST_CASE("ibus_bp_pcmux_R10_pred_valid_zero_blocks_speculation",
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
-  auto tr = run(ctx, {{1000u, false, kActTgt, false, true, kPredTgt}},
+  auto tr = run(ctx, {{.end_tick = 1000u, .br_taken = false, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = false, .pred_taken = true,
+                  .pred_target = kPredTgt}},
                 /*with_bp=*/true, 4);
   // 预测臂 MUST 不生效 ⇒ 逐拍顺序取指
   expect_seq(tr.pc, {kInitPc + 4, kInitPc + 8, kInitPc + 12, kInitPc + 16},
              "R10 pc");
   expect_seq(tr.flush, {0, 0, 0, 0}, "R10 flush");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R11 | ★★ **错路指令上的 `case_a` 误触发**（critic 十一轮 B-2）
+//     ★ `BRANCH_TAKEN` 是**被 flush 掩码后**的值（branch plugin: `taken = taken
+//       & !flush`）⇒ 错路指令的 taken 恒读作 **0**。
+//     ⇒ 若情形判定不排除错路指令，`case_a = pv & pt & !br_taken` 会在**错路
+//       指令**上误触发（`!br_taken` 恒真）⇒
+//         ① PC 跳到**错路的 fall-through**（pc_lag+4）⇒ PC 出轨；
+//         ② `mispredict_a_buf` 置位 ⇒ **过度 flush** ⇒ 抑制**正确路径**的指令
+//            ⇒ 双向副作用泄漏。
+//     ★ 场景：拍 0 的分支实际 taken→T（正确路径），拍 1 解析的是**被 flush
+//       抑制的错路指令**，而上一拍给它记了「预测 valid+taken」⇒ 误触发。
+//     ★ 该场景在 branchbench 4 档 / vendored ELF 47 个上**结构性不可达**
+//       ⇒ MUST 有单元锚。
+// ═══════════════════════════════════════════════════════════════════════════
+TEST_CASE("ibus_bp_pcmux_R11_flushed_instruction_excluded_from_case_a",
+          "[cpu][chmem][bp][pcmux]") {
+  ch::core::context ctx("ibus_bp_pcmux_r11");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  auto tr = run(ctx,
+                {{.end_tick = 1u, .br_taken = true, .br_target = kActTgt,
+                  .flushed = false, .pred_valid = true, .pred_taken = true,
+                  .pred_target = kPredTgt},
+                 {.end_tick = 1000u, .br_taken = false, .br_target = 0,
+                  .flushed = true, .pred_valid = false, .pred_taken = false,
+                  .pred_target = 0}},
+                /*with_bp=*/true, 4);
+  // next_pc(0)=T（实际 taken）；next_pc(1)=T+4（★ 错路指令 MUST NOT 触发 case_a
+  //   ⇒ 顺序推进）；next_pc(2)=T+8
+  expect_seq(tr.pc, {kActTgt, kActTgt + 4, kActTgt + 8, kActTgt + 12},
+             "R11 pc");
+  // 第 1 拍 flush=1（实际 taken 而未被投机）；第 2 拍起 MUST NOT 过度 flush
+  expect_seq(tr.flush, {1, 0, 0, 0}, "R11 flush");
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM
