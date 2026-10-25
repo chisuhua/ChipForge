@@ -115,6 +115,14 @@ class BranchPlugin : public PluginBase {
   // 公开 BRANCH_TAKEN key getter (Phase 6d 6d.3: 供 IBusPlugin/Factory 读取分支结果)
   static const Payload<ch::core::ch_bool>& get_branch_taken_key() { return BRANCH_TAKEN; }
 
+  /// IS_BRANCH —— 「本条指令是条件分支」(chmem-bp-btb-gshare-poc Task 1)
+  /// ★ BP 的 PHT 更新使能 = **「分支已解析」（任何方向）** ⇒ 必须知道
+  ///   「当前指令是不是分支」⇒ branch plugin 内部已在算 `is_branch`
+  ///   ⇒ 此处**导出**它 (避免 BP 重复解码)。
+  /// ★ 只含**条件分支** (B-type): `jal`/`jalr` 是无条件跳转 ⇒ 不占 PHT 表项
+  ///   (它们的方向恒为 taken ⇒ 无需方向学习) ⇒ 由 BP 用 BRANCH_TAKEN 区分。
+  static inline Payload<ch::core::ch_bool> IS_BRANCH{"cpu.is_branch"};
+
   // --------------------------------------------------------------------------
   // setup — 创建 CtrlLink 并注册 at_stage("branch") 回调
   //
@@ -235,6 +243,10 @@ class BranchPlugin : public PluginBase {
       taken = taken && !flush;
       n->operator()(BRANCH_TAKEN) = taken;
       n->operator()(RvKey::BRANCH_TARGET) = branch_target;
+      // ★ IS_BRANCH: 「本条指令是条件分支」—— 与 flush 无关 (flush 抑制的是
+      //   taken **结果**, 不是「是不是分支」) ⇒ 在 flush 抑制前后都成立。
+      //   供 BP 的 PHT 更新路径使用 (chmem-bp-btb-gshare-poc Task 1)。
+      n->operator()(IS_BRANCH) = ch::core::ch_bool(is_branch);
 
       // ── 5. CtrlLink flush 信号注册 ──
       // 当分支跳转时 flush 后续流水级指令 (Spike 7 HLT detection pattern)

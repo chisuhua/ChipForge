@@ -89,6 +89,27 @@ std::uint32_t cf_read_flush_count(void* top) {
   return static_cast<Vtop*>(top)->rootp->top__DOT__flush_count;
 }
 
+// BP 事件计数 (chmem-bp-btb-gshare-poc Task 1/4)
+// ★ BP 的输出是 payload（不出现在 Verilog 顶层）⇒ 计数用 ch_reg 产生
+//   ⇒ CppHDL codegen 出顶层信号 ⇒ host 经 --public-flat-rw 读。
+// ★ 命中 / 未命中 / 预测为 taken 的次数 ⇒ 供 AC-F2-13/14 使用。
+//
+// ★★ **必须条件编译**（CF_BP_STATS_READ，由 cpu_verilator_sim 传给 g++）:
+//   **BP 未注册时（--no-bp）生成的 Verilog 里没有这些信号** ⇒ 引用
+//   `top__DOT__bp_hit_count` 会让 Verilator 编译**失败**（不是运行期错）⇒
+//   harness 必须按 BP 是否启用编译**不同变体**。
+#ifdef CF_BP_STATS_READ
+std::uint32_t cf_read_bp_hit_count(void* top) {
+  return static_cast<Vtop*>(top)->rootp->top__DOT__bp_hit_count;
+}
+std::uint32_t cf_read_bp_miss_count(void* top) {
+  return static_cast<Vtop*>(top)->rootp->top__DOT__bp_miss_count;
+}
+std::uint32_t cf_read_bp_taken_count(void* top) {
+  return static_cast<Vtop*>(top)->rootp->top__DOT__bp_taken_count;
+}
+#endif  // CF_BP_STATS_READ
+
 // Run the CPU model: reset pulse (1 cycle) then toggle default_clock until
 // dmem[tohost] becomes 1 or max_cycles elapses. Prints the result line and
 // returns 0 on tohost=1, 1 otherwise.

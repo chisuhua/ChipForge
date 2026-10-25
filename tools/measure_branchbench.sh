@@ -38,8 +38,10 @@ BASELINE="${BENCH_BASELINE:-soc/cpu/docs/dse/branchbench-baseline-matrix.csv}"
 MAX_CYCLES="${BENCH_MAX_CYCLES:-2000000}"
 ELF_DIR="${BENCH_ELF_DIR:-build}"
 # bp_mode: which branch-predictor configuration the measurement applies to.
-# The no-BP reference rows carry "off"; a BP-enabled rerun (前置2 / ②) appends
-# rows with "on" (and its own workload_sha/build_id).
+#   off = BP **关闭**（无 BP 参照行，基线 CSV 的默认行）
+#   on  = BP **开启**（前置2 / ② 追加的行，带自己的 workload_sha/build_id）
+# ★ 命名统一为 **--no-bp / --btb-entries**（架构简报 v2.2 §5.3 定稿）：
+#   BP **默认开** ⇒ 「关闭」用 `--no-bp` ⇒ 不保留 `--enable-bp`（冗余且有歧义）
 BP_MODE="${BENCH_BP:-off}"
 CHECK_ONLY=0
 [ "${1:-}" = "--check-baseline" ] && CHECK_ONLY=1
@@ -160,7 +162,25 @@ for i in "${!MODES[@]}"; do
   # ★ 捕获 stderr (修正: 原为 2>/dev/null => flag 未生效却测出「无差异」的假绿通道开着)
   # ★ 注意: **不把 runner 退出码当错误** —— branchbench 的 tohost 携带校验和 (≠1),
   #   而 runner 的退出码判据是 tohost==1 => 必然非零. 正确性由宿主侧的校验和比对决定.
-  raw=$("$SIM" --elf "$elf" --cycles "$MAX_CYCLES" --stats 2>&1)
+  # ★ B4 修正: **必须**把 BP 状态传给 sim —— 否则 `bp_mode` 标签与实际行为
+  #   **脱钩**（脚本可标 "off" 而 sim 跑的是 BP=on）⇒ 假绿通道。
+  # ★ BP **默认开** ⇒ "off" 需显式传 `--no-bp`；"on" 不传（默认）。
+  if [ "$BP_MODE" = "off" ]; then
+    raw=$("$SIM" --elf "$elf" --cycles "$MAX_CYCLES" --stats --no-bp 2>&1)
+  else
+    raw=$("$SIM" --elf "$elf" --cycles "$MAX_CYCLES" --stats 2>&1)
+  fi
+  # ★ 生效值断言: runner 在 stderr 回显 `BP=on/off` ⇒ MUST 与请求一致
+  #   （否则「flag 未生效却测出无差异」的假绿通道是开着的）
+  eff_bp=$(printf '%s' "$raw" | grep -oE 'BP=(on|off)' | head -1 | cut -d= -f2)
+  if [ -n "$eff_bp" ]; then
+    if [ "$BP_MODE" = "off" ] && [ "$eff_bp" != "off" ]; then
+      fail "mode $m ($name): 请求 bp_mode=off 但 runner 回报 BP=$eff_bp (flag 未生效)"
+    fi
+    if [ "$BP_MODE" = "on" ] && [ "$eff_bp" != "on" ]; then
+      fail "mode $m ($name): 请求 bp_mode=on 但 runner 回报 BP=$eff_bp (flag 未生效)"
+    fi
+  fi
   out=$(printf '%s' "$raw" | grep -oE "TOHOST=[0-9]+ CYCLES=[0-9]+[^[:space:]]*" | head -1)
   [ -n "$out" ] || fail "mode $m ($name): 无结果行 —— 输出: $(printf '%s' "$raw" | tail -3)"
 

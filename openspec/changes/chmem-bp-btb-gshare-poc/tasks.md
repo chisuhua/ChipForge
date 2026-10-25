@@ -18,10 +18,10 @@ depends_on:
 
 ## Implementation
 
-- [ ] **Task 1** 最小 BTB（BTB + Bimodal 2-bit PHT）+ fetch NORMAL 的 **0 拍**查表 + payload 输出（`pred_target` / `pred_taken` / `pred_valid`）
+- [x] **Task 1** 最小 BTB（BTB + Bimodal 2-bit PHT）+ fetch NORMAL 的 **0 拍**查表 + payload 输出（`pred_target` / `pred_taken` / `pred_valid`）
 - [ ] **Task 2** branch LATE 的 PC-mux 接入（★ **五级嵌套**：`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
 - [ ] **Task 3** ★ flush 语义改写（★ **门控**，非「替换分量」）—— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）**；★ **MUST NOT** 把 `br_taken_buf` 分量替换为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用泄漏 ⇒ 校验和不等）
-- [ ] **Task 4** 误预测纠错（★ **按情形 A/B 区分**：A ⇒ 纠到 `pc_lag+4` + flush；B ⇒ 纠到 `actual_target` + **flush（MUST 抑制！）**；C ⇒ 抑制自身 redirect + **MUST NOT 抑制**；E（BTB miss 且实际跳转）⇒ **MUST 抑制**）+ **正确预测时抑制该分支自身 redirect**
+- [x] **Task 4** 误预测纠错（★ **按情形 A/B 区分**：A ⇒ 纠到 `pc_lag+4` + flush；B ⇒ 纠到 `actual_target` + **flush（MUST 抑制！）**；C ⇒ 抑制自身 redirect + **MUST NOT 抑制**；E（BTB miss 且实际跳转）⇒ **MUST 抑制**）+ **正确预测时抑制该分支自身 redirect**
 - [ ] **Task 5** 测量设施（★ **FLUSH 事件数计数器归本 change** —— FLUSH 是 DUT 内部 payload，**host 不可见** ⇒ 需改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **本 change 是首个可改 `ip/` 的 change**）+ ★ **MUST 复用**前置1 的 `--stats` 框架（**MUST NOT** 另起一套）+ BP 开关面（工厂参数 + CLI flag）
 
 ## Acceptance
@@ -86,6 +86,35 @@ depends_on:
 | 注册位 | ★ BP 注册在 **IBusPlugin 之后**（同 stage "fetch" 同 phase NORMAL ⇒ 生产者先写 `BP_PC`） |
 | **零退化验证** | ★ BP 注册后 4 档 cycles **逐位不变**（86034/88034/86534/87056）· checksum 不变 |
 
+### ★★ 关键发现：BP 的**注册位**是「BP 惰性」的根因（critic B1 追问后的实测定位）
+
+★ **症状**：BP 写路径已存在（Verilog 出现 `btb[...] <=`）但 **hit=0 / miss=cycles** ⇒ BP **完全惰性**
+  （正是 ADR-040 §10.5 反复防的那类「全绿但语义为零」的假阴性）。
+
+★ **根因**：BP 注册在 **IBusPlugin 之后**（原实现）⇒ 它在 `stages_` 里的插入序**早于
+  `Branch` plugin** ⇒ `elaborate()` 在**同 stage "branch" 同 phase NORMAL** 内按插入序执行
+  ⇒ **BP 的 `update()` 先于 Branch plugin 的计算** ⇒ BP 读到的是**陈旧/未初始化**的
+  `BRANCH_TAKEN` / `IS_BRANCH` ⇒ 写使能恒 false ⇒ **BTB 永远不写**。
+
+★ **修法**：BP 注册移到 **`Branch` 之后**。
+  - BP 有两个回调，两个约束的交集 = Branch 之后：
+    - `at_stage("fetch", NORMAL)`：需 IBus 在 fetch NORMAL 写的 `BP_PC` ⇒ **同 stage 同 phase**
+      ⇒ 生产者(Ibus) 先于 消费者(BP) ⇒ BP 在 IBus 之后 ✓
+    - `at_stage("branch", NORMAL)`：读 Branch plugin 算出的 `BRANCH_TAKEN` /
+      `BRANCH_TARGET` / `IS_BRANCH` ⇒ **同 stage 同 phase**
+      ⇒ 生产者(Branch) 先于 消费者(BP) ⇒ **BP 在 Branch 之后** ← 决定性约束
+  - ★ fetch stage 排在 branch stage **之前**（canonical_stage_order）⇒ fetch NORMAL 仍早于
+    branch NORMAL ⇒ 跨 stage 的 canonical 序不受影响。
+
+★ **判决实验（验证机制主张）**：查表地址分别用 `pc_reg`（BP_PC）与 `pc_lag`（分支地址）
+  ⇒ **命中数完全相同**（1999/3998/3992/3998）⇒ ★ **oracle R1 的「提前一拍预测」成立**
+  （BTB 表项是「该 PC 上次被解析时写的」⇒ 查该 PC 即可命中 ⇒ 预测**领先** actual 一拍）。
+
+★ **命中数的自洽性**（独立复算 taken/iter）：
+  - m0（not-taken）：hit=**1999** = 循环回边 1999 次（该档唯一的 taken）✓
+  - m1（taken）：hit=**3998** = 1999（回边）+ 1999（bnez）✓
+  - m2：3992 ✓ · m3：3998 ✓
+
 ### Task 4（BP 开关面 + FLUSH 计数）
 
 | 项 | 结果 |
@@ -121,3 +150,24 @@ depends_on:
 | 3 | ★ 本 change **MUST NOT** 触碰台账 `docs/architecture/tlm-coverage-parity-ledger.md`（台账重判归 ②） | ★ 本 change |
 | 4 | ★ 本 change **MUST NOT** 触碰 `tools/measure_branchbench.sh` 的**模式名数组与表头解析逻辑**（前置1 的范围）⇒ 本 change **仅追加** BP flag（`--bp=on\|off`）与生效值断言相关行 | ★ 本 change |
 | 5 | ★ `measure_branchbench.sh` 的 `2>/dev/null` MUST 改为**捕获 stderr** ⇒ 否则「flag 未生效却测出无差异」的**假绿通道**是开着的 | ★ 本 change |
+
+### 测试覆盖（critic B3：此前该插件 **0 case** ⇒ `[chmem]` binary 无回归锚）
+
+新增 `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（**点名** `branch_predictor_chmem.h`），
+**5 case / 30 assertions 全绿**：
+
+| case | 覆盖 |
+|---|---|
+| `bp_plugin_P1_entry_pack_unpack_roundtrip` | 62b 表项编码往返（tag30/target30/valid/is_unconditional）+ 「MUST NOT 用 `target[1:0]!=0` 判有效」的反例钉死 |
+| `bp_plugin_P2_index_is_pc9_to_2` | ★ 索引 = **PC[9:2]**（B2 修正的回归锚；相邻指令索引差 1） |
+| `bp_plugin_P3_btb_write_read_and_pht_saturate` | BTB 写→读闭环（写路径真生效） |
+| `bp_plugin_P4_prediction_is_live_node` | ★ **预测信号是活节点**（AC-F2-12：`impl()->is_const() == false`）+ C++ 侧常量对照（钉死「区别确实存在」） |
+| `bp_plugin_P5_invalid_entries_fail_fast` | 合法域 = **精确集合** {16,32,64,128,256}（SF1 修正）；越界 throw |
+
+### 回归（★ 用**重 build 后**的 binary —— 修正 critic B5 指出的「binary 过期」）
+
+- 8 架构门禁全 PASS
+- `ctest -R chipforge_tests_chmem` **PASS**（1006s，**新** binary `10-25 10:55`）
+- `ctest -R "branchbench_baseline|verilator|cpu_verilator"` **3/3 PASS**
+- `measure_branchbench.sh --check-baseline` exit 0（`bp_mode=off` ⇒ 传 `--no-bp` ⇒
+  cycles 与基线**逐位相同** ⇒ **BP 关闭时零影响** ✓）

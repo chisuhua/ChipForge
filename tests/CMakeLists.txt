@@ -128,6 +128,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_memory_model_chmem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoded_inst_migration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_vendored_elf.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_bp_plugin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_verilator_sim.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_bare_plumbing_verilator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_mmu_ptw_fsm_chmem.cpp

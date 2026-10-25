@@ -342,14 +342,6 @@ class CpuFactoryChmem {
     pb->register_plugin(std::make_unique<Decoder>());
     pb->register_plugin(std::make_unique<Hazard>());
     pb->register_plugin(std::move(ibus));
-    // ★ BP 注册在 IBusPlugin **之后**（同 stage "fetch" 同 phase NORMAL:
-    //   生产者 IBus 写 BP_PC 必须先于消费者 BP 查表 ⇒ 依赖注册序
-    //   ⇒ ★ 这是**同 stage 同 phase** 的保序, 与跨 stage 的 canonical 序不同)
-    if (enable_bp) {
-      const std::uint32_t entries = btb_entries.value_or(256u);
-      pb->register_plugin(
-          std::make_unique<cf::cpu::plugins::BranchPredictorPluginChmem<T>>(entries));
-    }
     pb->register_plugin(std::make_unique<RegFile>());
     pb->register_plugin(std::make_unique<IntAlu>());
     // csr-chmem-pipeline-integration B.1: 第 8 plugin (RegFile/IntAlu 之后,
@@ -358,6 +350,26 @@ class CpuFactoryChmem {
     //   之后, writeback-NORMAL 在 Branch 之后
     pb->register_plugin(std::make_unique<RiscvCsrPluginChmem<T>>());
     pb->register_plugin(std::make_unique<Branch>());
+    // ★★ BP 注册位（critic 指出原位错误，2026-10-25）——**必须在 Branch 之后**:
+    //   BP 有两个回调:
+    //     (a) at_stage("fetch",  NORMAL) —— 查表 + 产 payload
+    //         ⇒ 需要 IBus 在 fetch NORMAL 写的 `BP_PC` ⇒ **同 stage 同 phase**
+    //           ⇒ 生产者(Ibus) 必须先于 消费者(BP) ⇒ BP 注册在 IBus 之后 ✓
+    //     (b) at_stage("branch", NORMAL) —— 写 BTB / 更新 PHT
+    //         ⇒ 读 Branch plugin 在 branch NORMAL 算出的 BRANCH_TAKEN /
+    //           BRANCH_TARGET / IS_BRANCH ⇒ **同 stage 同 phase**
+    //           ⇒ 生产者(Branch) 必须先于 消费者(BP) ⇒ **BP 注册在 Branch 之后**
+    //   ★ 两个约束的交集 = **Branch 之后**（fetch stage 排在 branch stage 之前,
+    //     故 fetch NORMAL 仍早于 branch NORMAL ⇒ 跨 stage 的 canonical 序不受影响）
+    //   ★ 症状（曾误注册在 IBus 之后 ⇒ BP 早于 Branch）: 同 stage 同 phase 内
+    //     `elaborate()` 按 stages_ 插入序执行 ⇒ BP 的 update 读到**陈旧**的
+    //     BRANCH_TAKEN / IS_BRANCH ⇒ 写使能恒 false ⇒ **BTB 永远不写**
+    //     ⇒ 实测 hit=0 / miss=cycles ⇒ **BP 完全惰性**（假阴性陷阱）
+    if (enable_bp) {
+      const std::uint32_t entries = btb_entries.value_or(256u);
+      pb->register_plugin(
+          std::make_unique<cf::cpu::plugins::BranchPredictorPluginChmem<T>>(entries));
+    }
     pb->register_plugin(std::move(dmem));
 
 #ifndef CF_PLUGIN_USE_CH_MEM

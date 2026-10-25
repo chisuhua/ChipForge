@@ -75,6 +75,8 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/arch/riscv/payload_riscv.h"
+#include "ip/cpu/plugins/branch_chmem.h"
 
 namespace cf {
 namespace cpu {
@@ -112,7 +114,9 @@ static inline cf::plugin::Payload<cf::plugin::uint_t<32>> BP_PC{"cpu.bp_pc"};
 template <typename T>
 class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
  public:
-  static constexpr unsigned kXlenBits = sizeof(T) * 8;
+  // ★ CH_MEM 下 T 是 ch_uint<32>（不是 uint32_t）⇒ `sizeof(T)*8` **不是** 32
+  //   ⇒ 显式取 32（payload_common.h 的 keys<T,32> 要求 XLEN==32）
+  static constexpr unsigned kXlenBits = 32;
 
   // ── 表容量 (编译期 —— ch_mem 的 depth 是模板参数, 不可变) ──────────────
   static constexpr std::uint32_t kBtbEntries = 256;   // 物理深度 ⇒ addr_width = 8
@@ -138,9 +142,16 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
 
   explicit BranchPredictorPluginChmem(std::uint32_t logical_entries = kBtbEntries)
       : logical_entries_(logical_entries) {
-    if (logical_entries_ < kMinEntries || logical_entries_ > kMaxEntries) {
+    // ★ SF1 修正: 合法域是**精确集合** {16,32,64,128,256} —— 不是区间。
+    //   原检查只挡 `<16` / `>256` ⇒ `logical_entries=17` 静默通过 ⇒
+    //   索引 mask = `&17` ⇒ index ∈ {0,16} ⇒ **静默半坏**。
+    //   ★ MUST NOT 静默 clamp（AC-24）⇒ 越界 MUST **快速失败**。
+    if (logical_entries_ != 16 && logical_entries_ != 32 &&
+        logical_entries_ != 64 && logical_entries_ != 128 &&
+        logical_entries_ != 256) {
       throw std::runtime_error(
-          "BranchPredictorPluginChmem: logical_entries must be in {16,32,64,128,256}");
+          "BranchPredictorPluginChmem: logical_entries must be one of "
+          "{16,32,64,128,256} (got " + std::to_string(logical_entries_) + ")");
     }
   }
 
@@ -148,12 +159,22 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     // ★ fetch NORMAL: 以 `pc_reg` 本拍值为地址做 **0 拍** 查表, 产出 3 路 payload。
     //   与 branch LATE (ibus_chmem.h 的 update_pc) 同拍 ⇒ 提前一拍预测。
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL, [this, &pb]() { this->predict(pb); });
+    // ★ branch NORMAL: 分支已解析 ⇒ 更新 BTB / PHT (B1 写路径)
+    //   ★ 顺序: branch NORMAL **晚于** fetch NORMAL (canonical_stage_order:
+    //     stage 首现序 fetch ≺ branch) ⇒ 本拍的预测已写入 payload, 可被比较。
+    pb.at_stage("branch", cf::plugin::Phase::NORMAL, [this, &pb]() { this->update(pb); });
   }
 
   void build(cf::plugin::PipeBuilder&) override {}
 
   /// 当前逻辑条目数 (M)
   std::uint32_t logical_entries() const { return logical_entries_; }
+
+  /// 诊断辅助: 由**标量** PC 算索引 (非 DAG 路径; 供单元测试与调试用)
+  /// ★ 索引 = **PC[9:2]**（8 bit，对齐 ch_mem<_,256> 的 addr_width=8）
+  static std::uint32_t index_of_scalar(std::uint32_t pc) {
+    return (pc >> 2) & (kBtbEntries - 1u);
+  }
 
   /// BTB 表项写入口 (供 PHT/BTB 更新路径与单元测试使用)
   /// tag = PC[31:2], target = 目标绝对地址
@@ -191,9 +212,47 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
   std::unique_ptr<BtbMem> btb_;
   std::unique_ptr<PhtMem> pht_;
 
+  // ── 预测记录 (ch_reg 组, 跨拍保持) ──────────────────────────────────
+  // ★ Task 1 交付物「ch_reg 存预测记录」: 记录**本拍**的预测, 供**下一拍**
+  //   与实际分支结果比对 (判「预测是否正确」⇒ 决定是否 flush / 是否纠错)。
+  // ★ 跨拍保持已由 PoC P-1 验证 (ch_reg 1→3→7)。
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<1>>>  pred_taken_reg_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pred_target_reg_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<1>>>  pred_valid_reg_;
+
+  // ── host 可见的事件计数 (AC-F2-13/14 需要) ──────────────────────────
+  // ★ BP 的输出是 **payload**（不出现在 Verilog 顶层）⇒ 计数必须用 ch_reg
+  //   （CppHDL codegen 出顶层信号 ⇒ host 经 --public-flat-rw 读）
+  // ★ 与 FLUSH 计数（ibus_chmem.h 内）同一机制。
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> hit_count_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> miss_count_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> taken_count_;
+
   // 读端口 (每拍重绑到当前地址 —— PoC P-2P 证明: 地址来自**已被驱动**的信号)
   std::shared_ptr<std::optional<typename BtbMem::read_port>> btb_rp_;
   std::shared_ptr<std::optional<typename PhtMem::read_port>> pht_rp_;
+  // ★ 写端口 (B1: 无写路径 ⇒ valid≡0 ⇒ hit≡false ⇒ BP 永远惰性)
+  std::shared_ptr<std::optional<typename BtbMem::write_port>> btb_wp_;
+  std::shared_ptr<std::optional<typename PhtMem::write_port>> pht_wp_;
+
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_hit_count() {
+    if (!hit_count_)
+      hit_count_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_hit_count");
+    return *hit_count_;
+  }
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_miss_count() {
+    if (!miss_count_)
+      miss_count_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_miss_count");
+    return *miss_count_;
+  }
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_taken_count() {
+    if (!taken_count_)
+      taken_count_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_taken_count");
+    return *taken_count_;
+  }
 
   BtbMem& get_btb() {
     if (!btb_) {
@@ -217,9 +276,120 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
   //   - `& (M-1)` 是**运行期** mask ⇒ 限制有效条目数 (M 为 2 的幂)
   // ★ MUST NOT 用 `bits<N-1,0>(PC)` 且 N 运行时可变 —— `bits<>` 的边界是
   //   **编译期**模板参数 ⇒ 不可实例化。
-  /// 诊断辅助: 由**标量** PC 算索引 (非 DAG 路径; 供单元测试与调试用)
-  static std::uint32_t index_of_scalar(std::uint32_t pc) {
-    return (pc >> 2) & (kBtbEntries - 1u);
+  // ── 更新 (branch NORMAL) ──────────────────────────────────────────────
+  // ★ B1 写路径:
+  //   BTB: **taken 时**写 (PC → target) —— 目标此时才已知
+  //   PHT: **「分支已解析」（任何方向）**时更新 2-bit 饱和计数
+  //        ★ MUST NOT 仅在 taken 时更新 —— 否则学不到 not-taken
+  //          ⇒ 在以 not-taken 为主的负载上恒预测 taken ⇒ **净负收益**
+  //   ★ 更新地址 = **分支解析处的 PC**（= 预测时用的 PC）⇒ 二者必须**同指一条分支**
+  //     （off-by-one ⇒ 学到错误表项）
+  void update(cf::plugin::PipeBuilder& pb) {
+    auto* brn = pb.node_of_logic_stage("branch").get();
+    if (!brn) return;
+
+    using KT = cf::cpu::core::payload::keys<T, kXlenBits>;
+    using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<T>;
+    using BrPlugin = cf::cpu::plugins::BranchPlugin<T>;
+
+    // 分支所在指令的 PC（branch 节点的 KT::PC = decode 的 PC = pc_lag）
+    ch::core::ch_uint<32> br_pc(ch::core::ch_literal<0, 32>{});
+    if (brn->payloads().has(KT::PC)) {
+      br_pc = ch::core::ch_uint<32>(brn->operator()(KT::PC));
+    }
+    const ch::core::ch_bool taken =
+        brn->payloads().has(BrPlugin::get_branch_taken_key())
+            ? ch::core::ch_bool(brn->operator()(BrPlugin::get_branch_taken_key()))
+            : ch::core::ch_bool(false);
+    const ch::core::ch_bool is_branch =
+        brn->payloads().has(BrPlugin::IS_BRANCH)
+            ? ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH))
+            : ch::core::ch_bool(false);
+    ch::core::ch_uint<32> br_target(ch::core::ch_literal<0, 32>{});
+    if (brn->payloads().has(RvKey::BRANCH_TARGET)) {
+      br_target = ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
+    }
+
+    // ── 索引（与读路径**同一表达式** —— PoC 结论 3）──
+    auto idx8 = ch::core::bits<kBtbAddrWidth + 1, 2>(br_pc);
+    auto mask = ch::core::ch_uint<kBtbAddrWidth>(
+        ch::core::ch_literal<0, kBtbAddrWidth>{});
+    mask = ch::core::ch_uint<kBtbAddrWidth>(ch::core::ch_uint<32>(
+        static_cast<std::uint32_t>(logical_entries_ - 1u)));
+    auto idx = ch::core::ch_uint<kBtbAddrWidth>(idx8 & mask);
+
+    // ── BTB 写（taken 时）──
+    // ★ is_unconditional: 无条件跳转 (jal) 恒 taken ⇒ 不占 PHT 表项
+    //   ⇒ 方向来源为「无条件」⇒ 需在 BTB 表项里标记 (否则 jal 永不被预测)
+    // ★ 间接跳转 (jalr) 目标随运行时变化 ⇒ **不建 BTB 项** (静态缓存必错)
+    {
+      auto& btb = get_btb();
+      if (!btb_wp_) {
+        btb_wp_ = std::make_shared<std::optional<typename BtbMem::write_port>>();
+      }
+      // ★ 「无条件跳转」= taken 但**不是**条件分支 (is_branch=false) ⇒ jal/jalr
+      //   ★ 但 jalr 不建项 ⇒ 需区分 jal 与 jalr —— 用 opcode 不可得（branch 节点
+      //   未导出）⇒ 保守：**只有 is_branch（条件分支）建项**；jal 的方向问题
+      //   留给主体 change（它需要 jal/jalr 的 opcode 区分）
+      const ch::core::ch_bool write_en = taken & is_branch;
+      ch::core::ch_uint<64> wdata(ch::core::ch_literal<0, 64>{});
+      // ★ 打包必须是**活**表达式（tag 来自 br_pc，target 来自 br_target）
+      // ★ 打包必须是**活**表达式 (tag 来自 br_pc, target 来自 br_target)
+      //   ⇒ 全部用 ch 表达式拼装, **MUST NOT** 转 C++ 标量 (会折成常量)
+      //
+      // ★ 移位量的写法: `operator<<` 的 RHS 传 **ch_uint**（非 ch_literal）时
+      //   ResultWidth = LHS 宽 + RHS 额外宽 ⇒ 结果宽度会变 ⇒ 需显式收窄。
+      //   ⇒ 统一在 **64 bit** 域内运算: 先把 30 bit 字段零扩展到 64 bit,
+      //     再用 ch_uint<64> 左移（结果仍是 64 bit 域）。
+      const ch::core::ch_uint<64> pc_hi =
+          ch::core::ch_uint<64>(ch::core::bits<31, 2>(br_pc));
+      const ch::core::ch_uint<64> tgt_hi =
+          ch::core::ch_uint<64>(ch::core::bits<31, 2>(br_target));
+      // ★ 用 `shl<64>(lhs, rhs)`（**显式结果宽度**）而不是 `operator<<`:
+      //   后者的 ResultWidth = LHS 宽 + RHS 额外宽 ⇒ 64 bit 左移 64 bit 会溢出
+      //   ⇒ 编译失败（上游 operators_shift.h:58）。
+      const ch::core::ch_uint<64> pc_shifted = ch::core::shl<64>(
+          pc_hi, ch::core::ch_uint<64>(ch::core::ch_literal<kTagShift, 64>{}));
+      const ch::core::ch_uint<64> tgt_shifted = ch::core::shl<64>(
+          tgt_hi, ch::core::ch_uint<64>(ch::core::ch_literal<kTargetShift, 64>{}));
+      const ch::core::ch_uint<64> valid_at = ch::core::shl<64>(
+          ch::core::ch_uint<64>(ch::core::ch_literal<1, 64>{}),
+          ch::core::ch_uint<64>(ch::core::ch_literal<kValidBit, 64>{}));
+      ch::core::ch_uint<64> packed_w(tgt_shifted | pc_shifted | valid_at);
+      wdata = packed_w;
+      *btb_wp_ = btb.write(idx, wdata, write_en, "btb_write");
+    }
+
+    // ── PHT 更新（分支已解析，任何方向）──
+    {
+      auto& pht = get_pht();
+      if (!pht_wp_) {
+        pht_wp_ = std::make_shared<std::optional<typename PhtMem::write_port>>();
+      }
+      // ★ 读当前计数（读端口与写端口**同一地址**）⇒ 饱和 +1
+      if (!pht_rp_) {
+        pht_rp_ = std::make_shared<std::optional<typename PhtMem::read_port>>();
+      }
+      ch::core::ch_uint<kPhtAddrWidth> pidx(
+          ch::core::ch_literal<0, kPhtAddrWidth>{});
+      pidx = ch::core::ch_uint<kPhtAddrWidth>(idx);
+      *pht_rp_ = pht.aread(pidx, "pht_read");
+
+      const ch::core::ch_uint<2> cur((*pht_rp_)->impl());
+      const auto cur2 = ch::core::bits<1, 0>(cur);
+      // ★ 饱和: 0→1→2→3（**不回退**）⇒ taken 时 +1, not-taken 时 **保持**
+      //   ★ 「不回退」是 2-bit 饱和计数器的标准语义（Bimodal）⇒ 方向稳定性靠
+      //     饱和而非递减
+      const auto one = ch::core::ch_uint<2>(ch::core::ch_literal<1, 2>{});
+      const auto sat3 = ch::core::ch_uint<2>(ch::core::ch_literal<3, 2>{});
+      const auto inc = cur2 >= sat3 ? sat3 : ch::core::ch_uint<2>(cur2 + one);
+      const ch::core::ch_uint<2> newval(inc);
+
+      // ★ 写使能 = **「分支已解析」（任何方向）** ⇒ taken / not-taken 都写
+      //   （not-taken 时写回**同值**⇒ 语义为「饱和计数只增不减」）
+      const ch::core::ch_bool write_en = is_branch;
+      *pht_wp_ = pht.write(pidx, newval, write_en, "pht_write");
+    }
   }
 
   // ── 预测 (fetch NORMAL) ───────────────────────────────────────────────
@@ -233,11 +403,17 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     if (n->payloads().has(BP_PC)) {
       pc = ch::core::ch_uint<32>(n->operator()(BP_PC));
     }
+    // ★ 查表地址 = **pc_reg 本拍值**（BP_PC payload，由 IBus 在 fetch NORMAL 写）
+    //   ⇒ 预测的是「本拍正在取的那条指令」⇒ 若该指令是分支且表项存在（上次
+    //     执行时写的）⇒ 命中 ⇒ 预测**领先** actual 一拍。
 
     // ── 索引 (运行期 mask) ──────────────────────────────────────────────
     // ★ 索引 = `PC[9:2] & (M-1)` (物理深度 256 ⇒ addr_width 8)
     //   —— 全部是**活**表达式 (pc 是活节点) ⇒ 索引随 PC 变化
-    auto idx8 = ch::core::bits<kBtbAddrWidth - 1, 0>(pc);
+    // ★ B2 修正: 索引取 **PC[9:2]**（8 bit，对齐 addr_width=8）
+    //   ★ MUST NOT 用 `bits<7,0>(pc)` —— 那是 PC[7:0]，而 PC[1:0] 恒 0
+    //     ⇒ 只有 64 个 index 可达（4× 容量损失；M=16 时仅 4 槽可达）
+    auto idx8 = ch::core::bits<kBtbAddrWidth + 1, 2>(pc);
     auto mask = ch::core::ch_uint<kBtbAddrWidth>(
         ch::core::ch_literal<0, kBtbAddrWidth>{});
     mask = ch::core::ch_uint<kBtbAddrWidth>(ch::core::ch_uint<32>(
@@ -291,13 +467,37 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     // ★ 值全部是**活** ch 节点 ⇒ 写入 payload 后仍是活节点
     //   (★ MUST NOT 转成 C++ 标量 —— 那会折成 elaboration 期常量 ⇒ 假阴性)
     // ★ 目标还原: target30 << 2 (低位恒 0 ⇒ 无损)
-    const ch::core::ch_uint<32> target_abs =
-        ch::core::ch_uint<32>(ch::core::ch_uint<64>(target30) << 2);
+    const ch::core::ch_uint<32> target_abs = ch::core::ch_uint<32>(
+        ch::core::shl<64>(ch::core::ch_uint<64>(target30),
+                          ch::core::ch_uint<64>(ch::core::ch_literal<2, 64>{})));
     n->operator()(BP_PRED_TARGET) = cf::plugin::uint_t<32>(target_abs);
     n->operator()(BP_PRED_TAKEN) = cf::plugin::uint_t<1>(ch::core::ch_uint<1>(
         ch::core::ch_uint<1>(pred_taken)));
     n->operator()(BP_PRED_VALID) = cf::plugin::uint_t<1>(ch::core::ch_uint<1>(
         ch::core::ch_uint<1>(hit)));
+
+    // ── 事件计数 (host 可见) ──────────────────────────────────────────
+    // ★ 命中 / 未命中 / 预测为 taken 的次数 ⇒ 供 AC-F2-13（计数器自证）与
+    //   AC-F2-14（BTB 命中率自证: 命中次数 MUST > 0）使用。
+    {
+      const ch::core::ch_uint<32> one(ch::core::ch_literal<1, 32>{});
+      const ch::core::ch_uint<32> zero(ch::core::ch_literal<0, 32>{});
+      const ch::core::ch_uint<32> hit_inc =
+          select(hit, one, zero);
+      const ch::core::ch_uint<32> miss_inc =
+          select(hit, zero, one);
+      const ch::core::ch_uint<32> taken_inc =
+          select(pred_taken, one, zero);
+      auto& hc = get_hit_count();
+      auto& mc = get_miss_count();
+      auto& tc = get_taken_count();
+      ch::core::ch_uint<32> hv(hc);
+      ch::core::ch_uint<32> mv(mc);
+      ch::core::ch_uint<32> tv(tc);
+      hc <<= hv + hit_inc;
+      mc <<= mv + miss_inc;
+      tc <<= tv + taken_inc;
+    }
   }
 };
 

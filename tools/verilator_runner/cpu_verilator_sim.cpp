@@ -146,7 +146,15 @@ bool parse_args(int argc, char** argv, Options& opts) {
     } else if (a == "--no-bp") {
       opts.enable_bp = false;
     } else if (a == "--btb-entries" && i + 1 < argc) {
-      opts.btb_entries = static_cast<std::uint32_t>(std::atoi(argv[++i]));
+      // ★ N2: `atoi` 容忍尾串（`16abc` ⇒ 静默取 16）⇒ MUST 校验完整解析
+      const char* num = argv[++i];
+      char* end = nullptr;
+      const unsigned long v = std::strtoul(num, &end, 10);
+      if (end == num || (end != nullptr && *end != '\0') || v > 0xFFFFFFFFul) {
+        std::fprintf(stderr, "--btb-entries expects an integer (got '%s')\n", num);
+        return false;
+      }
+      opts.btb_entries = static_cast<std::uint32_t>(v);
     } else if (a == "--help" || a == "-h") {
       std::printf("usage: %s --elf <path> [flags]\n", argv[0]);
       std::printf("  --elf            vendored rv32ui-p-* ELF path (required)\n");
@@ -204,6 +212,9 @@ bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf)
 // Compile top.v + sim_main.cpp into work_dir/obj_dir + libVtop.so
 // (CppHDL VerilatorBackend two-phase recipe: verilator --cc then g++ -shared).
 bool build_libvtop(const Options& opts) {
+  // ★ BP 统计信号的读取**必须条件编译**（sim_main.cpp 的 CF_BP_STATS_READ）:
+  //   BP 未注册（--no-bp）⇒ 生成的 Verilog 无 bp_*_count 信号 ⇒ 引用即编译失败。
+  const bool bp_stats = opts.enable_bp;
   std::string bin = verilator_bin();
   std::string inc = verilator_include_dir(bin);
   std::string work = opts.work_dir;
@@ -226,7 +237,8 @@ bool build_libvtop(const Options& opts) {
   }
 
   std::string link =
-      "cd " + work + "/obj_dir && g++ -shared -fPIC -std=c++17 -o libVtop.so " +
+      "cd " + work + "/obj_dir && g++ -shared -fPIC -std=c++17 " +
+      (bp_stats ? "-DCF_BP_STATS_READ " : "") + "-o libVtop.so " +
       harness + " ./*.cpp " + inc + "/verilated.cpp " + inc +
       "/verilated_threads.cpp -I. -I" + inc + " -I" + inc +
       "/vltstd -L" + inc + " -pthread -lz 2>&1";
@@ -244,8 +256,10 @@ int main(int argc, char** argv) {
   if (!parse_args(argc, argv, opts)) return 2;
 
   // ── BP 开关面的合法性检查 (fail-fast; 不得静默 clamp) ────────────────
-  if (opts.btb_entries != 16 && opts.btb_entries != 32 && opts.btb_entries != 64 &&
-      opts.btb_entries != 128 && opts.btb_entries != 256) {
+  // ★ N3: `--no-bp` 时 `--btb-entries` 无意义 ⇒ 不校验（否则「明明关了还报错」）
+  if (opts.enable_bp && opts.btb_entries != 16 && opts.btb_entries != 32 &&
+      opts.btb_entries != 64 && opts.btb_entries != 128 &&
+      opts.btb_entries != 256) {
     std::fprintf(stderr,
                  "--btb-entries must be one of {16,32,64,128,256} (got %u)\n",
                  opts.btb_entries);
@@ -253,8 +267,12 @@ int main(int argc, char** argv) {
   }
   // ★ 生效值回显 (stderr) ⇒ 测量脚本据此断言「flag 确实生效」
   //   (否则「flag 未生效却测出无差异」的假绿通道是开着的)
-  std::fprintf(stderr, "BP=%s btb_entries=%u\n", opts.enable_bp ? "on" : "off",
-               opts.btb_entries);
+  // ★ N4: 关态**不**回显 entries（否则易被脚本误读为「生效值」）
+  if (opts.enable_bp) {
+    std::fprintf(stderr, "BP=on btb_entries=%u\n", opts.btb_entries);
+  } else {
+    std::fprintf(stderr, "BP=off\n");
+  }
 
   auto elf = load_elf_file(opts.elf_path);
   if (elf.size() < 52 || elf[0] != 0x7F || elf[1] != 'E' || elf[2] != 'L' ||
@@ -310,6 +328,22 @@ int main(int argc, char** argv) {
     auto* read_flush = reinterpret_cast<std::uint32_t (*)(void*)>(
         dlsym(handle, "cf_read_flush_count"));
     const std::uint32_t flush_count = read_flush ? read_flush(top) : 0u;
+    // ★ BP 事件计数（命中 / 未命中 / 预测 taken）
+    //   ★ **BP 未注册时（--no-bp）Verilog 里没有这些信号** ⇒ 读它们会让
+    //     Verilator 编译失败（`top__DOT__bp_hit_count` 不存在）⇒ MUST NOT 读。
+    std::uint32_t bp_hit = 0, bp_miss = 0, bp_taken = 0;
+    if (opts.enable_bp) {
+      // ★ 与 harness 的 CF_BP_STATS_READ 条件一致（BP 注册 ⇒ 宏已定义）
+      auto* read_bp_hit = reinterpret_cast<std::uint32_t (*)(void*)>(
+          dlsym(handle, "cf_read_bp_hit_count"));
+      auto* read_bp_miss = reinterpret_cast<std::uint32_t (*)(void*)>(
+          dlsym(handle, "cf_read_bp_miss_count"));
+      auto* read_bp_taken = reinterpret_cast<std::uint32_t (*)(void*)>(
+          dlsym(handle, "cf_read_bp_taken_count"));
+      bp_hit = read_bp_hit ? read_bp_hit(top) : 0u;
+      bp_miss = read_bp_miss ? read_bp_miss(top) : 0u;
+      bp_taken = read_bp_taken ? read_bp_taken(top) : 0u;
+    }
     // One line per sampled PC value (dense form; the host tool aggregates).
     // ⚠️ NOT a fetch count — the sampled stream includes non-architectural
     //    PC values (mechanism unconfirmed); relative/cross-mode use only.
@@ -325,6 +359,9 @@ int main(int argc, char** argv) {
     std::printf("PC_STATS cycles=%u pc_changes=%u\n", cycles, pc_changes);
     // ★ FLUSH 事件数（★ 语义：错路指令被抑制的次数 —— 由 DUT 内部计数器给出）
     std::printf("FLUSH_STATS count=%u\n", flush_count);
+    // ★ BP 事件计数（★ 命中 > 0 ⇒ BTB 真的能命中 ⇒ AC-F2-14 自证）
+    std::printf("BP_STATS hit=%u miss=%u pred_taken=%u\n", bp_hit, bp_miss,
+                bp_taken);
   } else {
     rc = run_sim(top, opts.max_cycles, elf_name.c_str());
   }
