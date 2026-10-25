@@ -23,7 +23,12 @@ depends_on:
 - [x] **Task 2** branch LATE 的 PC-mux 接入（★ **五级嵌套**：`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
   - ★ **落点**：`ip/cpu/plugins/ibus_chmem.h` `update_pc()`（branch LATE）—— 消费者在 IBus，BP 插件保持「纯预测器」（只产 payload）
   - ★ **已实现的链**（简报 §3.4.2 的五级，`trap`/`freeze` 两臂待 v0.11.0 Phase 3.5 落地后**外包**在 branch 之上）：
-    `next_pc = select(A, pc_lag+4, select(B, actual_target, select(C, pc+4, select(actual_taken, actual_target, select(pred_valid&pred_taken, pred_target, pc+4)))))`
+    `bp_next = select(pred_valid&pred_taken, pred_target, pc+4)`；
+    `next_pc = select(A, pc_lag+4, select(B, actual_target, select(C, **bp_next**, select(actual_taken, actual_target, bp_next))))`
+    ⇒ ★★ **C 臂的值是 `bp_next` 而不是 `pc+4`**（critic 十轮 B-1 / 缺口 #11 / 裁决 A3）：
+    `pc+4` 会**丢掉下一级投机** ⇒ 若分支的 target 本身又是一条分支 ⇒ **走错路 +
+    错路指令不被 flush ⇒ 副作用泄漏** ⇒ ★ 该场景在 branchbench / vendored ELF 上
+    **结构性不可达** ⇒ 由单元锚 **R8** 锁定。
   - ★ **情形 B 臂与 `actual_taken` 臂语义重复**（B ⊂ actual_taken ⇒ 两者都选 `actual_target`）⇒ 该臂**无可观测效果** ⇒ 保留仅为**规格保真**（简报明文要求五级）⇒ ★ **没有断言覆盖它**（诚实登记，见缺口 #10）
 - [x] **Task 3** ★ flush 语义改写（★ **门控**，非「替换分量」）—— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）**；★ **MUST NOT** 把 `br_taken_buf` 分量替换为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用泄漏 ⇒ 校验和不等）
   - ★ **落点**：同文件 `gated_flush()`（fetch NORMAL 发布 `FLUSH`）
@@ -271,7 +276,8 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 | 7 | **「提前一拍」的证明** | ✅ **已闭合**（Task 2/3/4 后） | ★ 本条原为「待 Task 2」—— 当时 BP 三个输出 payload **无消费者** ⇒ 「提前一拍」无任何行为后果 ⇒ 现已接入 PC-mux ⇒ **Δcycles 实测**（BP=on vs BP=off，同一 workload）：m0 86034→**84038**（−1996）、m1 88034→**84040**（−3994）、m2 86534→**84787**（−1747）、m3 87056→**85037**（−2019）⇒ **4 档全部改善且校验和逐位不变**（103/183/147/101 = off 基线）⇒ 机制成立 |
 | 8 | **方向性门禁的阈值 + S3 行为变化** | ⏳ 待主体 | ★ **本轮补全（critic B-3：缺口表只写了 2 个 90% 阈值，漏了 S3 会变的行为）**：<br>① **跨档 `pc_changes` 相等断言在 S3 必然假红** —— `pc_changes` = 采样 PC 值变化拍数（自述含非架构路径 PC 值、机制未确认）⇒ 今日 BP 三输出**无消费者** ⇒ 4 档轨迹相同（都 = 86034）⇒ S3 接入 PC-mux 后 m0（恒 not-taken）预测必错 ⇒ 采样流多出错路 PC ⇒ 4 档 `pc_changes` 不再相等 ⇒ **原断言会让 branchbench 因与 BP 健康度无关的原因判红** ⇒ ★ **本轮已把该断言限定在 `BP_MODE=off`**（守卫键 MUST 是 `BP_MODE`, **不可**是 `CHECK_BP_DIR` —— 「BP=on」有 `--check-bp-direction` 与 `--bp=on --check-baseline`/`BENCH_BP=on --check-baseline` **两条**路径，用后者只挡住前一条 ⇒ critic 六轮 BLOCKER-1 实测复现）⇒ **处置已落**：已用夹具（bp_mode=on 基线行 + 4 档 pc_changes 各不同）实测「新版 PASS / 把守卫改回 `CHECK_BP_DIR` 立即 FAIL」⇒ 主体仍 MUST 知悉：**BP=on 模式下前端活动量不再跨档可比**<br>★ **补充（critic 六轮 SF-5）**：`bp_dir_judges == 2` 只能防「档名消失/改名」，**不防档名与硬件方向错配**（顺序互换）⇒ 该错配由**校验和判据**兜住（BP=on 校验和 vs 该档名的 off 基线行：always_not_taken=103 / always_taken=183 ⇒ 互换后必然不符 ⇒ RED）<br>② **校验和判据今天是恒真** —— BP 输出无消费者 ⇒ BP=on 与 BP=off 必然同校验和 ⇒ 该判据**当前零鉴别力** ⇒ 它是 **S3 才激活**的承重判据（脚本注释已标注）<br>③ **FLUSH 口径随 Task 3 改写而失效** —— Task 3 把 flush 改成门控式 ⇒ AC-F2-13 的「ΔFLUSH = 2000/500/1022 逐位相等」与 AC-F2-3 的「ΔFLUSH ≥ 0.8×FLUSH(off)」全部作废 ⇒ 而 `--check-bp-direction` **对 FLUSH 一个数都不判** ⇒ ★ **决策级判据（AC-F2-3）仍无自动锚** ⇒ **主体 MUST 补 FLUSH 判据**（归主体，本 change 不越界）<br>④ **两个 90% 阈值**（m1 ≥90% / m2 ≤90%）设计成**方向性比值** ⇒ 对 S3 的 PC-mux 接入不敏感（真实 taken 率 100% vs 25% ⇒ 预测率应分别趋近 100% 与 25%）⇒ 预期仍成立；★ 但**绝对值必变** ⇒ 主体 MUST 复评并**显式重录**（★ MUST NOT 直接放宽） |
 | 9 | **BP 路径真正进入 CI** | ⏳ 归 ADR-088 | 前置 = 「CI 具备 build 能力」（CI 现在**不构建项目** ⇒ branchbench step 恒走 SKIP）⇒ 属 ADR-088 的 CI 基建项 ⇒ **不在本 change** ⇒ ★ 本 change 只交付**本地锚**（ctest entry + PR 手动跑 `tools/run_chipforge_tests.sh --all`）；★ MUST NOT 把「加了 ctest entry」说成「BP 路径进入 CI」（critic B-1：上一轮 commit message 正是这么写的 ⇒ 事实错误） |
-| 10 | ★ **情形 F 是设计简报未列的规格缺口** + ★ **`bp_spec_taken_buf` 的判定被实施层收紧**（偏离 AC-6 / 简报 §3.4.2 的字面定义） | ⚠️ **已实现 + 已升级为待 architect 裁决** | ★ **F**：预测 taken / 实际 taken / **目标不同**（陈旧 BTB 项 / `jalr` 等）—— 简报 §3.4.2 的情形清单**只列 A/B/C/D/E** ⇒ 本实现**补了 F**（走 `br_taken` 臂纠到实际目标 + **必须 flush**）<br>★ **偏离**：简报 §3.4.2 / AC-6 把 `bp_spec_taken_buf` 定义为「上一拍 BP 的投机 taken 臂**确实生效**了」⇒ 字面实现 = `pv & pt`；★ **本实现收紧为「投机被证明正确」= `case_c`（= `pv & pt & br_taken & (ptg == br_target)`）**<br>★ **偏离的理由（错路泄漏证明）**：简报的门控理由是「投机 taken 臂生效 ⇒ **fall-through 根本没被取** ⇒ 不需抑制」⇒ 但在情形 F 下**错路的不是 fall-through、而是投机目标 P 本身**（P ≠ fall-through ⇒ fall-through 确实没被取，但 **P 被取了** ⇒ P 的 store/写回是**泄漏的副作用**）⇒ 简报的字面公式在 F 下**不 flush ⇒ 泄漏** ⇒ 收紧为 `case_c` 后，F 的 `spec_ok=0` ⇒ taken 分量生效 ⇒ flush ⇒ **抑制的正是被取到的错路指令 P** ⇒ 且**不会过度 flush**（逐情形核过：A/B/E/F 都需要抑制；只有 C 不需要 ⇒ `case_c` 恰好是「被取到的指令是否在正确路径上」）<br>★ **本次改动未改变任何实测数字**：branchbench 4 档负载**不产生情形 F**（静态目标 + `jalr` 不建 BTB 项）⇒ `FLUSH(on)` 在两种定义下**逐位相同**（⇒ ΔFLUSH 与 Δcycles 逐位相等即旁证）⇒ ★ **实施层取更保守的一侧**（只可能多 flush ⇒ 不可能假绿）<br>★ **MUST 上报 architect**（见下方「★ 待 architect 裁决」表）⇒ ★ **实施者不自改门禁值**<br>★ **另**：★ **情形 B 臂冗余** —— `case_b = pv & !pt & br_taken` ⊂ `br_taken` ⇒ 该臂与 `actual_taken` 臂**选同一个值**（`actual_target`）⇒ **可证明无差异**（变异 M3 实测：删掉它测试**仍绿**）⇒ 保留仅因简报明文要求五级链 ⇒ ★ **没有任何断言覆盖它**（诚实登记：这是**已知无覆盖**的一臂） |
+| 10 | ★ **情形 F 是设计简报未列的规格缺口** + ★ **`bp_spec_taken_buf` 的判定被实施层收紧**（偏离 AC-6 / 简报 §3.4.2 的字面定义） | ⚠️ **已实现 + 已升级为待 architect 裁决** | ★ **F**：预测 taken / 实际 taken / **目标不同**（陈旧 BTB 项 / `jalr` 等）—— 简报 §3.4.2 的情形清单**只列 A/B/C/D/E** ⇒ 本实现**补了 F**（走 `br_taken` 臂纠到实际目标 + **必须 flush**）<br>★ **偏离**：简报 §3.4.2 / AC-6 把 `bp_spec_taken_buf` 定义为「上一拍 BP 的投机 taken 臂**确实生效**了」⇒ 字面实现 = `pv & pt`；★ **本实现收紧为「投机被证明正确」= `case_c`（= `pv & pt & br_taken & (ptg == br_target)`）**<br>★ **偏离的理由（错路泄漏证明）**：简报的门控理由是「投机 taken 臂生效 ⇒ **fall-through 根本没被取** ⇒ 不需抑制」⇒ 但在情形 F 下**错路的不是 fall-through、而是投机目标 P 本身**（P ≠ fall-through ⇒ fall-through 确实没被取，但 **P 被取了** ⇒ P 的 store/写回是**泄漏的副作用**）⇒ 简报的字面公式在 F 下**不 flush ⇒ 泄漏** ⇒ 收紧为 `case_c` 后，F 的 `spec_ok=0` ⇒ taken 分量生效 ⇒ flush ⇒ **抑制的正是被取到的错路指令 P** ⇒ 且**不会过度 flush**（逐情形核过：A/B/E/F 都需要抑制；只有 C 不需要 ⇒ `case_c` 恰好是「被取到的指令是否在正确路径上」）<br>★ **本次改动未改变任何实测数字**：branchbench 4 档负载**不产生情形 F**（静态目标 + `jalr` 不建 BTB 项 + M=256 无别名）⇒ ★ **这是推断，不是实测**（「两种定义下 `FLUSH(on)` 逐位相同」同理是**推断**；★「ΔFLUSH=Δcycles 即旁证」**不能**旁证 F 不发生 —— 两者同源）⇒ ★ **实施层取更保守的一侧**（只可能多 flush ⇒ 不可能假绿）<br>★ **MUST 上报 architect**（见下方「★ 待 architect 裁决」表）⇒ ★ **实施者不自改门禁值**<br>★ **另**：★ **情形 B 臂冗余** —— `case_b = pv & !pt & br_taken` ⊂ `br_taken` ⇒ 该臂与 `actual_taken` 臂**选同一个值**（`actual_target`）⇒ **可证明无差异**（变异 M3 实测：删掉它测试**仍绿**）⇒ 保留仅因简报明文要求五级链 ⇒ ★ **没有任何断言覆盖它**（诚实登记：这是**已知无覆盖**的一臂） |
+| 11 | ★★ **链式投机缺口**（critic 十轮 B-1）—— 简报 §2.1.2 的 `select(情形C, pc_reg(N+1)+4, …)` 与 §3.4.2 的 `bp-predict` 层组合后，**情形 C 会丢掉下一级投机** | ✅ **已修**（实施层取正确的一侧）+ ⚠️ **规格缺口待回写**（裁决 A3） | ★ **场景**：分支 B1（预测 taken→P、实际 taken→P ⇒ 情形 C），而 **P 处本身又是一条被正确预测 taken 的分支** B2（预测→Q）⇒ 旧写法让 PC 顺序走到 P+4/P+8… ⇒ **Q 永不被取**（走错路）且 `case_c` 使 `spec_ok=1` ⇒ 错路指令**不被 flush** ⇒ **store/写回副作用泄漏** ⇒ 校验和发散<br>★ **修法**：`case_c` 臂的值改为 **`bp_next`**（= 当前取指指令 `pc_reg(N)` 的投机）⇒ 抑制 B1 自身 redirect 的同时**保留 B2 的投机**<br>★ **该负载上结构性不可达** ⇒ 端到端两个锚（branchbench 4 档 / vendored ELF 47 个）**都抓不住** ⇒ ★ 由**单元锚 R8** 锁定（退回 `pc_plus_4` ⇒ RED）⇒ ★ **主体 MUST 把「链式投机」列为必测场景**（否则同类缺口会再次逃逸）<br>★ **本改动不改变任何实测数字**（branchbench 4 档 cycles/校验和/FLUSH_COUNT **逐位不变**） |
 
 ### ★★★ Task 5 判定（★ plan 的 Task 5 = 机制判定）
 
@@ -282,9 +288,11 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 | 项 | 实测 |
 |---|---|
 | 4 档校验和逐位相等 | m0 103 / m1 183 / m2 147 / m3 101 ⇒ **BP=on 与 BP=off 逐档相等** ✓ |
-| `[chmem]` vendored ELF | **47/47 PASS**（16410 assertions）⇒ 0 退化 ✓ |
+| `[chmem]` vendored ELF | **47/47 PASS**（16410 assertions）⇒ 0 退化 ✓ ⇒ ★★ **这本身就是 BP=on 锚**（`build_cpu` 的 `enable_bp` **默认 true**，测试未显式传 ⇒ BP 注册 ⇒ 不是「BP-off 零退化」而是「BP-on 下 47 个 ELF 的 tohost 仍全为 1」） |
 
 ⇒ ★ **BP 开启不改变架构可见结果** ⇒ 投机路径被正确纠正 / 抑制 ⇒ **无副作用泄漏**。
+⇒ ★★ 但注意：这两个锚的**负载都不含「链式投机」模式**（详见下方缺口 #11）⇒ 它们**证明不了**
+链式投机下的正确性 ⇒ 那条由单元锚 R8 承担。
 
 #### ② AC-F2-17 flush 时序对 —— **PASS**
 
@@ -292,7 +300,7 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 |---|---|---|
 | ① 投机成功 ⇒ 该拍**无** flush | 单元 `R5`（情形 C） | FLUSH 序列第 2 拍起恒 **0** ✓ |
 | ② 投机失败 ⇒ **下一拍**有 flush | 单元 `R3`（情形 A） | FLUSH 序列第 2 拍起恒 **1** ✓ |
-| ③ BTB miss 的实际跳转分支 ⇒ **下一拍**有 flush | 单元 `R1`/`R2`（BP 未注册） | FLUSH 恒 = `taken_buf` ✓ |
+| ③ BTB miss 的实际跳转分支 ⇒ **下一拍**有 flush | ★ 单元 **R9（情形 E：BP 已注册但 `pred_valid=0`）**（★ R1/R2 只是「BP **未注册**」路径 ⇒ 是**不同的代码分支**） | FLUSH 恒 1 ✓ |
 | ④ 未投机而实际跳转的 fall-through 副作用 **MUST NOT** 发生 | 端到端 4 档校验和 + vendored ELF 47/47 | ✓（同 AC-F2-16） |
 
 #### ③ AC-F2-3 量化判据 —— ★ **不可判定**（不是「不成立」）
@@ -308,21 +316,30 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 
 ★ **分量 2（`Δcycles ≥ 0.9 × ΔFLUSH`）4/4 PASS**（实测比值恒为 **1.000** ⇒ **每个被消除的 taken 气泡 = 恰好 1 拍**）。
 
-★ **分量 1（`ΔFLUSH ≥ 0.8 × FLUSH(off)`）4/4 不满足 ⇒ 但该阈值在任何实现下都不可满足** ⇒
-**这不是「机制不成立」，而是「判据缺陷」**。**证明**（用 AC-F2-13 自己登记的事实）：
+★ **分量 1（`ΔFLUSH ≥ 0.8 × FLUSH(off)`）4/4 不满足 ⇒ 但该阈值在本简报既定范围内不可能满足**
+⇒ **这不是「机制不成立」，而是「判据缺陷」**。**证明**（用 AC-F2-13 自己登记的事实）：
 
 ```
-FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的固定 flush 分量，
+FLUSH(off) = N_fixed + N_taken        （N_fixed = 方向无关的固定 flush 分量，
                                         AC-F2-13 已自述：m0 的 12000 = 6 × 2000 iter）
 ΔFLUSH ≤ N_taken                       （BP 最多消掉全部 taken 气泡）
 ⇒ ΔFLUSH / FLUSH(off) ≤ N_taken / (N_fixed + N_taken)
-   m0: 2000/12000 = 0.167   m1: 4000/14000 = 0.286
-   m2: 2500/12500 = 0.200   m3: 3022/13022 = 0.232
-⇒ 上界 ≤ 0.286 < 0.8   ⇒ ★ 该阈值**对完美预测器也不成立** ⇒ 结构性不可满足
+   ★ 精确值（CSV notes：回边 taken 1999 次 + branch_sel 0/2000/500/1022）：
+     m0: 1999/12000 = 0.167   m1: 3999/14000 = 0.286
+     m2: 2499/12500 = 0.200   m3: 3021/13022 = 0.232
+     （⇒ N_fixed = 12000-1999 = 14000-3999 = 12500-2499 = 13022-3021 = **10001**，
+       四档**分毫不差** ⇒ 「方向无关」的声称更强）
+⇒ 上界 ≤ 0.286 < 0.8   ⇒ ★ 该阈值**在本简报既定范围内**（RAS 延后、`jalr` 不建项、
+   条件分支是唯一的 taken 来源）对**任何实现**都不成立 ⇒ 结构性不可满足
 ```
 
 ⇒ ★ **该阈值与 AC-F2-13 自述事实（「FLUSH 含方向无关的固定分量」）自相矛盾** ⇒
 **实施者 MUST NOT 自改门禁值** ⇒ ★ **已升级为待 architect 裁决（A2，见上表）**。
+⇒ ★ **措辞边界（critic 十轮 SF-1 的更正）**：上界 0.286 是**在本简报既定范围内**导出的
+（RAS 已 defer、`jalr` 不建 BTB 项 ⇒ 条件分支是唯一的 taken 来源）⇒ ★ **不能**写成
+「任何实现下都不可满足」（若 ② 主体把 `jal`/`jalr` 也纳入预测，或把 RAS 落地，
+上界会被推高 ⇒ 届时 MUST 复评）⇒ ★ **实施者不自改阈值**，但 ★ **architect 复核时
+MUST 知悉这个边界**。
 
 #### ④ 机制判定结论
 
@@ -339,6 +356,11 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
 ⇒ ★★ **机制判定：「fetch 期提前一拍预测 ⇒ 消除 taken 转移气泡」= 成立**
 （依据：Δcycles **4/4 档 > 0**；**ΔFLUSH 与 Δcycles 逐位相等 4/4** ⇒ 每个消除的气泡恰 1 拍；
 校验和**逐位不变** ⇒ 无功能损坏）⇒ ★ **进 ② 主体**。
+⇒ ★★★ **限定条件（★ MUST NOT 省略）**：本判定的证据链覆盖 **对齐类场景 A/B/C/D/E/F**
+（branchbench 4 档 + vendored ELF 47 个 + 单元 R1~R10）；★ **链式投机场景**（分支的 target
+本身又是一条分支）在这两个负载上**结构性不可达** ⇒ ★ 该场景曾存在**功能缺口**
+（`case_c` 臂丢掉下一级投机 ⇒ 走错路 + 错路指令不被 flush ⇒ 副作用泄漏）⇒ 已修（缺口 #11 / 裁决 A3）
+⇒ ★ **主体 MUST 把链式投机列为必测场景**（否则同类缺口会再次逃逸）。
 ⇒ ★★ **但**：`AC-F2-3` 分量 1 的阈值**不可判定** ⇒ **A1 / A2 两项 MUST 在 ② 主体开工前落**
 （**硬前置**，各带三要素 + ≤ 2 工作日时限 ⇒ **不是「等回复」**）⇒ ★ 本 change **不留悬空项**。
 
@@ -347,7 +369,8 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
 | # | 待裁决项 | ① 触发阈值（何时 MUST 裁决） | ② 落点文件（裁决写在哪） | ③ 可判定时限 | 实施者已做什么（不阻塞本 change 关闭） |
 |---|---|---|---|---|---|
 | A1 | **`bp_spec_taken_buf` 的定义**：简报 §3.4.2 / AC-6 = 「投机 taken 臂**确实生效**」（= `pv & pt`）vs 本实现 = 「投机**被证明正确**」（= `case_c`）⇒ ★ **情形 F 下前者会泄漏错路指令 P 的副作用**（证明见缺口 #10） | ★ **情形 F 可达时**（陈旧 BTB 项 / `jalr` 建项 / 动态目标分支）⇒ 泄漏即为**功能错误**（校验和不等）⇒ 触发阈值 = 「主体引入 `jalr`/动态目标分支」或「branchbench 增加动态目标档」 | `docs/architecture/bp-btb-gshare-design-brief.md` §3.4.2（情形表 + 门控规则行）+ `openspec/changes/chmem-bp-btb-gshare/design.md`（② 主体）+ ADR-088 §5.3（若涉 P-6 结论） | ★ **≤ 2 个工作日**，且**硬前置**：② 主体开工前必须落 | ★ 实施层已取**更保守**的一侧（`case_c` ⇒ 只可能多 flush ⇒ **不可能假绿**）⇒ 且**本次未改变任何实测数字**（4 档负载不产生 F ⇒ 两种定义下 `FLUSH(on)` 逐位相同）⇒ ★ 主体可直接沿用 `case_c` 定义，**无需回退** |
-| A2 | **AC-F2-3 的第一分量阈值 `ΔFLUSH ≥ 0.8 × FLUSH(off)`** —— ★ **该阈值在任何实现下都不可满足**（证明见 Task 5 判定段）⇒ 与 AC-F2-13 自述事实（「FLUSH 含方向无关的固定分量」）**自相矛盾** | ★ **立即**（本次判定就要用到 ⇒ 已触发） | `openspec/changes/chmem-bp-btb-gshare-poc/tasks.md` 的 **AC-F2-3 条目**（重校准阈值）+ `docs/architecture/bp-btb-gshare-design-brief.md` §5（若门禁进主体） | ★ **≤ 2 个工作日**，且**硬前置**：② 主体开工前必须落 | ★ 实施者**未改任何阈值**；★ 本次判定用**不依赖阈值**的等价证据（`ΔFLUSH == Δcycles` 逐位相等 4/4 + 校验和逐位相等 4/4）⇒ **判定本身不被该阈值阻塞** |
+| A2 | **AC-F2-3 的第一分量阈值 `ΔFLUSH ≥ 0.8 × FLUSH(off)`** —— ★ **该阈值在本简报既定范围内不可能满足**（证明 + 措辞边界见 Task 5 判定段）⇒ 与 AC-F2-13 自述事实（「FLUSH 含方向无关的固定分量」）**自相矛盾** | ★ **立即**（本次判定就要用到 ⇒ 已触发） | `openspec/changes/chmem-bp-btb-gshare-poc/tasks.md` 的 **AC-F2-3 条目**（重校准阈值）+ `docs/architecture/bp-btb-gshare-design-brief.md` §5（若门禁进主体） | ★ **≤ 2 个工作日**，且**硬前置**：② 主体开工前必须落 | ★ 实施者**未改任何阈值**；★ 本次判定用**不依赖阈值**的等价证据（`ΔFLUSH == Δcycles` 逐位相等 4/4 + 校验和逐位相等 4/4）⇒ **判定本身不被该阈值阻塞** |
+| A3 | ★★ **`case_c` 臂的取值**（链式投机缺口，critic 十轮 B-1）—— 简报 §2.1.2 的字面链是 `select(情形C, pc_reg(N+1)+4, …)`，与 §3.4.2 的 `bp-predict` 层组合后 ⇒ **情形 C 会丢掉下一级投机** ⇒ 若分支的 target 本身又是一条分支 ⇒ **走错路 + 错路指令不被 flush ⇒ 副作用泄漏** | ★ **立即**（已触发：这是**功能正确性**缺口，且在 branchbench / vendored ELF 上**结构性不可达** ⇒ 只能靠单元锚兜住） | `docs/architecture/bp-btb-gshare-design-brief.md` §2.1.2 的 select 链（★ MUST 补 `bp_next` 层）+ `openspec/changes/chmem-bp-btb-gshare/design.md`（② 主体） | ★ **≤ 2 个工作日**，且**硬前置**：② 主体开工前必须落 | ★ 实施层已取**正确的一侧**：`case_c` 的值改为 **`bp_next`**（= 当前取指指令的投机）⇒ 抑制 B1 自身 redirect 的同时**保留 B2 的投机** ⇒ ★ 该改动**不改变任何实测数字**（branchbench 4 档 cycles/校验和/FLUSH **逐位不变** ⇒ 该负载不产生链式投机）⇒ ★ 已由单元锚 **R8** 锁定（退回 `pc_plus_4` ⇒ RED）；★ **AC-22 不受影响**（它只要求「多层 select 链 + 具名 trap 项」，不钉各臂取值）⇒ ★ 主体可直接沿用 |
 
 
 
@@ -357,6 +380,7 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
 
 | S3-a | **BP_STATS 是「前缀匹配」⇒ 主体追加的字段**无人锚 | `tools/measure_branchbench.sh:368` 用 `grep -oE 'BP_STATS hit=[0-9]+ miss=[0-9]+ pred_taken=[0-9]+'` —— **前缀**匹配 ⇒ 主体若在行**尾**追加字段（如 `flush=` / `n_correct=` / `n_false=`），该 grep **仍命中** ⇒ **新字段不被任何断言覆盖**（而删改中间字段会 fail-closed ⇒ 只有「尾部追加」这条通道是静默的） | 主体 MUST ①自己补该字段的断言，或 ②把 grep 改成**锚定式**（`…pred_taken=[0-9]+( |$)`）+ 显式列出期望字段集 ⇒ ★ **MUST NOT** 依赖现在的宽松前缀 |
 | S3-b | **`--bp=on --check-baseline` 在主体后必然假红** | CSV 里只有 `bp_mode=off` 的 4 行 ⇒ 主体改 BP 行为后 on/off 的 cycles **必然不同** ⇒ `--bp=on --check-baseline` 会以「**0 行比对 ⇒ MUST NOT 报 PASS**」失败（★ 脚本已 fail-closed，不会假绿，但会**阻塞**） | 主体 MUST **显式重录** `bp_mode=on` 的 4 行基线（含各自的 `workload_sha` / `build_id`）⇒ ★ **MUST NOT** 为了「让它过」而放宽判据（放宽 = 假绿） |
+| ★ S3-d | ★★ **五级链与既有 trap/freeze mux 的合并点** —— 本 change 只落了 **bp-predict / branch-actual / seq** 三层；★ `trap_redirect`（`csr-chmem-trap-pc-jump`）与 `freeze_hold`（PTW stall）两层待 v0.11.0 Phase 3.5 落地 ⇒ ★ **主体 MUST 明确合并点**：trap/freeze MUST 在 **bp-predict 之上**（简报 §3.4.2 的裁决），且 `trap` MUST 能**压过** branch-actual 的纠错 ⇒ ★ **不得**让后来的 trap 实现**重写**本 change 已定的 `case_c = bp_next` 语义（A3）⇒ ★ 主体开工时 MUST 把五级链的**完整**形状写进 `design.md` 并给 grep 锚（AC-22 已要求「具名 trap 项」） |
 | S3-c | **`workload_sha` 只覆盖 `.text` ⇒ 拦不住 harness 漂移 | 基线行的 workload 归属守卫 = `objcopy --only-section=.text` 的哈希（`measure_branchbench.sh:238`）⇒ 主体若改 **link script / `.data` / `.rodata` / harness 代码**（`.text` 之外的任何东西），`.text` 哈希**不变** ⇒ 「基线属于同一份 workload」的保证**失效** ⇒ 基线可能悄悄对应**另一份程序** | 主体 MUST ①扩展哈希覆盖面（至少 `.text` + `.data` + `.rodata`，或直接对整个 ELF 取哈希），或 ②在 CSV 里增加一列**全 ELF 哈希**并与 `.text` 哈希**同时**校验 ⇒ ★ 二选一，**MUST NOT** 沿用「只看 `.text`」 |
 
 ### 测试覆盖（critic B3：此前该插件 **0 case** ⇒ `[chmem]` binary 无回归锚）
@@ -406,7 +430,7 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
 ### ★★ Task 2/3/4 的单元锚（PC-mux 五级链 + 门控式 flush）
 
 `tests/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp`（**点名** `ip/cpu/plugins/ibus_chmem.h`），
-**7 case / 98 assertions 全绿** —— ★ 断的是 **PC-mux 各臂 + flush 门控分量的运行期值**
+**10 case / 132 assertions 全绿** —— ★ 断的是 **PC-mux 各臂 + flush 门控分量的运行期值**
 （读 fetch 节点发布的 `BP_PC` 与 `FLUSH` 两个 payload 的**信号值**）：
 
 | case | 场景 | 断的量 | ★ 抓得住哪类回归 |
@@ -418,6 +442,9 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
 | `R5_case_C_speculation_correct_no_flush` | 预测 taken / 实际 taken / **目标一致** | PC = `P+4k`（**不是** br_target）；FLUSH 第 2 拍起恒 **0** | ★★ **门控式 flush 的核心锚**：去掉 `!spec_ok` 或退回 `FLUSH = taken_buf` ⇒ FLUSH 变 1 ⇒ RED；★ 删 `case_c` 臂 ⇒ PC 变 P ⇒ RED |
 | `R6_case_F_target_mismatch_flushes` | 预测 taken 到 P / 实际 taken 到 **T≠P** | PC 恒 = T（**不是** P+4）；FLUSH 恒 1 | ★★ 与 R5 对照即证明「`case_c` 必须比较目标」：忽略目标一致性 ⇒ PC 变 P+4 且 FLUSH 变 0 ⇒ RED |
 | `R7_spec_ok_is_case_c_only` | ★ **时变**脚本：第 0~1 拍预测 taken、第 2 拍起预测 not-taken | 第 3 拍 FLUSH = 0 | ★★ **`spec_ok` MUST NOT 再与 `pred_eff` 相与**（`pred_eff` 是**另一条指令**的条件 ⇒ 误与 ⇒ 过度 flush ⇒ 校验和错 —— 端到端实测 m0 `93≠103`） |
+| ★★ `R8_chained_speculation_keeps_bp_next` | ★★ **链式投机**：B1（情形 C）的 target P 处**本身又是一条被正确预测 taken 的分支** B2（预测→Q） | PC 第 2 拍 = **Q**（不是 P+4）；FLUSH 全 0 | ★★ **critic 十轮 B-1**：`case_c` 臂写成 `pc_plus_4` ⇒ B2 的投机被丢 ⇒ **走错路 + 错路指令不被 flush ⇒ 副作用泄漏** ⇒ RED（★ 该场景在 branchbench / vendored ELF 上**结构性不可达** ⇒ 端到端抓不住） |
+| `R9_case_E_btb_miss_still_flushes` | ★ **情形 E**：BP **已注册**但 `pred_valid=0`（BTB miss ⇒ 未投机）而实际 taken | PC 恒 = 实际目标；FLUSH 恒 1 | ★ AC-F2-17 ③ 的真实锚（R1/R2 只是「BP **未注册**」路径 ⇒ 不同代码分支）；★ 变异「`pred_valid` 被忽略」⇒ RED |
+| `R10_pred_valid_zero_blocks_speculation` | `pred_valid=0` 而 `pred_taken=1`（BTB miss 时 PHT 读数是垃圾） | PC 逐拍顺序取指；FLUSH 恒 0 | ★★ **`pred_eff` MUST 带 `pred_valid_now`**（此前 7 个 case 全部 `valid ⇒ taken` 同真假 ⇒ 该变异抓不住 ⇒ 现由 R10 兜住） |
 
 ★ **为什么必须有这个文件**（branchbench 端到端判据不够）：① 端到端每次 ~50s，不能当快速回归；
 ② 端到端只能**整体**判红，无法隔离「哪条臂 / 哪个门控分量」出错；③ **FLUSH 门控是 DUT 内部量**，
@@ -432,7 +459,7 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
   （本项目用 `ch_reg(value, name)` 构造 ⇒ `rst_val = nullptr` ⇒ **0**）⇒ `pc` 被清 0 ⇒
   `set_initial_pc` 形同虚设 ⇒ ★ 同一事实见 `tests/cpu/test_cpu_chmem_vendored_elf.cpp:156` 的注释。
 
-★ **变异对照（★ 11 个单点变异，全部实测；★ 「被抓住」= 目标 case RED）**：
+★ **变异对照（★ 13 个单点变异，全部实测；★ 「被抓住」= 目标 case RED）**：
 
 | # | 变异（单点删除 / 改写） | 结果 | 被谁抓住 |
 |---|---|---|---|
@@ -447,8 +474,10 @@ FLUSH(off) = N_fixed + N_taken        （N_fixed ≈ 10000/档 = 方向无关的
 | M9 | `spec_ok_buf <<= (pred_eff & case_c)`（★ **本次修过的真 bug**） | **RED** | R7 |
 | M10 | `case_a` 臂误用 `pc_plus_4`（而非 `pc_lag_plus_4`） | **RED** | R3 |
 | M11 | `case_c` 忽略目标一致性（`pv & pt & br_taken`）⇒ 把情形 F 误判为 C | **RED** | R6 |
+| ★★ M12 | ★★ `case_c` 臂退回 `pc_plus_4`（= 简报 §2.1.2 的字面写法）⇒ **critic 十轮 B-1 的本体** | **RED** | R5, R8 |
+| M13 | `pred_eff` 丢掉 `pred_valid_now`（`pred_valid & pred_taken` → `pred_taken`） | **RED** | R10 |
 
-⇒ ★ **10/11 被抓住**；唯一未被抓住的 M3 是**可证明冗余**的一臂（已登记，非漏网）。
+⇒ ★ **12/13 被抓住**；唯一未被抓住的 M3 是**可证明冗余**的一臂（已登记，非漏网）。
 
 ### 回归（★ 用**重 build 后**的 binary —— 修正 critic B5 指出的「binary 过期」）
 

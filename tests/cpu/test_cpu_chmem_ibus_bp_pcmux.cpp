@@ -306,11 +306,16 @@ TEST_CASE("ibus_bp_pcmux_R4_case_B_redirects_to_actual_target",
 
 // ═══════════════════════════════════════════════════════════════════════════
 // R5 | **情形 C**（预测 taken / 实际 taken / 目标一致 ⇒ 投机被证明正确）
-//     ⇒ PC = **pc+4**（从投机目标 P 顺序往下），**不是** br_target
+//     ⇒ PC = **bp_next**（= 当前取指指令的投机；本夹具下 = 预测目标 P）
 //     ⇒ FLUSH = **0**（投机路径是对的 ⇒ 无需抑制错路 ⇒ 门控生效）
-//     ★★ 这是**门控式 flush** 的核心锚：
+//     ★★ 门控式 flush 的核心锚：
 //       变异「去掉 `!spec_ok`」或「退回 FLUSH = taken_buf」⇒ flush 变 1 ⇒ RED；
-//       变异「删掉 case_c 臂」⇒ pc 变 P ⇒ RED。
+//       变异「删掉 case_c 臂」⇒ pc 变 br_target ⇒ RED；
+//       变异「case_c 臂退回 `pc_plus_4`」（= 简报 §2.1.2 的字面写法）
+//         ⇒ pc 变 P+4 ⇒ RED ★★（这是 critic 第十轮 B-1 的锚）
+//     ★ 本夹具的预测是**常量**（「任何指令都被预测 taken→P」）⇒ 情形 C 下
+//       bp_next = P ⇒ PC 自环于 P（不是顺序推进）—— ★ 这正是
+//       「case_c MUST 保留 bp_next」的语义后果。
 // ═══════════════════════════════════════════════════════════════════════════
 TEST_CASE("ibus_bp_pcmux_R5_case_C_speculation_correct_no_flush",
           "[cpu][chmem][bp][pcmux]") {
@@ -322,8 +327,7 @@ TEST_CASE("ibus_bp_pcmux_R5_case_C_speculation_correct_no_flush",
   auto tr = run(ctx, {{1000u, true, kPredTgt, true, true, kPredTgt}},
                 /*with_bp=*/true, 6);
   expect_seq(tr.pc,
-             {kPredTgt, kPredTgt + 4, kPredTgt + 8, kPredTgt + 12, kPredTgt + 16,
-              kPredTgt + 20},
+             {kPredTgt, kPredTgt, kPredTgt, kPredTgt, kPredTgt, kPredTgt},
              "R5 pc");
   // 第 1 拍 case_c 尚未成立（还没有上一拍记录）⇒ flush=1；
   // 第 2 拍起 spec_ok=1 ⇒ 门控生效 ⇒ flush=0
@@ -371,16 +375,91 @@ TEST_CASE("ibus_bp_pcmux_R7_spec_ok_is_case_c_only",
                 {{2u, true, kPredTgt, true, true, kPredTgt},
                  {1000u, true, kPredTgt, true, false, kPredTgt}},
                 /*with_bp=*/true, 6);
-  // next_pc(0)=P; next_pc(1)=P+4（case_c）; next_pc(2)=P+8（case_c）;
+  // next_pc(0)=P; next_pc(1)=P（case_c ⇒ 保留 bp_next；本夹具的预测是常量
+  //   ⇒ bp_next=P）；next_pc(2)=P+4（case_c，但本拍 pred_eff=0 ⇒ bp_next=pc+4）；
   // next_pc(3)=P（case_b：上一拍预测变 not-taken ⇒ 纠到实际目标 P）
   expect_seq(tr.pc,
-             {kPredTgt, kPredTgt + 4, kPredTgt + 8, kPredTgt, kPredTgt,
+             {kPredTgt, kPredTgt, kPredTgt + 4, kPredTgt, kPredTgt,
               kPredTgt},
              "R7 pc");
   // FLUSH(1)=1（case_c(0)=0）; FLUSH(2)=0（case_c(1)=1 ⇒ spec_ok=1）
   // FLUSH(3)=0 ⇒ ★★ 关键：case_c(2)=1 ⇒ spec_ok=1 ⇒ 门控生效
   //   （若 spec_ok 被误与 pred_eff(=0) 相与 ⇒ 此拍 flush=1 ⇒ RED）
   expect_seq(tr.flush, {1, 0, 0, 1, 1, 1}, "R7 flush");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R8 | ★★ **链式投机**（critic 第十轮 B-1 的锚）
+//     场景：B1 在地址 X（预测 taken→P、实际 taken→P ⇒ 情形 C），
+//           而 **P 处本身又是一条被正确预测 taken 的分支** B2（预测→Q）。
+//     ⇒ 正确行为：B1 的 redirect 已被抑制，但 **B2 的投机 MUST 保留**
+//        ⇒ pc_reg(N+1) = Q（不是 P+4）。
+//     ⇒ ★ 若 case_c 臂写成 `pc_plus_4`（简报 §2.1.2 的字面写法）⇒ B2 的投机
+//        被丢掉 ⇒ PC 顺序走到 P+4/P+8… ⇒ **Q 永不被取**（走错路）且
+//        `case_c` 使 `spec_ok=1` ⇒ 错路指令**不被 flush** ⇒ 副作用泄漏。
+//     ★ 该场景在 branchbench 4 档与 vendored ELF 上**结构性不可达**
+//       （每 iter 只 1 条条件分支、其 target 非分支）⇒ MUST 有单元锚。
+// ═══════════════════════════════════════════════════════════════════════════
+TEST_CASE("ibus_bp_pcmux_R8_chained_speculation_keeps_bp_next",
+          "[cpu][chmem][bp][pcmux]") {
+  ch::core::context ctx("ibus_bp_pcmux_r8");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  auto tr = run(ctx,
+                {{1u, false, 0, true, true, kPredTgt},        // tick0: 预测 init 处 taken→P
+                 {2u, true, kPredTgt, true, true, kActTgt},  // tick1: B1 实际 taken→P（情形 C）
+                                                               //        + 预测 P 处 taken→Q
+                 {3u, true, kActTgt, false, false, 0},       // tick2: B2 实际 taken→Q
+                 {1000u, false, 0, false, false, 0}},
+                /*with_bp=*/true, 4);
+  // next_pc(0)=P（投机）；next_pc(1)=**Q**（case_c ⇒ 保留 bp_next）；
+  // next_pc(2)=Q+4（B2 已解析 ⇒ 顺序推进）
+  expect_seq(tr.pc, {kPredTgt, kActTgt, kActTgt + 4, kActTgt + 8}, "R8 pc");
+  // 全程无错路指令 ⇒ flush 恒 0
+  expect_seq(tr.flush, {0, 0, 0, 0}, "R8 flush");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R9 | **情形 E**（BP **已注册**但 `pred_valid=0` ⇒ BTB miss ⇒ 未投机；
+//                 而实际 taken）⇒ fall-through 是错路 ⇒ **MUST flush**
+//     ★ 与 R2（BP **未注册**）是**不同的代码路径**：
+//       R2 走 `payloads().has(...) == false`；R9 走「payload 在、但值为 0」。
+//     ★ 这是 AC-F2-17 ③ 的真实锚（R1/R2 只是「BP 未注册」路径）。
+// ═══════════════════════════════════════════════════════════════════════════
+TEST_CASE("ibus_bp_pcmux_R9_case_E_btb_miss_still_flushes",
+          "[cpu][chmem][bp][pcmux]") {
+  ch::core::context ctx("ibus_bp_pcmux_r9");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  // ★ BP 已注册（with_bp=true ⇒ payload 存在）但 `pred_valid=0` ⇒ 未投机
+  auto tr = run(ctx, {{1000u, true, kActTgt, false, false, 0}},
+                /*with_bp=*/true, 6);
+  expect_seq(tr.pc, {kActTgt, kActTgt, kActTgt, kActTgt, kActTgt, kActTgt},
+             "R9 pc");
+  expect_seq(tr.flush, {1, 1, 1, 1, 1, 1}, "R9 flush");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R10 | `pred_valid=0` ⇒ **预测臂 MUST NOT 生效**（哪怕 `pred_taken=1`）
+//     ★ BTB miss 时 PHT 读数是垃圾 ⇒ `pred_taken` 可能为 1 ⇒ MUST 被
+//       `pred_valid` 屏蔽 ⇒ 否则会跳到一个**从未被预测过**的目标。
+//     ★ 这是「`pred_eff` 丢掉 `pred_valid_now`」这个变异的唯一锚
+//       （此前 7 个 case 全部 `valid ⇒ taken` 同真假 ⇒ 该变异抓不住）。
+// ═══════════════════════════════════════════════════════════════════════════
+TEST_CASE("ibus_bp_pcmux_R10_pred_valid_zero_blocks_speculation",
+          "[cpu][chmem][bp][pcmux]") {
+  ch::core::context ctx("ibus_bp_pcmux_r10");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  auto tr = run(ctx, {{1000u, false, kActTgt, false, true, kPredTgt}},
+                /*with_bp=*/true, 4);
+  // 预测臂 MUST 不生效 ⇒ 逐拍顺序取指
+  expect_seq(tr.pc, {kInitPc + 4, kInitPc + 8, kInitPc + 12, kInitPc + 16},
+             "R10 pc");
+  expect_seq(tr.flush, {0, 0, 0, 0}, "R10 flush");
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM

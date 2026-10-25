@@ -319,9 +319,26 @@ class IBusPlugin : public PluginBase {
     //    Phase 3.5 落地后**外包**在 branch 之上 —— 见 brief §3.4.2）────────
     //   ★ 顺序（低 → 高）: seq → bp 投机 → actual taken → 情形 C → 情形 B → 情形 A
     const ch::core::ch_bool pred_eff = pred_valid_now & pred_taken_now;
-    ch::core::ch_uint<32> next_pc = select(pred_eff, pred_target_now, pc_plus_4);
+    // ★★ `bp_next` = 「**当前取指指令**（pc_reg(N)）的投机结果」——
+    //   pc_reg(N) 若被预测 taken ⇒ 取预测目标；否则顺序推进 pc+4。
+    //   ★ 它在情形 C 里**必须**被保留（见下）。
+    ch::core::ch_uint<32> bp_next = select(pred_eff, pred_target_now, pc_plus_4);
+    ch::core::ch_uint<32> next_pc = bp_next;
     next_pc = select(br_taken, br_target, next_pc);
-    next_pc = select(case_c, pc_plus_4, next_pc);
+    // ★★ 情形 C（投机被证明正确 ⇒ 抑制**本分支自身**的 redirect）
+    //   ⇒ 抑制 `br_taken` 臂（B1 已在上拍 redirect 过 ⇒ 不能再 redirect 一次）
+    //   ⇒ ★★ 但**必须保留 `bp_next`**（= pc_reg(N) 处那条指令的投机）——
+    //   若这里写 `pc_plus_4`（简报 §2.1.2 的字面写法），则：
+    //     B1 预测 taken→T 且实际 taken→T（情形 C），而 **T 处本身又是一条
+    //     被正确预测 taken 的分支** B2（预测→Q）⇒
+    //     `pc_plus_4` 会把 B2 的投机 **Q 丢掉** ⇒ pc 顺序走到 T+4/T+8…
+    //     ⇒ **Q 永不被取**（程序走错路）⇒ 且 T+4 是错路指令而
+    //     `case_c` 使 `spec_ok=1` ⇒ taken 分量被门控掉 ⇒ **该错路指令不被 flush**
+    //     ⇒ **store/写回副作用泄漏** ⇒ 校验和发散。
+    //   ⇒ 该洞在 branchbench 4 档与 vendored ELF 上**结构性不可达**（每 iter
+    //     只 1 条条件分支、其 target 非分支）⇒ MUST 有单元锚兜住（见
+    //     `tests/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp` 的 R8）。
+    next_pc = select(case_c, bp_next, next_pc);
     next_pc = select(case_b, br_target, next_pc);
     next_pc = select(case_a, pc_lag_plus_4, next_pc);
     pc_reg <<= next_pc;
