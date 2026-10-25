@@ -80,6 +80,15 @@ std::uint32_t cf_read_pc(void* top) {
   return static_cast<Vtop*>(top)->rootp->top__DOT___pc;
 }
 
+// FLUSH 事件数 (chmem-bp-btb-gshare-poc Task 4)
+// ★ FLUSH 是 DUT 内部 payload ⇒ host 不可直接见 ⇒ 计数在 ibus_chmem.h 内部
+//   以 ch_reg 累加 ⇒ CppHDL codegen 出顶层 Verilog 信号 `flush_count`
+//   (已实测: 生成物含 `logic [31:0] flush_count;` + always_ff 更新)
+// ★ ch_reg 有 1 拍延迟 ⇒ 读到的是「上一拍末」的累计值（差 1 拍，可接受）。
+std::uint32_t cf_read_flush_count(void* top) {
+  return static_cast<Vtop*>(top)->rootp->top__DOT__flush_count;
+}
+
 // Run the CPU model: reset pulse (1 cycle) then toggle default_clock until
 // dmem[tohost] becomes 1 or max_cycles elapses. Prints the result line and
 // returns 0 on tohost=1, 1 otherwise.
@@ -194,6 +203,9 @@ int cf_run_sim_stats(void* top, std::uint32_t max_cycles, const char* elf_name,
   if (out_tohost) *out_tohost = tohost_raw;
   if (out_dropped) *out_dropped = dropped;
   if (out_pc_changes) *out_pc_changes = pc_changes;
+  // ★ FLUSH 事件数 (DUT 内部计数; 1 拍延迟)
+  std::printf("FLUSH_COUNT=%u\n",
+              static_cast<Vtop*>(top)->rootp->top__DOT__flush_count);
   const bool done = (done_bit != 0);
   const bool pass = done && (tohost_raw == 1);
   const char* name = elf_name ? elf_name : "?";

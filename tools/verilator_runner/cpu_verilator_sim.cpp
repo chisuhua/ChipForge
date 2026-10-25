@@ -111,6 +111,12 @@ struct Options {
   bool stats = false;
   std::uint32_t stats_base = 0x80000000u;
   std::uint32_t stats_len = 256;
+  // chmem-bp-btb-gshare-poc Task 1/4: BP 开关面
+  //  - --no-bp: 关闭 BP（默认**开**）★ MUST NOT 保留 --enable-bp（与默认开冗余
+  //    ⇒ 会产生「两者同给时谁优先」的歧义）
+  //  - --btb-entries N: 逻辑条目数 M ∈ {16,32,64,128,256}（越界 fail-fast）
+  bool enable_bp = true;
+  std::uint32_t btb_entries = 256;
 };
 
 bool parse_args(int argc, char** argv, Options& opts) {
@@ -137,6 +143,10 @@ bool parse_args(int argc, char** argv, Options& opts) {
           std::strtoul(argv[++i], nullptr, 0));
     } else if (a == "--stats-len" && i + 1 < argc) {
       opts.stats_len = static_cast<std::uint32_t>(std::atoi(argv[++i]));
+    } else if (a == "--no-bp") {
+      opts.enable_bp = false;
+    } else if (a == "--btb-entries" && i + 1 < argc) {
+      opts.btb_entries = static_cast<std::uint32_t>(std::atoi(argv[++i]));
     } else if (a == "--help" || a == "-h") {
       std::printf("usage: %s --elf <path> [flags]\n", argv[0]);
       std::printf("  --elf            vendored rv32ui-p-* ELF path (required)\n");
@@ -151,6 +161,8 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::printf("                   INCLUDING speculative fetches - NOT a fetch/retire count)\n");
       std::printf("  --stats-base <h> histogram window base (default 0x80000000)\n");
       std::printf("  --stats-len <n>  histogram slots of 4 bytes (default 256)\n");
+      std::printf("  --no-bp          disable the branch predictor (default: enabled)\n");
+      std::printf("  --btb-entries <n> BP logical entries N in {16,32,64,128,256}\n");
       std::printf("\n");
       std::printf("Note: --enable-cache requires L1Cache CH_MEM (see change\n");
       std::printf("      verilator-l1cache-e2e-coverage in wave4 P2 placeholder).\n");
@@ -173,7 +185,9 @@ bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf)
       &ctx, nullptr, ch_uint<32>(kElfBase), true, elf,
       opts.enable_mmu,
       opts.mmu_mode,
-      opts.enable_cache);
+      opts.enable_cache,
+      opts.enable_bp,
+      opts.btb_entries);
   if (!pb) {
     std::fprintf(stderr, "build_cpu failed\n");
     return false;
@@ -229,6 +243,19 @@ int main(int argc, char** argv) {
   Options opts;
   if (!parse_args(argc, argv, opts)) return 2;
 
+  // ── BP 开关面的合法性检查 (fail-fast; 不得静默 clamp) ────────────────
+  if (opts.btb_entries != 16 && opts.btb_entries != 32 && opts.btb_entries != 64 &&
+      opts.btb_entries != 128 && opts.btb_entries != 256) {
+    std::fprintf(stderr,
+                 "--btb-entries must be one of {16,32,64,128,256} (got %u)\n",
+                 opts.btb_entries);
+    return 2;
+  }
+  // ★ 生效值回显 (stderr) ⇒ 测量脚本据此断言「flag 确实生效」
+  //   (否则「flag 未生效却测出无差异」的假绿通道是开着的)
+  std::fprintf(stderr, "BP=%s btb_entries=%u\n", opts.enable_bp ? "on" : "off",
+               opts.btb_entries);
+
   auto elf = load_elf_file(opts.elf_path);
   if (elf.size() < 52 || elf[0] != 0x7F || elf[1] != 'E' || elf[2] != 'L' ||
       elf[3] != 'F') {
@@ -279,6 +306,10 @@ int main(int argc, char** argv) {
     rc = run_stats(top, opts.max_cycles, elf_name.c_str(), hist.data(),
                    opts.stats_len, opts.stats_base, &cycles, &tohost,
                    &dropped, &pc_changes);
+    // ★ FLUSH 事件数（DUT 内部计数器; 1 拍延迟 ⇒ 差 1 拍）
+    auto* read_flush = reinterpret_cast<std::uint32_t (*)(void*)>(
+        dlsym(handle, "cf_read_flush_count"));
+    const std::uint32_t flush_count = read_flush ? read_flush(top) : 0u;
     // One line per sampled PC value (dense form; the host tool aggregates).
     // ⚠️ NOT a fetch count — the sampled stream includes non-architectural
     //    PC values (mechanism unconfirmed); relative/cross-mode use only.
@@ -292,6 +323,8 @@ int main(int argc, char** argv) {
     std::printf("PC_HIST_TOTAL distinct=%u dropped=%u window=0x%08x+%u\n",
                 distinct, dropped, opts.stats_base, opts.stats_len);
     std::printf("PC_STATS cycles=%u pc_changes=%u\n", cycles, pc_changes);
+    // ★ FLUSH 事件数（★ 语义：错路指令被抑制的次数 —— 由 DUT 内部计数器给出）
+    std::printf("FLUSH_STATS count=%u\n", flush_count);
   } else {
     rc = run_sim(top, opts.max_cycles, elf_name.c_str());
   }

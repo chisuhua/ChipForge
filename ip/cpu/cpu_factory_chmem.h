@@ -50,6 +50,7 @@ using namespace cf::cpu::arch::riscv;
 
 // branch_chmem.h 和 hazard_chmem.h 在各自命名空间内, 放在 using 之后确保可见
 #include "ip/cpu/plugins/branch_chmem.h"
+#include "ip/cpu/plugins/branch_predictor_chmem.h"
 #include "ip/cpu/plugins/hazard_chmem.h"
 #ifndef CF_PLUGIN_USE_CH_MEM
 #include "ip/cpu/plugins/mmu_exception_handler.h"
@@ -104,7 +105,13 @@ class CpuFactoryChmem {
       const std::vector<uint8_t>& elf_image = {},
       std::optional<bool> enable_mmu = std::nullopt,
       std::optional<std::string> mmu_mode = std::nullopt,
-      std::optional<bool> enable_cache = std::nullopt) {
+      std::optional<bool> enable_cache = std::nullopt,
+      // chmem-bp-btb-gshare-poc Task 1: BP 开关面
+      //  - enable_bp: **普通 bool**（默认 true）—— 不用 optional<bool>:
+      //    与 enable_mmu/enable_cache 的三态语义不同, 避免 nullopt 与「显式关闭」撞车
+      //  - btb_entries: optional<uint32_t>（运行期逻辑条目数 M ∈ {16..256}）⇒ **需要**三态
+      bool enable_bp = true,
+      std::optional<std::uint32_t> btb_entries = std::nullopt) {
     (void)memory;
 
     // Phase 6d P2 fail-fast: L1Cache CH_MEM 实装 owner 未分配 (wave4 P2 placeholder).
@@ -326,9 +333,23 @@ class CpuFactoryChmem {
       }
     }
 
+    // ★ chmem-bp-btb-gshare-poc Task 1: BP 插件注册
+    //   注册位 = IBusPlugin **之前**（BP 在 fetch NORMAL 查表, 依赖 IBus 写的 BP_PC;
+    //   但 BP_PC 是 **payload** ⇒ 生产者(fetch) 与消费者(fetch) 的保序由
+    //   canonical_stage_order (fetch NORMAL 内按注册序) 决定 ⇒
+    //   ★ BP MUST 注册在 IBusPlugin **之后**（同 stage 同 phase 内, 生产者先写）
+    //   ⇒ 实际注册放在 IBusPlugin 之后（见下）。
     pb->register_plugin(std::make_unique<Decoder>());
     pb->register_plugin(std::make_unique<Hazard>());
     pb->register_plugin(std::move(ibus));
+    // ★ BP 注册在 IBusPlugin **之后**（同 stage "fetch" 同 phase NORMAL:
+    //   生产者 IBus 写 BP_PC 必须先于消费者 BP 查表 ⇒ 依赖注册序
+    //   ⇒ ★ 这是**同 stage 同 phase** 的保序, 与跨 stage 的 canonical 序不同)
+    if (enable_bp) {
+      const std::uint32_t entries = btb_entries.value_or(256u);
+      pb->register_plugin(
+          std::make_unique<cf::cpu::plugins::BranchPredictorPluginChmem<T>>(entries));
+    }
     pb->register_plugin(std::make_unique<RegFile>());
     pb->register_plugin(std::make_unique<IntAlu>());
     // csr-chmem-pipeline-integration B.1: 第 8 plugin (RegFile/IntAlu 之后,

@@ -21,6 +21,7 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/core/payload_common.h"
+#include "ip/cpu/plugins/branch_predictor_chmem.h"
 #include "ip/cpu/arch/riscv/payload_riscv.h"
 #include "ip/cpu/plugins/branch_chmem.h"
 #include "ip/mmu/tlm/mmu_keys.h"  // mmu-chmem-pipeline-integration Phase 2 Task 2.1 (C2): sv32 消费
@@ -79,6 +80,11 @@ class IBusPlugin : public PluginBase {
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pc_reg_;
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pc_lag_reg_;
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_bool>>    br_taken_buf_;
+  // ★ chmem-bp-btb-gshare-poc Task 4: FLUSH 事件数计数器
+  //   FLUSH 是 DUT 内部 payload (host 不可见) ⇒ 计数必须在此处 (ip/) 产生。
+  //   承载为 ch_reg<ch_uint<32>> ⇒ CppHDL codegen 出 Verilog 信号 `flush_count`
+  //   ⇒ host 经 `--public-flat-rw` 读 `top__DOT__flush_count`。
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> flush_count_;
 
   // ch_mem aread/sread both have 1-cycle latency in the simulator: the data
   // proxy at cycle N holds imem[address presented at cycle N-1]. fetch.PC
@@ -107,6 +113,13 @@ class IBusPlugin : public PluginBase {
       pc_reg_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
           initial_pc_, "pc");
     return *pc_reg_;
+  }
+
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_flush_count() {
+    if (!flush_count_)
+      flush_count_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "flush_count");
+    return *flush_count_;
   }
 
   ch::core::ch_reg<ch::core::ch_bool>& get_br_taken_buf() {
@@ -165,6 +178,12 @@ class IBusPlugin : public PluginBase {
     n->operator()(KT::INSTRUCTION) = instr;
     n->operator()(KT::PC)          = pc_lag_val;
     n->operator()(FLUSH)           = br_taken_buf;
+    // ── BP 的取指地址 (chmem-bp-btb-gshare-poc Task 1) ──────────────────
+    // ★ KT::PC 是 **pc_lag**（上一拍地址）⇒ BP 预测需要 **pc_reg 本拍值**
+    //   （BP 预测的是「本拍正在取的那条分支」⇒ 提前一拍）。
+    // ★ 写入 BP_PC 供 BranchPredictorPluginChmem 在同一拍查表。
+    // ★ 本 PoC **不改变任何行为**（BP 的输出尚未被 PC-mux 消费）。
+    n->operator()(cf::cpu::plugins::BP_PC) = cf::plugin::uint_t<32>(pc_val);
     pc_lag <<= pc_val;
   }
 
@@ -182,6 +201,21 @@ class IBusPlugin : public PluginBase {
     auto next_pc   = select(br_taken, br_target, pc_plus_4);
     pc_reg <<= next_pc;
     get_br_taken_buf() <<= br_taken;
+
+    // ── FLUSH 事件计数 (chmem-bp-btb-gshare-poc Task 4) ────────────────
+    // ★ FLUSH 是 DUT 内部 payload ⇒ host 不可见 ⇒ 在此累加。
+    // ★ 计数的是**本拍生效的 flush**（即 fetch 阶段发布的 FLUSH 值）——
+    //   它是 `br_taken_buf`（上拍 taken）⇒ 与「错路指令被抑制」同拍。
+    // ★ ch_reg 是 1 拍延迟 ⇒ host 读到的是「上一拍末」的累计值（差 1 拍，可接受）。
+    {
+      auto* fch = pb.node_of_logic_stage("fetch").get();
+      auto flush_now = fch ? fch->operator()(FLUSH) : ch::core::ch_bool(false);
+      auto& fc = get_flush_count();
+      ch::core::ch_uint<32> fc_val(fc);
+      auto inc = select(flush_now, ch::core::ch_uint<32>(ch::core::ch_literal<1, 32>{}),
+                        ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}));
+      fc <<= fc_val + inc;
+    }
   }
 };
 

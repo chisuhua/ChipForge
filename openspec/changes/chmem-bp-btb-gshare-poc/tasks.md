@@ -73,8 +73,43 @@ depends_on:
 任何「上报 architect / 待裁决」句 MUST 同句给出 **① 触发阈值 ② 落点文件 ③ 可判定时限**；MUST NOT 以「等待回复」结束本 change。
 
 ## 实测留证
+## 实测留证（2026-10-25，branch `feature/chmem-bp-btb-gshare`）
 
-（实施后填写）
+### Task 1（查表 + payload 产出，**不改 PC-mux ⇒ 零行为风险**）
+
+| 项 | 结果 |
+|---|---|
+| BP plugin | `ip/cpu/plugins/branch_predictor_chmem.h`（新）：BTB `ch_mem<ch_uint<64>, 256>` 62b 编码 + PHT `ch_mem<ch_uint<2>, 256>` |
+| 挂钩点 | `at_stage("fetch", NORMAL)` ⇒ 查表 0 拍（`aread`）⇒ 与 branch LATE 同拍可消费 |
+| PC 来源 | ★ `ibus_chmem.h` 在 fetch NORMAL 写 **`BP_PC` payload**（= `pc_reg` **本拍值**）—— ★ `KT::PC` 是 `pc_lag`（上一拍地址）⇒ 预测需要本拍值 |
+| 预测信号 | ★ 全部为**活节点**（`ch_uint<1>(ch_bool)` 走上游 `bool_to_uint` 分支 ⇒ 复用同一 `impl()` 指针）⇒ **MUST NOT** 转 C++ 标量（否则折成 elaboration 期常量 ⇒ 假阴性） |
+| 注册位 | ★ BP 注册在 **IBusPlugin 之后**（同 stage "fetch" 同 phase NORMAL ⇒ 生产者先写 `BP_PC`） |
+| **零退化验证** | ★ BP 注册后 4 档 cycles **逐位不变**（86034/88034/86534/87056）· checksum 不变 |
+
+### Task 4（BP 开关面 + FLUSH 计数）
+
+| 项 | 结果 |
+|---|---|
+| CLI | `--no-bp`（默认开）· `--btb-entries N`（∈ {16,32,64,128,256}，**越界 fail-fast rc=2**） |
+| 生效值回显 | stderr `BP=on/off btb_entries=N` ⇒ 测量脚本可断言「flag 确实生效」（堵「flag 未生效却测出无差异」的假绿通道） |
+| FLUSH 计数 | `ibus_chmem.h` 内 `ch_reg<ch_uint<32>> flush_count` 累加 ⇒ Verilog 顶层信号 `flush_count` ⇒ host 经 `--public-flat-rw` 读 |
+
+### ★★ FLUSH 计数器的独立交叉验证（★ 关键：它同时是 `cycles − pc_changes` 的**第二证据源**）
+
+| mode | FLUSH_COUNT | Δ vs m0 | **独立复算** taken/iter | Δ vs m0 |
+|---|---|---|---|---|
+| 0 (not-taken) | 12000 | 0 | 0.000 | 0 |
+| 1 (taken) | 14000 | **2000** | 1.000 | **2000** ✓ |
+| 2 (2/8) | 12500 | **500** | 0.250 | **500** ✓ |
+| 3 (伪随机) | 13022 | **1022** | 0.511 | **1022** ✓ |
+
+⇒ ★ **FLUSH 计数器的 Δ 与「由源码语义独立算出的 taken 数」逐位相等** ⇒ 计数器**正确**。
+⇒ ★★ **附带结论**：`cycles − pc_changes` 的 Δ = 2000/500/1022 **与 FLUSH 计数器的 Δ 完全一致**
+   ⇒ 二者**互相印证** ⇒ ★ **`cycles − pc_changes` 的 Δ 可信**（但**其绝对值**仍含 m0 的
+   固定基线 12000 ⇒ **不是** taken 总数 —— 与 critic 三轮 B-1 的结论一致，**不矛盾**）。
+⇒ m0 的基线 12000 = 6 × 2000 iter ⇒ 每 iter **固定 6 次 flush**（来自 `branch_sel` 内的
+   `j` 等与方向无关的固定结构）⇒ ★ 这解释了为何「绝对差值」不等于 taken 数。
+
 
 
 ## ★ builder 开工须知（★ **逐条抄进本 change**，不跨 change 引用）
