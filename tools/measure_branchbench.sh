@@ -72,6 +72,7 @@ usage() { awk '/^# 用法:/{f=1} f && /^set -uo/{exit} f{sub(/^# ?/,""); print}'
 #      **最容易被误敲**的组合会只跑第一个 ⇒ 给出一个**不含任何方向性判据的 PASS**；
 #   ③ `--bp=on|off` 可与模式组合（brief v2.2 §5.3 定稿的用法 `--check-baseline --bp=on`）。
 MODE_ARG=""
+BP_ARG_SET=0
 for arg in "$@"; do
   case "$arg" in
     ""|--measure)
@@ -84,8 +85,12 @@ for arg in "$@"; do
     --check-bp-direction)
       [ -z "$MODE_ARG" ] || fail_plain "模式重复: '$*' (模式只接受一个)"
       MODE_ARG=bpdir ;;
-    --bp=on) BP_MODE=on ;;
-    --bp=off) BP_MODE=off ;;
+    --bp=on|--bp=off)
+      # ★ 重复给 --bp ⇒ MUST fail（否则「后者静默生效」⇒ 脚本 `--bp=on ... --bp=off`
+      #   会跑成 BP=off 却让人以为验的是 BP=on ⇒ 假绿 —— 与「参数拼错静默降级」同类）
+      [ "$BP_ARG_SET" -eq 0 ] || fail_plain "--bp 重复: '$*' (只能给一次)"
+      BP_ARG_SET=1
+      BP_MODE="${arg#--bp=}" ;;
     *) fail_plain "未知参数: '$arg' (见 --help)" ;;
   esac
 done
