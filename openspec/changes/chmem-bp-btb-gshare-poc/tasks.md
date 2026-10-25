@@ -183,7 +183,7 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 
 | 锚 | 位置 | 判据 | 抓得住 |
 |---|---|---|---|
-| **单元级** | `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（`[bp][plugin]`，**10 case / 150 assertions**） | 直接打**真实插件**，断言 **payload 的值** | BTB 写路径 / 方向学习 / flush 门控 / 饱和回绕 / branch 侧 fail-fast / 取指地址是否活 |
+| **单元级** | `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（`[bp][plugin]`，**10 case / 160 assertions**） | 直接打**真实插件**，断言 **payload 的值** | BTB 写路径 / 方向学习 / flush 门控 / 饱和回绕 / branch 侧 fail-fast / 取指地址是否活 |
 | **系统级** | `tools/measure_branchbench.sh --check-bp-direction` ⇒ ctest `branchbench_bp_direction` | 4 档 BP=on：hit>0 · 校验和与 BP=off 基线**逐位相等** · m1 预测率 ≥90% · m2 预测率 ≤90% | BTB 惰性 / 方向学习失效 / 饱和折常量 |
 
 ★ **两处锚都是「本地锚」, 不是「CI 保护」**（critic B-1 —— ★ 上一轮 commit message
@@ -241,7 +241,7 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 ### 测试覆盖（critic B3：此前该插件 **0 case** ⇒ `[chmem]` binary 无回归锚）
 
 `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（**点名** `branch_predictor_chmem.h`），
-**10 case / 150 assertions 全绿**（★ 机制类断言全部**断 payload 的运行期值**；R4/R5/R6 断的是标量/helper 语义）：
+**10 case / 160 assertions 全绿**（★ 机制类断言全部**断 payload 的运行期值**；R4/R5/R6 断的是标量/helper 语义）：
 
 | case | 覆盖 | 抓得住哪类回归 | ★ 变异验证 |
 |---|---|---|---|
@@ -285,7 +285,7 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 ### 回归（★ 用**重 build 后**的 binary —— 修正 critic B5 指出的「binary 过期」）
 
 - 8 架构门禁全 PASS
-- `ctest -R chipforge_tests_chmem` **PASS**（★ 本轮 binary；`[bp][plugin]` **10 case / 150 assertions** 全绿）
+- `ctest -R chipforge_tests_chmem` **PASS**（★ 本轮 binary；`[bp][plugin]` **10 case / 160 assertions** 全绿）
 - `ctest -R "branchbench_baseline|branchbench_bp_direction|verilator|cpu_verilator"` **5/5 PASS**
   （★ 新增 `branchbench_bp_direction` = `measure_branchbench.sh --check-bp-direction`）
 - `measure_branchbench.sh --check-baseline` exit 0（`bp_mode=off` ⇒ 传 `--no-bp` ⇒
@@ -297,8 +297,11 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
   |---|---|---|
   | `--check-baseline`（CSV 有 4 行 off） | **PASS** | 比对 4 档 |
   | `--bp=on --check-baseline`（CSV **无** bp=on 行） | **exit 1** | ★ 0 行比对 MUST NOT 报 PASS（critic 七轮 SF-1 前它静默 PASS） |
-  | `BENCH_BP=oon` | **exit 1** | ★ 取值 MUST 校验（critic 七轮 BLOCKER：原来 0 比对却 PASS + 生效值断言被跳过） |
-  | `--bp=off --check-bp-direction` | **exit 1** | 矛盾输入 MUST fail-closed（不静默取 on） |
+  | `BENCH_BP=oon`（任意模式） | **exit 1** | ★ **原始 env 值**在任何覆盖前校验（critic 八轮 B-1：上一版校验放在覆盖之后 ⇒ `BENCH_BP=oon --bp=on` / `--check-bp-direction` 仍被静默掩盖成 on） |
+  | `--bp=off --check-bp-direction` | **exit 1** | 矛盾输入（flag 渠道） |
+  | `BENCH_BP=off --check-bp-direction` | **exit 1** | 矛盾输入（**env 渠道**，critic 八轮 SF-1） |
+  | `BENCH_BP=off --bp=on`（冲突） | **exit 1** | env/flag 冲突 MUST NOT 静默择一（critic 八轮 SF-2） |
+  | `BENCH_BP=on --bp=on`（同值） | PASS | 两渠道一致 ⇒ 允许 |
   | `--check-baseline --check-bp-direction` | **exit 1** | 模式只接受一个（原会给出**不含方向性判据的 PASS**） |
   | `--bp=on --bp=off` | **exit 1** | 重复 `--bp`（原「后者静默生效」） |
   | `--foo` / `--bp=` / `--BP=on` | **exit 1** | 未知参数 / 非法值 |

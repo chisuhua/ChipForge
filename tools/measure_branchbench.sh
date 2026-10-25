@@ -66,6 +66,20 @@ fail() { echo "::warning file=soc/cpu/docs/dse/branchbench-baseline-matrix.csv::
 
 usage() { awk '/^# 用法:/{f=1} f && /^set -uo/{exit} f{sub(/^# ?/,""); print}' "$0"; }
 
+# ★★ `BENCH_BP` **原始值**校验 —— MUST 发生在**任何覆盖之前**（critic 八轮 B-1）：
+#   上一版把校验放在「flag / bpdir 已覆盖 BP_MODE 之后」⇒ `BENCH_BP=oon --bp=on`
+#   与 `BENCH_BP=oon --check-bp-direction` 两条路径把非法值**静默掩盖**成 on ⇒
+#   exit 0 PASS（与「env 与 flag 对称 fail-closed」的声称直接矛盾）。
+ENV_BP_RAW="${BENCH_BP:-}"
+ENV_BP_SET=0
+if [ -n "$ENV_BP_RAW" ]; then
+  ENV_BP_SET=1
+  case "$ENV_BP_RAW" in
+    on|off) ;;
+    *) fail_plain "BENCH_BP 取值非法: '$ENV_BP_RAW' (只接受 on|off)" ;;
+  esac
+fi
+
 # ★ 参数解析 **fail-closed** (critic SHOULD_FIX-1/2):
 #   ① 未知参数 MUST 报错（否则静默降级为「测量并打印」并 exit 0 ⇒ ctest 假绿通道）；
 #   ② **模式只能给一个** —— 否则 `--check-baseline --check-bp-direction` 这类
@@ -96,16 +110,25 @@ for arg in "$@"; do
     *) fail_plain "未知参数: '$arg' (见 --help)" ;;
   esac
 done
+# ★ env / flag **冲突** MUST fail-closed（critic 八轮 SF-2：原来 flag 静默赢，
+#   而「重复 --bp=on --bp=on 同值」都 fail ⇒ 严格度不一致）
+if [ "$ENV_BP_SET" -eq 1 ] && [ "$BP_ARG_SET" -eq 1 ] && [ "$ENV_BP_RAW" != "$BP_MODE" ]; then
+  fail_plain "BENCH_BP=$ENV_BP_RAW 与 --bp=$BP_MODE 冲突 (两条途径等价, MUST NOT 静默择一)"
+fi
 case "$MODE_ARG" in
   ""|measure) ;;
   baseline) CHECK_ONLY=1 ;;
   bpdir)
     # ★ BP 方向性判据（critic B-2: 机制指纹 MUST 有**自动化**锚，不能只活在
     #   commit message / 手工表格里）。★ 强制 BP=on（方向性判据只在 BP 开态有意义）。
-    # ★ critic 七轮 NIT-2: **矛盾输入**（显式 `--bp=off` + 本模式）MUST fail-closed,
-    #   不可静默取其一（否则「我明明给了 --bp=off」变成跑了 on）
-    [ "$BP_ARG_SET" -eq 0 ] || [ "$BP_MODE" = "on" ] \
-      || fail_plain "--check-bp-direction 强制 BP=on, 与 --bp=$BP_MODE 矛盾 (去掉 --bp 或写 --bp=on)"
+    # ★ 矛盾输入 MUST fail-closed（**两条途径都查** —— critic 八轮 SF-1：
+    #   上一版只查 flag ⇒ `BENCH_BP=off --check-bp-direction` 静默跑成 on）
+    if [ "$BP_ARG_SET" -eq 1 ] && [ "$BP_MODE" != "on" ]; then
+      fail_plain "--check-bp-direction 强制 BP=on, 与 --bp=$BP_MODE 矛盾 (去掉 --bp 或写 --bp=on)"
+    fi
+    if [ "$ENV_BP_SET" -eq 1 ] && [ "$ENV_BP_RAW" != "on" ]; then
+      fail_plain "--check-bp-direction 强制 BP=on, 与 BENCH_BP=$ENV_BP_RAW 矛盾 (unset 或写 on)"
+    fi
     CHECK_BP_DIR=1
     BP_MODE=on
     ;;
@@ -365,7 +388,10 @@ for i in "${!MODES[@]}"; do
         || fail "mode $m ($name): workload_sha 不符 —— BP=off 基线 $off_wsha != 当前 .text $cur_wsha (基线属于另一份代码, 须显式重录)"
     fi
 
-    compared_rows=$(( compared_rows + 1 ))
+    # ★ 这里**不**累加 `compared_rows`（critic 八轮 NIT-3）：该变量只在
+    #   `CHECK_ONLY` 收尾被读，而 bpdir 与 CHECK_ONLY 互斥 ⇒ 累加是死代码；
+    #   且若将来 (name,on) 基线行存在，line ~324 与本处会**双重计数** ⇒ 误红。
+    #   方向性判据的覆盖完整性由 `bp_dir_judges == 2` 保证。
     case "$name" in
       always_taken)
         # (3) PHT 学得到 taken ⇒ 预测率 MUST ≥ 90% (实测 3996/3998 = 99.95%)
@@ -444,6 +470,9 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   #   任何人把它接进 ctest/脚本都会被骗）。
   [ "$compared_rows" -gt 0 ] \
     || fail_plain "0 行比对 (bp_mode=$BP_MODE 无基线行) —— MUST NOT 报 PASS (基线行待 ② 追加)"
+  # ★ 注（critic 八轮 NIT-4）: 该「== 4」断言实际上**只兜 on 路径** ——
+  #   `BP_MODE=off` 时缺行会先在循环内「基线无 (name, off) 行」硬失败 ⇒ 到不了这里。
+  #   保留它是为了 `--bp=on --check-baseline`（② 追加行后部分缺失）的场景。
   [ "$compared_rows" -eq "${#MODES[@]}" ] \
     || fail_plain "只比对了 $compared_rows/${#MODES[@]} 档 (bp_mode=$BP_MODE 部分基线行缺失)"
   echo "branchbench: 基线一致 ($compared_rows 档, bp_mode=$BP_MODE) => PASS"
