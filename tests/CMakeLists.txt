@@ -129,6 +129,9 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_decoded_inst_migration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_vendored_elf.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_bp_plugin.cpp
+    # chmem-bp-btb-gshare Task 2/3/4 — IBus 侧 PC-mux 五级链 + 门控式 flush 单元锚
+    # （真实 IBusPlugin + fake 生产者；断 5 条臂与 flush 门控分量的**运行期值**）
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_verilator_sim.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/mmu/test_mmu_bare_plumbing_verilator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_mmu_ptw_fsm_chmem.cpp

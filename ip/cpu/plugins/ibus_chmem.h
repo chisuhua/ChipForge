@@ -84,6 +84,12 @@ class IBusPlugin : public PluginBase {
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pc_reg_;
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pc_lag_reg_;
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_bool>>    br_taken_buf_;
+  // ★ BP 纠错记录（Task 2/3）
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_bool>>    pred_valid_buf_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_bool>>    pred_taken_buf_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pred_target_buf_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_bool>>    bp_spec_ok_buf_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_bool>>    mispredict_a_buf_;
   // ★ chmem-bp-btb-gshare-poc Task 4: FLUSH 事件数计数器
   //   FLUSH 是 DUT 内部 payload (host 不可见) ⇒ 计数必须在此处 (ip/) 产生。
   //   承载为 ch_reg<ch_uint<32>> ⇒ CppHDL codegen 出 Verilog 信号 `flush_count`
@@ -136,6 +142,62 @@ class IBusPlugin : public PluginBase {
     return *br_taken_buf_;
   }
 
+  // ── BP 纠错所需的**上一拍预测记录**（chmem-bp-btb-gshare-poc Task 2/3）──
+  // ★ 为什么记录在 IBus 而非 BP 插件：PC-mux 与 flush 的消费方在 IBus
+  //   （`update_pc` branch LATE）；BP 插件保持「纯预测器」（只产 payload）。
+  // ★ 时序: 本拍 `update_pc` 用到的记录 = **上一拍**（fetch NORMAL）产出的预测，
+  //   而被解析的指令 = `pc_lag` = 上一拍 fetch 的那条 ⇒ 二者**同一条指令** ✓
+  ch::core::ch_reg<ch::core::ch_bool>& get_pred_valid_buf() {
+    if (!pred_valid_buf_)
+      pred_valid_buf_ = std::make_unique<ch::core::ch_reg<ch::core::ch_bool>>(
+          ch::core::ch_bool(false), "bp_pred_valid_buf");
+    return *pred_valid_buf_;
+  }
+  ch::core::ch_reg<ch::core::ch_bool>& get_pred_taken_buf() {
+    if (!pred_taken_buf_)
+      pred_taken_buf_ = std::make_unique<ch::core::ch_reg<ch::core::ch_bool>>(
+          ch::core::ch_bool(false), "bp_pred_taken_buf");
+    return *pred_taken_buf_;
+  }
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_pred_target_buf() {
+    if (!pred_target_buf_)
+      pred_target_buf_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_pred_target_buf");
+    return *pred_target_buf_;
+  }
+  /// ★ 上一拍的投机 taken 臂**被证明正确**（情形 C）⇒ 用于 gate 掉 taken 分量
+  ///   ★ 语义精确性: 设计简报写 `bp_spec_taken_buf` =「臂确实生效了」，但
+  ///     「臂生效」在**情形 F**（预测 taken / 实际 taken / **目标不同**）下也为真
+  ///     ⇒ 用「生效」去 gate ⇒ 情形 F 的错路指令**不被抑制** ⇒ 副作用泄漏。
+  ///     ⇒ 本实现取「**投机正确**」（情形 C）语义（覆盖 A/B/C/E + F ✓）。
+  ch::core::ch_reg<ch::core::ch_bool>& get_bp_spec_ok_buf() {
+    if (!bp_spec_ok_buf_)
+      bp_spec_ok_buf_ = std::make_unique<ch::core::ch_reg<ch::core::ch_bool>>(
+          ch::core::ch_bool(false), "bp_spec_ok_buf");
+    return *bp_spec_ok_buf_;
+  }
+  /// ★ 上一拍是**情形 A**（预测 taken / 实际 not-taken）⇒ 投机路径为错路 ⇒ flush
+  ch::core::ch_reg<ch::core::ch_bool>& get_mispredict_a_buf() {
+    if (!mispredict_a_buf_)
+      mispredict_a_buf_ = std::make_unique<ch::core::ch_reg<ch::core::ch_bool>>(
+          ch::core::ch_bool(false), "bp_mispredict_a_buf");
+    return *mispredict_a_buf_;
+  }
+
+  /// ★ 门控式 flush（brief v2.2 §3.4.2 唯一权威）:
+  ///   `flush = (taken_buf & !spec_ok_buf) | mispredict_a_buf`
+  ///   - BP **关闭** ⇒ `spec_ok_buf` 恒 false / `mispredict_a_buf` 恒 false
+  ///     ⇒ `flush == taken_buf` ⇒ **与改动前逐位相同（零退化）**
+  ///   - 情形 C（预测正确）⇒ spec_ok ⇒ taken 分量被 gate 掉 ⇒ **不 flush**
+  ///   - 情形 A ⇒ mispredict_a_buf ⇒ flush（抑制错 target 路径）
+  ///   - 情形 B / E / F ⇒ taken_buf 生效（`spec_ok_buf` 为 false）⇒ flush
+  ch::core::ch_bool gated_flush() {
+    const ch::core::ch_bool taken(get_br_taken_buf());
+    const ch::core::ch_bool spec_ok(get_bp_spec_ok_buf());
+    const ch::core::ch_bool misp_a(get_mispredict_a_buf());
+    return (taken & (!spec_ok)) | misp_a;
+  }
+
   void fetch_instr(PipeBuilder& pb) {
     using KT = cf::cpu::core::payload::keys<T, kXlenBits>;
     using MmuKeys = cf::ip::mmu::payload::mmu_keys<std::uint64_t>;
@@ -184,7 +246,11 @@ class IBusPlugin : public PluginBase {
     ch::core::ch_uint<32> instr(rp.impl());
     n->operator()(KT::INSTRUCTION) = instr;
     n->operator()(KT::PC)          = pc_lag_val;
-    n->operator()(FLUSH)           = br_taken_buf;
+    // ★ Task 3: FLUSH 改为**门控式**（brief v2.2 §3.4.2 唯一权威）
+    //   flush = (taken_buf & !spec_ok_buf) | mispredict_a_buf
+    //   - BP 关闭 ⇒ spec_ok / mispredict_a 恒 false ⇒ flush == taken_buf
+    //     ⇒ **与改动前逐位相同（零退化）**
+    n->operator()(FLUSH)           = gated_flush();
     // ── BP 的取指地址 (chmem-bp-btb-gshare-poc Task 1) ──────────────────
     // ★ KT::PC 是 **pc_lag**（上一拍地址）⇒ BP 预测需要 **pc_reg 本拍值**
     //   （BP 预测的是「本拍正在取的那条分支」⇒ 提前一拍）。
@@ -199,14 +265,80 @@ class IBusPlugin : public PluginBase {
     using BrPlugin = cf::cpu::plugins::BranchPlugin<T>;
     auto& pc_reg = get_pc();
     ch::core::ch_uint<32> pc_val(pc_reg);
+    ch::core::ch_uint<32> pc_lag_val(get_pc_lag());
     auto* brn = pb.node_of_logic_stage("branch").get();
     auto br_taken = brn ? brn->operator()(BrPlugin::get_branch_taken_key())
                         : ch::core::ch_bool(false);
     auto br_target = brn ? brn->operator()(RvKey::BRANCH_TARGET)
                          : ch::core::ch_uint<32>(ch::core::ch_literal<0, 1>{});
-    auto pc_plus_4 = pc_val + ch::core::ch_uint<32>(ch::core::ch_literal<4, 32>{});
-    auto next_pc   = select(br_taken, br_target, pc_plus_4);
+
+    // ── 本拍的预测（BP 在 fetch NORMAL 写；fetch ≺ branch ⇒ 此处可见）──────
+    // ★ BP 未注册（`--no-bp`）⇒ payload 缺失 ⇒ 默认 false/0 ⇒ 预测臂恒不生效
+    //   ⇒ PC-mux 退化为原「branch > seq」两臂 ⇒ **零退化**（可被 branchbench 校验和证明）
+    auto* fch = pb.node_of_logic_stage("fetch").get();
+    ch::core::ch_bool pred_valid_now(false);
+    ch::core::ch_bool pred_taken_now(false);
+    ch::core::ch_uint<32> pred_target_now(ch::core::ch_literal<0, 32>{});
+    if (fch && fch->payloads().has(cf::cpu::plugins::BP_PRED_VALID)) {
+      const auto bit = fch->operator()(cf::cpu::plugins::BP_PRED_VALID);
+      pred_valid_now =
+          (ch::core::ch_uint<1>(bit) == ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{}));
+    }
+    if (fch && fch->payloads().has(cf::cpu::plugins::BP_PRED_TAKEN)) {
+      const auto bit = fch->operator()(cf::cpu::plugins::BP_PRED_TAKEN);
+      pred_taken_now =
+          (ch::core::ch_uint<1>(bit) == ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{}));
+    }
+    if (fch && fch->payloads().has(cf::cpu::plugins::BP_PRED_TARGET)) {
+      pred_target_now = ch::core::ch_uint<32>(fch->operator()(cf::cpu::plugins::BP_PRED_TARGET));
+    }
+
+    // ── 上一拍的预测记录 vs 本拍的**实际**结果（二者同指 instr[pc_lag]）─────
+    const ch::core::ch_bool pv(get_pred_valid_buf());
+    const ch::core::ch_bool pt(get_pred_taken_buf());
+    const ch::core::ch_uint<32> ptg(get_pred_target_buf());
+
+    // 情形 A: 预测 taken / 实际 not-taken ⇒ 纠回 **fall-through**（pc_lag + 4）
+    const ch::core::ch_bool case_a = pv & pt & (!br_taken);
+    // 情形 B: 预测 not-taken / 实际 taken ⇒ 跳到实际目标（★ 暖机主路径）
+    const ch::core::ch_bool case_b = pv & (!pt) & br_taken;
+    // 情形 C: 预测 taken / 实际 taken / **目标一致** ⇒ 投机正确（抑制自身 redirect）
+    const ch::core::ch_bool case_c = pv & pt & br_taken & (ptg == br_target);
+    // ★ 情形 F（★ 设计简报未列 —— 本实现补的**规格缺口**）:
+    //   预测 taken / 实际 taken / **目标不同**（陈旧 BTB 项 / jalr 等）
+    //   ⇒ 投机路径是错路 ⇒ MUST flush；PC 由 br_taken 臂纠到实际目标
+    //   ⇒ 若照简报的「臂生效」口径 gate ⇒ F 不被抑制 ⇒ 副作用泄漏 ⇒ 校验和不等
+    //   ★ F **不需要独立的选择臂**：`case_c` 因「目标不一致」而恒 false ⇒
+    //   F 自然落到 `br_taken` 臂（纠到实际目标）且 `spec_ok=0` ⇒ flush 生效。
+
+    const ch::core::ch_uint<32> four(ch::core::ch_literal<4, 32>{});
+    const ch::core::ch_uint<32> pc_plus_4 = pc_val + four;
+    const ch::core::ch_uint<32> pc_lag_plus_4 = pc_lag_val + four;
+
+    // ── next_pc: 五级链（当前只有 branch / bp / seq 三臂；trap/freeze 待 v0.11.0
+    //    Phase 3.5 落地后**外包**在 branch 之上 —— 见 brief §3.4.2）────────
+    //   ★ 顺序（低 → 高）: seq → bp 投机 → actual taken → 情形 C → 情形 B → 情形 A
+    const ch::core::ch_bool pred_eff = pred_valid_now & pred_taken_now;
+    ch::core::ch_uint<32> next_pc = select(pred_eff, pred_target_now, pc_plus_4);
+    next_pc = select(br_taken, br_target, next_pc);
+    next_pc = select(case_c, pc_plus_4, next_pc);
+    next_pc = select(case_b, br_target, next_pc);
+    next_pc = select(case_a, pc_lag_plus_4, next_pc);
     pc_reg <<= next_pc;
+
+    // ── 记录（供下一拍纠错 / flush 门控）────────────────────────────────
+    get_pred_valid_buf()  <<= pred_valid_now;
+    get_pred_taken_buf()  <<= pred_taken_now;
+    get_pred_target_buf() <<= pred_target_now;
+    // ★ spec_ok = **情形 C**（投机被证明正确）。
+    //   ★★ 这里 MUST NOT 再与 `pred_eff`（本拍对 pc_reg(N) 的预测）：
+    //     `case_c` 讲的是 **instr[pc_reg(N-1)]** 的预测（record(N-1)）是否正确，
+    //     而 flush(N+1) 要判断的正是「pc_reg(N) 是不是错路地址」——
+    //     它由 N-1 的投机臂决定，正确性恰好 = case_c(N)。
+    //     误与 pred_eff（另一条指令的条件）⇒ 会**误清** spec_ok ⇒ 过度 flush
+    //     ⇒ 抑制合法指令 ⇒ 校验和错（实测 m0 93≠103）。
+    get_bp_spec_ok_buf()  <<= case_c;
+    get_mispredict_a_buf() <<= case_a;
     get_br_taken_buf() <<= br_taken;
 
     // ── FLUSH 事件计数 (chmem-bp-btb-gshare-poc Task 4) ────────────────
@@ -215,8 +347,8 @@ class IBusPlugin : public PluginBase {
     //   它是 `br_taken_buf`（上拍 taken）⇒ 与「错路指令被抑制」同拍。
     // ★ ch_reg 是 1 拍延迟 ⇒ host 读到的是「上一拍末」的累计值（差 1 拍，可接受）。
     {
-      auto* fch = pb.node_of_logic_stage("fetch").get();
-      auto flush_now = fch ? fch->operator()(FLUSH) : ch::core::ch_bool(false);
+      auto* f2 = pb.node_of_logic_stage("fetch").get();
+      auto flush_now = f2 ? f2->operator()(FLUSH) : ch::core::ch_bool(false);
       auto& fc = get_flush_count();
       ch::core::ch_uint<32> fc_val(fc);
       auto inc = select(flush_now, ch::core::ch_uint<32>(ch::core::ch_literal<1, 32>{}),

@@ -20,9 +20,19 @@ depends_on:
 
 - [x] **Task 1** 最小 BTB（`branch_predictor_chmem.h` 最小版：BTB 256×64b 62b 编码 + Bimodal 2-bit PHT 256×2b）+ fetch NORMAL **0 拍**（`aread`）查表 + payload 产出（`pred_target` / `pred_taken` / `pred_valid`）
   - ★ **部分交付**：`ch_reg` 存预测记录（`pred_*_reg_`）**已声明但未接线** ⇒ 归 **Task 4**（误预测纠错需跨拍比对）⇒ **不计入本 Task 完成范围**（★ 修正上一轮 commit message 的不实陈述）
-- [ ] **Task 2** branch LATE 的 PC-mux 接入（★ **五级嵌套**：`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
-- [ ] **Task 3** ★ flush 语义改写（★ **门控**，非「替换分量」）—— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）**；★ **MUST NOT** 把 `br_taken_buf` 分量替换为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用泄漏 ⇒ 校验和不等）
-- [ ] **Task 4** 误预测纠错（★ **按情形 A/B 区分**：A ⇒ 纠到 `pc_lag+4` + flush；B ⇒ 纠到 `actual_target` + **flush（MUST 抑制！）**；C ⇒ 抑制自身 redirect + **MUST NOT 抑制**；E（BTB miss 且实际跳转）⇒ **MUST 抑制**）+ **正确预测时抑制该分支自身 redirect**
+- [x] **Task 2** branch LATE 的 PC-mux 接入（★ **五级嵌套**：`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
+  - ★ **落点**：`ip/cpu/plugins/ibus_chmem.h` `update_pc()`（branch LATE）—— 消费者在 IBus，BP 插件保持「纯预测器」（只产 payload）
+  - ★ **已实现的链**（简报 §3.4.2 的五级，`trap`/`freeze` 两臂待 v0.11.0 Phase 3.5 落地后**外包**在 branch 之上）：
+    `next_pc = select(A, pc_lag+4, select(B, actual_target, select(C, pc+4, select(actual_taken, actual_target, select(pred_valid&pred_taken, pred_target, pc+4)))))`
+  - ★ **情形 B 臂与 `actual_taken` 臂语义重复**（B ⊂ actual_taken ⇒ 两者都选 `actual_target`）⇒ 该臂**无可观测效果** ⇒ 保留仅为**规格保真**（简报明文要求五级）⇒ ★ **没有断言覆盖它**（诚实登记，见缺口 #10）
+- [x] **Task 3** ★ flush 语义改写（★ **门控**，非「替换分量」）—— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）**；★ **MUST NOT** 把 `br_taken_buf` 分量替换为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用泄漏 ⇒ 校验和不等）
+  - ★ **落点**：同文件 `gated_flush()`（fetch NORMAL 发布 `FLUSH`）
+  - ★ **`spec_ok` 的语义是「投机**被证明正确**」（情形 C）**，不是「投机臂生效」** —— 后者在情形 F（目标不一致）下也为真 ⇒ 会让 F 的错路**不被抑制** ⇒ 副作用泄漏 ⇒ 校验和不等
+  - ★ **`spec_ok` MUST NOT 再与 `pred_eff` 相与** —— `pred_eff` 是「**本拍**对 `pc_reg(N)` 的预测」，`case_c` 讲的是「**上一拍**的预测是否被证明正确」⇒ 两者是**不同指令**的条件 ⇒ 误与 ⇒ 误清 `spec_ok` ⇒ **过度 flush** ⇒ 抑制合法指令 ⇒ 校验和错（实测 m0 `93 ≠ 103`）
+- [x] **Task 4** 误预测纠错（★ **按情形 A/B 区分**：A ⇒ 纠到 `pc_lag+4` + flush；B ⇒ 纠到 `actual_target` + **flush（MUST 抑制！）**；C ⇒ 抑制自身 redirect + **MUST NOT 抑制**；E（BTB miss 且实际跳转）⇒ **MUST 抑制**）+ **正确预测时抑制该分支自身 redirect**
+  - ★ **落点**：同上 `update_pc()` —— 5 个 `ch_reg` 纠错记录（`pred_valid/taken/target` + `spec_ok` + `mispredict_a`）+ 情形 A/B/C/F 判定
+  - ★ **情形 F**（预测 taken / 实际 taken / **目标不同**）= ★ **设计简报未列的规格缺口** ⇒ 本实现补（见缺口 #10）
+  - ★ **单元锚**：`tests/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp` —— **7 case / 98 assertions**，断 5 条臂与门控分量的**运行期值**（R1/R2 = BP 关闭零退化；R3 = 情形 A；R4 = 情形 B；R5 = 情形 C **不 flush**；R6 = 情形 F **必须 flush**；R7 = `spec_ok` 只等于 `case_c`）
 - [x] **Task 5** 测量设施（★ **FLUSH 事件数计数器归本 change** —— FLUSH 是 DUT 内部 payload，**host 不可见** ⇒ 需改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **本 change 是首个可改 `ip/` 的 change**）+ ★ **MUST 复用**前置1 的 `--stats` 框架（**MUST NOT** 另起一套）+ BP 开关面（工厂参数 + CLI flag）
 
 ## Acceptance
@@ -134,6 +144,30 @@ depends_on:
 | 生效值回显 | stderr `BP=on/off btb_entries=N` ⇒ 测量脚本可断言「flag 确实生效」（堵「flag 未生效却测出无差异」的假绿通道） |
 | FLUSH 计数 | `ibus_chmem.h` 内 `ch_reg<ch_uint<32>> flush_count` 累加 ⇒ Verilog 顶层信号 `flush_count` ⇒ host 经 `--public-flat-rw` 读 |
 
+### Task 2/3/4（PC-mux 五级链 + 门控式 flush + 误预测纠错）—— 实测留证
+
+★ **落点**：`ip/cpu/plugins/ibus_chmem.h`（`update_pc()` branch LATE + `gated_flush()` fetch NORMAL）
+★ **单元锚**：`tests/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp`（**7 case / 98 assertions**，见下节）
+
+**BP=on vs BP=off（branchbench 4 档，同一 workload）**：
+
+| mode | 校验和 (off) | 校验和 (on) | cycles (off) | cycles (on) | **Δcycles** | BP hit / pred_taken |
+|---|---|---|---|---|---|---|
+| 0 always_not_taken | 103 | **103** ✓ | 86034 | **84038** | **−1996** | 1999 / 1998 |
+| 1 always_taken | 183 | **183** ✓ | 88034 | **84040** | **−3994** | 3998 / 3996 |
+| 2 pattern_6of8 | 147 | **147** ✓ | 86534 | **84787** | **−1747** | 3992 / 2247 |
+| 3 pseudo_random | 101 | **101** ✓ | 87056 | **85037** | **−2019** | 3998 / 3089 |
+
+⇒ ★ **校验和逐档相等** ⇒ BP 开启**不改变架构可见结果**（投机路径被正确纠正/抑制）。
+⇒ ★ **4 档 cycles 全部改善** ⇒ 「提前一拍」机制**有行为后果**（闭合缺口 #7）。
+⇒ ★ **BP=off 时 cycles 与校验和逐位不变**（`--check-baseline` PASS）⇒ **零退化**。
+
+★ **一个真实 bug 的实测记录（★ 教训）**：`spec_ok_buf` 曾被写成 `pred_eff & case_c`
+  ⇒ `pred_eff` 是「**本拍**对 `pc_reg(N)` 的预测」，`case_c` 讲的是「**上一拍**的预测是否正确」
+  ⇒ 两者是**不同指令**的条件 ⇒ 误与 ⇒ 误清 `spec_ok` ⇒ **过度 flush** ⇒ 抑制合法指令
+  ⇒ **校验和 m0 = 93 ≠ 103**（端到端立刻暴露）⇒ 修法：`spec_ok_buf <<= case_c`。
+  ⇒ ★ 该 bug 现在有**单元级**锚（`R7`，时变脚本制造「`case_c=1` 但 `pred_eff=0`」的时刻）。
+
 ### ★★ FLUSH 计数器的独立交叉验证（★ 关键：它同时是 `cycles − pc_changes` 的**第二证据源**）
 
 | mode | FLUSH_COUNT | Δ vs m0 | **独立复算** taken/iter | Δ vs m0 |
@@ -229,14 +263,23 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
 | # | 项 | 状态 | 归属 / 说明 |
 |---|---|---|---|
 | 1 | **`is_unconditional` 位未落地** | ❌ 未实现 | 现状：BTB 写使能 = `taken & is_branch`（`is_branch` 只含 B-type 条件分支）⇒ **`jal` 永不建 BTB 项**、`is_unconditional` 位**永不置 1** ⇒ 简报 §3.2「`is_unconditional` 位必需」与「`jal` 只更新 BTB」**未落地**。★ 需 branch plugin 导出 jal/jalr 区分（opcode）⇒ **留给 Task 4/主体**（本 PoC 不覆盖无条件跳转） |
-| 2 | **`pred_*_reg_`（ch_reg 预测记录）** | ⚠️ 声明但未接线 | 跨拍预测记录是 **Task 4（误预测纠错）**的前置 ⇒ 本轮**不计入 Task 1 完成范围**（★ 修正上一轮 commit message 的不实陈述） |
+| 2 | **`pred_*_reg_`（ch_reg 预测记录）** | ✅ **已接线**（Task 4） | ★ 本条原为「声明但未接线」⇒ **Task 2/3/4 落地后已接线**：5 个 `ch_reg` 纠错记录（`pred_valid` / `pred_taken` / `pred_target` + `spec_ok` + `mispredict_a`）在 `ip/cpu/plugins/ibus_chmem.h` 内 ⇒ ★ **刻意放在 IBus 而非 BP 插件**（PC-mux 与 flush 的消费方在 IBus ⇒ BP 保持「纯预测器」） |
 | 3 | **`jalr` 不建项** | ✅ 已实现（保守） | `jalr` 目标随运行时变化 ⇒ 不建 BTB 项 ⇒ 走顺序取指（台账 #9 的终态） |
 | 4 | **M 运行期 mask 的效果无测试** | ⚠️ 缺测 | `index_of_scalar` 用 `kBtbEntries`(256) 做 mask，而运行期路径用 `logical_entries_−1` ⇒ **M<256 时二者不等价**；现有断言只覆盖 M=256 语义 ⇒ 「M 运行期可配」**无端到端证据** |
 | 5 | **`pack_entry` / `unpack_entry` 与运行路径并行** | ⚠️ 双实现 | 运行路径（`update()`）用**内联 shl/or** 拼 62b；`pack_entry` 是**影子 API**（仅测试用）⇒ 两者一旦分叉，测试发现不了（测试只测 helper） |
 | 6 | **门禁漏网：`?:` 形式** | ⚠️ **已知缺口**（★ 本轮**缩小**但未闭合） | `check_plugin_portability.sh` 的 Check 5 只查 `if (ch_bool)`；**C++ 三目 `?:` 的条件位同样做 contextual conversion** ⇒ 同样会在 elaboration 期折成常量（★ 本轮 PHT 饱和 bug 正是这个形态：Verilog 里 `ge_ge_2` dangling ⇒ 计数器 3→0 **回绕**而非饱和）。★ 曾尝试加 Check 5b，但**误报/漏报都难以做到既零噪音又可靠**（本仓库的真实逻辑写在 `predict()`/`update()` 等**被 at_stage 调用的方法**里，而「at_stage 闭包内」的范围抓不到）⇒ **撤销该门禁，改为在此登记为已知缺口** ⇒ 后续应由 ADR-040 的门禁专项处理。★ **本轮补上的只是「这一处」**：R8（逐拍采样）+ 系统级 m1 预测率判据 ⇒ **PHT 饱和这一处**再有 `?:` 会被抓住；★ 但**其它**站点（如未来的 ALU/CSR/流水线逻辑）仍无静态护栏 ⇒ 缺口**未闭合** |
-| 7 | **「提前一拍」的证明** | ⏳ 待 Task 2 | 本 change 内 BP 的三个输出 payload **无消费者** ⇒ 「提前一拍」**没有任何行为后果** ⇒ 证明 MUST 留到 Task 2 接入 PC-mux 后用 Δcycles |
+| 7 | **「提前一拍」的证明** | ✅ **已闭合**（Task 2/3/4 后） | ★ 本条原为「待 Task 2」—— 当时 BP 三个输出 payload **无消费者** ⇒ 「提前一拍」无任何行为后果 ⇒ 现已接入 PC-mux ⇒ **Δcycles 实测**（BP=on vs BP=off，同一 workload）：m0 86034→**84038**（−1996）、m1 88034→**84040**（−3994）、m2 86534→**84787**（−1747）、m3 87056→**85037**（−2019）⇒ **4 档全部改善且校验和逐位不变**（103/183/147/101 = off 基线）⇒ 机制成立 |
 | 8 | **方向性门禁的阈值 + S3 行为变化** | ⏳ 待主体 | ★ **本轮补全（critic B-3：缺口表只写了 2 个 90% 阈值，漏了 S3 会变的行为）**：<br>① **跨档 `pc_changes` 相等断言在 S3 必然假红** —— `pc_changes` = 采样 PC 值变化拍数（自述含非架构路径 PC 值、机制未确认）⇒ 今日 BP 三输出**无消费者** ⇒ 4 档轨迹相同（都 = 86034）⇒ S3 接入 PC-mux 后 m0（恒 not-taken）预测必错 ⇒ 采样流多出错路 PC ⇒ 4 档 `pc_changes` 不再相等 ⇒ **原断言会让 branchbench 因与 BP 健康度无关的原因判红** ⇒ ★ **本轮已把该断言限定在 `BP_MODE=off`**（守卫键 MUST 是 `BP_MODE`, **不可**是 `CHECK_BP_DIR` —— 「BP=on」有 `--check-bp-direction` 与 `--bp=on --check-baseline`/`BENCH_BP=on --check-baseline` **两条**路径，用后者只挡住前一条 ⇒ critic 六轮 BLOCKER-1 实测复现）⇒ **处置已落**：已用夹具（bp_mode=on 基线行 + 4 档 pc_changes 各不同）实测「新版 PASS / 把守卫改回 `CHECK_BP_DIR` 立即 FAIL」⇒ 主体仍 MUST 知悉：**BP=on 模式下前端活动量不再跨档可比**<br>★ **补充（critic 六轮 SF-5）**：`bp_dir_judges == 2` 只能防「档名消失/改名」，**不防档名与硬件方向错配**（顺序互换）⇒ 该错配由**校验和判据**兜住（BP=on 校验和 vs 该档名的 off 基线行：always_not_taken=103 / always_taken=183 ⇒ 互换后必然不符 ⇒ RED）<br>② **校验和判据今天是恒真** —— BP 输出无消费者 ⇒ BP=on 与 BP=off 必然同校验和 ⇒ 该判据**当前零鉴别力** ⇒ 它是 **S3 才激活**的承重判据（脚本注释已标注）<br>③ **FLUSH 口径随 Task 3 改写而失效** —— Task 3 把 flush 改成门控式 ⇒ AC-F2-13 的「ΔFLUSH = 2000/500/1022 逐位相等」与 AC-F2-3 的「ΔFLUSH ≥ 0.8×FLUSH(off)」全部作废 ⇒ 而 `--check-bp-direction` **对 FLUSH 一个数都不判** ⇒ ★ **决策级判据（AC-F2-3）仍无自动锚** ⇒ **主体 MUST 补 FLUSH 判据**（归主体，本 change 不越界）<br>④ **两个 90% 阈值**（m1 ≥90% / m2 ≤90%）设计成**方向性比值** ⇒ 对 S3 的 PC-mux 接入不敏感（真实 taken 率 100% vs 25% ⇒ 预测率应分别趋近 100% 与 25%）⇒ 预期仍成立；★ 但**绝对值必变** ⇒ 主体 MUST 复评并**显式重录**（★ MUST NOT 直接放宽） |
 | 9 | **BP 路径真正进入 CI** | ⏳ 归 ADR-088 | 前置 = 「CI 具备 build 能力」（CI 现在**不构建项目** ⇒ branchbench step 恒走 SKIP）⇒ 属 ADR-088 的 CI 基建项 ⇒ **不在本 change** ⇒ ★ 本 change 只交付**本地锚**（ctest entry + PR 手动跑 `tools/run_chipforge_tests.sh --all`）；★ MUST NOT 把「加了 ctest entry」说成「BP 路径进入 CI」（critic B-1：上一轮 commit message 正是这么写的 ⇒ 事实错误） |
+| 10 | ★ **情形 F 是设计简报未列的规格缺口** + ★ **情形 B 臂无可观测效果** | ⚠️ **已实现但规格缺口未回写** | ★ **F**：预测 taken / 实际 taken / **目标不同**（陈旧 BTB 项 / `jalr` 等）—— 简报 §3.4.2 的情形清单**只列 A/B/C/E** ⇒ 本实现**补了 F**（走 `br_taken` 臂纠到实际目标 + **必须 flush**）⇒ ★ **依据**：若照简报「臂生效」口径 gate `spec_ok`，F 的错路指令**不被抑制** ⇒ 副作用泄漏 ⇒ 校验和不等 ⇒ ★ **主体 MUST 把 F 补进简报 §3.4.2 的情形表**（本 PoC 不越界改架构文档）<br>★ **B 臂冗余**：`case_b = pv & !pt & br_taken` ⊂ `br_taken` ⇒ 该臂与 `actual_taken` 臂**选同一个值**（`actual_target`）⇒ **可证明无差异** ⇒ 保留仅因简报明文要求五级链 ⇒ ★ **没有任何断言覆盖它**（诚实登记：这是**已知无覆盖**的一臂） |
+
+### ★★★ S3（② 主体）前瞻 —— 主体 MUST 知悉的 3 条（★ **本轮已登记，主体落地时 MUST 处理**）
+
+| # | 前瞻项 | 为什么现在就会咬人 | 主体 MUST 做什么 |
+|---|---|---|---|
+| S3-a | **BP_STATS 是「前缀匹配」⇒ 主体追加的字段**无人锚 | `tools/measure_branchbench.sh:368` 用 `grep -oE 'BP_STATS hit=[0-9]+ miss=[0-9]+ pred_taken=[0-9]+'` —— **前缀**匹配 ⇒ 主体若在行**尾**追加字段（如 `flush=` / `n_correct=` / `n_false=`），该 grep **仍命中** ⇒ **新字段不被任何断言覆盖**（而删改中间字段会 fail-closed ⇒ 只有「尾部追加」这条通道是静默的） | 主体 MUST ①自己补该字段的断言，或 ②把 grep 改成**锚定式**（`…pred_taken=[0-9]+( |$)`）+ 显式列出期望字段集 ⇒ ★ **MUST NOT** 依赖现在的宽松前缀 |
+| S3-b | **`--bp=on --check-baseline` 在主体后必然假红** | CSV 里只有 `bp_mode=off` 的 4 行 ⇒ 主体改 BP 行为后 on/off 的 cycles **必然不同** ⇒ `--bp=on --check-baseline` 会以「**0 行比对 ⇒ MUST NOT 报 PASS**」失败（★ 脚本已 fail-closed，不会假绿，但会**阻塞**） | 主体 MUST **显式重录** `bp_mode=on` 的 4 行基线（含各自的 `workload_sha` / `build_id`）⇒ ★ **MUST NOT** 为了「让它过」而放宽判据（放宽 = 假绿） |
+| S3-c | **`workload_sha` 只覆盖 `.text` ⇒ 拦不住 harness 漂移 | 基线行的 workload 归属守卫 = `objcopy --only-section=.text` 的哈希（`measure_branchbench.sh:238`）⇒ 主体若改 **link script / `.data` / `.rodata` / harness 代码**（`.text` 之外的任何东西），`.text` 哈希**不变** ⇒ 「基线属于同一份 workload」的保证**失效** ⇒ 基线可能悄悄对应**另一份程序** | 主体 MUST ①扩展哈希覆盖面（至少 `.text` + `.data` + `.rodata`，或直接对整个 ELF 取哈希），或 ②在 CSV 里增加一列**全 ELF 哈希**并与 `.text` 哈希**同时**校验 ⇒ ★ 二选一，**MUST NOT** 沿用「只看 `.text`」 |
 
 ### 测试覆盖（critic B3：此前该插件 **0 case** ⇒ `[chmem]` binary 无回归锚）
 
@@ -281,6 +324,53 @@ for m in 0 1 2 3; do ./build/bin/cpu_verilator_sim --elf build/branchbench_m${m}
     ★ 该 symptom **只证明「命名空间作用域 static key 跨 TU 会断链」这一机理**，
     **不**证明当前仓库里有活跃的跨 TU 断链（当前读写方恰好同 TU）。
 
+
+### ★★ Task 2/3/4 的单元锚（PC-mux 五级链 + 门控式 flush）
+
+`tests/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp`（**点名** `ip/cpu/plugins/ibus_chmem.h`），
+**7 case / 98 assertions 全绿** —— ★ 断的是 **PC-mux 各臂 + flush 门控分量的运行期值**
+（读 fetch 节点发布的 `BP_PC` 与 `FLUSH` 两个 payload 的**信号值**）：
+
+| case | 场景 | 断的量 | ★ 抓得住哪类回归 |
+|---|---|---|---|
+| `R1_bp_off_not_taken_is_zero_regression` | BP **未注册** + 分支 not-taken | PC 逐拍 `init+4k`；FLUSH 恒 0 | ★ **BP 关闭 ⇒ 零退化**（PC-mux 退化成 seq 单臂、flush 恒 0） |
+| `R2_bp_off_taken_is_zero_regression` | BP **未注册** + 分支 taken | PC 恒 = 实际目标；FLUSH 恒 1 | ★ **零退化的另一半**：无 BP 时 flush 语义与改动前**逐位相同** |
+| `R3_case_A_falls_back_and_flushes` | 预测 taken / 实际 not-taken | PC = `init+4`（**不是**投机目标 P）；FLUSH 第 2 拍起恒 1 | ★ 删 `case_a` 臂 ⇒ PC 变 P+4 ⇒ RED；★ 删 `\| mispredict_a_buf` ⇒ FLUSH 变 0 ⇒ RED |
+| `R4_case_B_redirects_to_actual_target` | 预测 not-taken / 实际 taken | PC 恒 = 实际目标 T（**不是** fall-through） | ★ 删 `actual_taken` 臂 ⇒ PC 变 `init+4` ⇒ RED |
+| `R5_case_C_speculation_correct_no_flush` | 预测 taken / 实际 taken / **目标一致** | PC = `P+4k`（**不是** br_target）；FLUSH 第 2 拍起恒 **0** | ★★ **门控式 flush 的核心锚**：去掉 `!spec_ok` 或退回 `FLUSH = taken_buf` ⇒ FLUSH 变 1 ⇒ RED；★ 删 `case_c` 臂 ⇒ PC 变 P ⇒ RED |
+| `R6_case_F_target_mismatch_flushes` | 预测 taken 到 P / 实际 taken 到 **T≠P** | PC 恒 = T（**不是** P+4）；FLUSH 恒 1 | ★★ 与 R5 对照即证明「`case_c` 必须比较目标」：忽略目标一致性 ⇒ PC 变 P+4 且 FLUSH 变 0 ⇒ RED |
+| `R7_spec_ok_is_case_c_only` | ★ **时变**脚本：第 0~1 拍预测 taken、第 2 拍起预测 not-taken | 第 3 拍 FLUSH = 0 | ★★ **`spec_ok` MUST NOT 再与 `pred_eff` 相与**（`pred_eff` 是**另一条指令**的条件 ⇒ 误与 ⇒ 过度 flush ⇒ 校验和错 —— 端到端实测 m0 `93≠103`） |
+
+★ **为什么必须有这个文件**（branchbench 端到端判据不够）：① 端到端每次 ~50s，不能当快速回归；
+② 端到端只能**整体**判红，无法隔离「哪条臂 / 哪个门控分量」出错；③ **FLUSH 门控是 DUT 内部量**，
+端到端只能间接覆盖 ⇒ ★ 本文件把二者都变成**可单点定位**的断言。
+
+★ **夹具两条纪律**（实测踩坑记录）：
+- ★ **branch payload 的生产者必需**：只注册 `IBusPlugin` 时，branch node 的
+  `BRANCH_TAKEN` / `BRANCH_TARGET` cell 为 **null** ⇒ IBus 的 mux 操作数为 null ⇒
+  **Simulator 构造期 SIGSEGV**（`muximpl::create_instruction` → `lnodeimpl::id(this=0x0)`）。
+  ⇒ 本文件用 `ScriptDriver` 扮演 BranchPlugin + BP 预测器**两个**角色。
+- ★ **不调用 `sim->reset()`**：CppHDL 的 `reset()` 把每个 `ch_reg` 复位成 `rst_val`
+  （本项目用 `ch_reg(value, name)` 构造 ⇒ `rst_val = nullptr` ⇒ **0**）⇒ `pc` 被清 0 ⇒
+  `set_initial_pc` 形同虚设 ⇒ ★ 同一事实见 `tests/cpu/test_cpu_chmem_vendored_elf.cpp:156` 的注释。
+
+★ **变异对照（★ 11 个单点变异，全部实测；★ 「被抓住」= 目标 case RED）**：
+
+| # | 变异（单点删除 / 改写） | 结果 | 被谁抓住 |
+|---|---|---|---|
+| M1 | 删 `case_a` 臂（`select(case_a, pc_lag+4, …)`） | **RED** | R3 |
+| M2 | 删 `case_c` 臂（`select(case_c, pc+4, …)`） | **RED** | R5, R7 |
+| M3 | 删 `case_b` 臂（`select(case_b, br_target, …)`） | ★ **仍绿** | —（★ **可证明无差异**：`case_b ⊂ actual_taken` ⇒ 两臂选同一个值 ⇒ 该臂**无可观测效果** ⇒ 保留仅因简报明文要求五级链 ⇒ 见缺口 #10） |
+| M4 | 删 BP 投机臂（`select(pred_eff, pred_target, pc+4)`） | **RED** | R3 |
+| M5 | 删 `actual_taken` 臂（`select(br_taken, br_target, …)`） | **RED** | R2, R4, R6 |
+| M6 | 门控去掉 `!spec_ok`（`(taken & (!spec_ok)) \| misp_a` → `taken \| misp_a`） | **RED** | R5, R7 |
+| M7 | 门控去掉 `\| mispredict_a_buf` 分量 | **RED** | R3 |
+| M8 | 门控整体退回 `FLUSH = taken_buf`（改动前语义） | **RED** | R3, R5, R7 |
+| M9 | `spec_ok_buf <<= (pred_eff & case_c)`（★ **本次修过的真 bug**） | **RED** | R7 |
+| M10 | `case_a` 臂误用 `pc_plus_4`（而非 `pc_lag_plus_4`） | **RED** | R3 |
+| M11 | `case_c` 忽略目标一致性（`pv & pt & br_taken`）⇒ 把情形 F 误判为 C | **RED** | R6 |
+
+⇒ ★ **10/11 被抓住**；唯一未被抓住的 M3 是**可证明冗余**的一臂（已登记，非漏网）。
 
 ### 回归（★ 用**重 build 后**的 binary —— 修正 critic B5 指出的「binary 过期」）
 
