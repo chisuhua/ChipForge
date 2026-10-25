@@ -333,12 +333,6 @@ class CpuFactoryChmem {
       }
     }
 
-    // ★ chmem-bp-btb-gshare-poc Task 1: BP 插件注册
-    //   注册位 = IBusPlugin **之前**（BP 在 fetch NORMAL 查表, 依赖 IBus 写的 BP_PC;
-    //   但 BP_PC 是 **payload** ⇒ 生产者(fetch) 与消费者(fetch) 的保序由
-    //   canonical_stage_order (fetch NORMAL 内按注册序) 决定 ⇒
-    //   ★ BP MUST 注册在 IBusPlugin **之后**（同 stage 同 phase 内, 生产者先写）
-    //   ⇒ 实际注册放在 IBusPlugin 之后（见下）。
     pb->register_plugin(std::make_unique<Decoder>());
     pb->register_plugin(std::make_unique<Hazard>());
     pb->register_plugin(std::move(ibus));

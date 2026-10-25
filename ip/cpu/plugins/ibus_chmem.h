@@ -86,11 +86,14 @@ class IBusPlugin : public PluginBase {
   //   ⇒ host 经 `--public-flat-rw` 读 `top__DOT__flush_count`。
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> flush_count_;
 
-  // ch_mem aread/sread both have 1-cycle latency in the simulator: the data
-  // proxy at cycle N holds imem[address presented at cycle N-1]. fetch.PC
-  // must therefore expose the PREVIOUS cycle's PC (pc_lag) so it stays
-  // aligned with the fetched instruction; consumers (decode/branch) read
-  // (pc_lag, instr) together.
+  // ★ 读延迟（★ 2026-10-25 更正 —— 原注释说「aread/sread 都是 1 拍」，
+  //   与上游 `c27543d` 之后的实际行为**矛盾**）：
+  //   - `sread` = **1 拍**（本插件的 imem 读用它，见 fetch_instr）
+  //   - `aread` = **0 拍**（上游 c27543d 起 Verilog 侧是组合 `assign`）
+  //   ⇒ fetch.PC 必须暴露**上一拍**的 PC（pc_lag）以与取到的指令对齐
+  //     （decode/branch 一起读 (pc_lag, instr)）。
+  //   ★ 推论: BP 的 BTB 查表**可以**用 `aread`（0 拍）⇒ 预测结果同拍可被
+  //     branch LATE 的 PC-mux 消费 ⇒ **提前一拍**（见架构简报 v2.2 §2.1）。
   ch::core::ch_reg<ch::core::ch_uint<32>>& get_pc_lag() {
     if (!pc_lag_reg_)
       pc_lag_reg_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(

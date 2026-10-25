@@ -172,7 +172,7 @@ word = { tag30 = PC[31:2], target30 = target[31:2], valid(1b), is_unconditional(
 | 项 | 规则 |
 |----|------|
 | 索引 | `bits<7,0>(PC) & literal(M-1)`（**无全局历史 XOR** —— GShare 不在本期） |
-| 饱和 | **0→1→2→3（不回退）** |
+| 饱和 | ★ **taken ⇒ 饱和 +1（0→1→2→3）；not-taken ⇒ 饱和 −1（3→2→1→0）**（★ 与 TLM 侧 `branch_predictor.h:274-286` 一致；★ 原「不回退」措辞有歧义 ⇒ 不递减 ⇒ 零方向信息 ⇒ 净负收益） |
 | 预测 taken 阈值 | ★ **counter ≥ 2** |
 | 写使能 | ★ **「分支已解析」（任何方向）** —— 若只在 taken 时更新 ⇒ 学不到 not-taken ⇒ 在 not-taken 密集的负载上**净负收益** |
 | 更新地址 | ★ **分支解析处的 `KT::PC`**（= 预测时的 `pc_reg`）⇒ 二者必须**同指一条分支**（off-by-one ⇒ 学到错误表项） |

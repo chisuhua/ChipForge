@@ -311,7 +311,7 @@ flush 判据从「上拍 taken」改为**门控式**（§3.4.2 唯一权威：`f
 |---|------|
 | 表 | `ch_mem<ch_uint<2>, N>`（N = 256）⇒ **2-bit 饱和计数器**（PoC P-3 已验证可行） |
 | 索引 | ★ **Bimodal 语义**：`bits<7,0>(PC) & literal(M-1)`（**不用**全局历史 XOR）⇒ GShare 延后 |
-| 饱和 | 0→1→2→3 饱和（不回退），**≥2 ⇒ 预测 taken** |
+| 饱和 | ★ **taken ⇒ 饱和 +1（0→1→2→3）；not-taken ⇒ 饱和 −1（3→2→1→0）**；**≥2 ⇒ 预测 taken**。★ 与 TLM 侧 `branch_predictor.h:274-286` 语义一致。★ **原措辞「0→1→2→3（不回退）」有歧义** —— 标准 bimodal 在 not-taken 时**要递减**；若不递减 ⇒ PHT 只增不减 ⇒ 恒 3 ⇒ **零方向信息** ⇒ 退化成「净负收益」的 BTB-only |
 | 冷启动 | 初值 0（弱 not-taken）⇒ 冷启动语义由 `no_predict_initially` 条目覆盖 |
 | ★ **PHT 更新使能** | ★ **「分支已解析」（任何方向）** —— ★ **不是**「仅 taken」！若只在 taken 时更新 ⇒ PHT 学不到 not-taken ⇒ 在 not-taken 分支上恒预测 taken ⇒ **净负收益**（§2.2 的老问题换个入口回来） |
 | ★ **BTB 更新使能** | ★ **taken**（目标此时才已知） |

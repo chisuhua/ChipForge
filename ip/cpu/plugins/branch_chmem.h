@@ -123,6 +123,18 @@ class BranchPlugin : public PluginBase {
   ///   (它们的方向恒为 taken ⇒ 无需方向学习) ⇒ 由 BP 用 BRANCH_TAKEN 区分。
   static inline Payload<ch::core::ch_bool> IS_BRANCH{"cpu.is_branch"};
 
+  /// BRANCH_TAKEN_RAW —— **未被 flush 抑制**的分支结果 (chmem-bp-btb-gshare-poc)
+  /// ★ `BRANCH_TAKEN` 是**被 flush 抑制后**的值（`taken = taken && !flush`）
+  ///   ⇒ 错路指令的 taken 结果**已被抹掉** ⇒ 用它做 PHT 方向学习会学错方向。
+  /// ★ BP 的 PHT 方向学习 MUST 用**未抑制**的方向（且配 `BRANCH_FLUSHED` 门控
+  ///   ⇒ 错路指令根本不参与学习）。
+  static inline Payload<ch::core::ch_bool> BRANCH_TAKEN_RAW{"cpu.branch_taken_raw"};
+
+  /// BRANCH_FLUSHED —— 「本拍指令是错路指令（其副作用已被抑制）」
+  /// ★ BP 的表更新（PHT / BTB）**MUST NOT** 让错路指令污染表项
+  ///   （否则 PHT 学到错路方向 ⇒ 净负收益）。
+  static inline Payload<ch::core::ch_bool> BRANCH_FLUSHED{"cpu.branch_flushed"};
+
   // --------------------------------------------------------------------------
   // setup — 创建 CtrlLink 并注册 at_stage("branch") 回调
   //
@@ -240,8 +252,12 @@ class BranchPlugin : public PluginBase {
       auto* fch = pb.node_of_logic_stage("fetch").get();
       auto flush = fch ? fch->operator()(IBusPlugin<T>::FLUSH)
                        : ch::core::ch_bool(false);
+      // ★ 未抑制的分支结果（供 BP 的 PHT 方向学习用）—— 必须在抑制**之前**取
+      const ch::core::ch_bool taken_raw = taken;
       taken = taken && !flush;
       n->operator()(BRANCH_TAKEN) = taken;
+      n->operator()(BRANCH_TAKEN_RAW) = taken_raw;
+      n->operator()(BRANCH_FLUSHED) = ch::core::ch_bool(flush);
       n->operator()(RvKey::BRANCH_TARGET) = branch_target;
       // ★ IS_BRANCH: 「本条指令是条件分支」—— 与 flush 无关 (flush 抑制的是
       //   taken **结果**, 不是「是不是分支」) ⇒ 在 flush 抑制前后都成立。

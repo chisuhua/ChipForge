@@ -18,11 +18,12 @@ depends_on:
 
 ## Implementation
 
-- [x] **Task 1** 最小 BTB（BTB + Bimodal 2-bit PHT）+ fetch NORMAL 的 **0 拍**查表 + payload 输出（`pred_target` / `pred_taken` / `pred_valid`）
+- [x] **Task 1** 最小 BTB（`branch_predictor_chmem.h` 最小版：BTB 256×64b 62b 编码 + Bimodal 2-bit PHT 256×2b）+ fetch NORMAL **0 拍**（`aread`）查表 + payload 产出（`pred_target` / `pred_taken` / `pred_valid`）
+  - ★ **部分交付**：`ch_reg` 存预测记录（`pred_*_reg_`）**已声明但未接线** ⇒ 归 **Task 4**（误预测纠错需跨拍比对）⇒ **不计入本 Task 完成范围**（★ 修正上一轮 commit message 的不实陈述）
 - [ ] **Task 2** branch LATE 的 PC-mux 接入（★ **五级嵌套**：`trap > branch-actual/mispredict > freeze > bp-predict > seq`）
 - [ ] **Task 3** ★ flush 语义改写（★ **门控**，非「替换分量」）—— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）**；★ **MUST NOT** 把 `br_taken_buf` 分量替换为 `mispredict_buf` 分量（⇒ BTB miss / 情形 B / `jalr` 的 fall-through 副作用泄漏 ⇒ 校验和不等）
-- [x] **Task 4** 误预测纠错（★ **按情形 A/B 区分**：A ⇒ 纠到 `pc_lag+4` + flush；B ⇒ 纠到 `actual_target` + **flush（MUST 抑制！）**；C ⇒ 抑制自身 redirect + **MUST NOT 抑制**；E（BTB miss 且实际跳转）⇒ **MUST 抑制**）+ **正确预测时抑制该分支自身 redirect**
-- [ ] **Task 5** 测量设施（★ **FLUSH 事件数计数器归本 change** —— FLUSH 是 DUT 内部 payload，**host 不可见** ⇒ 需改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **本 change 是首个可改 `ip/` 的 change**）+ ★ **MUST 复用**前置1 的 `--stats` 框架（**MUST NOT** 另起一套）+ BP 开关面（工厂参数 + CLI flag）
+- [ ] **Task 4** 误预测纠错（★ **按情形 A/B 区分**：A ⇒ 纠到 `pc_lag+4` + flush；B ⇒ 纠到 `actual_target` + **flush（MUST 抑制！）**；C ⇒ 抑制自身 redirect + **MUST NOT 抑制**；E（BTB miss 且实际跳转）⇒ **MUST 抑制**）+ **正确预测时抑制该分支自身 redirect**
+- [x] **Task 5** 测量设施（★ **FLUSH 事件数计数器归本 change** —— FLUSH 是 DUT 内部 payload，**host 不可见** ⇒ 需改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **本 change 是首个可改 `ip/` 的 change**）+ ★ **MUST 复用**前置1 的 `--stats` 框架（**MUST NOT** 另起一套）+ BP 开关面（工厂参数 + CLI flag）
 
 ## Acceptance
 
@@ -45,7 +46,7 @@ depends_on:
 - [ ] **AC-F2-11** ★ **测量方法护栏**：`enable_mmu=false`（**bare**）· **排除 trap 周期** · **无条件跳转（jal/jalr/ret）与条件分支分开统计**
 
 - [ ] **AC-F2-12** ★ **预测信号必须是活节点** —— `pred_valid` / `pred_taken` 的 payload cell `impl()->is_const() == false` ⇒ 否则被折成常量 ⇒ Δcycles ≈ 0 而 FLUSH 不变 ⇒ **假阴性**（机制被判「不成立」⇒ 误关 ②）
-- [ ] **AC-F2-13** ★ **计数器自证** —— BP 关态下 `FLUSH 事件数 == PC 跳变法测得的 taken 转移数` ⇒ 防「计数器恒 0 ⇒ 『显著下降』真空成立」的**假阳性**
+- [ ] **AC-F2-13** ★ **计数器自证（★ 修正：原文的字面判据不成立）** —— 原文「`FLUSH 事件数 == PC 跳变法测得的 taken 转移数`」**字面为假**（实测 m0：`FLUSH_COUNT=12000` 而该档 taken=0 ⇒ 该档每 iter 有 **6 次与方向无关的固定 flush**）⇒ 改为**差值口径**：`ΔFLUSH`（各档 vs 无 BP 参照档）**MUST** 等于**由源码语义独立算出的 taken 数**（实测 Δ = 2000 / 500 / 1022，逐位相等 ✓）⇒ 目的不变：防「计数器恒 0 ⇒ 『显著下降』真空成立」的**假阳性**
 - [ ] **AC-F2-14** ★ **BTB 命中率自证** —— BP 开态下 `BTB 命中次数 > 0` ⇒ 防「索引退化为 0 ⇒ 恒 miss ⇒ Δ=0 且 FLUSH 不变」的**假阴性**
 - [ ] **AC-F2-15** ★ **无条件跳转占比报告** —— 报告 `jal` 数 / `jalr` 数 / taken 转移数 三者的比例 ⇒ 供 architect 判定「84.5% 门槛在构造上是否可达」（★ `jalr` 不建 BTB 项 ⇒ 其气泡**不可恢复**）
 - [ ] **AC-F2-16** ★★ **功能等价（★ PoC 的鉴别力来源 —— 无此项则 PoC 可在「功能已坏」的机器上判「机制成立」⇒ 假阳性 ⇒ 该结论会被写进 ADR-088 §5.3.2 ⇒ 主体继承）**：BP 开/关两种状态下 ① 4 档**校验和逐位相等** ② `[chmem]` vendored ELF **47/47 0 退化** ⇒ ★ 任一不满足 ⇒ **机制判定作废**（判「不成立」并按 AC-F2-3 的不成立分支结案）
@@ -61,7 +62,8 @@ depends_on:
 | `tools/measure_branchbench.sh` | ★ **前置1 owner**（改名 / 按表头取列 / **捕获 stderr**） | 前置2 **仅追加** `--bp=on\|off` flag + 生效值断言；主体 ✗（硬门禁） | ★ **捕获 stderr 归前置1**（否则假绿通道开着）⇒ 前置2 只加 flag |
 | `tools/verilator_runner/*` | ★ **前置1 建 `--stats` 框架 + `pc_changes`/PC 直方图**（★ **NOT** retired） | 前置2 **补 FLUSH 计数**；主体 **补 BP flag + 回显** | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
 | `ip/cpu/plugins/branch_predictor_chmem.h` | ✗（禁 `ip/**`） | 前置2 **创建（最小版）**；主体 **重写（完整版）** | ★ 前置2 的 PoC 版 MUST NOT 被主体当作已完成 ⇒ 主体 AC-1 MUST 检查**完整功能**（非文件存在）；★ PoC 残留的**删除/重写责任归主体**；★ `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case 在主体后 MUST 仍绿（机制锚）⇒ ★ **该 8 case 只能依赖公开接口** |
-| `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | 前置2 **首次改**（5 臂 mux + FLUSH 门控 + FLUSH 计数）；主体 **二次改**（补完整语义 + 过时注释 #8） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**五臂 select 链**结构 |
+| `ip/cpu/plugins/branch_chmem.h`（**★ owner 表扩展 —— 本轮新增**） | ✗ | ★ **前置2 改**（新增 `IS_BRANCH` / `BRANCH_TAKEN_RAW` / `BRANCH_FLUSHED` 三个 payload + 修正陈旧注释） | ★ **边界扩展登记**：BP 的 PHT 方向学习需要**未抑制**的分支结果与**错路标记** ⇒ branch plugin 需导出 ⇒ 原 owner 表未含本文件 ⇒ 本轮登记 |
+| `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | 前置2 **首次改**（5 臂 mux + FLUSH 门控 + FLUSH 计数 + 过时注释 #8）；主体 **二次改**（补完整语义） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**五臂 select 链**结构 |
 | `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 参数转发） | ✗ | 前置2 **首次注册**（BP 开关）；主体 **补全**（4 参数转发修复 #9 + 完整注册） | ★ 同上 ⇒ 增量扩展 |
 | `docs/architecture/adr/ADR-088-*.md` | ✗ | 前置2 写 **§5.3.2 的「机制结论」段**；主体 写 **「绝对值门禁结论」段** | ★ **主体 MUST NOT 覆盖前置2 的机制结论段**（否则「机制不成立」的结论会被主体的「达标」结论抹掉） |
 | `docs/architecture/tlm-coverage-parity-ledger.md` | ★ **前置1 MUST NOT 触碰** | 前置2 MUST NOT 触碰；主体 owner | ★ 台账重判只归主体 |
@@ -106,9 +108,19 @@ depends_on:
   - ★ fetch stage 排在 branch stage **之前**（canonical_stage_order）⇒ fetch NORMAL 仍早于
     branch NORMAL ⇒ 跨 stage 的 canonical 序不受影响。
 
-★ **判决实验（验证机制主张）**：查表地址分别用 `pc_reg`（BP_PC）与 `pc_lag`（分支地址）
-  ⇒ **命中数完全相同**（1999/3998/3992/3998）⇒ ★ **oracle R1 的「提前一拍预测」成立**
-  （BTB 表项是「该 PC 上次被解析时写的」⇒ 查该 PC 即可命中 ⇒ 预测**领先** actual 一拍）。
+★ **判决实验（★ 修正上一轮的错误推论 —— critic 三轮 B-6）**：查表地址分别用 `pc_reg`（BP_PC）
+  与 `pc_lag`（分支地址）⇒ **命中数完全相同**（1999/3998/3992/3998）。
+  ★★ **该实验对「差一拍」完全不敏感 ⇒ 零鉴别力 ⇒ 不能证明「提前一拍」**：
+  - 查 `pc_reg(N)` = 地址 A（A 的表项来自**上一次** A 被解析时写的 ⇒ 首次必 miss）；
+  - 查 `pc_lag(N)` = `pc_reg(N−1)` = 地址 B（B 的表项同拍写，但读的是边沿写前的旧值 ⇒ 首次同样必 miss）。
+  ⇒ 两者命中数相同**不构成**「提前一拍」的证据。
+  ★ **该实验真正证明的是**：**写侧地址（`pc_lag`）与读侧 tag 比对（`pc_reg`）同指一条分支**
+  ⇒ 简报 §3.3「更新地址 = 分支解析处的 `KT::PC` ⇒ 二者必须同指一条分支
+  （off-by-one ⇒ 学到错误表项）」这条**不变量成立**。
+  ★ **指纹**：hit = 「该分支的执行次数 − 1 次冷启动 miss」
+  （m0: 2000 iter 回边 − 1 = 1999；m1: 2×(2000−1) = 3998）⇒ 逐位吻合。
+  ★ **「提前一拍」的证明 MUST 留到 Task 2 接入 PC-mux 后用 Δcycles**（BP 的三个输出 payload
+  在本 change 内**无消费者** ⇒ 本 commit 里「提前一拍」**没有任何行为后果**）。
 
 ★ **命中数的自洽性**（独立复算 taken/iter）：
   - m0（not-taken）：hit=**1999** = 循环回边 1999 次（该档唯一的 taken）✓
@@ -151,18 +163,42 @@ depends_on:
 | 4 | ★ 本 change **MUST NOT** 触碰 `tools/measure_branchbench.sh` 的**模式名数组与表头解析逻辑**（前置1 的范围）⇒ 本 change **仅追加** BP flag（`--bp=on\|off`）与生效值断言相关行 | ★ 本 change |
 | 5 | ★ `measure_branchbench.sh` 的 `2>/dev/null` MUST 改为**捕获 stderr** ⇒ 否则「flag 未生效却测出无差异」的**假绿通道**是开着的 | ★ 本 change |
 
+
+### ★★★ 诚实登记：本 change 尚未闭合的项（★ 勿被「已交付」的措辞误导）
+
+| # | 项 | 状态 | 归属 / 说明 |
+|---|---|---|---|
+| 1 | **`is_unconditional` 位未落地** | ❌ 未实现 | 现状：BTB 写使能 = `taken & is_branch`（`is_branch` 只含 B-type 条件分支）⇒ **`jal` 永不建 BTB 项**、`is_unconditional` 位**永不置 1** ⇒ 简报 §3.2「`is_unconditional` 位必需」与「`jal` 只更新 BTB」**未落地**。★ 需 branch plugin 导出 jal/jalr 区分（opcode）⇒ **留给 Task 4/主体**（本 PoC 不覆盖无条件跳转） |
+| 2 | **`pred_*_reg_`（ch_reg 预测记录）** | ⚠️ 声明但未接线 | 跨拍预测记录是 **Task 4（误预测纠错）**的前置 ⇒ 本轮**不计入 Task 1 完成范围**（★ 修正上一轮 commit message 的不实陈述） |
+| 3 | **`jalr` 不建项** | ✅ 已实现（保守） | `jalr` 目标随运行时变化 ⇒ 不建 BTB 项 ⇒ 走顺序取指（台账 #9 的终态） |
+| 4 | **M 运行期 mask 的效果无测试** | ⚠️ 缺测 | `index_of_scalar` 用 `kBtbEntries`(256) 做 mask，而运行期路径用 `logical_entries_−1` ⇒ **M<256 时二者不等价**；现有断言只覆盖 M=256 语义 ⇒ 「M 运行期可配」**无端到端证据** |
+| 5 | **`pack_entry` / `unpack_entry` 与运行路径并行** | ⚠️ 双实现 | 运行路径（`update()`）用**内联 shl/or** 拼 62b；`pack_entry` 是**影子 API**（仅测试用）⇒ 两者一旦分叉，测试发现不了（测试只测 helper） |
+| 6 | **门禁漏网：`?:` 形式** | ⚠️ **已知缺口** | `check_plugin_portability.sh` 的 Check 5 只查 `if (ch_bool)`；**C++ 三目 `?:` 的条件位同样做 contextual conversion** ⇒ 同样会在 elaboration 期折成常量（★ 本轮 PHT 饱和 bug 正是这个形态：Verilog 里 `ge_ge_2` dangling ⇒ 计数器 3→0 **回绕**而非饱和）。★ 曾尝试加 Check 5b，但**误报/漏报都难以做到既零噪音又可靠**（本仓库的真实逻辑写在 `predict()`/`update()` 等**被 at_stage 调用的方法**里，而「at_stage 闭包内」的范围抓不到）⇒ **撤销该门禁，改为在此登记为已知缺口** ⇒ 后续应由 ADR-040 的门禁专项处理 |
+| 7 | **「提前一拍」的证明** | ⏳ 待 Task 2 | 本 change 内 BP 的三个输出 payload **无消费者** ⇒ 「提前一拍」**没有任何行为后果** ⇒ 证明 MUST 留到 Task 2 接入 PC-mux 后用 Δcycles |
+
 ### 测试覆盖（critic B3：此前该插件 **0 case** ⇒ `[chmem]` binary 无回归锚）
 
 新增 `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（**点名** `branch_predictor_chmem.h`），
-**5 case / 30 assertions 全绿**：
+**6 case / 52 assertions 全绿**（★ 相对上一版 5 case / 30 assertions：**R1/R2/R3 三个新 case 直接实例化真实插件**
+⇒ 锚在**插件的真实输出**上，而非影子 helper）：
 
-| case | 覆盖 |
-|---|---|
-| `bp_plugin_P1_entry_pack_unpack_roundtrip` | 62b 表项编码往返（tag30/target30/valid/is_unconditional）+ 「MUST NOT 用 `target[1:0]!=0` 判有效」的反例钉死 |
-| `bp_plugin_P2_index_is_pc9_to_2` | ★ 索引 = **PC[9:2]**（B2 修正的回归锚；相邻指令索引差 1） |
-| `bp_plugin_P3_btb_write_read_and_pht_saturate` | BTB 写→读闭环（写路径真生效） |
-| `bp_plugin_P4_prediction_is_live_node` | ★ **预测信号是活节点**（AC-F2-12：`impl()->is_const() == false`）+ C++ 侧常量对照（钉死「区别确实存在」） |
-| `bp_plugin_P5_invalid_entries_fail_fast` | 合法域 = **精确集合** {16,32,64,128,256}（SF1 修正）；越界 throw |
+| case | 覆盖 | 抓得住哪类回归 |
+|---|---|---|
+| `bp_plugin_R1_btb_is_written_when_producer_comes_first` | ★ **注册位顺序**（真实插件 + 真实生产者替身）⇒ 断言插件产出的 payload cell **是活节点** | ★ **注册位回退**（BP 早于生产者 ⇒ 读到陈旧值 ⇒ BTB 永不写 ⇒ RED） |
+| `bp_plugin_R2_btb_entry_readable_after_update` | ★ 插件产出的 `BP_PRED_TARGET` / `BP_PRED_VALID` 是**活节点**（AC-F2-12 **真测插件输出**） | ★ **预测被折成常量** |
+| `bp_plugin_R3_pht_learns_not_taken` | ★ not-taken 分支 ⇒ 预测方向 MUST NOT 恒 taken | ★ **方向学习失效**（任何方向都 +1 ⇒ 恒 3 ⇒ 恒预测 taken） |
+| `bp_plugin_R4_index_is_pc9_to_2` | 索引 = **PC[9:2]** + M 运行期 mask | 索引退化 |
+| `bp_plugin_R5_invalid_entries_fail_fast` | 合法域 = **精确集合** {16,32,64,128,256} | ctor fail-open 回退 |
+| `bp_plugin_R6_entry_pack_unpack_roundtrip` | 62b 编码往返 + 「MUST NOT 用 `target[1:0]!=0` 判有效」 | 编码 helper 分叉 |
+
+★ **★ 关键修正：payload key MUST 是跨 TU 唯一的单例**（`inline` 变量，**不可** `static inline`）——
+  `static inline` 在头文件里 ⇒ **每个 TU 各有一份实例** ⇒ `PayloadStore` 按 `&key` 索引
+  ⇒ 不同 TU 的同名 key 是**不同 cell**。★ 实测症状: BP 内部读回自己的 cell 非空，
+  但**测试 TU** 读同一 key 得空（测试 TU 包含该头文件 ⇒ 持有另一个实例）
+  ⇒ 真实流水线里 IBus 与 BP 同属一个 TU（`cpu_factory_chmem.h` 包含两者）⇒ **侥幸能通**；
+  但任何**跨 TU** 的读写（测试、工具）都会断链。
+  ★ 参照: `branch_chmem.h` 的 `BRANCH_TAKEN` 等也是 `static inline` ⇒ **同类隐患**
+  （目前读写方恰好同 TU ⇒ 未暴露）⇒ ★ **建议后续 change 把既有 key 也统一为 `inline`**。
 
 ### 回归（★ 用**重 build 后**的 binary —— 修正 critic B5 指出的「binary 过期」）
 

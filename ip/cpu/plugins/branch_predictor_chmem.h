@@ -91,21 +91,34 @@ namespace plugins {
 //   ⇒ 预测信号会被折成 elaboration 期常量 ⇒ Δcycles ≈ 0 而 FLUSH 不变
 //   ⇒ **假阴性**（机制被判「不成立」⇒ 误关 ②）。故 MUST 用 uint_t<N>。
 
+// ★★★ payload key 必须是**跨 TU 唯一**的单例 ⇒ 用 **`inline` 变量**
+//   （C++17 起 inline 变量有唯一实例），**不可**用 `static inline`
+//   （`static inline` 在头文件里 ⇒ **每个 TU 各有一份实例** ⇒
+//     `PayloadStore` 按 `&key` 索引 ⇒ 不同 TU 的同名 key 是**不同 cell**）。
+//   ★ 实测症状: BP 内部读回自己的 cell 非空，但**测试 TU** 读同一 key 得空
+//     （测试 TU 包含本头文件 ⇒ 它持有**另一个** `BP_PRED_VALID` 实例）。
+//   ⇒ 真实流水线里 IBus 与 BP 同属一个 TU（`cpu_factory_chmem.h` 包含两者）
+//      ⇒ 侥幸能通；但任何**跨 TU** 的读写（测试、工具）都会断链。
+//   ⇒ 修法: 全部 key 改 `inline`（C++17 inline 变量 ⇒ 跨 TU 唯一）。
+//
+// ★ 参照: `branch_chmem.h` 的 `BRANCH_TAKEN` 等也是 `static inline` ⇒ 同类隐患
+//   （目前读写方恰好同 TU ⇒ 未暴露）。★ 本 change 至少对自己的 key 修对。
+
 /// 预测目标地址 (32b) —— BTB 命中的分支目标
-static inline cf::plugin::Payload<cf::plugin::uint_t<32>> BP_PRED_TARGET{
+inline cf::plugin::Payload<cf::plugin::uint_t<32>> BP_PRED_TARGET{
     "cpu.bp_pred_target"};
 
 /// 预测方向 (1b) —— 1 = 预测 taken
-static inline cf::plugin::Payload<cf::plugin::uint_t<1>> BP_PRED_TAKEN{
+inline cf::plugin::Payload<cf::plugin::uint_t<1>> BP_PRED_TAKEN{
     "cpu.bp_pred_taken"};
 
 /// 预测有效 (1b) —— 1 = BTB 命中且方向可判
-static inline cf::plugin::Payload<cf::plugin::uint_t<1>> BP_PRED_VALID{
+inline cf::plugin::Payload<cf::plugin::uint_t<1>> BP_PRED_VALID{
     "cpu.bp_pred_valid"};
 
 /// 本拍正在取的取指地址 (32b) —— **由 IBusPlugin 在 fetch NORMAL 写入**
 /// (BP 需要 `pc_reg` 的**本拍值**; fetch 节点的 KT::PC 是 `pc_lag` = 上一拍地址)
-static inline cf::plugin::Payload<cf::plugin::uint_t<32>> BP_PC{"cpu.bp_pc"};
+inline cf::plugin::Payload<cf::plugin::uint_t<32>> BP_PC{"cpu.bp_pc"};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // BranchPredictorPluginChmem<T>
@@ -297,14 +310,27 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     if (brn->payloads().has(KT::PC)) {
       br_pc = ch::core::ch_uint<32>(brn->operator()(KT::PC));
     }
-    const ch::core::ch_bool taken =
-        brn->payloads().has(BrPlugin::get_branch_taken_key())
-            ? ch::core::ch_bool(brn->operator()(BrPlugin::get_branch_taken_key()))
-            : ch::core::ch_bool(false);
-    const ch::core::ch_bool is_branch =
-        brn->payloads().has(BrPlugin::IS_BRANCH)
-            ? ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH))
-            : ch::core::ch_bool(false);
+    // ★ 全部用 `if/else` 而非三目 —— 三目的条件位对 ch_bool 做 contextual
+    //   conversion ⇒ 运行期语义丢失（ADR-040 §10.5 那一族）。★ 这里条件是
+    //   `has()`（elaboration 期的 map 查询）⇒ 三目本可行，但为让
+    //   `check_plugin_portability.sh` Check 5b 能**零误报**地检查全仓 ⇒ 统一用 if。
+    ch::core::ch_bool taken(ch::core::ch_literal<0, 1>{});
+    ch::core::ch_bool taken_raw(ch::core::ch_literal<0, 1>{});
+    ch::core::ch_bool flushed(ch::core::ch_literal<0, 1>{});
+    if (brn->payloads().has(BrPlugin::get_branch_taken_key())) {
+      taken = ch::core::ch_bool(brn->operator()(BrPlugin::get_branch_taken_key()));
+    }
+    // ★ **未抑制**的方向（供 PHT 方向学习）+ 错路标记（供表更新门控）
+    if (brn->payloads().has(BrPlugin::BRANCH_TAKEN_RAW)) {
+      taken_raw = ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_TAKEN_RAW));
+    }
+    if (brn->payloads().has(BrPlugin::BRANCH_FLUSHED)) {
+      flushed = ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_FLUSHED));
+    }
+    ch::core::ch_bool is_branch(ch::core::ch_literal<0, 1>{});
+    if (brn->payloads().has(BrPlugin::IS_BRANCH)) {
+      is_branch = ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH));
+    }
     ch::core::ch_uint<32> br_target(ch::core::ch_literal<0, 32>{});
     if (brn->payloads().has(RvKey::BRANCH_TARGET)) {
       br_target = ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
@@ -331,7 +357,8 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
       //   ★ 但 jalr 不建项 ⇒ 需区分 jal 与 jalr —— 用 opcode 不可得（branch 节点
       //   未导出）⇒ 保守：**只有 is_branch（条件分支）建项**；jal 的方向问题
       //   留给主体 change（它需要 jal/jalr 的 opcode 区分）
-      const ch::core::ch_bool write_en = taken & is_branch;
+      // ★ B7: **错路指令 MUST NOT 写 BTB**（否则把错路 target 写进表项）
+      const ch::core::ch_bool write_en = taken & is_branch & (!flushed);
       ch::core::ch_uint<64> wdata(ch::core::ch_literal<0, 64>{});
       // ★ 打包必须是**活**表达式（tag 来自 br_pc，target 来自 br_target）
       // ★ 打包必须是**活**表达式 (tag 来自 br_pc, target 来自 br_target)
@@ -377,17 +404,30 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
 
       const ch::core::ch_uint<2> cur((*pht_rp_)->impl());
       const auto cur2 = ch::core::bits<1, 0>(cur);
-      // ★ 饱和: 0→1→2→3（**不回退**）⇒ taken 时 +1, not-taken 时 **保持**
-      //   ★ 「不回退」是 2-bit 饱和计数器的标准语义（Bimodal）⇒ 方向稳定性靠
-      //     饱和而非递减
       const auto one = ch::core::ch_uint<2>(ch::core::ch_literal<1, 2>{});
       const auto sat3 = ch::core::ch_uint<2>(ch::core::ch_literal<3, 2>{});
-      const auto inc = cur2 >= sat3 ? sat3 : ch::core::ch_uint<2>(cur2 + one);
-      const ch::core::ch_uint<2> newval(inc);
+      const auto zero2 = ch::core::ch_uint<2>(ch::core::ch_literal<0, 2>{});
 
-      // ★ 写使能 = **「分支已解析」（任何方向）** ⇒ taken / not-taken 都写
-      //   （not-taken 时写回**同值**⇒ 语义为「饱和计数只增不减」）
-      const ch::core::ch_bool write_en = is_branch;
+      // ★★ B1 修正: 饱和判定**MUST 用 `select()`** —— 不可用 C++ 三目 `?:`。
+      //   `ch_bool` 只有 `explicit operator bool()` ⇒ 三目条件位在 **elaboration 期**
+      //   被求值成 C++ false ⇒ **饱和分支成死代码** ⇒ 2-bit 计数器 3→0 **回绕**
+      //   （实测: Verilog 里 `ge_ge_2` dangling，写入值 = `(cur+1)&3`；
+      //     行为指纹 = `pred_taken ≈ hit/2` —— 正是 0→1→2→3→0 循环）。
+      //   ⇒ 这是 ADR-040 §10.5 那一族（运行期 ch_bool 被静默折成常量），只是藏在 `?:`。
+      const auto inc_val = select(cur2 >= sat3, sat3,
+                                  ch::core::ch_uint<2>(cur2 + one));
+      // ★ 饱和 -1: cur>0 ? cur-1 : 0
+      const auto dec_val = select(cur2 == zero2, zero2,
+                                  ch::core::ch_uint<2>(cur2 - one));
+      // ★★ B2 修正: **方向学习** —— taken ⇒ 饱和 +1；not-taken ⇒ 饱和 -1。
+      //   原实现「任何方向都 +1」⇒ 计数器单调上升 ⇒ 恒 3 ⇒ **PHT 零方向信息**
+      //   ⇒ 退化成 brief 明文判定为「净负收益」的 BTB-only。
+      //   ★ 与 TLM 侧语义一致（branch_predictor.h:274-286: taken⇒饱和+1 / not⇒饱和-1）。
+      const ch::core::ch_uint<2> newval = select(taken_raw, inc_val, dec_val);
+
+      // ★ B7: **错路指令 MUST NOT 污染 PHT**（否则学到错路方向 ⇒ 净负收益）
+      //   ★ 写使能 = 「是条件分支」且「不是错路」⇒ 真实分支的**任何方向**都学
+      const ch::core::ch_bool write_en = is_branch & (!flushed);
       *pht_wp_ = pht.write(pidx, newval, write_en, "pht_write");
     }
   }
@@ -399,10 +439,15 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
 
     // ★ PC 来源: fetch 节点的 KT::PC 是 **pc_lag** (ibus_chmem.h:166) —— 上一拍地址。
     //   预测必须用 **pc_reg 本拍值** ⇒ 由 IBusPlugin 写 BP_PC payload 供本插件读。
-    ch::core::ch_uint<32> pc(ch::core::ch_literal<0, 32>{});
-    if (n->payloads().has(BP_PC)) {
-      pc = ch::core::ch_uint<32>(n->operator()(BP_PC));
+    // ★ SF5: `BP_PC` 缺失 ⇒ **fail-fast**（不可静默降级为 PC=0 ——
+    //   那会让查表地址恒 0 ⇒ 命中/未命中全错 ⇒ 又一个「全绿但语义为零」的通道）。
+    if (!n->payloads().has(BP_PC)) {
+      throw std::runtime_error(
+          "BranchPredictorPluginChmem: fetch node lacks BP_PC payload "
+          "(the IBus plugin must write it in fetch NORMAL; the BP plugin MUST be "
+          "registered AFTER the IBus plugin)");
     }
+    ch::core::ch_uint<32> pc(ch::core::ch_uint<32>(n->operator()(BP_PC)));
     // ★ 查表地址 = **pc_reg 本拍值**（BP_PC payload，由 IBus 在 fetch NORMAL 写）
     //   ⇒ 预测的是「本拍正在取的那条指令」⇒ 若该指令是分支且表项存在（上次
     //     执行时写的）⇒ 命中 ⇒ 预测**领先** actual 一拍。
