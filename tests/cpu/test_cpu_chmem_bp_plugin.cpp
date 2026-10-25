@@ -87,11 +87,24 @@ std::uint64_t read_u32(ch::Simulator& sim, const ch::core::ch_uint<32>& cell) {
 /// 本插件扮演「IBus + Branch」的角色，按**分段脚本**驱动这些信号。
 class FakeCpuDriver : public cf::plugin::PluginBase {
  public:
+  /// ★ 逐 key 的「不写哪一个」选择器（None = 全写；All = 全不写）
+  enum class SkipPayload {
+    None,
+    All,
+    BranchTaken,
+    BranchTakenRaw,
+    BranchFlushed,
+    IsBranch,
+    BranchTarget,
+  };
+
   struct Phase {
     std::uint32_t end_tick;  ///< 本段结束 tick（含）；tick < end_tick 属于本段
     bool taken;               ///< 本段内分支的**原始**方向
     bool flushed;             ///< 本段内指令是否是「错路指令」
-    std::uint32_t fetch_pc = 0;  ///< 本段的取指地址（0 = 用 br_pc_）
+    /// ★ 本段的取指地址；★ **哨兵值 0 = 用 `br_pc_`**
+    ///   （⇒ 当前无法表达「取指地址真的是 0」；本套测试用不到，但须知晓该协议）
+    std::uint32_t fetch_pc = 0;
   };
 
   FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target,
@@ -103,10 +116,13 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
   }
 
   /// ★ 只写 BP_PC、**不写** branch payload（用于验证 BP 的 branch 侧 fail-fast）
+  /// ★ `skip_payload`: 逐 key 指定「**不写哪一个**」（0 = 全写）⇒ R9 用它做
+  ///   **逐点**覆盖（否则只断聚合存在性 ⇒ 单点删除抓不住 —— critic 六轮 SF-3：
+  ///   `"BRANCH_TAKEN"` 是 `"BRANCH_TAKEN_RAW"` 的前缀 ⇒ 前缀断言有歧义）
   FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target,
-                std::vector<Phase> phases, bool write_branch_payloads)
+                std::vector<Phase> phases, SkipPayload skip_payload)
       : br_pc_(br_pc), br_target_(br_target), phases_(std::move(phases)),
-        write_branch_payloads_(write_branch_payloads) {
+        skip_payload_(skip_payload) {
     if (phases_.empty()) {
       throw std::runtime_error("FakeCpuDriver: phases must not be empty");
     }
@@ -128,8 +144,8 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
       auto* n = pb.node_of_logic_stage("branch").get();
       if (!n) return;
       // ★ 只写 BP_PC 的形态 ⇒ **不写**任何 branch payload ⇒ BP 的 branch 侧
-      //   fail-fast MUST 被触发（R9 的锚）
-      if (!write_branch_payloads_) return;
+      //   fail-fast MUST 被触发（R9 的锚）。★ 逐 key 跳过见 skip_payload_。
+      if (skip_payload_ == SkipPayload::All) return;
       using KT = cf::cpu::core::payload::keys<ch::core::ch_uint<32>, 32>;
       using RvKey = cf::cpu::arch::riscv::payload_keys_riscv<ch::core::ch_uint<32>>;
       using BrPlugin = cf::cpu::plugins::BranchPlugin<ch::core::ch_uint<32>>;
@@ -138,7 +154,6 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
       ch::core::ch_uint<32> tgt(ch::core::ch_literal<0, 32>{});
       tgt = ch::core::ch_uint<32>(ch::core::ch_uint<32>(br_target_));
       n->operator()(KT::PC) = cf::plugin::uint_t<32>(pc);
-      n->operator()(RvKey::BRANCH_TARGET) = cf::plugin::uint_t<32>(tgt);
 
       // ★ 方向 / 错路标记 = **随 tick 变化的活表达式**
       const ch::core::ch_bool taken_raw = phase_value(
@@ -148,10 +163,22 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
       // ★ 与真实 branch plugin 同口径: `BRANCH_TAKEN` 是**被 flush 抑制后**的值,
       //   `BRANCH_TAKEN_RAW` 是**未抑制**的方向（供 PHT 方向学习）。
       const ch::core::ch_bool taken = taken_raw & (!flushed);
-      n->operator()(BrPlugin::get_branch_taken_key()) = taken;
-      n->operator()(BrPlugin::BRANCH_TAKEN_RAW) = taken_raw;
-      n->operator()(BrPlugin::BRANCH_FLUSHED) = flushed;
-      n->operator()(BrPlugin::IS_BRANCH) = ch::core::ch_bool(true);
+      // ★ 逐 key 跳过（None = 全写）
+      if (skip_payload_ != SkipPayload::BranchTaken) {
+        n->operator()(BrPlugin::get_branch_taken_key()) = taken;
+      }
+      if (skip_payload_ != SkipPayload::BranchTakenRaw) {
+        n->operator()(BrPlugin::BRANCH_TAKEN_RAW) = taken_raw;
+      }
+      if (skip_payload_ != SkipPayload::BranchFlushed) {
+        n->operator()(BrPlugin::BRANCH_FLUSHED) = flushed;
+      }
+      if (skip_payload_ != SkipPayload::IsBranch) {
+        n->operator()(BrPlugin::IS_BRANCH) = ch::core::ch_bool(true);
+      }
+      if (skip_payload_ != SkipPayload::BranchTarget) {
+        n->operator()(RvKey::BRANCH_TARGET) = cf::plugin::uint_t<32>(tgt);
+      }
 
       // ★ tick 计数寄存器自增（每拍 +1）⇒ phase 判据随拍变化
       const ch::core::ch_uint<32> one(static_cast<std::uint32_t>(1));
@@ -195,7 +222,7 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
   std::uint32_t br_pc_;
   std::uint32_t br_target_;
   std::vector<Phase> phases_;
-  bool write_branch_payloads_ = true;
+  SkipPayload skip_payload_ = SkipPayload::None;
   ch::core::ch_reg<ch::core::ch_uint<32>> tick_count_{
       ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "bp_test_tick"};
 };
@@ -468,24 +495,25 @@ TEST_CASE("bp_plugin_R8_pht_saturation_does_not_wrap_around", "[cpu][chmem][bp][
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 9) branch 侧 payload 缺失 ⇒ **fail-fast**（critic B-2）
+// 9) branch 侧 payload 缺失 ⇒ **逐 key fail-fast**（critic 五轮 B-2 / 六轮 SF-3）
 //    ★ R1(b) 撞的是 **fetch 侧** 的 `BP_PC` fail-fast（BP 先注册 ⇒ fetch stage
-//      先跑）⇒ BP 的 branch 侧 5 个 fail-fast（BRANCH_TAKEN / BRANCH_TAKEN_RAW
-//      / BRANCH_FLUSHED / IS_BRANCH / BRANCH_TARGET）**零断言覆盖**。
-//    ★ 本 case: 生产者**先注册**且**只写 BP_PC** ⇒ fetch 侧正常 ⇒ 撞 branch 侧
-//      ⇒ 断言异常消息含 "branch node lacks BRANCH_TAKEN"。
+//      先跑）⇒ BP 的 branch 侧 5 个 fail-fast 原本**零断言覆盖**。
+//    ★ **逐 key** 覆盖：5 个 key 各跑一次「只缺这一个」⇒ 断言**完整消息尾巴**
+//      `lacks <KEY> payload`（★ MUST 带 " payload" —— 否则 `BRANCH_TAKEN` 是
+//      `BRANCH_TAKEN_RAW` 的**前缀** ⇒ 单点删除抓不住 —— critic 六轮 SF-3）。
 // ═════════════════════════════════════════════════════════════════════════════
-TEST_CASE("bp_plugin_R9_branch_payloads_fail_fast_when_missing",
-          "[cpu][chmem][bp][plugin]") {
-  ch::core::context ctx("bp_r9");
+namespace {
+using Skip = FakeCpuDriver::SkipPayload;
+
+void expect_missing_branch_payload(Skip skip, const char* key) {
+  ch::core::context ctx(std::string("bp_r9_") + key);
   ctx.set_as_current_context();
   ch::core::ctx_swap guard(&ctx);
 
   cf::plugin::PipeBuilder pb(&ctx);
-  // ★ 生产者先注册，但**不写** branch payload
   pb.register_plugin(std::make_unique<FakeCpuDriver>(
       0x8000010cu, 0x80000118u,
-      std::vector<FakeCpuDriver::Phase>{{1000u, true, false}}, /*write_branch_payloads=*/false));
+      std::vector<FakeCpuDriver::Phase>{{1000u, true, false}}, skip));
   pb.register_plugin(std::make_unique<Btb>(256u));
   pb.build();
 
@@ -499,8 +527,23 @@ TEST_CASE("bp_plugin_R9_branch_payloads_fail_fast_when_missing",
   }
   // ★ MUST 抛异常（否则 = 静默降级为 false ⇒ 表不更新却无报错）
   REQUIRE(threw);
-  // ★ 且必须落在 **branch 侧**（不是 fetch 侧的 BP_PC）
-  REQUIRE(msg.find("branch node lacks BRANCH_TAKEN") != std::string::npos);
+  // ★ 且必须**正是这一个** key（完整尾巴，避免前缀歧义）
+  const std::string want = std::string("lacks ") + key + " payload";
+  INFO("missing key: " << key << " ; actual: " << msg);
+  REQUIRE(msg.find(want) != std::string::npos);
+}
+}  // namespace
+
+TEST_CASE("bp_plugin_R9_branch_payloads_fail_fast_when_missing",
+          "[cpu][chmem][bp][plugin]") {
+  // ① 全不写 ⇒ 撞第一个检查（BRANCH_TAKEN）
+  expect_missing_branch_payload(Skip::All, "BRANCH_TAKEN");
+  // ② 逐 key 只缺一个（★ 单点删除 MUST 被抓住）
+  expect_missing_branch_payload(Skip::BranchTaken, "BRANCH_TAKEN");
+  expect_missing_branch_payload(Skip::BranchTakenRaw, "BRANCH_TAKEN_RAW");
+  expect_missing_branch_payload(Skip::BranchFlushed, "BRANCH_FLUSHED");
+  expect_missing_branch_payload(Skip::IsBranch, "IS_BRANCH");
+  expect_missing_branch_payload(Skip::BranchTarget, "BRANCH_TARGET");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -183,6 +183,13 @@ bash tools/measure_branchbench.sh --check-baseline --bp=on   # BP 启用
 bash tools/measure_branchbench.sh --check-baseline --bp=off  # BP 禁用（= 无 BP 参照）
 ```
 
+★ **当前状态（2026-10-25 前置2 实现轮）**：`--bp=on|off` 已实现（也可用 `BENCH_BP` 环境变量）；
+  ★ 但 CSV 里**尚无** `bp_mode=on` 行 ⇒ `--check-baseline --bp=on` 会走「无基线行 ⇒ 仅打印」分支
+  （exit 0，不比对）⇒ **BP=on 的 cycles 基线须由 ② 追加行后才生效**。
+★ 另：`--check-bp-direction`（前置2 新增）做 **BP 方向性判据**（hit>0 / 校验和与 off 基线逐位相等 /
+  always_taken 预测率 ≥90% / pattern_6of8 预测率 ≤90%）⇒ 这是「BP 机制活着」的自动锚，
+  ★ 属**本地锚**（CI 不跑 ctest ⇒ 见 ADR-088 §5.2 判据 4）。
+
 ⇒ **CSV 结构**：现有 4 行**保留**（无 BP 参照）+ **新增 4 行**（BP 启用）⇒ 8 行。CSV 须加一列 `bp_mode`（`off`/`on`）。
 
 ⚠️ **精确相等口径**（无容差）⇒ BP 启用后的 cycles **必然与无 BP 不同** ⇒ **不能**用同一个「基线漂移」判据 ⇒ 须**按 `bp_mode` 分组**比对。

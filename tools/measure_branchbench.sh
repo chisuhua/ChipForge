@@ -26,9 +26,15 @@
 #   分组键 = (mode_name, bp_mode); workload_sha 作**硬**漂移守卫 (fail-closed); build_id 仅记录.
 #
 # 用法:
-#   bash tools/measure_branchbench.sh                    # 测量并打印
-#   bash tools/measure_branchbench.sh --check-baseline   # 与基线比对, 不一致则 exit 1
-#   bash tools/measure_branchbench.sh --check-bp-direction  # ★ BP 方向性判据 (BP=on)
+#   bash tools/measure_branchbench.sh                       # 测量并打印 (BP=off)
+#   bash tools/measure_branchbench.sh --check-baseline      # 与基线比对, 不一致则 exit 1
+#   bash tools/measure_branchbench.sh --check-bp-direction  # ★ BP 方向性判据 (强制 BP=on)
+#   bash tools/measure_branchbench.sh --bp=on|off [...]      # 指定 BP 状态 (默认 off)
+#   bash tools/measure_branchbench.sh --help
+#
+# ★ bp_mode 的两条设定途径（等价）：`--bp=on|off` 或环境变量 `BENCH_BP=on|off`
+#   （brief v2.2 §5.3 定稿写作 `--bp=on|off`；本脚本两种都支持）。
+#   ★ `--check-bp-direction` 会**强制** BP=on（方向性判据只在 BP 开态有意义）。
 #
 # 环境变量: BENCH_SIM / BENCH_BASELINE / BENCH_MAX_CYCLES / BENCH_ELF_DIR / BENCH_BP
 set -uo pipefail
@@ -53,24 +59,48 @@ MODES=(0 1 2 3)
 #   mode1: cond=1 => `bne` taken     => always_taken
 MODE_NAMES=(always_not_taken always_taken pattern_6of8 pseudo_random)
 
+# ★ 与基线 CSV 无关的失败**不挂** CSV 文件注解（否则 GitHub annotation 指向错文件）
+fail_plain() { echo "FAIL: $*"; exit 1; }
+# ★ 基线内容类失败挂 CSV 文件注解（便于定位需重录的行）
 fail() { echo "::warning file=soc/cpu/docs/dse/branchbench-baseline-matrix.csv::FAIL: $*"; exit 1; }
 
-# ★ 参数解析 **fail-closed** (critic SHOULD_FIX-1): 未知参数 MUST 报错 ——
-#   否则「参数拼错」⇒ 脚本静默降级为「测量并打印」并 exit 0
-#   ⇒ ctest entry 变成**假绿通道**（判据一条都没跑却报 PASS）。
-case "${1:-}" in
-  ""|--measure) ;;
-  --check-baseline) CHECK_ONLY=1 ;;
-  --check-bp-direction)
+usage() { awk '/^# 用法:/{f=1} f && /^set -uo/{exit} f{sub(/^# ?/,""); print}' "$0"; }
+
+# ★ 参数解析 **fail-closed** (critic SHOULD_FIX-1/2):
+#   ① 未知参数 MUST 报错（否则静默降级为「测量并打印」并 exit 0 ⇒ ctest 假绿通道）；
+#   ② **模式只能给一个** —— 否则 `--check-baseline --check-bp-direction` 这类
+#      **最容易被误敲**的组合会只跑第一个 ⇒ 给出一个**不含任何方向性判据的 PASS**；
+#   ③ `--bp=on|off` 可与模式组合（brief v2.2 §5.3 定稿的用法 `--check-baseline --bp=on`）。
+MODE_ARG=""
+for arg in "$@"; do
+  case "$arg" in
+    ""|--measure)
+      [ -z "$MODE_ARG" ] || fail_plain "模式重复: '$*' (模式只接受一个)"
+      MODE_ARG=measure ;;
+    -h|--help) usage; exit 0 ;;
+    --check-baseline)
+      [ -z "$MODE_ARG" ] || fail_plain "模式重复: '$*' (模式只接受一个)"
+      MODE_ARG=baseline ;;
+    --check-bp-direction)
+      [ -z "$MODE_ARG" ] || fail_plain "模式重复: '$*' (模式只接受一个)"
+      MODE_ARG=bpdir ;;
+    --bp=on) BP_MODE=on ;;
+    --bp=off) BP_MODE=off ;;
+    *) fail_plain "未知参数: '$arg' (见 --help)" ;;
+  esac
+done
+case "$MODE_ARG" in
+  ""|measure) ;;
+  baseline) CHECK_ONLY=1 ;;
+  bpdir)
     # ★ BP 方向性判据（critic B-2: 机制指纹 MUST 有**自动化**锚，不能只活在
     #   commit message / 手工表格里）。★ 强制 BP=on（方向性判据只在 BP 开态有意义）。
     CHECK_BP_DIR=1
     BP_MODE=on
     ;;
-  *) fail "未知参数: '$1' (支持: 空 | --measure | --check-baseline | --check-bp-direction)" ;;
 esac
 
-[ -x "$SIM" ] || fail "缺少可执行 $SIM (先 cmake --build build)"
+[ -x "$SIM" ] || fail_plain "缺少可执行 $SIM (先 cmake --build build)"
 [ -f "$BASELINE" ] || fail "缺少基线 $BASELINE"
 
 # ---- 按表头名取列 (修正: 原按位置取列会在 notes 含逗号 / 新增列时静默错位) ----
@@ -147,14 +177,14 @@ if [ -z "$OBJCOPY" ]; then
   done
 fi
 if [ -z "$OBJCOPY" ]; then
-  fail "缺少 objcopy (riscv32- 或 riscv64-unknown-elf-objcopy 均可) ⇒ 无法验证 workload_sha (基线归属守卫) —— 设 BENCH_OBJCOPY 或安装工具链 (★ fail-closed: 不得静默跳过)"
+  fail_plain "缺少 objcopy (riscv32- 或 riscv64-unknown-elf-objcopy 均可) ⇒ 无法验证 workload_sha (基线归属守卫) —— 设 BENCH_OBJCOPY 或安装工具链 (★ fail-closed: 不得静默跳过)"
 fi
 if [ -n "$IDX_WSHA" ] && ! "$OBJCOPY" --version >/dev/null 2>&1; then
-  fail "BENCH_OBJCOPY=$OBJCOPY 不可执行 ⇒ 无法验证 workload_sha (★ fail-closed)"
+  fail_plain "BENCH_OBJCOPY=$OBJCOPY 不可执行 ⇒ 无法验证 workload_sha (★ fail-closed)"
 fi
 
 for m in "${MODES[@]}"; do
-  [ -f "$ELF_DIR/branchbench_m${m}.elf" ] || fail "缺少 $ELF_DIR/branchbench_m${m}.elf (CMake 目标 branchbench_elfs)"
+  [ -f "$ELF_DIR/branchbench_m${m}.elf" ] || fail_plain "缺少 $ELF_DIR/branchbench_m${m}.elf (CMake 目标 branchbench_elfs)"
 done
 
 # 当前 build 的 .text sha (4 档共用 => 取 mode0)
@@ -162,11 +192,11 @@ cur_wsha=""
 if [ -n "$IDX_WSHA" ]; then
   if ! "$OBJCOPY" -O binary --only-section=.text "$ELF_DIR/branchbench_m0.elf" "$ELF_DIR/.bb_m0.text" 2>/dev/null; then
     rm -f "$ELF_DIR/.bb_m0.text"
-    fail "objcopy 提取 .text 失败 ⇒ 无法计算 workload_sha (★ fail-closed)"
+    fail_plain "objcopy 提取 .text 失败 ⇒ 无法计算 workload_sha (★ fail-closed)"
   fi
   cur_wsha=$(sha256sum "$ELF_DIR/.bb_m0.text" | cut -c1-16)
   rm -f "$ELF_DIR/.bb_m0.text"
-  [ -n "$cur_wsha" ] || fail "workload_sha 计算为空 (★ fail-closed)"
+  [ -n "$cur_wsha" ] || fail_plain "workload_sha 计算为空 (★ fail-closed)"
 fi
 
 rc=0
@@ -263,20 +293,25 @@ for i in "${!MODES[@]}"; do
   # ★ BP 方向性判据 (critic B-2: 机制指纹 MUST 有**自动化**锚)
   #   —— 背景: BP 的 B-2 修正 (PHT 方向学习) / B-1 修正 (饱和判定用 select)
   #      在修复前**没有任何自动锚**: 4 档指纹只活在 commit message 里,
-  #      CI 的 branchbench_baseline 跑的是 bp_mode=off ⇒ BP 路径整体不在 CI 内
-  #      ⇒ 有人再写出一个 `?:` 折常量 ⇒ CI 全绿而机制被判「不成立」⇒ 误杀 ②。
+  #      而唯一存在的 branchbench entry 跑的是 bp_mode=off
+  #      ⇒ **BP 路径没有任何自动判据**（★ 注意: 本仓 CI **不跑 ctest 也不构建项目**
+  #      ⇒ 连 bp_mode=off 的 entry 在 CI 里也恒走 SKIP —— 见 ADR-088 §5.2 判据 4 /
+  #      brief AC-9；所以这里的「自动锚」是**本地锚**，由 PR 提交者手动跑兑现）
+  #      ⇒ 有人再写出一个 `?:` 折常量 ⇒ 判据全绿而机制被判「不成立」⇒ 误杀 ②。
   #   —— 判据 (全部是**方向性**不等式, 对 S3 的 PC-mux 接入不敏感):
   #      (1) 4 档 hit > 0            ⇒ BTB 查表/写路径活着 (AC-F2-14 命中自证)
   #      (2) BP=on 的校验和 == BP=off 基线 ⇒ BP 不改变架构可见结果
+  #          ★ 当前**恒真**（BP 三输出无消费者）⇒ 它是 S3 才激活的承重判据；
+  #          ★ 它同时兜住「档名 ↔ 硬件方向错配」（错配 ⇒ 校验和与基线行不符 ⇒ RED）
   #      (3) always_taken: pred >= 0.9×hit ⇒ PHT 学得到 taken
   #          (饱和判定被折常量 ⇒ 计数器 3→0 回绕 ⇒ pred ≈ hit/2 ⇒ RED)
-  #      (4) pattern_6of8: pred < hit ⇒ 方向学习生效
+  #      (4) pattern_6of8: pred <= 0.9×hit ⇒ 方向学习生效
   #          (退化成「任何方向都 +1」⇒ pred == hit ⇒ RED)
   # ═══════════════════════════════════════════════════════════════════════════
   if [ "$CHECK_BP_DIR" -eq 1 ]; then
     # ★ fail-closed: 缺 BP_STATS ⇒ 输出格式变了 ⇒ 静默跳过方向性判据会开假绿通道
     bp_stats=$(printf '%s' "$raw" | grep -oE 'BP_STATS hit=[0-9]+ miss=[0-9]+ pred_taken=[0-9]+' | head -1)
-    [ -n "$bp_stats" ] || fail "mode $m ($name): 输出缺 BP_STATS (★ fail-closed: 无法做 BP 方向性判据)"
+    [ -n "$bp_stats" ] || fail_plain "mode $m ($name): 输出缺 BP_STATS (★ fail-closed: 无法做 BP 方向性判据)"
     bp_hit=$(printf '%s' "$bp_stats" | grep -oE 'hit=[0-9]+' | cut -d= -f2)
     bp_pred=$(printf '%s' "$bp_stats" | grep -oE 'pred_taken=[0-9]+' | cut -d= -f2)
 
@@ -331,15 +366,18 @@ for i in "${!MODES[@]}"; do
 
   cycles_minus_pc=""
   # ★ fail-closed (critic F2): 缺 pc_changes ⇒ 输出格式变了 ⇒ 静默跳过跨档断言会开假绿通道
-  [ -n "$pc_changes" ] || fail "mode $m ($name): 输出缺 pc_changes (★ fail-closed)"
+  [ -n "$pc_changes" ] || fail_plain "mode $m ($name): 输出缺 pc_changes (★ fail-closed)"
   if [ -n "$pc_changes" ]; then
     # 工作量一致性: 4 档 pc_changes 必须相同 (AC-F1-2)
-    # ★★ 仅在 **BP=off** 模式下断言 (critic B-3 暗雷 1): S3 接入 PC-mux 后,
-    #   不同档的预测正确性不同 ⇒ 采样 PC 轨迹**必然**不同 (m0 恒 not-taken ⇒
-    #   预测必错 ⇒ 采样流多出错路 PC) ⇒ 该断言会在 S3 **假红**, 且与
-    #   「BP 是否健康」无关 ⇒ MUST NOT 用它给 BP 路径判生死。
+    # ★★ 仅在 **BP=off** 下断言 (critic B-3 暗雷 ① / 六轮 BLOCKER-1) ——
+    #   守卫键 MUST 是 **BP_MODE**, **不可**用 CHECK_BP_DIR:
+    #   「BP=on」有两条路径（`--check-bp-direction` 与 `BENCH_BP=on --check-baseline`
+    #   / `--bp=on --check-baseline`）⇒ 用 CHECK_BP_DIR 只挡住前者 ⇒ 后者（② 追加
+    #   bp=on 基线行后的正规用法）仍会触发 ⇒ **S3 接入 PC-mux 后必然假红**：
+    #   不同档的预测正确性不同 ⇒ 采样 PC 轨迹必然不同（m0 恒 not-taken ⇒ 预测必错
+    #   ⇒ 采样流多出错路 PC）⇒ 该断言与「BP 是否健康」无关 ⇒ MUST NOT 用它判生死。
     #   ⇒ BP=on 模式只保留「字段存在」检查 (fail-closed), 不做跨档相等断言。
-    if [ "$CHECK_BP_DIR" -eq 0 ]; then
+    if [ "$BP_MODE" = "off" ]; then
       if [ -z "$first_pc_changes" ]; then
         first_pc_changes="$pc_changes"
       elif [ "$pc_changes" != "$first_pc_changes" ]; then

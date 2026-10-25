@@ -538,7 +538,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | 优先级 | 若同时给 `--no-bp` 与其它 ⇒ **`--no-bp` 胜**（显式关闭优先） |
 | 可观测性 | ★ runner 在 **stderr 回显生效值**（`BP=on/off`、`btb_entries=N`）⇒ 测量脚本据此**断言**与请求一致（防止 flag 没生效却测出「无差异」并误判 BP 无效） |
 | 转发完整性 | ★ `build_cpu_with_elaborate`（`cpu_factory_chmem.h:451-458`）**必须转发**新参数（否则该路径行为不同 ⇒ 静默不一致） |
-| 测量脚本 flag 词汇 | ★ **统一一套**：`measure_branchbench.sh` 与 `cpu_verilator_sim` 用**同一套** `--bp=on|off`（v1 发明的 `--check-baseline --bp=on` 与边界简报的 `--enable-bp/--no-bp` 是**两套词汇** ⇒ 消除） |
+| 测量脚本 flag 词汇 | ★ **两层词汇，职责不同**（★ 前置2 实现轮更正：原文写「两者用同一套 `--bp=on\|off`」与上一行的 `--no-bp` **自相矛盾**）：<br>① `cpu_verilator_sim` = **开关式**：`--no-bp`（默认开）/ `--btb-entries N`（表达「关掉」）<br>② `measure_branchbench.sh` = **模式轴式**：`--bp=on\|off` 或环境变量 `BENCH_BP=on\|off`（表达「本次测量属于哪个 bp_mode 行」）+ `--check-baseline` / `--check-bp-direction`<br>★ 脚本 `--bp=on\|off` 已实现（前置2），可与 `--check-baseline` 组合 = v1 的 `--check-baseline --bp=on` 用法 |
 | CSV 结构 | ★ 新列**追加在末尾**（保持 `$2=校验和`、`$3=cycles` 的位置语义，`measure_branchbench.sh:52,63` 按位置取列）⇒ **更稳的做法**：改脚本为**按表头名取列** |
 | CSV 列 | 增 `bp_mode` + `workload_sha` ⇒ `--check-baseline` 按 `(workload_sha, bp_mode)` **分组精确比对** |
 | 跨 build 漂移 | Verilator 确定性 ⇒ 同 build 噪声为 0 ⇒ 阈值可很紧；★ **跨 build 可能漂移** ⇒ CSV 必须记录 build 标识，否则「精确相等」会变成随机红 |
