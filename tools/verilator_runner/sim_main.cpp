@@ -12,15 +12,23 @@
 //   cf_read_dmem(word)               — read the dmem ch_mem array (tohost)
 //   cf_read_pc                       — current PC (diagnostics)
 //   cf_run_sim                       — full reset+loop+verify+report
-//   cf_run_sim_stats                 — same, plus a per-cycle PC histogram and a
-//                                      pc_changes counter (number of cycles in
-//                                      which the PC value changed).
-//                                      ⚠️ NEITHER is "instructions executed":
-//                                      the PC stream includes SPECULATIVE fetches
-//                                      (empirically 0x80000068 / 0x80000128 are
-//                                      sampled 2000x although architecturally
-//                                      unreachable), and the histogram sums to
-//                                      CYCLES, not to a fetch count.
+//   cf_run_sim_stats                 — same, plus a per-cycle PC-value histogram
+//                                      and a pc_changes counter (cycles in which
+//                                      the sampled PC value changed).
+//                                      ⚠️ NEITHER is "instructions executed" /
+//                                      "fetches":
+//                                        - the histogram sums to CYCLES (one
+//                                          sample per cycle), and it contains
+//                                          PC values that are NOT on the
+//                                          architectural path (e.g.
+//                                          0x80000018, the bnez target, is
+//                                          sampled 2000x in a mode where that
+//                                          branch is never taken);
+//                                        - the mechanism producing those values
+//                                          is NOT confirmed — do not name it.
+//                                      ⇒ MUST be used only as a relative
+//                                        (cross-mode) activity indicator, never
+//                                        as an instruction/fetch count.
 //                                      (chmem-branch-microbench-fix: replaces the
 //                                       one-off "temporarily patch sim_main.cpp"
 //                                       measurement with a resident facility)
@@ -112,16 +120,22 @@ int cf_run_sim(void* top, std::uint32_t max_cycles, const char* elf_name) {
   return pass ? 0 : 1;
 }
 
-// Same simulation, plus a resident per-static-PC fetch histogram
-// (chmem-branch-microbench-fix AC-F1-2). `hist` is indexed by
-// (pc - hist_base) / 4 and MUST have hist_len entries; entries outside the
-// window are dropped (and reported via *out_dropped). Returns the same
-// rc as cf_run_sim; *out_cycles / *out_tohost carry the counters.
+// Same simulation, plus a per-cycle PC-value histogram (chmem-branch-microbench-fix
+// AC-F1-2). `hist` is indexed by (pc - hist_base) / 4 and MUST have hist_len
+// entries; samples outside the window are counted in *out_dropped.
+// Returns the same rc as cf_run_sim; *out_cycles / *out_tohost carry the counters.
 //
-// Rationale: the fetch workload parity criterion needs "how many times each
-// static PC was fetched" — a quantity that objdump cannot provide (it only
-// proves the static instruction stream matches). Sampling PC once per cycle
-// is the same method the E-3 bubble measurement used.
+// ⚠️ WHAT THIS IS NOT (measured, do not re-derive):
+//   - NOT a per-static-PC *fetch* histogram: the histogram contains PC values
+//     that are not on the architectural path (e.g. the bnez target 0x80000018
+//     is sampled 2000x in a mode where that branch never fires), and
+//     0x8000001c is sampled 0x in that same mode;
+//   - NOT an instruction/retire count: sum(hist) == cycles, and pc_changes
+//     (cycles whose sampled PC value changed) is likewise not a retire count.
+//   The mechanism behind the non-architectural samples is NOT confirmed.
+// ⇒ Use only as a RELATIVE, cross-mode activity indicator. A retired
+//   instruction count needs the DUT-internal flush signal (not host-visible)
+//   and therefore belongs to a later change.
 int cf_run_sim_stats(void* top, std::uint32_t max_cycles, const char* elf_name,
                      std::uint32_t* hist, std::uint32_t hist_len,
                      std::uint32_t hist_base, std::uint32_t* out_cycles,
@@ -143,12 +157,12 @@ int cf_run_sim_stats(void* top, std::uint32_t max_cycles, const char* elf_name,
   std::uint32_t done_bit = 0;
   std::uint32_t cycles = 0;
   std::uint32_t dropped = 0;
-  // pc_changes counts cycles in which the PC value changed.
-  // ⚠️ This is FRONT-END ACTIVITY, not a retired/executed instruction count:
-  //    the PC stream includes speculative (wrong-path) fetches, and a taken
-  //    redirect whose target equals pc+4 still counts as a change. Do NOT use
-  //    it as "instructions executed"; a retired count needs the flush signal,
-  //    which is internal to the DUT (not host-visible).
+  // pc_changes counts cycles in which the sampled PC value changed.
+  // ⚠️ This is a RELATIVE activity indicator, NOT a retired/executed
+  //    instruction count: the sampled PC stream contains values that are not
+  //    on the architectural path (mechanism unconfirmed), and sum(hist) ==
+  //    cycles. Do NOT use it as "instructions executed"; a retired count needs
+  //    the DUT-internal flush signal (not host-visible).
   std::uint32_t pc_changes = 0;
   std::uint32_t prev_pc = vtop->rootp->top__DOT___pc;
   for (std::uint32_t i = 0; i < max_cycles && done_bit == 0; ++i) {

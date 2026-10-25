@@ -102,8 +102,10 @@ struct Options {
   bool enable_mmu = false;
   std::string mmu_mode = "bare";
   bool enable_cache = false;
-  // chmem-branch-microbench-fix: resident per-static-PC fetch histogram.
-  // --stats            print PC_HIST lines (one per fetched static PC)
+  // chmem-branch-microbench-fix: per-cycle PC-value histogram + pc_changes.
+  // ⚠️ NOT a fetch/retire count (the sampled PC stream contains values that
+  //    are not on the architectural path; mechanism unconfirmed).
+  // --stats            print PC_HIST lines (one per sampled PC value)
   // --stats-base <hex> histogram window base (default = ELF base)
   // --stats-len  <n>   number of 4-byte slots (default 256)
   bool stats = false;
@@ -277,7 +279,9 @@ int main(int argc, char** argv) {
     rc = run_stats(top, opts.max_cycles, elf_name.c_str(), hist.data(),
                    opts.stats_len, opts.stats_base, &cycles, &tohost,
                    &dropped, &pc_changes);
-    // One line per fetched static PC (dense form; the host tool aggregates).
+    // One line per sampled PC value (dense form; the host tool aggregates).
+    // ⚠️ NOT a fetch count — the sampled stream includes non-architectural
+    //    PC values (mechanism unconfirmed); relative/cross-mode use only.
     std::uint32_t distinct = 0;
     for (std::uint32_t i = 0; i < opts.stats_len; ++i) {
       if (hist[i] == 0) continue;

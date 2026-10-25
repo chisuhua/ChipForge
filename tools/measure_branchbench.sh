@@ -8,8 +8,9 @@
 #   3) **工作量一致性 (AC-F1-2)**: 承重证据 = **静态结构** (档位选择无分支 + 分支两路径等长
 #      ⇒ 4 档执行同一指令序列 ⇒ 动态指令数结构上必然相同).
 #      常驻 `pc_changes` (PC 轨迹变化点数) 4 档相同 ⇒ **前端活动量**一致 (动态佐证).
-#      ⚠️ `pc_changes` **不是**已执行指令数 (含投机/错路取指); `cycles - pc_changes` 的
-#      语义**未确认** (实测回边 taken 不计入) ⇒ **MUST NOT** 作为任何结论的依据.
+#      ⚠️ `pc_changes` **不是**已执行指令数 (采样流含非架构路径上的 PC 值, 机制未确认);
+#      `cycles - pc_changes` 的语义**未确认** (实测回边 taken 不计入)
+#      ⇒ **MUST NOT** 作为任何结论的依据.
 #   4) --check-baseline: cycles 与基线**精确相等** (无容差) + workload_sha 匹配
 #
 # ★设计要点 (为什么可测):
@@ -128,7 +129,7 @@ if [ -z "$OBJCOPY" ]; then
   done
 fi
 if [ -z "$OBJCOPY" ]; then
-  fail "缺少 riscv32-unknown-elf-objcopy ⇒ 无法验证 workload_sha (基线归属守卫) —— 设 BENCH_OBJCOPY 或安装工具链 (★ fail-closed: 不得静默跳过)"
+  fail "缺少 objcopy (riscv32- 或 riscv64-unknown-elf-objcopy 均可) ⇒ 无法验证 workload_sha (基线归属守卫) —— 设 BENCH_OBJCOPY 或安装工具链 (★ fail-closed: 不得静默跳过)"
 fi
 if [ -n "$IDX_WSHA" ] && ! "$OBJCOPY" --version >/dev/null 2>&1; then
   fail "BENCH_OBJCOPY=$OBJCOPY 不可执行 ⇒ 无法验证 workload_sha (★ fail-closed)"
@@ -168,9 +169,11 @@ for i in "${!MODES[@]}"; do
   status=$(printf '%s' "$out" | grep -oE '(PASS|FAIL|TIMEOUT)' | head -1)
   pc_changes=$(printf '%s' "$raw" | grep -oE 'pc_changes=[0-9]+' | head -1 | cut -d= -f2)
   dropped=$(printf '%s' "$raw" | grep -oE 'dropped=[0-9]+' | head -1 | cut -d= -f2)
-  # ★ (critic N2): 直方图窗口溢出 ⇒ 计数被丢弃 ⇒ 前端活动量断言不可信 ⇒ fail
-  if [ -n "$dropped" ] && [ "$dropped" -ne 0 ]; then
-    fail "mode $m ($name): 直方图窗口溢出 (dropped=$dropped) —— 提高 --stats-len"
+  # ★ fail-closed (critic SHOULD_FIX-6): 缺 dropped 字段 ⇒ 输出格式变了 ⇒ 静默跳过
+  #   溢出检查会开假绿通道 ⇒ 与 pc_changes 同等对待
+  [ -n "$dropped" ] || fail "mode $m ($name): 输出缺 dropped (★ fail-closed: 无法判断直方图是否溢出)"
+  if [ "$dropped" -ne 0 ]; then
+    fail "mode $m ($name): 直方图窗口溢出 (dropped=$dropped) ⇒ 计数被丢弃 ⇒ 前端活动量断言不可信 —— 提高 --stats-len (或检查 --stats-base 覆盖范围)"
   fi
 
   # ---- 结果正确性 (硬闸): 校验和必须与基线期望值逐位相等 ----
@@ -209,7 +212,7 @@ for i in "${!MODES[@]}"; do
     fi
   fi
 
-  bubbles=""
+  cycles_minus_pc=""
   # ★ fail-closed (critic F2): 缺 pc_changes ⇒ 输出格式变了 ⇒ 静默跳过跨档断言会开假绿通道
   [ -n "$pc_changes" ] || fail "mode $m ($name): 输出缺 pc_changes (★ fail-closed)"
   if [ -n "$pc_changes" ]; then
@@ -219,11 +222,18 @@ for i in "${!MODES[@]}"; do
     elif [ "$pc_changes" != "$first_pc_changes" ]; then
       fail "mode $m ($name): pc_changes=$pc_changes != $first_pc_changes ($(printf '%s' "${MODE_NAMES[0]}")) —— ★ 前端活动量跨档不一致 (承重证据 = 静态结构论证; 此项为动态佐证)"
     fi
-    bubbles=$(( cycles - pc_changes ))
+    cycles_minus_pc=$(( cycles - pc_changes ))
   fi
 
-  printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s pc_changes=%-8s cycles-minus-pc=%-6s checksum-ok\n" \
-    "$m" "$name" "$BP_MODE" "$tohost" "$cycles" "${pc_changes:-?}" "${bubbles:-?}"
+  # ★ NIT-5: `cycles-minus-pc` 的语义**未确认** ⇒ 仅在 --check-baseline 下输出
+  #   (默认输出不给下游留下可被误引用的未确认量)
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s pc_changes=%-8s cycles-minus-pc=%-6s checksum-ok\n" \
+      "$m" "$name" "$BP_MODE" "$tohost" "$cycles" "${pc_changes:-?}" "${cycles_minus_pc:-?}"
+  else
+    printf "branchbench: mode=%s %-16s bp=%s tohost=%-10s cycles=%-8s pc_changes=%-8s checksum-ok\n" \
+      "$m" "$name" "$BP_MODE" "$tohost" "$cycles" "${pc_changes:-?}"
+  fi
 
   if [ "$CHECK_ONLY" -eq 1 ] && [ "$base_cycles" != "$cycles" ]; then
     echo "::warning file=soc/cpu/docs/dse/branchbench-baseline-matrix.csv::FAIL: mode $m ($name) 基线漂移: 基线 $base_cycles != 实测 $cycles (精确相等口径; 漂移须显式重录基线 + commit 说明原因)"

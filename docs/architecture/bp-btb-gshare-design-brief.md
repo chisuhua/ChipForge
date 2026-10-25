@@ -479,7 +479,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | # | 判据 | 说明 |
 |---|------|------|
 | **AC-8a**（功能，无阈值） | 4 档在 `bp=on` 与 `bp=off` 下**校验和逐位相等** | 保留 |
-| **AC-8b-1**（结构等式含暖机，★ v2.2 修正） | `always_taken` 档上 `Δcycles(bp=off − bp=on)` **逐位等于**「该档 bp=off 下的 **条件分支** taken 转移数 × 1 拍 **− W**」⇒ ★ **W = 2 × 该档静态条件分支数**（推导：迭代 1 = BTB miss、迭代 2 = 计数=1 预测不跳转）⇒ **MUST 实测并报告 W**（★ **MUST NOT** 写死魔数 `W ≤ 4` —— 档内静态分支数可能更多 ⇒ 正确实现会被判 RED）⇒ ★ **N MUST NOT 含 `jalr`**（不建 BTB 项 ⇒ 其气泡不可恢复 ⇒ 等式不可满足）⇒ ★★ **N 的口径 MUST 由源码语义 / 独立计数导出**（★ **MUST NOT** 用 `(cycles − pc_changes)` 反推 —— 该差值**不是** taken 总数：前置1 实测 `always_taken` 档的循环回边（目标 ≠ `pc+4`）taken 1999 次却**不计入**该差值 ⇒ 其语义**未确认**）。★ **本等式的成立性 MUST 在 ② 实施时用「BP 关态的 taken 数」独立验证**（前置1 只确认了 `branch_sel` 那条分支）⇒ ★ **「零误预测档」的准确表述 = 「零*代价*误预测**」** | ★ 把「1 拍/taken」从**分类恒等式**升级为**实测等式** |
+| **AC-8b-1**（结构等式含暖机，★ v2.2 修正） | `always_taken` 档上 `Δcycles(bp=off − bp=on)` **逐位等于**「该档 bp=off 下的 **条件分支** taken 转移数 × 1 拍 **− W**」⇒ ★ **W = 2 × 该档计入 N 的那组静态条件分支数**（★ **MUST NOT** 把循环回边计入 W —— 它已被排除出 N）（推导：迭代 1 = BTB miss、迭代 2 = 计数=1 预测不跳转）⇒ **MUST 实测并报告 W**（★ **MUST NOT** 写死魔数 `W ≤ 4` —— 档内静态分支数可能更多 ⇒ 正确实现会被判 RED）⇒ ★ **N MUST NOT 含 `jalr`**（不建 BTB 项 ⇒ 其气泡不可恢复 ⇒ 等式不可满足）⇒ ★★ **N 的口径 MUST 由源码语义 / 独立计数导出**（★ **MUST NOT** 用 `(cycles − pc_changes)` 反推 —— 该差值**不是** taken 总数：前置1 实测 `always_taken` 档的循环回边（目标 ≠ `pc+4`）taken 1999 次却**不计入**该差值 ⇒ 其语义**未确认**）。★ **本等式的成立性 MUST 在 ② 实施时用「BP 关态的 taken 数」独立验证**（前置1 只确认了 `branch_sel` 那条分支）⇒ ★ **「零误预测档」的准确表述 = 「零*代价*误预测**」** | ★ 把「1 拍/taken」从**分类恒等式**升级为**实测等式** |
 | **AC-8b-2**（净收益模型，★ v2.2 按情形 A/B 修正） | 其余档 `Δcycles(off − on) = N_correct×1 − N_false_A×1`（N 由 **BP 内部计数器**导出）⇒ ★ **符号修正**（v2 写成 `on − off`，方向反了）⇒ ★ **`N_false` MUST 只计情形 A**（预测 taken / 实际 not-taken，代价 **1 拍**）⇒ ★ **情形 B**（预测 not-taken / 实际 taken）代价 **0 拍**（与无 BP 行为相同）⇒ **MUST NOT** 计入 ⇒ ★ **MUST NOT** 用「2×命中率 − 1」推导门槛（该式仅在情形 B ≈ 0 时成立） |
 | **AC-8b-3**（有界替代，不引入计数器时） | 只断言 `0 ≤ Δcycles(off − on) ≤ N_taken×1`，精确净收益降级为 PoC 报告项 | 兜底 |
 | **AC-8c**（反证）★ **限定 `always_taken` 档** | `Δcycles(off − on) == 0` ⇒ **BP 未生效**。⚠️ v2 的写法对 `always_not_taken` 档**不成立**（该档预测 not-taken 与无 BP 等价 ⇒ Δ 合法地 ≈ 0） | ★ 修正 |
@@ -558,7 +558,7 @@ flush(N) = hold_z(N)                                          ← 停顿分量�
 | `tests/cpu/manual_elf/branchbench/branchbench.c` | ✓ owner | ✗ | ✗（硬门禁） |
 | `soc/cpu/docs/dse/branchbench-baseline-matrix.csv` | ✓ **建列** | ✓ 仅追加行 | ✓ 仅追加行 |
 | `tools/measure_branchbench.sh` | ✓ owner（改名 / 按表头取列 / **捕获 stderr**） | ✓ 仅追加 flag 行 | ✗（硬门禁） |
-| `tools/verilator_runner/*` | ✓ `--stats` 框架 + retired 计数 | ✓ FLUSH 计数 | ✓ BP flag + 回显 |
+| `tools/verilator_runner/*` | ✓ `--stats` 框架 + `pc_changes`/PC 直方图（★ **NOT** retired） | ✓ FLUSH 计数 + retired 计数 | ✓ BP flag + 回显 |
 | `ip/cpu/plugins/branch_predictor_chmem.h` | ✗ | ✓ **创建（最小版）** | ✓ **重写（完整版）** |
 | `ip/cpu/plugins/ibus_chmem.h`（mux + flush） | ✗ | ✓ **首次改** | ✓ **二次改（增量扩展）** |
 | `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 转发） | ✗ | ✓ 首次注册 | ✓ 补全（+4 参数转发修复） |

@@ -43,7 +43,7 @@
 | **实施顺序** | ★ **本 change 主体不得开工**，直到两个前置 change 完成：① `chmem-branch-microbench-fix` ② `chmem-bp-btb-gshare-poc` | 简报 §4 |
 | **next_pc 五级嵌套** | ★ `trap > branch-actual/mispredict > freeze(hold) > bp-predict > seq`（与 `fetch_stall_protocol` rev.14 + R11.1 协调） | 简报 §3.4.2 |
 | **完整三步时序** | ★ 正确预测 ⇒ **必须抑制该分支自身的 redirect**（否则目标指令被取两次 ⇒ Δcycles≈0 ⇒ 误判机制不成立） | 简报 §2.1.2 |
-| **host 可见事件计数** | 「已执行指令数」+「FLUSH 事件数」⇒ 供 AC-8b 与前置2 判据 | AC-15 |
+| **host 可见事件计数** | 「已执行(retired)指令数」+「FLUSH 事件数」⇒ 供 AC-8b 与前置2 判据（★ **两者均归前置2** —— 需 flush 信号） | AC-15 |
 | **绝对值门槛** | ★ 净命中率门槛 **≥ 84.5%**（= 101461 / 120065）⇒ ★ 若前置2 报告的可达下界 < 84.5% ⇒ **不得以「GShare 延后」结案** | 简报 §0.5 |
 | **「不做什么」机检化** | `branch_predictor_chmem.h` 内不得出现 GShare/GHR/RAS 标识、不得出现 `ch_reg<ch_uint<13>>` ⇒ grep 门禁 | AC-12 |
 | **builder 开工须知** | ★ 10 条（含台账 7 列护栏 / case 名零交集 / CSV 按表头名取列 / `--btb-entries` 合法域 / 三 change 边界硬门禁） | 简报 §5.5 |
@@ -303,7 +303,7 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 | `tests/cpu/manual_elf/branchbench/branchbench.c` | ✓ owner | ✗ | ✗（硬门禁） | ✅ 闭合 |
 | `soc/cpu/docs/dse/branchbench-baseline-matrix.csv` | ✓ **建列**（`workload_sha` / `build_id` / `bp_mode=off`）+ 改按表头取列 | ✓ **追加** BP 行 | ✓ **追加** BP 行 | ★ 建列归前置1；追加归后两者 |
 | `tools/measure_branchbench.sh` | ✓ owner（改名 / 按表头取列 / 捕获 stderr） | ✓ **仅追加** `--bp=on\|off` flag 行 + 生效值断言 | ✗（硬门禁） | ★ **捕获 stderr 归前置1**（否则假绿通道开着）⇒ 前置2 只加 flag |
-| `tools/verilator_runner/*` | ✓ `--stats` 框架 + **retired 计数** | ✓ **FLUSH 计数** + BP flag | ✓ `--no-bp` / `--btb-entries` + 回显 | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
+| `tools/verilator_runner/*` | ✓ `--stats` 框架 + `pc_changes`/PC 直方图（★ **NOT** retired） | ✓ **FLUSH 计数** + **retired 计数** + BP flag | ✓ `--no-bp` / `--btb-entries` + 回显 | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
 | `ip/cpu/plugins/branch_predictor_chmem.h` | ✗（禁 `ip/**`） | ✓ **创建**（最小版） | ✓ **重写**（完整版） | ★ 前置2 的 PoC 版 **MUST NOT** 被主体当作已完成 ⇒ 主体 AC-1 MUST 检查**完整功能**（非文件存在）；★ PoC 残留的**删除/重写责任归主体**；★ `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case **在主体后 MUST 仍绿**（机制锚） |
 | `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | ✓ **首次改**（五级 mux + flush 双分量 + FLUSH 计数） | ✓ **二次改**（补完整语义 + 过时注释 #8） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**四情形 select 链**结构 |
 | `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 参数转发） | ✗ | ✓ **首次注册**（BP 开关） | ✓ **补全**（4 参数转发修复 #9 + 完整注册） | ★ 同上 ⇒ 增量扩展 |
@@ -313,8 +313,8 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 ### ★★ FLUSH 计数归属定案（★ v2.2 —— metis 三审 A7/4b：前置1 spec 要求输出 FLUSH 计数 vs 前置1 禁 `ip/**` ⇒ 互斥）
 
 ⇒ ★ **裁决**：**FLUSH 事件数归前置2**。
-- 理由：FLUSH 是 DUT 内部 payload（`ibus_chmem.h:167` 的 `br_taken_buf`），**host 不可直接见** ⇒ 要计数须改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **违反前置1 的「不得触碰 `ip/**`」边界** ⇒ 前置1 **只交付 host 可导出的 retired 计数**（由 PC 轨迹导出）
-- ⇒ ★ **前置1 spec 的「已执行指令数须可观测」场景 MUST 改写**为「**取指次数**」口径（★ retired 需要 flush 数，在前置1 语境下不可得）⇒ 4 档的判据 = 「**除分支 PC 与其两个后继外**，各静态 PC 的取指次数逐档相同」
+- 理由：FLUSH 是 DUT 内部 payload（`ibus_chmem.h:167` 的 `br_taken_buf`），**host 不可直接见** ⇒ 要计数须改 `ip/cpu/plugins/ibus_chmem.h` ⇒ **违反前置1 的「不得触碰 `ip/**`」边界** ⇒ 前置1 **只交付 host 可导出的「采样到的 PC 值的变化拍数」**（★ **不是** retired —— 采样流含非架构 PC 值，机制未确认）
+- ⇒ ★ **前置1 spec 的「工作量计数须可观测」场景已改写**为「采样到的 PC 值的变化拍数 + 总周期数」（★ **不是** retired —— 采样流含非架构 PC 值，机制未确认；★ retired 与 FLUSH 均需 flush 信号 ⇒ 前置1 不可得 ⇒ 归前置2）⇒ ★ **4 档工作量的承重证据 = 静态结构论证**（档位选择无分支 + 分支两路径等长 ⇒ 4 档执行同一指令序列）；动态计数仅作**跨档活动量**佐证
 - ⇒ ★ **前置2** 交付 FLUSH 计数（首个可改 `ip/` 的 change）⇒ 主体复用
 
 ### ★★ 「归档时必须完成」归属（★ v2.2 —— metis 三审 3c：该 H2 不在 `## Acceptance` 下 ⇒ verifier 不查）

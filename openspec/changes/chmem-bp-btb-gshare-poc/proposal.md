@@ -46,7 +46,8 @@ depends_on:
 2. **fetch NORMAL 的预测** —— BTB `aread`（0-cycle）+ payload 输出
 3. **branch LATE 的 PC-mux 接入** —— ★ **五级嵌套**（`trap > branch-actual/mispredict > freeze > bp-predict > seq`，见架构简报 §3.4.2）
 4. **flush 判据改写（★ 门控，非「替换分量」）** —— `flush = hold_z | (taken_buf && !bp_spec_taken_buf) | mispredict_A_buf` ⇒ ★ **BP 关闭时与现状逐位相同（零退化）** ⇒ ★ **MUST NOT** 用「替换分量」写法
-5. **测量设施** —— 「已执行指令数」+「FLUSH 事件数」+ **host 侧 PC 序列**（查重复 PC）+ TLM 侧 cycle 数同时输出
+5. **测量设施** —— ★ **FLUSH 事件数**（DUT 内部 ⇒ 需改 `ip/` ⇒ 归本 change）+ **host 侧 PC 轨迹**（查重复 PC）+ TLM 侧 cycle 数同时输出
+   ★ **已执行(retired)指令数**：retired = 取指 − flush ⇒ 依赖 FLUSH 计数 ⇒ **本 change 交付**（★ 前置1 **不**交付它 —— 前置1 的 `--stats` 只给 `pc_changes`/PC 直方图，**非** retired）
 
 ### Out of Scope（5 项）
 

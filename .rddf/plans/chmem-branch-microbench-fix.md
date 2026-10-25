@@ -4,7 +4,7 @@
 > **规模**: 小 · **前置**: 无
 > **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` **v2.2** §2.4 / §4.1
 > ★ **AC 清单**: `openspec/changes/chmem-branch-microbench-fix/tasks.md`（AC-F1-1 … AC-F1-7）
-> ★ **owner 表**: 见本 change 的 tasks.md（★ 本 change = 前置1 owner：`branchbench.c` / 基线 CSV 建列 / `measure_branchbench.sh` / `--stats` 框架 + retired 计数）
+> ★ **owner 表**: 见本 change 的 tasks.md（★ 本 change = 前置1 owner：`branchbench.c` / 基线 CSV 建列 / `measure_branchbench.sh` / `--stats` 框架 + `pc_changes`/PC 直方图（★ **NOT** retired —— retired 需 flush ⇒ 归前置2））
 
 ---
 
@@ -17,7 +17,7 @@
 - [ ] **Task 1** `branch_cond` 无分支化（位运算 select）⇒ `objdump` 验证 **0 条条件分支**
 - [ ] **Task 2** `branch_sel` 两条路径补齐等长（taken 路径补一条 `j`）⇒ `objdump` 验证两路径指令数相等（含 `ret`）
 - [ ] **Task 3** ★ **档名互换重命名**（mode0 ⇄ mode1）+ 改名传播清单（同 commit：CSV `mode_name` · `measure_branchbench.sh` 的 `MODE_NAMES` · 文档旧档名）
-- [ ] **Task 4** ★ **常驻测量设施（仅 host 可导出的部分）**：「**已执行(retired)指令数**」计数器（由 PC 轨迹导出）+ `--stats` 输出行（★ **FLUSH 事件数归前置2** —— host 不可见 ⇒ 须改 `ip/` ⇒ 违反本 change 的「不得触碰 `ip/**`」边界）
+- [ ] **Task 4** ★ **常驻测量设施（仅 host 可导出的部分）**：**采样到的 PC 值的变化拍数**（`pc_changes`）+ 逐 cycle PC 直方图 + `--stats` 输出行（★ **不是** retired 指令数 —— 采样流含非架构 PC 值，机制未确认 ⇒ 仅作跨档活动量的相对量；★ **retired 与 FLUSH 事件数均归前置2** —— retired = 取指 − flush，flush 是 DUT 内部 payload ⇒ host 不可见 ⇒ 须改 `ip/` ⇒ **违反本 change 的「不得触碰 `ip/**`」边界**）
 - [ ] **Task 5** 基线重录（★ **4 档 `.text` sha256 MUST 逐档相同**）+ 建列（`workload_sha` / `build_id` / `bp_mode=off`）+ 改按表头取列 + **捕获 stderr** + 证伪留痕（★ **MUST 替换 CSV notes 中两条失效断言**）
 
 ## ★ 兜底句纪律
