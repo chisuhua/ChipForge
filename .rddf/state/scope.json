@@ -3,9 +3,9 @@
   "current_scope": {
     "category": "ip",
     "target": "cpu",
-    "sub_target": null
+    "sub_target": "docs"
   },
-  "updated_at": "2026-10-23T05:39:23Z",
+  "updated_at": "2026-10-26T08:11:53Z",
   "updated_by": "user",
   "session_id": "ses_ebd10896effeIBebOAJUcXVV3E",
   "history": [
@@ -43,6 +43,13 @@
       "at": "2026-10-18T16:23:59Z",
       "by": "user",
       "trigger": "scope-matrix-proposal initial (2026-10-19)"
+    },
+    {
+      "from": "ip/cpu",
+      "to": "ip/cpu",
+      "at": "2026-10-26T08:11:53Z",
+      "by": "user",
+      "trigger": "用户指令『把 bp-btb-gshare-design-brief.md 移入 ip/cpu/docs，遵循 scope 工作目录（ip-cpu 相关放 ip/cpu scope）』⇒ sub_target = docs"
     }
   ]
 }
