@@ -19,6 +19,7 @@
 > **设计核心（ADR-083, 2026-10-08）**：ChipForge 用 **Plugin-style** 设计所有硬件模块。**业务 IP 不再分别为 TLM 和 RTL 各写一份**。同一份 Plugin-style 代码经由**两个编译模式**产出不同仿真后端：
 > - **TLM 模式**（默认）：`cf::plugin::uint_t<N>` 解析为 POD；`pb.run()` 每周期执行 → C++ 直仿
 > - **CH_MEM 模式**（`-DCF_PLUGIN_USE_CH_MEM`，v0.3.0+ 新正道）：`cf::plugin::uint_t<N>` 解析为 `ch::core::ch_uint<N>`；`pb.elaborate(ctx)` 一次性发射 lnode DAG → ① CppHDL Simulator tick 直仿；② `ch::toVerilog(ctx)` 生成 Verilog；③ Verilator 编译+联合仿真
+> - ★★ **目标态（ADR-088 v1.4 §10，2026-10-26 裁决）**：**一个模型 + 两个后端 + 一道差分门禁** —— TLM 模式是**过渡期的第三条腿**（提供亚秒级快环），★ **不是** parity 的一条腿；★ **一致性证据 = 同一输入的确定性双后端差分执行**（ADR-089）⇒ 「463 条台账计数」不再是 parity 证据（台账重新定性为 **CH_MEM 覆盖边界规格**）；★ **TLM 模式的删除时点绑 ADR-088 §5.2 的 B3**（新增判据 6/7：差分门禁已绿 + CI build 能力）⇒ ★ 阶段 A（差分门禁）MUST 先于阶段 C（删 TLM）。
 
 ```
 +------------------------------------------------------------------+
