@@ -37,7 +37,7 @@ review_by: 2026-11-09
 
 ## 架构依据
 
-### 缺陷一：机制规格（简报 `docs/architecture/bp-btb-gshare-design-brief.md`）
+### 缺陷一：机制规格（简报 `ip/cpu/docs/bp-btb-gshare-design-brief.md`）
 
 | # | 缺陷 | 后果 | PoC 证据 |
 |---|---|---|---|
@@ -62,12 +62,12 @@ review_by: 2026-11-09
 | # | 缺陷 | 后果 |
 |---|---|---|
 | #13 | `soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv` **缺 `workload_sha` / `build_id` 列**（branchbench CSV **有**） | 「重录的数值只因 BP 而变」这一归因**缺机器可验证支撑**（toolchain/ELF 差异无法在脚本层排除） |
-| #14 | `docs/architecture/adr.md`（113/117-122/136-142 行）与 `docs/architecture/bp-btb-gshare-design-brief.md`（296/300/304/460/461 行）存在 **GFM 表格结构伤**（行 cell 数 ≠ 表头 cell 数 / code span 内未转义管道符） | GFM 渲染时 **excess cell 被静默丢弃** ⇒ 该行的**约束与行动指令在渲染视图里不可见**（PoC 的 S3-a / S3-d 两行正是这样被 critic 抓到的） |
+| #14 | `docs/architecture/adr.md`（113/117-122/136-142 行）与 `ip/cpu/docs/bp-btb-gshare-design-brief.md`（296/300/304/460/461 行）存在 **GFM 表格结构伤**（行 cell 数 ≠ 表头 cell 数 / code span 内未转义管道符） | GFM 渲染时 **excess cell 被静默丢弃** ⇒ 该行的**约束与行动指令在渲染视图里不可见**（PoC 的 S3-a / S3-d 两行正是这样被 critic 抓到的） |
 | #15 | ★ **简报 §5.1 的 BP 条目状态与台账冲突**（#11 `per_thread_ghr_isolation`：简报 not-covered vs 台账 partial） | 主体 AC-3「台账逐条重判」**无基线** ⇒ 重判结果不可信 |
 
 ## 范围
 
-- **只改文档/ADR/CSV 表头**：① `docs/architecture/bp-btb-gshare-design-brief.md`（回写 v2.3）② `docs/architecture/adr/ADR-088-tlm-backend-retirement.md`（§5.3.2 的结论段）③ `docs/architecture/adr.md`（注册表表格结构）④ `soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv`（加两列 + 回填）
+- **只改文档/ADR/CSV 表头**：① `ip/cpu/docs/bp-btb-gshare-design-brief.md`（回写 v2.3）② `docs/architecture/adr/ADR-088-tlm-backend-retirement.md`（§5.3.2 的结论段）③ `docs/architecture/adr.md`（注册表表格结构）④ `soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv`（加两列 + 回填）
 - ★ **不改任何 `ip/**` 代码**（`is_unconditional` / RAS / GShare 属 `chmem-bp-btb-gshare` 的 Task 7）
 - ★ **不改任何门禁阈值**（判据重校准由 architect 在本 change 内落结论，实施者只落实）
 
@@ -82,7 +82,7 @@ review_by: 2026-11-09
 
 ## What Changes
 
-1. **简报回写 v2.3**（`docs/architecture/bp-btb-gshare-design-brief.md`）：
+1. **简报回写 v2.3**（`ip/cpu/docs/bp-btb-gshare-design-brief.md`）：
    - §2.1.2 的 select 链：引入 `bp_next` 层（`bp_predict` 项取 `bp_next`，不是裸 `pred_target`）
    - §2.1.2 的情形清单：**补情形 F** + **补「被解析指令在错路上」维度**（一切情形判定 MUST 排除）
    - §3.4.2 的门控规则行：`bp_spec_taken_buf` = 「投机**被证明正确**」；flush = **门控**（不是「替换分量」）
@@ -96,12 +96,12 @@ review_by: 2026-11-09
 
 ## Acceptance
 
-- [ ] **AC-A1** 简报 §2.1.2 的 select 链含 `bp_next` 层，且**可 grep 断言**（`grep -c "bp_next" docs/architecture/bp-btb-gshare-design-brief.md` ≥ 1）
+- [ ] **AC-A1** 简报 §2.1.2 的 select 链含 `bp_next` 层，且**可 grep 断言**（`grep -c "bp_next" ip/cpu/docs/bp-btb-gshare-design-brief.md` ≥ 1）
 - [ ] **AC-A2** 简报 §2.1.2 的情形清单含**情形 F** 与「被解析指令在错路上」维度（各可 grep）
 - [ ] **AC-A3** 简报 §3.4.2 的 `bp_spec_taken_buf` 定义 = 「投机被证明正确」；flush 判据为**门控**式
 - [ ] **AC-A4** ADR-088 §5.3.2 有**两个**结论段（净收益率 / 绝对值门禁），且**互不引用为前提**
 - [ ] **AC-A5** perf CSV 有 `workload_sha` / `build_id` 两列且**非空**；`tools/measure_perf.sh` 的漂移检测**消费**这两列（缺列 ⇒ fail-closed）
-- [ ] **AC-A6** `python3 tools/check_md_tables.py docs/architecture/adr.md docs/architecture/bp-btb-gshare-design-brief.md docs/architecture/bp-btb-gshare-design-brief.md` ⇒ **全部 OK**（0 FAIL）
+- [ ] **AC-A6** `python3 tools/check_md_tables.py docs/architecture/adr.md ip/cpu/docs/bp-btb-gshare-design-brief.md ip/cpu/docs/bp-btb-gshare-design-brief.md` ⇒ **全部 OK**（0 FAIL）
 - [ ] **AC-A7** `tools/check_md_tables.py` 被**至少一个门禁脚本**调用（`grep -l check_md_tables tools/*.sh` ≥ 1）⇒ ⇒ 「改 md 表格漏跑」从纪律变成**CI 可捕获**
 - [ ] **AC-A9** ★★ **简报 §5.1 的 14 条 BP 行与台账逐条状态对齐** —— ★ **实测冲突**：简报 §5.1 的 #11 `per_thread_ghr_isolation` 记「not-covered」，而台账 `:270` 同行记「**partial**」⇒ ⇒ ★ **以哪边为准 MUST 由 architect 裁定并两边同步**（★ 主体 AC-3 的「台账逐条重判」会撞上这个冲突 ⇒ **不先对齐 ⇒ 重判无基线**）
 - [ ] **AC-A10** ★★ **台账头部三态计数修正** —— ★ **实测**：头部声明 partial **292**，条目级实测 partial **282**（covered 154 / not-covered 27 / 合计 463 ⇒ 与 TLM 独占 463 case 数吻合）⇒ ★ 头部 **292 ⇒ 282**（★ 台账是**主体 owner** 的文件 ⇒ 由主体改；★ 本 change 只登记，不越界改）
