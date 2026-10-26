@@ -27,6 +27,7 @@
 """
 
 import argparse
+import concurrent.futures
 import datetime
 import json
 import os
@@ -54,6 +55,12 @@ FORBIDDEN_FIELDS = {"tolerance", "eps", "max_delta", "max_diff", "atol", "rtol"}
 
 EXCEPTION_COUNT_SOFT_LIMIT = 10  # S-12：> N ⇒ 提示 architect 复审（**不阻断**）
 
+# ★ kind → 默认 cycle cap（契约 S-15：branchbench 在 Simulator 侧 MUST ≤ 20,000 拍）
+#   - elf        : vendored riscv-tests ELF ⇒ 最长基线 959 拍 ⇒ 3000 足够
+#   - branchbench: 完整跑需 ~86k 拍（基线 CSV）⇒ Simulator 侧 9 拍/s ⇒ 61 h/档 **不可行**
+#                  ⇒ cap 20k（**跑不到 done** ⇒ 该 case 为 partial，见 S-9 partial 语义）
+DEFAULT_CAPS = {"elf": 3000, "branchbench": 20000}
+
 
 # ────────────────────────────────────────────────────────────── 语料清单
 
@@ -68,22 +75,44 @@ def parse_corpus(path):
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 4:
-                errors.append(f"{path}:{lineno}: expected 4 tab-separated fields, got {len(parts)}")
+            # ★ 第 5 列 `max_cycles` **可选**（per-case cycle cap 覆写，契约 S-13 v1.5）
+            if len(parts) not in (4, 5):
+                errors.append(f"{path}:{lineno}: expected 4 or 5 tab-separated fields, got {len(parts)}")
                 continue
-            name, kind, relpath, layer = (p.strip() for p in parts)
+            name, kind, relpath, layer = (p.strip() for p in parts[:4])
             if kind not in ("elf", "branchbench"):
                 errors.append(f"{path}:{lineno}: unknown kind '{kind}'")
                 continue
             if layer not in ("pr", "night"):
                 errors.append(f"{path}:{lineno}: unknown layer '{layer}'")
                 continue
-            cases.append({"name": name, "kind": kind, "relpath": relpath, "layer": layer})
+            entry = {"name": name, "kind": kind, "relpath": relpath, "layer": layer}
+            if len(parts) == 5 and parts[4].strip():
+                cap_raw = parts[4].strip()
+                if not cap_raw.isdigit() or int(cap_raw) <= 0:
+                    errors.append(f"{path}:{lineno}: max_cycles must be a positive integer, got '{cap_raw}'")
+                    continue
+                entry["max_cycles"] = int(cap_raw)
+            cases.append(entry)
     names = [c["name"] for c in cases]
     dupes = sorted({n for n in names if names.count(n) > 1})
     if dupes:
         errors.append(f"{path}: duplicate case names: {dupes}")
     return cases, errors
+
+
+def check_corpus_files_exist(cases):
+    """pre-flight：清单引用的 ELF MUST 存在 ⇒ 否则 `ERROR`（fail-closed）。
+
+    ★ branchbench 的 4 个 ELF 是 **CMake 构建产物**（target `branchbench_elfs`）
+      ⇒ 不在版本控制内 ⇒ 首次跑批前 MUST 先 `cmake --build build`。
+    """
+    missing = []
+    for c in cases:
+        rel = c["relpath"]
+        if not os.path.isfile(os.path.join(REPO_ROOT, rel)):
+            missing.append(f"{c['name']} -> {rel}")
+    return missing
 
 
 def check_corpus_against_harnesses(cases):
@@ -216,6 +245,12 @@ def judge(case_name, sim, vl, exceptions):
     """判定一个 case。返回 dict：verdict / error_kind / first_divergence / applied。
 
     ★ 纯函数（不碰文件、不跑进程）⇒ 可被 `--self-test` 用合成数据直接验证。
+
+    ★★ **partial 语义（S-9，v1.5）**：case 在 cycle cap 处被截断（两侧 `done=false`）时，
+      `tohost`（两侧都是 0）与 `cycles`（两侧都是 cap）**相等但无判别力** ⇒
+      MUST NOT 计入「通过证据」⇒ 标为 `vacuous`（承重判据退化为 regs + memsig + pchash）。
+      ★ 两侧 `done` 不一致 ⇒ **FAIL**（completion_mismatch）：一后端跑完了另一后端没跑完
+      ⇒ 这是**真分歧**（不是门禁故障）⇒ MUST NOT 记为 ERROR。
     """
     result = {
         "verdict": "PASS",
@@ -223,6 +258,8 @@ def judge(case_name, sim, vl, exceptions):
         "first_divergence": None,
         "applied": [],
         "differences": [],
+        "completion": {"sim_done": None, "vl_done": None, "partial": None},
+        "vacuous_observations": [],
     }
 
     # ── S-2：确定性前置（先于任何观测量比对）──
@@ -246,6 +283,28 @@ def judge(case_name, sim, vl, exceptions):
         if _obs_value(sim, key) is None or _obs_value(vl, key) is None:
             result.update(verdict="ERROR", error_kind=f"observation_missing:{key}")
             return result
+
+    # ── S-9 partial：completion 状态（先于观测量比对）──
+    sim_done = (sim or {}).get("done")
+    vl_done = (vl or {}).get("done")
+    if sim_done is None or vl_done is None:
+        result.update(verdict="ERROR", error_kind="completion_missing")
+        return result
+    result["completion"] = {"sim_done": bool(sim_done), "vl_done": bool(vl_done),
+                             "partial": not (bool(sim_done) and bool(vl_done))}
+    if bool(sim_done) != bool(vl_done):
+        # ★ 一侧跑完、一侧没跑完 ⇒ **真分歧**（FAIL），不是门禁故障（ERROR）
+        result.update(verdict="FAIL", error_kind="completion_mismatch")
+        result["first_divergence"] = {
+            "metric": "completion",
+            "cycle_index": -1,
+            "sim_value": bool(sim_done),
+            "vl_value": bool(vl_done),
+        }
+        return result
+    if result["completion"]["partial"]:
+        # ★ 两侧都被 cap 截断 ⇒ tohost / cycles 相等但**无判别力** ⇒ 标 vacuous
+        result["vacuous_observations"] = ["tohost", "cycles"]
 
     # ── S-9：逐项比对（强度序：pchash > cycles+regs/memsig > tohost）──
     for key in OBSERVATIONS:
@@ -294,9 +353,15 @@ def _run(cmd, timeout_s):
     return proc, None
 
 
+def case_cap(case, opts):
+    """★ per-case cycle cap（契约 S-15）：ELF 与 branchbench 的需求差 ~30 倍 ⇒
+    单个全局 cap 会让 ELF 白跑（cap 过大）或 branchbench 跑不完（cap 过小）。"""
+    return int(case.get("max_cycles") or DEFAULT_CAPS.get(case["kind"], opts.max_cycles))
+
+
 def run_simulator(case, opts):
     out = os.path.join(opts.work_dir, f"{case['name']}.sim.json")
-    cmd = [opts.sim_bin, "--elf", case["relpath"], "--cycles", str(opts.max_cycles),
+    cmd = [opts.sim_bin, "--elf", case["relpath"], "--cycles", str(case_cap(case, opts)),
            "--json", out]
     proc, err = _run(cmd, opts.timeout_s)
     if err:
@@ -309,7 +374,15 @@ def run_simulator(case, opts):
 
 def run_verilator(case, opts):
     out = os.path.join(opts.work_dir, f"{case['name']}.vl.json")
-    cmd = [opts.vl_bin, "--elf", case["relpath"], "--cycles", str(opts.max_cycles),
+    # ★★★ work-dir / verilog 路径 MUST **per-case 隔离**：
+    #   `cpu_verilator_sim` 默认 `--work-dir /tmp/cpu_vl_sim` + `--verilog /tmp/cpu.v`
+    #   ⇒ 并行跑批时后一个 case 会覆盖前一个的 `top.v` 与 `obj_dir/` ⇒ **静默错测**。
+    # ★ MUST 用**绝对路径**：`cpu_verilator_sim` 内部执行 `cd <work-dir> && verilator ...
+    #   <verilog_path>` ⇒ 相对路径在 `cd` 之后失效 ⇒ Verilog 编译失败 ⇒ 无报告。
+    vdir = os.path.abspath(os.path.join(opts.work_dir, "vl", case["name"]))
+    os.makedirs(vdir, exist_ok=True)
+    cmd = [opts.vl_bin, "--elf", case["relpath"], "--cycles", str(case_cap(case, opts)),
+           "--work-dir", vdir, "--verilog", os.path.join(vdir, "top.v"),
            "--json", out]
     proc, err = _run(cmd, opts.timeout_s)
     if err:
@@ -325,6 +398,7 @@ def run_verilator(case, opts):
 def _frag(**over):
     base = {
         "backend": "sim",
+        "done": True,          # ★ completion 语义（S-9 partial）
         "determinism": {"node_count": 2511, "names_hash": "67205f7da2dced52"},
         "observations": {
             "tohost": 1,
@@ -387,6 +461,32 @@ def self_test():
     r = judge("c2", _frag(), bad, [ok_exc])
     checks.append(("例外作用域不匹配 ⇒ FAIL", r["verdict"] == "FAIL", r["verdict"]))
 
+    # ── S-9 partial 语义（v1.5 新增）──
+    part = _frag(done=False)
+    part["observations"] = dict(part["observations"], tohost=0, cycles=20000)
+    r = judge("c1", part, dict(part), [])
+    checks.append(("两侧都被 cap 截断 ⇒ partial ⇒ 标 vacuous",
+                    r["verdict"] == "PASS" and r["completion"]["partial"] is True
+                    and set(r["vacuous_observations"]) == {"tohost", "cycles"},
+                    f"{r['verdict']}/{r['vacuous_observations']}"))
+
+    badp = dict(part)
+    badp["observations"] = dict(part["observations"], pchash="deadbeefdeadbeef")
+    r = judge("c1", part, badp, [])
+    checks.append(("partial 下 pchash 不等 ⇒ FAIL（承重判据仍有效）",
+                    r["verdict"] == "FAIL" and r["first_divergence"]["metric"] == "pchash",
+                    f"{r['verdict']}/{r['first_divergence'] and r['first_divergence']['metric']}"))
+
+    done_side = _frag(done=True)
+    r = judge("c1", part, done_side, [])
+    checks.append(("completion 不一致 ⇒ FAIL/completion_mismatch",
+                    r["verdict"] == "FAIL" and r["error_kind"] == "completion_mismatch",
+                    f"{r['verdict']}/{r['error_kind']}"))
+
+    r = judge("c1", _frag(done=None), _frag(), [])
+    checks.append(("completion 缺失 ⇒ ERROR", r["verdict"] == "ERROR"
+                    and r["error_kind"] == "completion_missing", r["error_kind"]))
+
     width = max(len(c[0]) for c in checks)
     failed = 0
     for name, passed, detail in checks:
@@ -412,6 +512,8 @@ def main(argv=None):
     ap.add_argument("--vl-bin", default=os.path.join("build", "bin", "cpu_verilator_sim"))
     ap.add_argument("--max-cycles", type=int, default=3000)
     ap.add_argument("--timeout-s", type=int, default=3600)
+    ap.add_argument("--jobs", type=int, default=4,
+                    help="并行度（两侧 runner 是独立子进程 ⇒ 线程池安全；默认 4）")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--skip-harness-check", action="store_true",
                     help="跳过「两侧 kCases 集合 == 清单」断言")
@@ -434,6 +536,14 @@ def main(argv=None):
         for e in fatal:
             print(f"ERROR: {e}", file=sys.stderr)
         print(f"verdict=ERROR error_kind=input_invalid", file=sys.stderr)
+        return 2
+
+    # pre-flight：语料文件存在性（fail-closed）
+    missing_files = check_corpus_files_exist(cases)
+    if missing_files:
+        for m in missing_files:
+            print(f"ERROR: corpus file not found: {m}", file=sys.stderr)
+        print("verdict=ERROR error_kind=corpus_missing_files", file=sys.stderr)
         return 2
 
     # S-13：两侧执行集合断言
@@ -460,11 +570,13 @@ def main(argv=None):
     per_case = []
     verdict = "PASS"
     error_kind = None
-    for case in selected:
+
+    def _one(case):
+        """跑一个 case 的两侧 ⇒ 返回该 case 的报告条目（顺序无关，事后按清单排序）。"""
         sim, sim_err = run_simulator(case, opts)
         vl, vl_err = run_verilator(case, opts)
         if sim_err or vl_err:
-            entry = {
+            return {
                 "name": case["name"],
                 "observations": {},
                 "first_divergence": None,
@@ -472,37 +584,52 @@ def main(argv=None):
                 "error_kind": "runner_error",
                 "runner_error": sim_err or vl_err,
             }
-            per_case.append(entry)
-            verdict = "ERROR"
-            error_kind = error_kind or "runner_error"
-            print(f"[ERROR] {case['name']}: {sim_err or vl_err}", file=sys.stderr)
-            continue
         j = judge(case["name"], sim, vl, exceptions)
-        entry = {
+        return {
             "name": case["name"],
             "determinism": sim.get("determinism"),
             "observations": sim.get("observations", {}),
+            "completion": j.get("completion"),
+            "vacuous_observations": j.get("vacuous_observations", []),
             "first_divergence": j["first_divergence"],
             "verdict": j["verdict"],
             "error_kind": j["error_kind"],
             "differences": j["differences"],
             "exceptions_applied": j["applied"],
+            "cap": case_cap(case, opts),
         }
+
+    # ★ 并行：两侧 runner 是**独立子进程**（各自独立 context / 独立 work-dir）
+    #   ⇒ 线程池安全；52 case 串行 ≈ 3 h（Simulator 侧 branchbench 4×33 min 主导）
+    #   ⇒ 并行 4 路 ≈ 45 min。
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, opts.jobs)) as pool:
+        results = list(pool.map(_one, selected))
+
+    # 报告按**清单顺序**排列（并行完成顺序不定 ⇒ MUST 重排以保证报告可 diff）
+    order = {c["name"]: i for i, c in enumerate(selected)}
+    results.sort(key=lambda e: order.get(e["name"], 1 << 30))
+
+    for entry in results:
         per_case.append(entry)
-        if j["verdict"] == "FAIL":
+        if entry["verdict"] == "FAIL":
             verdict = "FAIL"
-            error_kind = error_kind or "backend_divergence"
-        elif j["verdict"] == "ERROR" and verdict != "FAIL":
+            error_kind = error_kind or entry["error_kind"]
+        elif entry["verdict"] == "ERROR" and verdict != "FAIL":
             verdict = "ERROR"
-            error_kind = error_kind or j["error_kind"]
-        flag = {"PASS": "PASS", "FAIL": "FAIL", "ERROR": "ERROR"}[j["verdict"]]
+            error_kind = error_kind or entry["error_kind"]
+        flag = {"PASS": "PASS", "FAIL": "FAIL", "ERROR": "ERROR"}[entry["verdict"]]
         extra = ""
-        if j["first_divergence"]:
-            fd = j["first_divergence"]
-            extra = f"  first_divergence={fd.get('metric')}: sim={fd.get('sim_value')} vl={fd.get('vl_value')}"
-        if j["applied"]:
-            extra += f"  exceptions={j['applied']}"
-        print(f"[{flag}] {case['name']}{extra}")
+        if entry.get("first_divergence"):
+            fd = entry["first_divergence"]
+            extra = (f"  first_divergence={fd.get('metric')}: "
+                     f"sim={fd.get('sim_value')} vl={fd.get('vl_value')}")
+        if entry.get("exceptions_applied"):
+            extra += f"  exceptions={entry['exceptions_applied']}"
+        if entry.get("vacuous_observations"):
+            extra += f"  ★partial(vacuous={entry['vacuous_observations']})"
+        if entry.get("runner_error"):
+            extra += f"  runner_error={entry['runner_error']}"
+        print(f"[{flag}] {entry['name']}{extra}")
 
     report = {
         "schema_version": "parity-report-v1",
@@ -519,6 +646,8 @@ def main(argv=None):
         "per_case": per_case,
         "exceptions_applied": sorted({e for c in per_case for e in c.get("exceptions_applied", [])}),
         "warnings": exc_warnings,
+        "partial_cases": [c["name"] for c in per_case if c.get("vacuous_observations")],
+        "jobs": opts.jobs,
         "timings": {},
     }
     with open(opts.report, "w", encoding="utf-8") as fh:
