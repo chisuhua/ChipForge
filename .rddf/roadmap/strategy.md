@@ -27,6 +27,7 @@
 | 5 | AC 1:1 映射 tasks.md section | ✅ Yes |
 | 6 | wave4 initiative 现在建占位 | ✅ Yes |
 | 7 | 版本号 v0.7.0/0.8.0/v0.9.0 绑 initiative archive (Phase 6d 已消费 v0.4.0/v0.5.0/v0.6.0, 序号跳号) | ✅ Yes |
+| **8** | ★ **一致性证据 = 同一模型双后端差分执行**（2026-10-26 architect 裁决；ADR-089 + ADR-088 v1.4 §10） | ✅ Yes —— ★ **目标态 = 一个模型（CH_MEM，`uint_t` 模态消失）+ 两个后端（CppHDL Simulator / Verilator）+ 一道差分门禁**；★ **TLM 是过渡期第三条腿（快环），不是 parity 的一条腿**；★ 台账重新定性为 **CH_MEM 覆盖边界规格**；★ **删 TLM 模式绑 B3（阶段 C）**，且**阶段 A（差分门禁）MUST 先落地**；★ ★ **阶段 A 是 v0.11.0 窗口内的目标，NOT v0.11.0 archive 硬门禁**（★ 与 2026-10-19「BP 不进 v0.11.0 硬门禁」的减负决策同向 ⇒ 不给 v0.11.0 单方面加新 gate） |
 
 ## 3. Initiative 清单
 
@@ -67,6 +68,21 @@ graph TD
   P1c --> P2f
   P1d -.-> P1
   P2g -.独立.-> P2f
+
+  subgraph PARITY [★ 2026-10-26 新增 — 目标态三段路径 (ADR-089 / ADR-088 v1.4 §10)]
+    PA0["★ G-A0 双审通过<br/>Oracle + Metis<br/>★ 用户裁决: 不立即开工"]
+    PA1["A1 parity-gate-spec<br/>零代码 · S-1…S-n"]
+    PA2a["A2a 可观测性<br/>Simulator 通用 ELF runner<br/>两侧 5 观测量 + 样例 JSON"]
+    PA2b["A2b 比对器<br/>fail-closed ≥5 例<br/>变异自检 ≥2 例 + S 覆盖矩阵"]
+    PA3["A3 语料 + 首跑<br/>两侧交集 47 + branchbench4<br/>★ 产物 = 既存后端分歧清单"]
+    PA4["A4 门禁接线 + CI<br/>分层 corpus + 单元级快车道"]
+    PB1["阶段 B 台账冻结<br/>CH_MEM 覆盖边界规格<br/>★ 先修计数 → 脚本 PASS → 再冻结"]
+    PC0["阶段 C ★ 5 硬前置<br/>① 差分门禁绿 ② CI build<br/>③ 参考语义抽规格 ④ 台账冻结<br/>⑤ 门禁体系自身改版"]
+    PB3["B3 删 TLM 模式<br/>既有 5 步删除动作"]
+    PA0 --> PA1 --> PA2a --> PA2b --> PA3 --> PA4 --> PC0
+    PA3 --> PB1 --> PC0
+    PC0 --> PB3
+  end
 ```
 
 ## 5. 战略柱映射
@@ -161,6 +177,9 @@ graph TD
 | 风险 | 缓解 |
 |------|------|
 | 战略表手维护漂移 | 强制脚本派生, 文档标 "do not edit" |
+| ★ **parity 门禁首跑照出大量既存后端分歧 ⇒ 工期失控**（2026-10-26 新增） | ① 分类为「上游对齐 / 有意例外 / 真 bug」② 上游对齐项 ⇒ 向上游 CppHDL 提 issue + 记收敛期限 ③ 有意例外 ⇒ 白名单登记（带机制说明 + 上游状态 + 变异对照）④ **MUST NOT** 改用容差吸收 ⇒ ★ ≤ 2 个工作日出分类结论，**不得挂起** |
+| ★ **删 TLM 模式后回归成本暴涨**（TLM 快环 432 case ≈ 0.6s 消失；CH_MEM Simulator vendored 47 ≈ 1594s） | ① **CI build 能力 = 阶段 C 硬前置**（不可跳过）② CI 侧只跑分层 corpus 快子集，全量夜间 ③ 本地全量 ⇒ ADR-088 §10.3 前置 ② |
+| ★ **parity 门禁自身成为新的假绿通道**（两边都错 ⇒ 门禁绿） | ① 门禁 MUST 带**变异自检**（改 1 拍 ⇒ MUST RED）② 观测量 MUST **fail-closed**（缺 ⇒ FAIL）③ 门禁的**鉴别力**是验收项（V-3/V-4）⇒ ★ 随 A2 交付，**不得后补** |
 | Initiative schema 太薄 | 仅存 id/title/summary, 详情靠 markdown, CI grep + 人审兜底 |
 | P2 占位腐化 | P1 执行期同步修订 wave4 placeholder |
 | Mega 耦合 (A 方案) | 已规避 (B 方案) |
@@ -184,16 +203,17 @@ graph TD
 
 > **关键认识**: 战略启动后, 每个版本节点触发 Go/No-Go 决策, 中止条件明确, 不隐性吞噬时间盒。
 
-| 节点 | Go 条件 | No-Go 动作 |
-|------|--------|----------|
-| v0.7.0 archive | P0#1 canonical-ordering PASS + 0 新 fail | 暂停, 修复 P0#1 后重试 |
-| v0.8.0 中间检查 | P1#3 PADDR 真消费 + cycle-precision 实装 + multi-cycle stall 注 | **如果评估显示剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) |
-| v0.9.0 archive | Phase 1.5 毕业标准达成 (RV32I ≥85%, SoC demo ≥5 ELF tohost=1, cache-dse-sweep CSV, D4+ADR-040+ADR-044+ADR-045 全合规) | 推迟 1 个 wave, 回填 Open Questions, 重审 |
+| 节点 | Go 条件 | No-Go 动作 | 备注 |
+|------|--------|----------|------|
+| v0.7.0 archive | P0#1 canonical-ordering PASS + 0 新 fail | 暂停, 修复 P0#1 后重试 | — |
+| v0.8.0 中间检查 | P1#3 PADDR 真消费 + cycle-precision 实装 + multi-cycle stall 注 | **如果评估显示剩余 debt 超预期**: 中止 Phase 1.5, 直接切 Phase 2 (riscv-tests RV64GC) | — |
+| v0.9.0 archive | Phase 1.5 毕业标准达成 (RV32I ≥85%, SoC demo ≥5 ELF tohost=1, cache-dse-sweep CSV, D4+ADR-040+ADR-044+ADR-045 全合规) | 推迟 1 个 wave, 回填 Open Questions, 重审 | — |
 | v0.10.0 archive | mfc Phase H archive + mmu-chmem Phase A-E（rv32um 8/8 + DMIPS/MHz ≥1.4 defer v0.11.0）| 推迟 v0.11.0, 修 mfc-extract-fsm-h 残留 |（**v0.10.0 archive 门禁为规划时点快照**：v0.10.4 2026-09-30 已发版；mfc Phase H + mmu-chmem Phase A-E 实际归属 v0.11.0，见 `objective-soc-cpu-v0110-launch.md §9.1`）|
 | v0.11.0 archive | rv32um 8/8 + DMIPS/MHz ≥1.4 + [cpu-l1-mmu-demo] 7/7（workaround 移除）+ [mmu-verilator] 5/5 + mfc-extract-fsm-h archive + 4 architecture gates 0 error | 推迟 v1.0.0 启动期，发 v0.11.x hotfix 修 mfc-extract-fsm-h 残留 |（**2026-10-19 决策**: BP / CoreMark ≥1.9 不进 v0.11.0 硬门禁, 归 v1.0.0 窗口, 详见 `objective-soc-cpu-v0110-launch.md §11` + oracle session ses_ead89ad2）|
-| v1.0.0 archive | S/U mode + RV32A + BTB + FreeRTOS + CoreMark ≥2.3 | 推迟 v1.2.0, 修 PoC-6 BP 不足 |
-| v1.2.0 archive | lockstep 1M 零分歧 HARD + Linux-sim SOFT + 4-way RRIP + PMP + gdbstub | 触发 R6: 降级 v1.2.0 为"验证基建版", Linux-sim 并入 v1.3.0 合并交付 |
-| v1.3.0 archive | Linux-on-FPGA + chip-selector + ADR-080 转硬门禁 + FPGA CoreMark ≥2.5 | 触发 R3/R7/R8: 商业化定位降级 / soft-float 路线 / FPGA-only 产品化 |
+| v1.0.0 archive | S/U mode + RV32A + BTB + FreeRTOS + CoreMark ≥2.3 | 推迟 v1.2.0, 修 PoC-6 BP 不足 | — |
+| ★ **阶段 A 门禁（G-A3）** | 差分门禁在**两侧交集 47 ELF** + branchbench 4 档全绿 + fail-closed（≥5 例）+ 变异自检（≥2 例）+ **既存后端分歧清单归零或全部显式登记**（ADR-089 V-1~V-6）| ★ **不得进入阶段 C**（删 TLM 模式）⇒ 先修分歧 / 登记例外 / 提上游 issue | ★ architect 签 · PR 内；★ **阶段 A 是 v0.11.0 窗口内目标，NOT v0.11.0 archive 硬门禁** |
+| v1.2.0 archive | lockstep 1M 零分歧 HARD + Linux-sim SOFT + 4-way RRIP + PMP + gdbstub | 触发 R6: 降级 v1.2.0 为"验证基建版", Linux-sim 并入 v1.3.0 合并交付 | — |
+| v1.3.0 archive | Linux-on-FPGA + chip-selector + ADR-080 转硬门禁 + FPGA CoreMark ≥2.5 | 触发 R3/R7/R8: 商业化定位降级 / soft-float 路线 / FPGA-only 产品化 | — |
 
 ## 10.5 v1.4+ 候选（migrated 2026-10-09: 收容原 §3.3/§3.4 中 v1.4+ 内容）
 
