@@ -226,6 +226,14 @@ if(CHIPFORGE_BUILD_VERILATOR_RUNNER)
     add_subdirectory(tools/verilator_runner)
 endif()
 
+# 阶段 A2a: double-backend parity gate — Simulator-side CLI runner
+# (contract: docs/architecture/parity-gate-contract.md; pairs with
+# tools/verilator_runner/cpu_verilator_sim)
+option(CHIPFORGE_BUILD_PARITY_RUNNER "Build tools/parity_runner/parity_sim_runner" ON)
+if(CHIPFORGE_BUILD_PARITY_RUNNER)
+    add_subdirectory(tools/parity_runner)
+endif()
+
 # CTest 聚合: 根级 enable_testing() 使 ctest 收集所有子目录的 add_test
 # (子目录 src/cf_plugin/CMakeLists.txt 自身有 enable_testing(), 此处冗余声明为安全)
 enable_testing()
