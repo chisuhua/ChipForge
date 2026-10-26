@@ -68,6 +68,8 @@ struct CfParityObs {
   std::uint32_t timed_out;    // 1 => cycle cap reached without done bit
   std::uint32_t pc_head[8];   // first 8 PC samples (diagnostics / S-8)
   std::uint32_t regs_raw[31]; // x1..x31 raw values (diagnostics)
+  std::uint64_t mem_sig;      // ③ DUT-side memory signature (contract S-6)
+  std::uint64_t mem_sig_updates;  // ③ store counter (self-check anchor)
 };
 
 namespace {
@@ -355,6 +357,12 @@ int cf_run_sim_parity(void* top, std::uint32_t max_cycles, int reset_pulse,
     done_bit = tohost_raw & 0x1u;
   }
 
+  // ③ memsig: the DUT-side probe registers (same DAG node names on both
+  //   backends => directly comparable). Names verified in the emitted
+  //   Verilog: `logic [31:0] mem_sig;` / `assign _mem_sig = mem_sig;`.
+  const std::uint64_t mem_sig = vtop->rootp->top__DOT__mem_sig;
+  const std::uint64_t mem_sig_updates = vtop->rootp->top__DOT__mem_sig_updates;
+
   std::uint64_t regs_hash = kFnvOffset;
   std::uint32_t regs_raw[31] = {0};
   for (int i = 1; i <= 31; ++i) {
@@ -371,13 +379,29 @@ int cf_run_sim_parity(void* top, std::uint32_t max_cycles, int reset_pulse,
     out->timed_out = (done_bit == 0) ? 1u : 0u;
     for (int i = 0; i < 8; ++i) out->pc_head[i] = pc_head[i];
     for (int i = 0; i < 31; ++i) out->regs_raw[i] = regs_raw[i];
+    out->mem_sig = mem_sig;
+    out->mem_sig_updates = mem_sig_updates;
   }
 
   const bool done = (done_bit != 0);
   const bool pass = done && (tohost_raw == 1);
+
+  // Contract S-6 self-check (mirrors parity_sim_runner): "the guest wrote
+  // tohost but the store counter says zero" => the memory signature is a
+  // false green => ERROR (2), not FAIL (1).
+  if (tohost_raw != 0 && mem_sig_updates == 0) {
+    std::fprintf(stderr,
+                 "observation error: mem_sig_updates == 0 although tohost=%u "
+                 "was written => the memory signature is a false green\n",
+                 tohost_raw);
+    return 2;
+  }
+
   std::printf("TOHOST=%u CYCLES=%llu %s\n", tohost_raw,
               static_cast<unsigned long long>(cycles),
               !done ? "TIMEOUT" : (pass ? "PASS" : "FAIL"));
+  // Contract S-10: TIMEOUT is an ERROR (2), not a backend divergence (1).
+  if (!done) return 2;
   return pass ? 0 : 1;
 }
 

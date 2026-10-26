@@ -392,6 +392,8 @@ int main(int argc, char** argv) {
       std::uint32_t timed_out;
       std::uint32_t pc_head[8];
       std::uint32_t regs_raw[31];
+      std::uint64_t mem_sig;
+      std::uint64_t mem_sig_updates;
     };
     auto* run_parity = reinterpret_cast<int (*)(void*, std::uint32_t, int,
                                                 CfParityObs*)>(
@@ -430,7 +432,11 @@ int main(int argc, char** argv) {
     json += "    \"cycles\": " + std::to_string(obs.cycles) + ",\n";
     json += "    \"pchash\": \"" + std::string(hex_pc) + "\",\n";
     json += "    \"pc_samples\": " + std::to_string(obs.pc_samples) + ",\n";
-    json += "    \"memsig\": null\n";
+    char hex_sig[24];
+    std::snprintf(hex_sig, sizeof(hex_sig), "%016llx",
+                  static_cast<unsigned long long>(obs.mem_sig));
+    json += "    \"memsig\": \"" + std::string(hex_sig) + "\",\n";
+    json += "    \"memsig_updates\": " + std::to_string(obs.mem_sig_updates) + "\n";
     json += "  },\n";
     json += "  \"pc_head\": [";
     for (int i = 0; i < 8; ++i) {
