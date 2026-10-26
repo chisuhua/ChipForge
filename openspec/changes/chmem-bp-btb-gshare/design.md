@@ -77,6 +77,24 @@ flush = hold_z | (taken_buf & !spec_ok_buf) | mispredict_A_buf
 ⇒ GShare/RAS 可延后；**否则** ⇒ MUST 把 GShare 拉回本期（AC-1 范围放开）。
 ★ 净收益率的**分母口径**归 **A6**（裁决项）⇒ ★ 实测数据见 `tasks.md` 的 Task 7。
 
+### 0.7 ★ v2.3.1 增量（2026-10-26，metis 实施前 gap 分析的产物 —— **同样优先于以下全部内容**）
+
+★ **metis 找出 6 个 blocker + 6 个 quality**，其中**规划侧已落**的部分：
+
+| # | 发现 | 落点 |
+|---|---|---|
+| B2 | **增量 1 的「无条件」信号无来源**（`branch_chmem.h:201-203` 算出 `is_jal`/`is_jalr` 但未导出）⇒ 且 **owner 表漏 `branch_chmem.h`** ⇒ 主体改它无授权 ⇒ 撞三 change 边界硬门禁 | `tasks.md` owner 表 **新增一行** + §3 payload 契约 **新增行**（本节上方） |
+| B3 | **「重写 vs 增量扩展」自相矛盾**（owner 表两行直接打架） | `tasks.md` owner 表取「**增量扩展**」+ **AC-28**（保留声明） |
+| B4 | **「独立开关」的实现机制未钉** ⇒ builder 自由发挥（编译期宏 ⇒ 重编译 ×3 + 宏矩阵爆炸；运行期可重配 ⇒ CH_MEM 静态 elaboration 下白付硬件） | `tasks.md` **Task 7 Step 5b**：工厂布尔 + CLI flag（先例 `enable_bp`） |
+| B5 | **AC-22 的 grep 断言会被「假 trap 项」骗过**（注释里的 `trap_redirect` 也命中） | §1.3 **v2.3.1 收紧** + **AC-22**（结构 pattern + 精确形态 + 惰性锚） |
+| B6 | **开工门禁措辞**与「前置已实测完成」冲突（两个前置 change 仍未 archive） | `tasks.md` 定位段：**机制落地 + 单元锚全绿即可开工**；archive 仍 MUST 在本 change 归档前完成（三要素齐备） |
+| Q3 | **Step 4b 的「~80%」是点估计** ⇒ 预测式数字腐烂的温床 | **已删**：改为「**静态上界** ⇒ 实测低于它 NOT 判 FAIL」 |
+| Q4 | **Task 7 Step 1 的「62b 位宽须重算」是陈旧措辞** —— 实测 62b **已含** `is_unconditional`（bit[3]）⇒ 真正的缺口 = **ch 写路径 `:417` 未写该位** ⇒ host/ch 双实现漂移 | **Task 7 Step 1 已改写** + **AC-29**（④ 逐位相等断言） |
+| Q5 | **AC-27 不 fail-closed**（分母口径归 A6 未裁决 ⇒ 单负载的 fail-open 论证） | **AC-27**：两种分母**同报取小** + **A6 兜底三要素**（触发/落点/时限） |
+| Q8 | **终局兜底缺失**（三档全用尽仍不达标 ⇒ 归档路径被自己的 AC 堵死） | **Task 7 Step 6 + AC-16**：按 **P-3 临时口径**结案 + 移交后续 change ⇒ MUST NOT 不可归档 |
+| Q11 | **`tools/check_md_tables.py` 是孤儿工具**（不在任何 CI / gate / AC-9 清单里）⇒ 「写了工具不接线 = 假护栏」 | **AC-9** 新增第 9 条门禁 + 须知 #1 |
+| ★ | **v2.3 覆盖声明未传播到执行文件**（`.rddf/plans/chmem-bp-btb-gshare.md` 顶部只有 v2.1）⇒ ★ builder 的执行 SSOT 是 **plan 文件** ⇒ ★ **MUST 先同步** | ★ **plan 文件归 builder**（planner 不越界起草）⇒ 同步清单见 `tasks.md` 的「★ planner 交接清单」段 |
+
 ### 0.6 场景维度**尚未完备**（★ MUST NOT 声称「场景覆盖完备」）
 
 ★ 情形 A~F 是**单指令分类** ⇒ **不含**两个已证实会造成功能缺口的维：
@@ -120,7 +138,7 @@ next_pc = select( trap_redirect,        trap_target,     ← 最高（protocol r
 | 2 | ★ **本 change** 在其基础上**插入** `bp_predict` 项 | 必须**基于**已落地的 5 项 mux 扩展 |
 | — | ★ 若本 change 先于 trap 项落地 ⇒ **必须预留 trap 插入位** | ★ 必须在源码里**留出 trap 项的位置**（否则后续 trap 项无处插入 ⇒ 返工）|
 
-⇒ ★ **登记（本 change 实现 MUST 满足的可判定形式）**：`update_pc` 的 `next_pc` MUST 是**可 grep 的多层 select 链**，且**源码中 MUST 出现一个具名的 trap 项**（例如 `trap_redirect` / `trap_target` 标识）⇒ 这样后续 `csr-chmem-trap-pc-jump` 落地时有**可插入的位置**（★ **MUST NOT** 只写「注释 + 结构预留」—— 注释不可机检 ⇒ 后续 trap 项无处插入 ⇒ 返工）
+⇒ ★ **登记（本 change 实现 MUST 满足的可判定形式）**：`update_pc` 的 `next_pc` MUST 是**可 grep 的多层 select 链**，且**源码中 MUST 出现一个具名的 trap 项**（例如 `trap_redirect` / `trap_target` 标识）⇒ ★★ **v2.3.1 收紧（metis：原断言会被「假 trap 项」骗过）**：★ **grep pattern MUST 匹配 select 链内的实参**（如 `select(\s*trap_redirect`）⇒ **纯注释行不命中**⇒ ★★ **占位臂的精确形态（MUST）**：① 四个具名信号 `trap_redirect` / `trap_target` / `freeze_hold` / `hold_pc`；② 占位期恒绑定 **false / 0**；③ **trap 臂 MUST 在 select 链最顶层**（顺序断言）；④ ★ **占位臂惰性** ⇒ BP 关闭态的 mux 输出 MUST 与现状**逐位相同**（单元锚）⇒ ⇒ 否则占位臂接错优先级**无法被检出**⇒ 这样后续 `csr-chmem-trap-pc-jump` 落地时有**可插入的位置**（★ **MUST NOT** 只写「注释 + 结构预留」—— 注释不可机检 ⇒ 后续 trap 项无处插入 ⇒ 返工）
 
 ---
 
@@ -217,6 +235,7 @@ branch LATE(N+1):
 | BP 的**输出** | ① `pred_target`（32b）② `pred_taken`（1b）③ `pred_valid`（1b）⇒ **写入 payload**（mode-aware `uint_t<N>`，禁裸 `bool`） |
 | 误预测记录 | `ch_reg` 组（pred_taken / pred_target / pred_valid）⇒ 跨拍保持 |
 | ★ **BP 的表更新输入（branch plugin 导出）** | ★ **前置2 实现轮追加**（原契约未列 ⇒ 主体重写时易丢失）：① `BRANCH_TAKEN_RAW`（1b，未被 flush 抑制的原始方向）② `BRANCH_FLUSHED`（1b，错路标记 ⇒ 表更新门控）③ `IS_BRANCH`（1b，条件分支标志）⇒ ★ BP 侧**缺失即 fail-fast**（MUST NOT 静默降级为 false ⇒ 表不更新却无报错） |
+| ★ **无条件跳转判别（★ v2.3.1 新增 —— 增量 1 的前置）** | ★ **branch plugin MUST 导出**「本条指令是 `jal`（PC 相对 ⇒ 目标静态 ⇒ 可安全建 BTB 项）」的 payload（★ **候选命名**：`IS_JAL`（1b，只含 `jal`）/ `IS_UNCOND`（1b，含 `jal`+`j`）；★ **语义待主体定，但 MUST 明确 `jalr` 是否包含** —— ★ **`jalr` MUST NOT 含在内**（目标随运行时变化 ⇒ 静态 BTB 项必错 ⇒ AC-14））⇒ ★ **来源已存在**：`branch_chmem.h:201-203` 已算出 `is_jal`/`is_jalr` ⇒ ★ **MUST NOT** 在 BP 侧从 opcode 反推（★ branch 节点**未导出** opcode ⇒ PoC 的 `branch_predictor_chmem.h:386-392` 已明写「jal 的方向问题留给主体 change」）⇒ ★ **缺失即 fail-fast**（与 `BRANCH_TAKEN_RAW` / `BRANCH_FLUSHED` / `IS_BRANCH` 同款纪律） |
 | 纠错目标 | 「预测 taken、实际 not-taken」⇒ **`pc_lag + 4`** |
 | ★ **顺序契约** | ★ **跨 stage**（生产者 fetch NORMAL → 消费者 branch LATE）⇒ 保序机制 = **`elaborate()` 按 `canonical_stage_order()` 执行**（stage 首现序 × EARLY→NORMAL→LATE）⇒ fetch ≺ branch 且 NORMAL ≺ LATE ⇒ **与插件注册顺序无关** |
 | ★ **pc_reg 单驱动纪律** | BP **只写 payload**，**禁止**自身 `<<= pc_reg`（`pc_reg` 的唯一写者是 `update_pc`） |

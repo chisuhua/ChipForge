@@ -48,6 +48,7 @@ review_by: 2026-11-09
 |---|---|---|
 | #13 | `soc/cpu/docs/dse/verilator-perf-baseline-matrix.csv` **缺 `workload_sha` / `build_id` 列**（branchbench CSV **有**） | 「重录的数值只因 BP 而变」这一归因**缺机器可验证支撑**（toolchain/ELF 差异无法在脚本层排除） |
 | #14 | `docs/architecture/adr.md`（113/117-122/136-142 行）与 `docs/architecture/bp-btb-gshare-design-brief.md`（296/300/304/460/461 行）存在 **GFM 表格结构伤**（行 cell 数 ≠ 表头 cell 数 / code span 内未转义管道符） | GFM 渲染时 **excess cell 被静默丢弃** ⇒ 该行的**约束与行动指令在渲染视图里不可见**（PoC 的 S3-a / S3-d 两行正是这样被 critic 抓到的） |
+| #15 | ★ **简报 §5.1 的 BP 条目状态与台账冲突**（#11 `per_thread_ghr_isolation`：简报 not-covered vs 台账 partial） | 主体 AC-3「台账逐条重判」**无基线** ⇒ 重判结果不可信 |
 
 ## 范围
 
@@ -87,6 +88,8 @@ review_by: 2026-11-09
 - [ ] **AC-A5** perf CSV 有 `workload_sha` / `build_id` 两列且**非空**；`tools/measure_perf.sh` 的漂移检测**消费**这两列（缺列 ⇒ fail-closed）
 - [ ] **AC-A6** `python3 tools/check_md_tables.py docs/architecture/adr.md docs/architecture/bp-btb-gshare-design-brief.md docs/architecture/bp-btb-gshare-design-brief.md` ⇒ **全部 OK**（0 FAIL）
 - [ ] **AC-A7** `tools/check_md_tables.py` 被**至少一个门禁脚本**调用（`grep -l check_md_tables tools/*.sh` ≥ 1）⇒ ⇒ 「改 md 表格漏跑」从纪律变成**CI 可捕获**
+- [ ] **AC-A9** ★★ **简报 §5.1 的 14 条 BP 行与台账逐条状态对齐** —— ★ **实测冲突**：简报 §5.1 的 #11 `per_thread_ghr_isolation` 记「not-covered」，而台账 `:270` 同行记「**partial**」⇒ ⇒ ★ **以哪边为准 MUST 由 architect 裁定并两边同步**（★ 主体 AC-3 的「台账逐条重判」会撞上这个冲突 ⇒ **不先对齐 ⇒ 重判无基线**）
+- [ ] **AC-A10** ★★ **台账头部三态计数修正** —— ★ **实测**：头部声明 partial **292**，条目级实测 partial **282**（covered 154 / not-covered 27 / 合计 463 ⇒ 与 TLM 独占 463 case 数吻合）⇒ ★ 头部 **292 ⇒ 282**（★ 台账是**主体 owner** 的文件 ⇒ 由主体改；★ 本 change 只登记，不越界改）
 - [ ] **AC-A8** ★ **零代码改动**（`git diff --stat` 不含 `ip/**` / `src/**` / `tests/**`）
 
 ## Capabilities
