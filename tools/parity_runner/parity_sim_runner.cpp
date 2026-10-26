@@ -31,6 +31,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <unistd.h>
 #include <fstream>
@@ -130,6 +131,7 @@ struct Options {
   // Increment-1 scaffolding: memsig needs the DUT-side probe (increment 2).
   // Without this flag a missing observation is a hard ERROR (contract S-1/S-14).
   bool allow_incomplete = false;
+  std::string dump_nodes;   // diagnostic: substring filter for DAG node listing
 };
 
 void usage(const char* argv0) {
@@ -146,6 +148,7 @@ void usage(const char* argv0) {
   std::printf("  --json <path>       write the report fragment to <path>\n");
   std::printf("  --verbose           per-cycle trace to stderr\n");
   std::printf("  --allow-incomplete  permit not-yet-collected observations (memsig)\n");
+  std::printf("  --dump-nodes <sub> list DAG nodes whose name contains <sub> (diagnostic)\n");
   std::printf("  --help / -h         this message\n");
 }
 
@@ -187,6 +190,8 @@ bool parse_args(int argc, char** argv, Options* o) {
       o->verbose = true;
     } else if (a == "--allow-incomplete") {
       o->allow_incomplete = true;
+    } else if (a == "--dump-nodes" && i + 1 < argc) {
+      o->dump_nodes = need("--dump-nodes");
     } else if (a == "--help" || a == "-h") {
       usage(argv[0]);
       std::exit(0);
@@ -281,6 +286,24 @@ int main(int argc, char** argv) {
     return 2;
   }
 
+  // Diagnostic: list DAG nodes whose name contains a substring, together with
+  // their membership in the evaluation list. Used to answer "is my probe
+  // actually scheduled?" / "is it emitted into the Verilog?" (the codegen
+  // only emits nodes in the eval list).
+  if (!opts.dump_nodes.empty()) {
+    for (const auto& node : ctx.get_nodes()) {
+      if (!node) continue;
+      const auto nm = node->name();
+      if (nm.find(opts.dump_nodes) == std::string::npos) continue;
+      bool in_eval = false;
+      for (const auto& e : ctx.get_eval_list()) {
+        if (e && e->id() == node->id()) { in_eval = true; break; }
+      }
+      std::fprintf(stderr, "[nodes] id=%u name=%s type=%d eval=%s\n", node->id(),
+                   nm.c_str(), (int)node->type(), in_eval ? "yes" : "no");
+    }
+  }
+
   // ── determinism preconditions (contract S-2) ───────────────────────────
   std::vector<std::string> names;
   names.reserve(ctx.get_nodes().size());
@@ -306,6 +329,10 @@ int main(int argc, char** argv) {
   // ── resolve node ids once ──────────────────────────────────────────────
   auto tohost_id = resolve_node_id(ctx, "tohost_probe_data_proxy");
   auto pc_id = resolve_node_id(ctx, "pc");
+  // ③ memsig (contract S-6): DUT-side probe registers, named identically on
+  // both backends so the two sides can be compared directly.
+  auto mem_sig_id = resolve_node_id(ctx, "mem_sig");
+  auto mem_sig_upd_id = resolve_node_id(ctx, "mem_sig_updates");
 
   constexpr int kNumX = 32;
   std::vector<std::optional<std::uint32_t>> reg_ids(kNumX);
@@ -392,14 +419,38 @@ int main(int argc, char** argv) {
   }
 
   // Contract S-1 / S-14: a declared observation that is not collected is an
-  // ERROR, not a "skip". memsig lands in increment 2, so it is reported as
+  // ERROR, not a "skip". memsig lands in increment 3, so it is reported as
   // pending and only tolerated with --allow-incomplete.
-  if (!opts.allow_incomplete) {
+  const bool memsig_available = mem_sig_id.has_value() && mem_sig_upd_id.has_value();
+  if (!memsig_available && !opts.allow_incomplete) {
     std::fprintf(stderr,
                  "missing observation 'memsig': DUT-side probe not implemented "
                  "yet (A2a increment 2); pass --allow-incomplete to run without "
                  "it\n");
     return 2;
+  }
+
+  // ③ memsig + self-check (contract S-6): "the guest wrote tohost but the
+  // store counter says zero" => the signature is a false green => ERROR.
+  std::uint64_t mem_sig_val = 0;
+  std::uint64_t mem_sig_upd_val = 0;
+  if (memsig_available) {
+    const auto& dm = sim->data_map();
+    auto sv = read_slot(dm, *mem_sig_id);
+    auto uv = read_slot(dm, *mem_sig_upd_id);
+    if (!sv || !uv) {
+      std::fprintf(stderr, "observation error: mem_sig slot missing\n");
+      return 2;
+    }
+    mem_sig_val = *sv;
+    mem_sig_upd_val = *uv;
+    if (tohost_val != 0 && mem_sig_upd_val == 0) {
+      std::fprintf(stderr,
+                   "observation error: mem_sig_updates == 0 although tohost=%llu "
+                   "was written => the memory signature is a false green\n",
+                   static_cast<unsigned long long>(tohost_val));
+      return 2;
+    }
   }
 
   const bool done = (tohost_val & 0x1ull) != 0;
@@ -423,7 +474,13 @@ int main(int argc, char** argv) {
   json += "    \"cycles\": " + std::to_string(cycles) + ",\n";
   json += "    \"pchash\": \"" + hex64(pchash) + "\",\n";
   json += "    \"pc_samples\": " + std::to_string(pc_samples) + ",\n";
-  json += "    \"memsig\": null\n";
+  if (memsig_available) {
+    json += "    \"memsig\": \"" + hex64(mem_sig_val) + "\",\n";
+    json += "    \"memsig_updates\": " + std::to_string(mem_sig_upd_val) + "\n";
+  } else {
+    json += "    \"memsig\": null,\n";
+    json += "    \"memsig_updates\": null\n";
+  }
   json += "  },\n";
   json += "  \"pc_head\": [";
   for (int i = 0; i < 8; ++i) {
