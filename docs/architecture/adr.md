@@ -77,43 +77,43 @@
 
 ### 2.1 已实现决策（✅）— 38 条
 
-| ID | 标题 | 类别 | 验证路径 |
-|----|------|------|----------|
-| ADR-001 | 三层框架分工 | 架构 | `CppTLM/` + `CppHDL/` + `ip/` 目录均存在 |
-| ADR-002 | CppTLM 事件驱动调度 | 架构 | `core/event_queue.hh` |
-| ADR-003 | CppHDL LogicNode DAG + 多后端 | 架构 | `core/lnode.h` + `codegen_verilog.h` + `simulator.h` |
-| ADR-004 | SimObject 类层次 | TLM | `core/{sim_object,sim_module,tlm_module,chstream_module}.hh` |
-| ADR-005 | StreamAdapter 类型擦除 | TLM | `core/stream_adapter_base.hh` + `framework/stream_adapter.hh` |
-| ADR-006 | ChStreamAdapterFactory | TLM | `framework/chstream_adapter_factory.hh` |
-| ADR-008 | HybridCacheWrapper TLM↔RTL | TLM | `rtl/hybrid_cache_wrapper.hh` |
-| ADR-009 | ch_uint<N> 硬件整数 | HDL | `core/uint.h` |
-| ADR-010 | ch_reg<T> 时序寄存器 | HDL | `core/reg.h` |
-| ADR-011 | ch_mem<T,D> SRAM | HDL | `core/mem.h` |
-| ADR-012 | Component::describe() | HDL | `component.h` |
-| ADR-013 | Component::create_ports() | HDL | `component.h` |
-| ADR-014 | lnode 节点构建 | HDL | `core/{lnode,lnodeimpl,node_builder}.h` |
-| ADR-015 | ModuleFactory JSON 装配 | 注册 | `core/module_factory.hh` |
-| ADR-016 | REGISTER_CHSTREAM 批量注册 | 注册 | `chstream_register.hh` |
-| ADR-017 | PluginLoader dlopen | 注册 | `core/plugin_loader.hh` |
-| ADR-018 | __io 端口宏 | 端口 | `core/io.h:318` |
-| ADR-019 | __in / __out 端口宏 | 端口 | `core/io.h:337-338` |
-| ADR-020 | ch_logic_in/out 旧 API | 端口 | `core/io.h` |
-| ADR-021 | bundle_base<Self> CRTP | Bundle | `core/bundle/bundle_base.h` |
-| ADR-022 | CH_BUNDLE_FIELDS_T 宏族 | Bundle | `core/bundle/bundle_meta.h:23-32` |
-| ADR-023 | ch_stream<T> 协议 | Bundle | `bundle/stream_bundle.h:19` |
-| ADR-025 | Plugin 基类无 tick | Plugin | `include/cf/plugin/plugin_base.h` |
-| ADR-026 | at_stage() 逻辑阶段名 | Plugin | `include/cf/plugin/pipe_builder.h:68` |
-| ADR-027 | Phase 子阶段 EARLY/NORMAL/LATE | Plugin | `include/cf/plugin/pipe_builder.h:38` |
-| ADR-028 | declare_substage() | Plugin | `include/cf/plugin/pipe_builder.h:77` |
-| ADR-030 | PipeNode 三态握手 | Plugin | `include/cf/plugin/pipe_node.h` |
-| ADR-032 | PipeBuilder 统一编译器 | Plugin | `include/cf/plugin/pipe_builder.h:53` |
-| ADR-033 | CtrlLink 四种控制 API | Plugin | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
-| ADR-037 | Plugin 作为设计范式 | 范式 | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制；gitignored 草稿不链接）+ **v2.0 Phase 6c M5 落地 (2026-09-17, D4 elaboration 语义兑现)** |
-| ADR-038 | chstream_register 集中入口 | 目录 | `chstream_register.hh` |
+| ID | 标题 | 类别 | 当前状态 | 验证路径 |
+|----|------|------|----------|----------|
+| ADR-001 | 三层框架分工 | 架构 | ✅ | `CppTLM/` + `CppHDL/` + `ip/` 目录均存在 |
+| ADR-002 | CppTLM 事件驱动调度 | 架构 | ✅ | `core/event_queue.hh` |
+| ADR-003 | CppHDL LogicNode DAG + 多后端 | 架构 | ✅ | `core/lnode.h` + `codegen_verilog.h` + `simulator.h` |
+| ADR-004 | SimObject 类层次 | TLM | ✅ | `core/{sim_object,sim_module,tlm_module,chstream_module}.hh` |
+| ADR-005 | StreamAdapter 类型擦除 | TLM | ✅ | `core/stream_adapter_base.hh` + `framework/stream_adapter.hh` |
+| ADR-006 | ChStreamAdapterFactory | TLM | ✅ | `framework/chstream_adapter_factory.hh` |
+| ADR-008 | HybridCacheWrapper TLM↔RTL | TLM | ✅ | `rtl/hybrid_cache_wrapper.hh` |
+| ADR-009 | ch_uint<N> 硬件整数 | HDL | ✅ | `core/uint.h` |
+| ADR-010 | ch_reg<T> 时序寄存器 | HDL | ✅ | `core/reg.h` |
+| ADR-011 | ch_mem<T,D> SRAM | HDL | ✅ | `core/mem.h` |
+| ADR-012 | Component::describe() | HDL | ✅ | `component.h` |
+| ADR-013 | Component::create_ports() | HDL | ✅ | `component.h` |
+| ADR-014 | lnode 节点构建 | HDL | ✅ | `core/{lnode,lnodeimpl,node_builder}.h` |
+| ADR-015 | ModuleFactory JSON 装配 | 注册 | ✅ | `core/module_factory.hh` |
+| ADR-016 | REGISTER_CHSTREAM 批量注册 | 注册 | ✅ | `chstream_register.hh` |
+| ADR-017 | PluginLoader dlopen | 注册 | ✅ | `core/plugin_loader.hh` |
+| ADR-018 | __io 端口宏 | 端口 | ✅ | `core/io.h:318` |
+| ADR-019 | __in / __out 端口宏 | 端口 | ✅ | `core/io.h:337-338` |
+| ADR-020 | ch_logic_in/out 旧 API | 端口 | ✅ | `core/io.h` |
+| ADR-021 | bundle_base<Self> CRTP | Bundle | ✅ | `core/bundle/bundle_base.h` |
+| ADR-022 | CH_BUNDLE_FIELDS_T 宏族 | Bundle | ✅ | `core/bundle/bundle_meta.h:23-32` |
+| ADR-023 | ch_stream<T> 协议 | Bundle | ✅ | `bundle/stream_bundle.h:19` |
+| ADR-025 | Plugin 基类无 tick | Plugin | ✅ | `include/cf/plugin/plugin_base.h` |
+| ADR-026 | at_stage() 逻辑阶段名 | Plugin | ✅ | `include/cf/plugin/pipe_builder.h:68` |
+| ADR-027 | Phase 子阶段 EARLY/NORMAL/LATE | Plugin | ✅ | `include/cf/plugin/pipe_builder.h:38` |
+| ADR-028 | declare_substage() | Plugin | ✅ | `include/cf/plugin/pipe_builder.h:77` |
+| ADR-030 | PipeNode 三态握手 | Plugin | ✅ | `include/cf/plugin/pipe_node.h` |
+| ADR-032 | PipeBuilder 统一编译器 | Plugin | ✅ | `include/cf/plugin/pipe_builder.h:53` |
+| ADR-033 | CtrlLink 四种控制 API | Plugin | ✅ | `include/cf/plugin/ctrl_link.h:34/40/46/52` |
+| ADR-037 | Plugin 作为设计范式 | 范式 | ✅ Accepted | `.omo/drafts/decision-plugin-framework-2026-06-08.md`（D1-D9 决策，Plugin 范式强制；gitignored 草稿不链接）+ **v2.0 Phase 6c M5 落地 (2026-09-17, D4 elaboration 语义兑现)** |
+| ADR-038 | chstream_register 集中入口 | 目录 | ✅ | `chstream_register.hh` |
 | ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity；§10.5 payload key 模态约束 + §10.6 生产者/消费者顺序契约 于 2026-10-22 `chmem-mmu-keys-modality` 补齐；v2.0 2026-09-17 Phase 6c M5 落地)** | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
-| ADR-041 | Bridge 适配层允许 tick | Plugin | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
-| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
-| ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
+| ADR-041 | Bridge 适配层允许 tick | Plugin | ✅ | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
+| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | ✅ | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
+| ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | ✅ | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
 | ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令（v2.0 含算术多周期 FSM 子类） | Plugin | ✅ v1.0 Phase 6c M5 (2026-09-17) + ✅ v2.0 算术豁免 (2026-09-28, mfc-cpu-pipeline-multi-cycle-fsm 触发) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
 | ADR-048 | Plugin 注册规范序 (MMU before IBus/DBus, C++17 inline int 计数器) | Plugin | ✅ v0.7.0 落地 (2026-09-24) | [`adr/ADR-048-plugin-registration-canonical-order.md`](./adr/ADR-048-plugin-registration-canonical-order.md) |
@@ -133,19 +133,20 @@
 
 | ID | 标题 | 类别 | 状态 | 备注 |
 |----|------|------|------|------|
-| ADR-029 | 模块级 ImplMode | Plugin | 🚧（推迟到 Phase 6） |
-| ADR-031 | StageLink / CtrlLink / DirectLink | Pipe | 🚧（Phase 0 仅 CtrlLink 已完成） |
-| ADR-034 | ScoreBoard 三种变体 | 验证 | 🚧 |
-| ADR-035 | CompareDriver TLM↔RTL 驱动 | 验证 | 🚧 |
-| ADR-036 | 三级测试金字塔 | 验证 | 🚧 |
-| ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部; Phase 1.3d-extras L1Cache Adapter 已注册, 通用模板 Phase 5 实施） |
-| ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） |
+| ADR-029 | 模块级 ImplMode | Plugin | 🚧（推迟到 Phase 6） | — |
+| ADR-031 | StageLink / CtrlLink / DirectLink | Pipe | 🚧（Phase 0 仅 CtrlLink 已完成） | — |
+| ADR-034 | ScoreBoard 三种变体 | 验证 | 🚧 | — |
+| ADR-035 | CompareDriver TLM↔RTL 驱动 | 验证 | 🚧 | — |
+| ADR-036 | 三级测试金字塔 | 验证 | 🚧 | — |
+| ADR-007 | StreamAdapter 跨 TLM↔RTL 通用桥接 | TLM | 🚧（仅 `HybridCacheWrapper` 局部; Phase 1.3d-extras L1Cache Adapter 已注册, 通用模板 Phase 5 实施） | — |
+| ADR-039 | 统一目录结构 | 目录 | 🚧（当前仍 tlm/rtl 分离） | — |
 | ADR-044 | L1 Cache↔MMU VIPT 锁定 + 反别名安全边界 | IP 架构 | 🚧（设计方向已锁，实装推迟 mmu-tlb-ptw-impl 以后） | [`ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md`](../../ip/cache/docs/adr/ADR-044-l1-cache-vipt-coherence.md) |
 | ADR-045 | Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop | Plugin | ✅ Accepted (2026-09-15, plugin-framework-stall v0.1.3) | [`adr/ADR-045-plugin-ctrl-link-consumption.md`](adr/ADR-045-plugin-ctrl-link-consumption.md) |
 | ADR-085 | MMU_PTW 架构 — 伞索引（TLB/PTW 分层 + PTWCache 页目录项缓存 + 同拍串联命中判定 / `start_level` 选择；决策拆为 D01–D21 共 21 个子 ADR） | IP 架构 | 🚧（设计提案 2026-10-22；实装归未立项 change `chmem-ptw-walk`） | [`ip/mmu/docs/adr/ADR-085-mmu-ptw-architecture.md`](../../ip/mmu/docs/adr/ADR-085-mmu-ptw-architecture.md) |
 | ADR-086 | MMU L0 / L1 TLB 架构 — 伞索引（两级 leaf 翻译缓存：L0 全相联 8 项 + L1 组相连 256 set × 8 way，级联查询 + XOR interleave；ADR-085 的 CH_MEM 侧增量） | IP 架构 | 🚧（设计提案 2026-10-23；实装归未立项 change `chmem-ptw-walk` 的后续增量） | [`ip/mmu/docs/adr/ADR-086-l0-l1-tlb-architecture.md`](../../ip/mmu/docs/adr/ADR-086-l0-l1-tlb-architecture.md) |
 | ADR-087 | ISA 声明真实性与 RV64 就绪度门禁（isa 三态语义 + isa→xlen 映射 + XLEN 单一来源 + 语义层编译期护栏 + RV64 准入 G1–G9） | IP 架构 | ✅ **Accepted v1.1**（2026-10-24；Change 1 已实装并归档 `2026-10-24-rv64-isa-declaration-correction`；§D4 护栏随 TLM 退役切换已登记；Change 2/3 待立项） | [`adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md`](adr/ADR-087-isa-declaration-integrity-and-rv64-readiness.md) |
-| ADR-088 | TLM 后端退役 — 冻结契约与语义裁决锚（检测面口径 + 冻结条款 + 5 子系统语义裁决表 + 覆盖平价台账三态格式 + B3 删除判据 + ADR-080 范围重定义 + ADR-087 v1.1 待办登记） | 架构治理 | ✅ **Accepted v1.1**（2026-10-24；B0 归档 `chmem-tlm-backend-freeze` + **B2 语义裁决完成**：§3 五行正式表态 / §7 ADR-080 范围重定义 / §5.2 BP 专项前置） | [`adr/ADR-088-tlm-backend-retirement.md`](adr/ADR-088-tlm-backend-retirement.md) |
+| ADR-088 | TLM 后端退役 — 冻结契约与语义裁决锚（检测面口径 + 冻结条款 + 5 子系统语义裁决表 + 覆盖平价台账三态格式 + B3 删除判据 + ADR-080 范围重定义 + ADR-087 v1.1 待办登记） | 架构治理 | ✅ **Accepted v1.4**（2026-10-26；★ **§10 目标态**：一个模型（CH_MEM）+ 两个后端（CppHDL Simulator / Verilator）+ 一道差分门禁；★ 三段路径 A/B/C；★ §5.2 删除判据新增 6/7 条（差分门禁已绿 + CI build 能力）⇒ 配套 ADR-089）；★ **§5.3.1 根因表述修订**（删掉被 E-1/E-2 证伪的「TLM 有 BTB ⇒ 预测命中不 flush」⇒ 改述为「单遍重定向零代价 vs 两级取指 1 拍/次 taken 转移」）+ ★ **§5.3.3 三个独立结论**（C-1 净收益率=报告项 / C-2 绝对值门禁判据 `cycles ≤ 813074` / C-3 增量自身 fail-closed）⇒ ★ v1.2 见下）B0 归档 `chmem-tlm-backend-freeze` + **B2 语义裁决完成**：§3 五行正式表态 / §7 ADR-080 范围重定义 / §5.2 BP 专项前置） | [`adr/ADR-088-tlm-backend-retirement.md`](adr/ADR-088-tlm-backend-retirement.md) |
+| ADR-089 | **双后端差分 parity 门禁**（同一模型 × CppHDL Simulator / Verilator 差分执行；观测量 5 项 + 逐拍相等默认 + 例外白名单 + fail-closed） | 验证基建 | ✅ **Accepted v1.0**（2026-10-26；★ 取代「463 条台账计数」作为一致性证据 ⇒ 台账重新定性为 **CH_MEM 覆盖边界规格**；★ 是 ADR-088 §5.2 删除判据 6 的来源） | [`adr/ADR-089-backend-parity-differential-gate.md`](./adr/ADR-089-backend-parity-differential-gate.md) |
 
 > ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 `.rddf/roadmap/archive/phase-1.5-stall-and-validate.md` §11。
 
@@ -1562,6 +1563,9 @@ Summary:
 | 2026-06-23 | 1.3.1 | **组织修复**：§3 章节顺序 K/J → J/K（按字母序）；§2.1 主表新增 ADR-037 行（33→34 条）；§2.4 统计表新增 K 范式决策行（合计 42→43 条，Plugin 类别数 5→6 不变）；TOC J 锚点 2-条→3-条 同步 |
 | 2026-10-08 | 1.4 | **新增 ADR-083**：Plugin-style 作为硬件模块的单一 source of truth（CppHDL 设施后端 + CppTLM 降级为 bridge 依赖）；同步修订 `overview.md` / `AGENTS.md` / `background-and-goals.md` / `tech-selection.md` / `code-framework-mapping.md` 描述 Plugin-style + CppHDL 后端双模式架构 |
 | 2026-10-23 | 1.5 | **新增 ADR-087**：ISA 声明真实性与 RV64 就绪度门禁（RV64 架构符合性审查触发）—— 确认当前实现 = RV32IM + Zicsr(subset)、**不符合 RV64**，且路线图已将 RV64 推迟至 v1.x 之后；因此决策聚焦"声明纠偏 + 技术护栏 + 准入判据"而非实现 RV64。同步修订 `ip/cpu/README.md` / `ip/cpu/docs/{blueprint,status,multi_isa_architecture}.md` / `soc/docs/integration-guide.md` 中「RV64GC」虚假宣称；缺口表 SSOT = `ip/cpu/docs/rv64_readiness_gap.md` |
+| 2026-10-26 | 1.8 | **ADR-088 升 v1.3（✅ Accepted）**：§5.3.1 **根因表述修订**（★ 原「TLM 侧有 BTB ⇒ 预测命中不 flush」已被 E-1/E-2 **证伪** ⇒ 删掉，改述为「**单遍模型重定向零代价 vs CH_MEM 两级取指每次 taken 转移 1 拍额外取指**」+ 气泡总量 120065 × 1 拍 + `914544 − 120065 = 794479 ≈ TLM 794478` 交叉验证）+ §5.3.3 **三个独立结论**（★ C-1 净收益率 = **报告项**（两分母同报取小）· ★ C-2 绝对值门禁判据 = **`Dhrystone cycles ≤ 813074`**（整数比较；★ 与差距闭合率 `101470/120066` **数值重合** ⇒ 分母之争不影响判定）· ★ C-3 **增量自身 fail-closed**（`cycles(增量on) ≤ cycles(增量off)`）⇒ ★ 增量 3 现状实测 **822514**（比不开 GShare 慢 2001 拍）⇒ **不满足 C-3** ⇒ 索引对齐 + GHR 驱动源收窄是**入场券**）⇒ ★ 配套：`ip/cpu/docs/bp-btb-gshare-design-brief.md` **v2.3**（★ 由 `docs/architecture/` 迁入 `ip/cpu/docs/`，scope = ip/cpu） |
+| 2026-10-26 | 1.10 | **新增 ADR-089**（双后端差分 parity 门禁，✅ Accepted）：★ **parity 语义从「463 条台账计数」改为「同一输入的确定性双后端差分执行」** ⇒ 观测量 5 项（tohost / 最终 regfile / **DUT 自算内存签名（mailbox）** / **总 cycle 数（标量）** / **逐拍 PC 流 hash**）⇒ ②③⑤ bit-exact、★ **逐拍语义归 ⑤**、④ 总拍数相等 ⇒ **例外白名单 5 必填字段**（机制说明 / 上游状态+issue / 变异对照 / **收敛期限** / **corpus 作用域**）+ **扩张权归 architect** ⇒ **fail-closed**（每观测量各一例，≥5 例）⇒ corpus = **两侧交集 47 ELF**（★ Verilator 侧另有 `rv32ui-p-simple` ⇒ 补进 Simulator 侧）+ branchbench 4 档（Dhrystone 后置）⇒ ★ 台账重新定性为「CH_MEM 覆盖边界规格」（冻结）⇒ ★ 阶段 A（差分门禁）MUST 先于阶段 C（删 TLM 模式）；★ **v1.1（双审后）**：③ 改形为 mailbox 签名 · ④/⑤ 措辞拆分 · 确定性判据 · corpus 单一清单文件 · **阶段 C 第 5 条硬前置（门禁体系自身改版，防 Check 2/7 真空 PASS）** · A2 拆 A2a/A2b · 新增 A4（CI 接线） |
+| 2026-10-26 | 1.9 | **ADR-088 升 v1.4（✅ Accepted）**：★ 新增 **§10 目标态与三段迁移路径** —— **一个模型（CH_MEM，`uint_t` 模态消失）+ 两个后端（CppHDL Simulator / Verilator）+ 一道差分门禁**；阶段 A = 差分门禁（不动 TLM）· 阶段 B = 台账冻结为覆盖边界规格 · 阶段 C = 删 TLM 模式（B3）⇒ ★ §5.2 删除判据新增 **第 6 条**（差分门禁已绿）与 **第 7 条**（CI build 能力 = 判据 4 的可判定化）⇒ ★ 阶段 C 的 5 条硬前置（差分门禁 / CI build / TLM 参考语义抽成规格 / 台账冻结 / **门禁体系自身改版**） |
 | 2026-10-24 | 1.7 | **ADR-088 升 v1.1（✅ Accepted）**：B2 语义裁决完成 —— §3 逐子系统表**五行正式表态**（M 扩展 = CH_MEM 组合式为规范（功能+cycle）/ CSR = CH_MEM 为规范 / MMU PTW = **现在不接线**，回退 vaddr 表态为已知临时降级，实装归未立项 `chmem-ptw-walk` / BP = **CH_MEM-only 且必须做**，不适用「不做」出口，B3 删除门禁追加双前置 / MMU exception handler = 必须注册）+ 新增 **§7 ADR-080 范围重定义**（「TLM↔CH_MEM 双模对拍」→「CppHDL Simulator ↔ Verilator 后端间对拍」，消解 roadmap v1.3.0 与 TLM 退役窗口的计划冲突）+ §5.2 BP 专项删除前置。**ADR-087 升 v1.1（✅ Accepted）**：拟批准触发（Change 1 归档）已满足 + §D4 护栏随 TLM 退役切换正式登记（切换条件 = Change 2 单一来源落地）+ Change 1 实装记录（`[cpu]` 129 → 137）。另实测纠正 ADR-088 §1.3 的 TLM 独占数（361 → **463**，实测差集口径）与 §4 口径注记（509/451 → 678/463） |
 | 2026-10-24 | 1.6 | **新增 ADR-088**：TLM 后端退役治理锚（冻结条款 + 5 子系统语义裁决表 + 覆盖平价台账三态格式 + B3 删除判据「CH_MEM binary 包含闭包反查」+ ADR-087 v1.1 待办显式登记）—— 立**判据先于动作**的退役秩序；同时 ADR-083 升 **v1.1**（补 §2.5 冻结条款 + §5.4 退役时间线 B0→B1→B2→B3）。配套上线 `tools/check_tlm_freeze.sh` 冻结门禁（warn 级，检测面 = `ip/` 下非 `_chmem.h` 的 `.h` 减 9 个双模共享文件） |
 
