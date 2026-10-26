@@ -168,9 +168,9 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 | TLM 编译     | | CppHDL     | | CppHDL      | | CppHDL      |
 | POD 直仿     | | Simulator  | | toVerilog   | | Verilator   |
 | (pb.run())   | | tick()     | | → .v 文件    | | Backend      |
-|              | |            | |              | |              |
-| 默认编译     | | 需 -DCF_PLUGIN_USE_CH_MEM                  |
-| ~0.6s 反馈   | | CH_MEM 模式编译后才可用                    |
+| — | — | — | — | — | — |
+| 默认编译     | — | 需 -DCF_PLUGIN_USE_CH_MEM                  |
+| ~0.6s 反馈   | — | CH_MEM 模式编译后才可用                    |
 +--------------+ +------------+ +-------------+ +-------------+
                               |
 +-----------------------------v-------------------------------+
