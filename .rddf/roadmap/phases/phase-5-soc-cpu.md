@@ -16,7 +16,7 @@ phase_refs: []
 
 ## 完成条件
 - [ ] S/U mode 支持 (P3#11)
-- [ ] BTB 分支预测 (P3#13)
+- [ ] BTB 分支预测 (P3#13) — ★ **v2.3 范围已重排（planner 2026-10-26，A5 决策）**：① **本期 MUST 含增量 1**（`is_unconditional` + `jal` 建项）② GShare（★ **移植**，TLM 参考已有）③ RAS（★ **新增设计**，条件性）⇒ ★ 判据 = **净收益率 ≥ 84.5%**（当前 CH_MEM Bimodal-only 实测 **56.67%** ⇒ 未达标 ⇒ GShare 大概率必须进本期）⇒ ★ 详见 `feat-bp-btb-gshare` 的 phase-5 段 + `openspec/changes/chmem-bp-btb-gshare` 的 **Task 7 / AC-27 / AC-28 / AC-29**
 - [ ] AMO/LR/SC (P3#12)
 - [ ] FreeRTOS demo (P3#14)
 - [ ] CoreMark ≥ 2.3

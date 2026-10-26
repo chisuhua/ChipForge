@@ -24,6 +24,7 @@ phase_refs: []
 - [ ] **PoC-1**: MUL/DIV 1c/33c rv32um 100% · **PoC-2**: RV32C ≥95% · **PoC-3**: ICache ≥90%
 - [ ] ADR-082 negotiate capability 集成（mfc Phase G）
 - [ ] **PoC-6**: CoreMark/MHz ≥ 1.9 (BP 完成) — **defer → v1.0.0** (决策 2026-10-19, 见 `objective-soc-cpu-v0110-launch.md §11`)
+- [ ] **前置2 PoC**（`chmem-bp-btb-gshare-poc`）★ **机制判定已完成（2026-10-26）**：机制成立（Δcycles 4 档全改善 + 校验和逐位不变 + ΔFLUSH ≡ Δcycles）⇒ Dhrystone cycles **−7.4%** / DMIPS **1.34472**（★ 仍 < 1.4 硬门禁 ⇒ **绝对值门禁未恢复** ⇒ 净收益率 **56.67%** vs 需 **84.51%**）⇒ ★ **待归档**（★ 归档 = 本 change 的开工前置之一，见 `chmem-bp-btb-gshare` 的定位段）
 - [x] **TLM 冻结门禁上线**（B0）: CI 可执行，TLM-only 文件新增 feature 函数即 fail — 见 `objective-ip-cpu-tlm-backend-retirement` Gate 1 ✅ **已完成**（2026-10-24，change `chmem-tlm-backend-freeze` 归档；`tools/check_tlm_freeze.sh` 已在 `architecture-gates.yml` warn 级 step，violations=0 / candidates=31 / base=a9f0d97432）
 - [x] **TLM 死代码清理**（B0）: 4 文件 / 201 行删除，双 binary 0 退化 ✅ **已完成**（2026-10-24，同上 change 归档；`ip/cpu/plugins/{exception,fpu}.h` + `ip/cpu/arch/riscv/fpu.h` + `ip/cache/plugins/cache_keys.h` 已删）
 - [x] **ADR-088 Proposed**（B0）: TLM 仿真后端退役与 CH_MEM 单后端收敛（冻结条款 + 语义裁决表 + 覆盖平价台账 + 删除判据） ✅ **已完成并升 Accepted v1.2**（2026-10-24；B0 立冻结契约 + B2 语义裁决完成 + §5.3 性能门禁承接裁决）

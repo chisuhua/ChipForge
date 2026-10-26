@@ -168,6 +168,7 @@ depends_on:
 | P-7 | plan 的 **Task 2b**（Bimodal）之后 | ★ **追加增量 3（GShare 移植）**与**增量 2（RAS，条件性）**两个可选步骤 ⇒ ★ 顺序按 **成本序 1 → 3 → 2** |
 | P-8 | plan 的 Tasks 清单 | ★ **追加 Task 7**（增量分档的量收益，Step 1~6，含 Step 5b 开关机制与 Step 5c 测量矩阵）|
 | P-9 | plan 的「不可触碰」/ owner 纪律段 | ★ 补：**`branch_chmem.h` 的改动授权**（本 change 主体 owner）⇒ 否则撞三 change 边界硬门禁 |
+| P-10 | （非 plan 文件）★ **前置2 PoC 的收口** | ★ `chmem-bp-btb-gshare-poc` 的 **17 个未勾选 AC** MUST 逐条勾选（★ 证据已在该 change 的「实测留证」段）⇒ ★ 其中 **AC-F2-8**（净收益率下界）**现已可闭合**：实测 = `68044/120065` = **56.67%** ⇒ ★ 且 **两个前置 change MUST 在本 change 归档前 archive**（见定位段）|
 
 ★ **同步完成后**：builder 开工前 MUST 再核一遍 —— plan 的 Task 编号与本 change 的 Task 1~7 **一一对应**（★ 防止出现「plan 有 Task 8 但 tasks.md 没有」的孤儿）。
 
