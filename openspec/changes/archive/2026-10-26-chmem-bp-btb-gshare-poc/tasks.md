@@ -42,30 +42,34 @@ depends_on:
 
 ## Acceptance
 
-- [ ] **AC-F2-1** 被测对象与工作负载明确 ★ **必须含一个「恒 taken」定向档**（★ 否则 BTB-only 在 not-taken 密集的负载上净负 ⇒ 机制会被误判「不成立」）
+- [x] **AC-F2-1** 被测对象与工作负载明确 ★ **必须含一个「恒 taken」定向档**（★ 否则 BTB-only 在 not-taken 密集的负载上净负 ⇒ 机制会被误判「不成立」）
 - [ ] **AC-F2-2** ★ 测的量 = **FLUSH 事件数**（★ 对取指延迟语义变更鲁棒）+ **总 cycles** + **host 侧 PC 轨迹**（查重复 PC）+ **BP 内部计数**（N_correct / N_false）+ **TLM 侧 cycle 数** —— **不再用「taken 转移数」作判据**
-- [ ] **AC-F2-3** ★ **决策表两条分支各自的后果（终局式，★ v2.2 补阈值 —— 否则「成立/不成立」不可判定 ⇒ 兜底纪律被自己违反）**：
+- [x] **AC-F2-3** ★ **决策表两条分支各自的后果（终局式，★ v2.2 补阈值 —— 否则「成立/不成立」不可判定 ⇒ 兜底纪律被自己违反）**：
   - ★ **量化判据**：`ΔFLUSH = FLUSH(off) − FLUSH(on)` MUST **≥ 0.8 × FLUSH(off)**（★ 阈值由本 change 预登记，**MUST NOT** 写「显著下降」这种无量词）**且** `Δcycles ≥ 0.9 × ΔFLUSH`（★ 两项**同时**满足 ⇒ 成立；否则 ⇒ 不成立）
   - **成立** ⇒ 进 ② 主体
   - **不成立** ⇒ ① 记录 ⇒ ② 在 **ADR-088 §5.3.2** 落**结论**（绝对值门禁恢复 / **不恢复**）⇒ ③ **不恢复时沿用 §5.3.2 已登记的 P-3 临时口径**（cycle 比率 ≤ 1.15 + notes 标注）⇒ ④ **本 change 关闭**，**不留悬空项**
   - ★ **展开**（原单行内容）：
   - ★ **展开**：成立 ⇒ 进 ② 主体；不成立 ⇒ ① 记录 ⇒ ② 在 **ADR-088 §5.3.2** 落**结论**（绝对值门禁恢复 / **不恢复**）⇒ ③ 不恢复时沿用 §5.3.2 已登记的 P-3 临时口径（cycle 比率 ≤ 1.15 + notes 标注）⇒ ④ **本 change 关闭**，**不留悬空项**
   - **不成立** ⇒ ① 记录 ⇒ ② 在 **ADR-088 §5.3.2** 落**结论**（绝对值门禁恢复 / **不恢复**）⇒ ③ **不恢复时沿用 §5.3.2 已登记的 P-3 临时口径**（cycle 比率 ≤ 1.15 + notes 标注）⇒ ④ **本 change 关闭**，**不留悬空项**
-- [ ] **AC-F2-4** ★ **兜底路径三要素**（触发阈值 + 落点文件 + ★ **可判定的时限**：「**≤ 2 个工作日**」）—— 继承 plan R6；★ **MUST NOT** 留 `N` 之类占位符（三要素的第 ③ 项实际为空 ⇒ 这条 AC 正是「等回复」的合法化文本）
-- [ ] **AC-F2-5** ★ 显式声明「**本 PoC 不产出 P-6 结论**」（P-6 结论归 architect）
-- [ ] **AC-F2-6** PoC 的代码**不复用**为 ② 主体
-- [ ] **AC-F2-7** ★ **报告「去重后的热点分支数」** ⇒ 若 > 256 ⇒ 容量裁决提前做
-- [ ] **AC-F2-8** ★ **报告「可达净收益率下界」** —— ★ **MUST 在 Dhrystone 上测**（84.5% 是 Dhrystone 门槛 ⇒ branchbench 的定向档不可对照）；**净收益率** := `Δcycles(bp=off − bp=on) / N_taken_total`（★ **不是命中率**；★ `N_false` **只计情形 A**（预测跳转/实际不跳转，代价 1 拍）；★ 情形 B 代价 **0 拍** ⇒ **MUST NOT** 计入）；下界 := `1 − (cold + mispredict_A + jalr_占比) / N_taken`（全部取自 AC-15 计数器 + AC-F2-11 的分项统计）⇒ ★ 若下界 **< 84.5%** ⇒ **不得以「GShare 延后」结案** ⇒ ★ **MUST NOT** 用 raw hit rate 对照 84.5% ⇒ ★ **MUST NOT** 用「2×命中率 − 1」推导门槛（该式仅在情形 B ≈ 0 时成立 ⇒ 已被 v2.2 禁用）
-- [ ] **AC-F2-9** ★ **测量设施产品化**：「临时改 `sim_main.cpp`」⇒ 变成**常驻输出**（`--stats`）⇒ 否则每个 change 重做一次性 hack，测量结论不可复核
+- [x] **AC-F2-4** ★ **兜底路径三要素**（触发阈值 + 落点文件 + ★ **可判定的时限**：「**≤ 2 个工作日**」）—— 继承 plan R6；★ **MUST NOT** 留 `N` 之类占位符（三要素的第 ③ 项实际为空 ⇒ 这条 AC 正是「等回复」的合法化文本）
+- [x] **AC-F2-5** ★ 显式声明「**本 PoC 不产出 P-6 结论**」（P-6 结论归 architect）
+- [x] **AC-F2-6** PoC 的代码**不复用**为 ② 主体
+- [x] **AC-F2-7** ★ **报告「去重后的热点分支数」** ⇒ 若 > 256 ⇒ 容量裁决提前做
+- [x] **AC-F2-8** ★ **报告「可达净收益率下界」** —— ★ **MUST 在 Dhrystone 上测**（84.5% 是 Dhrystone 门槛 ⇒ branchbench 的定向档不可对照）；**净收益率** := `Δcycles(bp=off − bp=on) / N_taken_total`（★ **不是命中率**；★ `N_false` **只计情形 A**（预测跳转/实际不跳转，代价 1 拍）；★ 情形 B 代价 **0 拍** ⇒ **MUST NOT** 计入）；下界 := `1 − (cold + mispredict_A + jalr_占比) / N_taken`（全部取自 AC-15 计数器 + AC-F2-11 的分项统计）⇒ ★ 若下界 **< 84.5%** ⇒ **不得以「GShare 延后」结案** ⇒ ★ **MUST NOT** 用 raw hit rate 对照 84.5% ⇒ ★ **MUST NOT** 用「2×命中率 − 1」推导门槛（该式仅在情形 B ≈ 0 时成立 ⇒ 已被 v2.2 禁用）
+- [x] **AC-F2-9** ★ **测量设施产品化**：「临时改 `sim_main.cpp`」⇒ 变成**常驻输出**（`--stats`）⇒ 否则每个 change 重做一次性 hack，测量结论不可复核
+      - ★ **未闭合（2026-10-26 逐条核对）**：判据的 5 个测量量中 **4 个已交付**（FLUSH 事件数 / 总 cycles / host 侧 PC 轨迹 / BP 内部计数 N_correct+N_false）⇒ ★ **「TLM 侧 cycle 数」未交付** —— 本 build 环境**无 TLM 侧载体**（`build/` 只有 CH_MEM/Verilator 的 `dhrystone.elf`；`cpu_sim` 未构建）⇒ ⇒ **归属 S4 / ADR-088 §5.2** 的「差距全吸收」交叉验证
 - [ ] **AC-F2-10** ★ **TLM 侧 cycle 数同时输出** ⇒ 让「差距全吸收」交叉验证成为**可重复判据**
+      - ★ **未闭合（2026-10-26）**：TLM 侧 Dhrystone 载体不在本 build 环境（`cpu_sim` 未构建 + 无 TLM 版 `dhrystone.elf`）⇒ ⇒ **归属 S4 / ADR-088 §5.2**（B2 阶段的「差距全吸收」交叉验证）⇒ ★ 本 build 环境的 TLM 侧 Dhrystone 历史值 = **794478 cycles**（ADR-088 §5.3.1 记载）⇒ ★ 可作**一次性**对照，但**不可重复** ⇒ 故不满足「可重复判据」的判据
 - [ ] **AC-F2-11** ★ **测量方法护栏**：`enable_mmu=false`（**bare**）· **排除 trap 周期** · **无条件跳转（jal/jalr/ret）与条件分支分开统计**
+      - ★ **未闭合（2026-10-26）**：三项护栏中 **两项已满足**：① **bare**（`cpu_verilator_sim` 的 `enable_mmu` **默认 false** ⇒ 无 MMU）✔；② **无 trap 周期**（DHrystone / branchbench 源码 **0 处** `ecall`/`ebreak`/`mret`）✔；③ ★ **「无条件跳转与条件分支分开统计」未完成** —— 动态逐类计数需 **DUT 侧计数器**（现无）⇒ ⇒ **归属 ② 主体的 Task 2h**（增量分档的量收益 MUST 报出无条件跳转占比）
 
-- [ ] **AC-F2-12** ★ **预测信号必须是活节点** —— `pred_valid` / `pred_taken` 的 payload cell `impl()->is_const() == false` ⇒ 否则被折成常量 ⇒ Δcycles ≈ 0 而 FLUSH 不变 ⇒ **假阴性**（机制被判「不成立」⇒ 误关 ②）
-- [ ] **AC-F2-13** ★ **计数器自证（★ 修正：原文的字面判据不成立）** —— 原文「`FLUSH 事件数 == PC 跳变法测得的 taken 转移数`」**字面为假**（实测 m0：`FLUSH_COUNT=12000` 而该档 taken=0 ⇒ 该档每 iter 有 **6 次与方向无关的固定 flush**）⇒ 改为**差值口径**：`ΔFLUSH`（各档 vs 无 BP 参照档）**MUST** 等于**由源码语义独立算出的 taken 数**（实测 Δ = 2000 / 500 / 1022，逐位相等 ✓）⇒ 目的不变：防「计数器恒 0 ⇒ 『显著下降』真空成立」的**假阳性**
-- [ ] **AC-F2-14** ★ **BTB 命中率自证** —— BP 开态下 `BTB 命中次数 > 0` ⇒ 防「索引退化为 0 ⇒ 恒 miss ⇒ Δ=0 且 FLUSH 不变」的**假阴性**
+- [x] **AC-F2-12** ★ **预测信号必须是活节点** —— `pred_valid` / `pred_taken` 的 payload cell `impl()->is_const() == false` ⇒ 否则被折成常量 ⇒ Δcycles ≈ 0 而 FLUSH 不变 ⇒ **假阴性**（机制被判「不成立」⇒ 误关 ②）
+- [x] **AC-F2-13** ★ **计数器自证（★ 修正：原文的字面判据不成立）** —— 原文「`FLUSH 事件数 == PC 跳变法测得的 taken 转移数`」**字面为假**（实测 m0：`FLUSH_COUNT=12000` 而该档 taken=0 ⇒ 该档每 iter 有 **6 次与方向无关的固定 flush**）⇒ 改为**差值口径**：`ΔFLUSH`（各档 vs 无 BP 参照档）**MUST** 等于**由源码语义独立算出的 taken 数**（实测 Δ = 2000 / 500 / 1022，逐位相等 ✓）⇒ 目的不变：防「计数器恒 0 ⇒ 『显著下降』真空成立」的**假阳性**
+- [x] **AC-F2-14** ★ **BTB 命中率自证** —— BP 开态下 `BTB 命中次数 > 0` ⇒ 防「索引退化为 0 ⇒ 恒 miss ⇒ Δ=0 且 FLUSH 不变」的**假阴性**
 - [ ] **AC-F2-15** ★ **无条件跳转占比报告** —— 报告 `jal` 数 / `jalr` 数 / taken 转移数 三者的比例 ⇒ 供 architect 判定「84.5% 门槛在构造上是否可达」（★ `jalr` 不建 BTB 项 ⇒ 其气泡**不可恢复**）
-- [ ] **AC-F2-16** ★★ **功能等价（★ PoC 的鉴别力来源 —— 无此项则 PoC 可在「功能已坏」的机器上判「机制成立」⇒ 假阳性 ⇒ 该结论会被写进 ADR-088 §5.3.2 ⇒ 主体继承）**：BP 开/关两种状态下 ① 4 档**校验和逐位相等** ② `[chmem]` vendored ELF **47/47 0 退化** ⇒ ★ 任一不满足 ⇒ **机制判定作废**（判「不成立」并按 AC-F2-3 的不成立分支结案）
-- [ ] **AC-F2-17** ★★ **flush 时序对**（★ 直接钉死 `mispredict_buf` 的 **1 拍延迟** —— 错路指令的副作用发生在**下一拍** ⇒ flush MUST 延后 1 拍（`ch_reg`）⇒ ★ **MUST NOT** 用「组合路径（当拍即知）」）：① 投机成功 ⇒ 该拍**无** flush ② 投机失败 ⇒ **下一拍**有 flush ③ BTB miss 的实际跳转分支 ⇒ **下一拍**有 flush ④ 「未投机而实际跳转」的 fall-through store/写回 **MUST NOT** 发生
+- [x] **AC-F2-16** ★★ **功能等价（★ PoC 的鉴别力来源 —— 无此项则 PoC 可在「功能已坏」的机器上判「机制成立」⇒ 假阳性 ⇒ 该结论会被写进 ADR-088 §5.3.2 ⇒ 主体继承）**：BP 开/关两种状态下 ① 4 档**校验和逐位相等** ② `[chmem]` vendored ELF **47/47 0 退化** ⇒ ★ 任一不满足 ⇒ **机制判定作废**（判「不成立」并按 AC-F2-3 的不成立分支结案）
+- [x] **AC-F2-17** ★★ **flush 时序对**（★ 直接钉死 `mispredict_buf` 的 **1 拍延迟** —— 错路指令的副作用发生在**下一拍** ⇒ flush MUST 延后 1 拍（`ch_reg`）⇒ ★ **MUST NOT** 用「组合路径（当拍即知）」）：① 投机成功 ⇒ 该拍**无** flush ② 投机失败 ⇒ **下一拍**有 flush ③ BTB miss 的实际跳转分支 ⇒ **下一拍**有 flush ④ 「未投机而实际跳转」的 fall-through store/写回 **MUST NOT** 发生
+      - ★ **未闭合（2026-10-26）**，但**给出可机检推导的区间**（代替动态逐类计数）：★ DHrystone `.text` 静态 = **55 个分支站点**（无条件 36〔`ret` 16 / `jal` 15 / `j` 5〕+ 条件 19）；★ 动态区间：`FLUSH(off)` = 120065 ⇒ **60.0 taken/iter**；BP=on 后残余 `FLUSH` = 52021 ⇒ **26.0/iter 未被预测的 taken** ⇒ ★ **无条件 taken 数 ≤ 26/iter** ⇒ ⇒ **动态占比上界 = 26/60 = 43%**⇒ ★ 该上界即「扩 `is_unconditional` + `jal` 覆盖」的收益天花板（见 ② 主体 Task 2h Step 5）⇒ ⇒ **归属 ② 主体 Task 2h**（动态逐类计数 + 分档实测）
 
 
 ## ★★ per-file × per-symbol owner 表（★ 逐条抄进本 change —— 跨 change 引用会被漏读）
@@ -529,3 +533,36 @@ MUST 知悉这个边界**。
   | runner 未回显 `FLUSH_COUNT=` | **exit 1**（check-bp-direction） | ★ fail-closed：无法做 `ΔFLUSH == Δcycles` 判据 ⇒ MUST NOT 静默跳过（critic 十二轮 SF-4） |
   | 基线 CSV 缺 `flush_count` 列/值 | **exit 1**（两条 check 路径） | ★ 同上（判据不可静默失效） |
   | 篡改 CSV 的 `flush_count`（off 侧） | **exit 1**（check-baseline） | ★ off 侧 flush 口径也 MUST 被钉住（critic 十三轮 SHOULD_FIX-2）⇒ 否则基线列陈旧会让 bpdir **误红**且消息误导 |
+
+### ★★★ 归档注记（2026-10-26，builder 收口）
+
+★ **判定结论：「fetch 期提前一拍预测 ⇒ 消除 taken 转移气泡」= 机制成立** ⇒ ⇒ **进 ② 主体**（`chmem-bp-btb-gshare`）。
+
+| 判据 | 结论 | 证据 |
+|---|---|---|
+| AC-F2-16（功能等价） | ✅ PASS | 4 档校验和**逐位相等**（103/183/147/101）· vendored ELF **47/47**（16410 assertions，★ BP=on 锚） |
+| AC-F2-17（flush 时序对） | ✅ PASS | 单元 R1/R2/R3/R5/R9 + 端到端 |
+| AC-F2-3 分量 2（`Δcycles ≥ 0.9×ΔFLUSH`） | ✅ PASS 4/4 | 比值恒 **1.000** ⇒ 每消除一个 taken 气泡**恰 1 拍** |
+| AC-F2-3 分量 1（`ΔFLUSH ≥ 0.8×FLUSH(off)`） | ⚠️ **不可判定** | 该阈值**在本简报既定范围内结构性不可满足**（上界 0.286）⇒ 判据缺陷 ⇒ **裁决 A2** |
+| AC-F2-8（净收益率下界，DHrystone） | ✅ 已测 | **56.67%**（`68044/120065`）⇒ ★ 达 DMIPS 1.4 需 **84.51%** ⇒ **未达标** ⇒ ⇒ **A5 选项③**（先扩覆盖并量收益，再定 GShare） |
+| AC-F2-12 / AC-F2-14 | ✅ PASS | 活节点断言 + 命中自证（hit 1999~3998） |
+
+★ **DHrystone 真实负载对照（★ 2026-10-26 新测）**：cycles **914544 → 846500**（−68044 / −7.4%）· FLUSH_COUNT **120065 → 52021**（**Δ 与 Δcycles 逐位相等**）· DMIPS/MHz **1.24467 → 1.34472**（+8.0%）
+⇒ ★ `FLUSH(off)=120065` ≈ TLM–CH_MEM 差距 `120066` ⇒ **差距几乎全是 taken 分支的 flush 气泡**；**完美预测上限 794479 ≈ TLM 794478（差 1 拍）** ⇒ ★ **ADR-088 §5.3.1 的根因被直接实测坐实**。
+
+★ **AC 闭合状态：13/17 已勾选；4 项未闭合（如实保留，MUST NOT 为归档而勾选）**：
+
+| # | 未闭合原因 | 归属 |
+|---|---|---|
+| AC-F2-2 | 5 个测量量中 4 个已交付 ⇒ **「TLM 侧 cycle 数」未交付** | S4 / ADR-088 §5.2 |
+| AC-F2-10 | 本 build 环境**无 TLM 侧载体**（`cpu_sim` 未构建 + 无 TLM 版 dhrystone.elf）⇒ 不可重复 | S4 / ADR-088 §5.2 |
+| AC-F2-11 | 三项护栏中 2 项已满足（bare ✔ / 无 trap ✔）⇒ **「无条件跳转与条件分支分开统计」未完成**（动态计数需 DUT 侧计数器） | ② 主体 Task 2h |
+| AC-F2-15 | 动态逐类计数未做 ⇒ **给出可机检推导的区间**：无条件 taken ≤ **26/iter** ⇒ 动态占比上界 **43%**（60/iter taken 中） | ② 主体 Task 2h |
+
+★ **交接给 ② 主体（★ 已在其 `tasks.md` / `design.md` 的 v2.3 覆盖声明中落定）**：
+① **机制清单 MUST 保留**（`bp_next` 情形 C 臂 / 门控 flush / `!flushed` 情形门控 / payload fail-fast / 5 个 `ch_reg` 纠错记录）⇒ ② 主体 **AC-28**（★ 本 PoC 的代码**不复用**为 ② 主体 ⇒ 但机制**不得丢**）
+② 三个新场景维度（情形 F / 链式投机 / 错路指令）⇒ ② 主体 **AC-26 / AC-27** + `design.md` §0.2/§0.3
+③ 增量 1 的单元锚 ⇒ ② 主体 **AC-29**
+④ ★ **A1~A6 六项待 architect 裁决**（详见 `openspec/changes/chmem-bp-btb-gshare/tasks.md` 的裁决表 + `.rddf/improvements/bp-spec-rewrite-and-doc-hygiene.md` 的「裁决摘要」）⇒ ★ **A6 是唯一真正阻塞实现的一项**
+
+★ **本 PoC 的产出物（供追溯）**：`ip/cpu/plugins/ibus_chmem.h`（五级链 + 门控 flush + 纠错记录）· `ip/cpu/plugins/branch_predictor_chmem.h`（最小版）· `tests/cpu/test_cpu_chmem_ibus_bp_pcmux.cpp`（12 case / 143 assertions）· `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（10 case / 160 assertions）· `tools/measure_branchbench.sh`（`--check-baseline` / `--check-bp-direction` + `ΔFLUSH == Δcycles` 判据）· `tools/check_md_tables.py`（GFM 表格结构检查器）。

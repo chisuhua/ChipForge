@@ -16,7 +16,7 @@ depends_on:
 
 > **定位**: B1 ② 主体。实现 **BTB + Bimodal 2-bit PHT**（★ GShare / RAS **不在本期**，见架构简报 §3.1）。
 > **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` v2.2 §2.1 / §3.2 / §3.3 / §3.4 / §4.3 / §5.1 / §5.5
-> ★ **两个前置（MUST 先完成）**（`chmem-branch-microbench-fix` + `chmem-bp-btb-gshare-poc`）：★ **v2.3 修订** —— 前置的**机制落地 + 单元锚全绿**（= 实测已完成，见前置2 的 12 case/143 assertions + 15 变异）**即可开工**；★ 但 **archive 仍 MUST 在本 change 归档前完成**（⇒ 兜底三要素：触发阈值 = 本 change 进入归档流程；落点 = 本行 + `openspec/changes/archive/`；时限 = **≤ 2 个工作日**）⇒ ★ 理由：强制串行会让「已验证的机制」在等归档 ⇒ 白等⇒ ★ **MUST NOT** 把「可开工」读成「可跳过前置的验收口径」
+> ★ **两个前置：✅ 已归档（2026-10-26）** —— `2026-10-26-chmem-branch-microbench-fix`（12/12 完成）+ `2026-10-26-chmem-bp-btb-gshare-poc`（**13/17 AC 闭合**；★ 4 项未闭合 AC-F2-2 / 10 / 11 / 15 的原因与归属见该 change 的**归档注记**）⇒ ★ **开工门禁已解除** ⇒ ★ 继承项：**AC-F2-11（无条件跳转与条件分支分开统计）/ AC-F2-15（无条件跳转占比报告）⇒ 归本 change 的 Task 2h**（★ 其余两项 AC-F2-2 / AC-F2-10 归 S4 / ADR-088 §5.2）⇒ ★ **MUST NOT** 把「可开工」读成「可跳过前置的验收口径」
 > ★ **执行文件** `.rddf/plans/chmem-bp-btb-gshare.md` 顶部有 **v2.1 覆盖声明**（★ **v2.3 覆盖声明尚未落到该文件** —— ★ **该文件是 builder 的执行 SSOT** ⇒ ★ **MUST NOT** 只读本 change 的 `tasks.md` / `design.md` 就开工 ⇒ ★ **builder 开工前 MUST 先把本 change 的 v2.3 覆盖声明同步进 plan 文件**（含其 owner 表里「flush 双分量」「四情形 select 链」两条作废标注）⇒ ★ **同步清单见本 change 的「★ planner 交接清单」段**
 
 ## Implementation
@@ -168,7 +168,7 @@ depends_on:
 | P-7 | plan 的 **Task 2b**（Bimodal）之后 | ★ **追加增量 3（GShare 移植）**与**增量 2（RAS，条件性）**两个可选步骤 ⇒ ★ 顺序按 **成本序 1 → 3 → 2** |
 | P-8 | plan 的 Tasks 清单 | ★ **追加 Task 7**（增量分档的量收益，Step 1~6，含 Step 5b 开关机制与 Step 5c 测量矩阵）|
 | P-9 | plan 的「不可触碰」/ owner 纪律段 | ★ 补：**`branch_chmem.h` 的改动授权**（本 change 主体 owner）⇒ 否则撞三 change 边界硬门禁 |
-| P-10 | （非 plan 文件）★ **前置2 PoC 的收口** | ★ `chmem-bp-btb-gshare-poc` 的 **17 个未勾选 AC** MUST 逐条勾选（★ 证据已在该 change 的「实测留证」段）⇒ ★ 其中 **AC-F2-8**（净收益率下界）**现已可闭合**：实测 = `68044/120065` = **56.67%** ⇒ ★ 且 **两个前置 change MUST 在本 change 归档前 archive**（见定位段）|
+| P-10 | （非 plan 文件）★ **前置2 PoC 的收口** | ✅ **已完成（2026-10-26 归档** `2026-10-26-chmem-bp-btb-gshare-poc`**）**：13/17 AC 勾选 + 归档注记；★ 其中 **AC-F2-8**（净收益率下界）= `68044/120065` = **56.67%** ⇒ ★ **4 项未闭合**（AC-F2-2 / 10 / 11 / 15）⇒ ★ 其中 **AC-F2-11 / AC-F2-15 归本 change 的 Task 2h**（★ MUST 在 Task 2h 的测量里报出无条件跳转占比）|
 
 ★ **同步完成后**：builder 开工前 MUST 再核一遍 —— plan 的 Task 编号与本 change 的 Task 1~7 **一一对应**（★ 防止出现「plan 有 Task 8 但 tasks.md 没有」的孤儿）。
 
