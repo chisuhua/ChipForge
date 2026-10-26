@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.3（2026-10-26，builder；v1.3 = A2a inc-3 的 ③ memsig 落定 + 两例变异对照 + 5/5 corpus 全观测量对齐）**
+> **Status**: ✅ **v1.4（2026-10-26，builder；v1.4 = A2b 比对器落盘 + S-15 缓存条款实测更正 + §7 覆盖矩阵填实）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -288,6 +288,7 @@ loop:
 **要求**
 - 白名单**扩张** MUST 经 **architect 审**（`ADR-089` D3，2026-10-26 用户裁决）；实施者**不得**自行新增条目。
 - 门禁 MUST 校验：含白名单变更的 commit message 引 `ADR-089`（机检）。
+  ★ **v1.4 状态（诚实标注）**：规模护栏 / 过期失效 / 扩张权（architect 审）**已实现**；**「commit message 引裁决编号」的机检尚未实现**（需 git hook 级检查）⇒ 登记为 A4 的待办，★ **MUST NOT 假装已覆盖**。
 - 真实例外条目数 **> 10**（`N = 10`）⇒ 报告顶部 **强制提示 architect 复审**；★ **MUST NOT** 以「超过 N ⇒ 退出码非 0」作护栏（会逼出假登记）。
 - `sunset` 已过期 ⇒ 该条目**自动失效** ⇒ 门禁 FAIL，并标注「升级为真 bug 类」。
 
@@ -299,9 +300,12 @@ loop:
 ### S-13 语料清单的单一来源
 
 **要求**
-- 清单文件（A3 落盘）：`tests/cpu/parity/corpus.txt`，每行 `name<TAB>kind<TAB>relpath`，`#` 起注释；`kind ∈ {elf, branchbench}`。
+- 清单文件：`tests/cpu/parity/corpus.txt`，每行 `name<TAB>kind<TAB>relpath<TAB>layer`，`#` 起注释；`kind ∈ {elf, branchbench}` · `layer ∈ {pr, night}`。★ **归属细化（v1.4）**：**A2b 落「格式 + 种子清单」**（47 ELF + 4 branchbench = **51 case**）· **A3 落「扩到 48**（补 `rv32ui-p-simple`）**+ 首跑」**。
 - ★ 两侧 harness MUST **都从这一个文件**读取；MUST NOT 各自维护 C++ 数组。
-- 门禁 MUST 断言「Simulator 侧实际执行集合 == Verilator 侧实际执行集合 == 清单集合」，任一不等 ⇒ `ERROR`。
+- 门禁 MUST 断言两侧 harness 对清单的覆盖，且 **v1.4 起按方向性判定**：
+  - **清单 ⊄ 某侧 `kCases`** ⇒ `ERROR` / `corpus_mismatch`（该 case 不会被那一侧跑 ⇒ 差分缺一侧 ⇒ **真漏检**）
+  - **某侧 `kCases` ⊄ 清单** ⇒ `WARNING`（**覆盖超集**：对清单内 case 无差分风险；当前事实 = `rv32ui-p-simple`
+    只在 Verilator 侧 ⇒ 由 A3 收口）
 - 首批：两侧交集 **47** ELF + branchbench **4** 档；★ `rv32ui-p-simple` MUST 在清单内（Simulator 侧 `kCases` 需补 1 行 —— A3 落）。
 - 新增 corpus MUST 先有「5 观测量可采」的证据，否则登记为「该观测量对该 corpus 豁免」（走 S-11，禁止静默跳过）。
 
@@ -328,13 +332,20 @@ loop:
 
 **要求**
 - **PR 层**：ELF 子集 **≤ 8**（MUST 含 `add`/`sub`/`lw`/`sw`/`beq` 类 + 1 个 rv32um）+ branchbench **0 档**。
-- **夜间层**：49 corpus（47 ELF + 4 档分支微基准 = 51 − ?，以 S-13 清单为准全部覆盖）。
-- ★ Verilog 构建产物 MUST **按 config 缓存**（key = 插件集 + 参数 hash，目录 `build/parity/vl_cache/<key>/`）；同一 config 的 47 ELF MUST 只编译一次（V2-6 现状每 ELF 都重编译，直接采纳会爆预算）。
+- **夜间层**：**51 case = 47 ELF + 4 branchbench 档**（以 S-13 清单为准，全部覆盖）。
+- ★★ **Verilog 构建缓存（v1.4 更正 —— 原「按 config 缓存」被实测推翻）**：生成的 Verilog **把 ELF 的
+  指令内存烤进了网表**（实测 `imem[32] = 32'h200193;`；两个 ELF 的网表差 640 行）⇒ **每个 ELF 的网表都不同** ⇒
+  ★ **跨 ELF 无可复用** ⇒ 现实约束是「**每 corpus 一次编译**」。
+  ⇒ 时长预算据此重算：**PR 层 8 case ≈ 10 min**（Simulator ≈7 min + Verilator ≈3 min）·
+  **夜间 51 case ≈ 1 h**（Simulator ≈45 min + Verilator ≈17 min）。
+  ★ 要真正省掉 Verilator 侧编译，必须把 ELF 从 **elaboration 期**移出（imem 初始化改为运行期加载）
+  ⇒ 属 DUT/上游级改动 ⇒ 登记为开放项 **O-5**（不在本期）。
+- ★ 分层（v1.4 落实）：清单 `layer` 列 + `--layer pr|night|all` 驱动；PR 层的 case 集合 MUST ⊆ 清单。
 - ★★ **branchbench 在 Simulator 侧的 cap MUST ≤ 20,000 拍**（实测 ≈ 9.1 拍/s ⇒ 20k ≈ 37 min/档）；`--cycles 2,000,000`（Verilator 侧现状默认）在 Simulator 侧 ≈ 61 小时/档，**不可行** ⇒ 若某档无法在 cap 内到达 done，MUST 登记为「该 corpus 仅 Verilator 侧可跑」的显式豁免（走 S-11），**MUST NOT** 静默跳过。
 - 时长阈值：★ **本期不设未实测的硬阈值**；A4 MUST 先把实测 p95 写进报告 `timings`，再据此定阈值。
 
-**验收方式**：机检（缓存命中率 = N-1/N；分层集合 ⊆ S-13 清单）；人工（A4 定阈值）。
-**归属**：A4。
+**验收方式**：机检（分层集合 ⊆ S-13 清单；`--layer` 只执行对应层）× 人工（A4 定时长阈值）。
+**归属**：A2b（分层驱动）· A4（接线 + 阈值）。
 
 ---
 
@@ -428,28 +439,28 @@ branchbench_m0	branchbench	build/branchbench_m0.elf
 
 ---
 
-## 7. 「S ⇒ 实现/测试」覆盖矩阵（模板，G-A2 必交）
+## 7. 「S ⇒ 实现/测试」覆盖矩阵（G-A2 必交；2026-10-26 填实）
 
-| S | 归属 change | 实现位置（A2a/A2b/A3/A4 填） | 测试 / 变异对照 | 状态 |
+> ★ 本表是 **G-A2** 的核心交付物：每个 S 至少 1 个实现落点，或显式 `N/A + 理由`。
+
+| S | 归属 | 实现落点 | 测试 / 变异对照 | 状态 |
 |---|---|---|---|---|
-| S-1 | A2a/A2b |  |  | ☐ |
-| S-2 | A2a/A2b |  |  | ☐ |
-| S-3 | A2a |  |  | ☐ |
-| S-4 | A2a |  |  | ☐ |
-| S-5 | A2a |  |  | ☐ |
-| S-6 | A2a |  |  | ☐ |
-| S-7 | A2a/A2b |  |  | ☐ |
-| S-8 | A2a/A2b |  |  | ☐ |
-| S-9 | A2b |  |  | ☐ |
-| S-10 | A2b |  |  | ☐ |
-| S-11 | A2b |  |  | ☐ |
-| S-12 | A2b + 流程 |  |  | ☐ |
-| S-13 | A3/A2b |  |  | ☐ |
-| S-14 | A2b |  |  | ☐ |
-| S-15 | A4 |  |  | ☐ |
-| S-16 | 全部 |  |  | ☐ |
-
----
+| S-1 | A2b | `tools/parity/parity_gate.py` 的 `OBSERVATIONS`（5 个 id 冻结） | `--self-test`：全等 PASS / 缺失 ERROR | ✅ |
+| S-2 | A2a+A2b | Simulator runner 导出 `determinism` · `cpu_verilator_sim::generate_verilog()` 从 **DAG** 导出 · `judge()` 前置校验 | 两侧实测 2511 / `67205f7d…` 相等；`--self-test` 的 `determinism_mismatch` | ✅ |
+| S-3 | A2a | runner 强制 `--reset none`（fail-fast）· VL `--reset-pulse`（默认 1；0 仅诊断） | 3 ELF `pchash`/`pc_head` 逐位相等；`--reset-pulse 0` 反例（`x30=0x1000`） | ✅ |
+| S-4 | A2a | Sim：节点 `tohost_probe_data_proxy` · VL：`top__DOT__dmem[0x400]` | 5/5 corpus `tohost` 相等 | ✅ |
+| S-5 | A2a | Sim：节点 `reg_1..reg_31` · VL：`read_reg()`（`top__DOT___reg_N`，实测确认） | 31 个寄存器原始值 diff 为空 | ✅ |
+| S-6 | A2a | `ip/cpu/plugins/dmem_chmem.h` 探针 → `mem_sig` / `mem_sig_updates`；两侧各自读取 + 假绿自校验 | 变异 ①数据取反（`a55f52c5`→`8fcc53ba`）②计数恒 0 ⇒ 两侧 rc=2；零 cycle 影响；5/5 相等 | ✅ |
+| S-7 | A2a | 两侧同构循环（`step → cycles+=1 → sample → break on done`） | 5/5 `cycles` 相等 | ✅ |
+| S-8 | A2a | 两侧逐拍 FNV-1a over PC + `pc_samples` | 5/5 `pchash` 相等；相位 offset = 0 | ✅ |
+| S-9 | A2b | `judge()`（纯函数：强度序比对 + `first_divergence` + 禁降级） | `--self-test` 9 例 | ✅ |
+| S-10 | A2b | `main()` 三态返回；VL parity 路径 TIMEOUT → 2 | 负向 N1~N5（均 rc=2）；branchbench 两侧 rc=2 | ✅ |
+| S-11 | A2b | `load_exceptions()`（未知/容差字段拒收 · 5+3 字段 · `issue_url` · `justification` · 过期失效 · 合成例外必存在） | 负向 N1/N2/N3 + `--self-test`（过期 / 作用域 / 豁免） | ✅ |
+| S-12 | A2b | `load_exceptions()` 规模软限（>10 ⇒ WARNING，不阻断） | 过期 → FAIL（self-test） | ⚠️ 规模护栏 ✅；**commit message 引 `ADR-089` 的机检未实现** ⇒ A4 |
+| S-13 | A2b（种子）/ A3（扩充） | `tests/cpu/parity/corpus.txt`（51 case + `layer`）+ `check_corpus_against_harnesses()`（方向性判定） | 负向 N4（清单缺覆盖 ⇒ ERROR）/ N5（格式坏 ⇒ ERROR）；`rv32ui-p-simple` ⇒ WARNING | ✅（48 的收口归 A3） |
+| S-14 | A2b | `build/parity/report.json`（S-14 全字段 + 逐 case `determinism`） | 结构校验（顶层 / per_case / 观测量键齐备） | ✅ |
+| S-15 | A2b | `--layer pr\|night\|all` + 清单 `layer` 列 | PR 层 8 case 实测 **≈10 min**；★ 缓存条款已按实测更正 | ✅ |
+| S-16 | 全部 | 三个 change 的 `tasks.md` 均引 `[S-x]` + 本矩阵 | — | ✅ |
 
 ## 8. 开放项（★ 需 architect 确认 / 需 A2a 实测）
 
@@ -460,7 +471,8 @@ branchbench_m0	branchbench	build/branchbench_m0.elf
 | **O-1** | PC 采样实测 offset | ✅ **已实测 = 0**：`add`/`mul`/`simple` 三个 ELF 的 `pchash` 与 `pc_head`（首位 `0x80000004`）**逐位相等** | ✅ 已闭合 |
 | **O-2** | Verilator 侧 `reg_1..31` 的实际信号名 | ✅ **已实测 = `top__DOT___reg_N`**（生成 Verilog 声明 `logic [31:0] _reg_30;` / Verilator 头 `IData/*31:0*/`）⇒ 31 个寄存器逐位读取成功 | ✅ 已闭合 |
 | **O-3** | `memsig` 探针的触发条件（哪个 stage / 哪个 payload 组）与 hash 常数 | 语义已定（S-6），机制细节待实现 | A2a |
-| **O-4** | Verilog 构建缓存形态（复用 `--work-dir` vs hash 目录） | 未定 | A4 |
+| **O-4** | Verilog 构建缓存形态 | ✅ **已闭合（2026-10-26）**：实测网表**随 ELF 变化** ⇒ 跨 ELF 缓存不成立 ⇒ 每 corpus 一次编译 | ✅ 已闭合 |
+| **O-5** | 让 Verilator 侧免掉「每 ELF 一次编译」：把 ELF 从 elaboration 期移出（imem 初始化改运行期加载） | 需改 DUT/上游；★ 收益 = 夜间层省 ≈17 min | architect 评估（不在阶段 A 范围） |
 
 ---
 
