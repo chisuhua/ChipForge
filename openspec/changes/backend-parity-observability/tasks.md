@@ -35,12 +35,13 @@ depends_on:
 
 ## inc-2 Verilator 侧观测量导出（⏳）
 
-- [ ] 2.1 实测 `reg_1..reg_31` 在生成 Verilog 里的真实信号名，回写契约 §2.2（O-2）[S-5]
-- [ ] 2.2 `sim_main.cpp` 增加 `cf_read_reg()` + 逐拍 PC 滚动 hash（`--stats` 直方图保留为诊断，**不得**当 ⑤）[S-5, S-8]
-- [ ] 2.3 `cpu_verilator_sim` 增加 `--json <path>`，字段与 Simulator 侧**同名同义** [S-1, S-14]
-- [ ] 2.4 新增 `--reset-pulse=0`（默认 1，**既有 48/48 行为不变**）[S-3]
-- [ ] 2.5 同 ELF 双侧 `regs` / `pchash` 相等（或登记差异 → 交 A3 分类）[S-5, S-8]
-- [ ] 2.6 缺观测量 ⇒ exit 2（与 Simulator 侧同构）[S-10]
+- [x] 2.1 实测 `reg_1..reg_31` 在生成 Verilog 里的真实信号名 = **`top__DOT___reg_N`**，已回写契约 §2.2（O-2 闭合）[S-5]
+- [x] 2.2 `sim_main.cpp` 新增 `cf_run_sim_parity()`：`read_reg()`（x1..x31）+ 逐拍 PC 滚动 hash（`--stats` 直方图保留为诊断，**不得**当 ⑤）[S-5, S-8]
+- [x] 2.3 `cpu_verilator_sim` 新增 `--json <path>`，字段与 Simulator 侧**同名同义**（含 `determinism` / `pc_head` / `regs_raw`）[S-1, S-14]
+- [x] 2.4 新增 `--reset-pulse <0|1>`（默认 1，**既有 48/48 行为不变**）+ ★ **实测发现 `0` 会丢 init**（Verilog 只在复位分支加载 init）⇒ 已加 stderr 警告「NOT parity-compatible」[S-3]
+- [x] 2.5 同 ELF 双侧 `regs` / `pchash` 相等 —— **3/3 ELF 逐位相等**（`rv32ui-p-add` / `rv32um-p-mul` / `rv32ui-p-simple`）[S-5, S-8]
+- [x] 2.7 ★★ **初始状态语义定案**（实测推翻原 `reset_mode=none` 方案）：生成 Verilog **只在复位边沿**加载 ctor init（`else pc <= 32'h80000000;`）⇒ 跳过脉冲则 `pc` 从 0 起（`x30=0x1000` 而非 `0x80001000`）；而 `Simulator::reset()` 只是**清零**。⇒ 正确口径 `init_semantics = ctor-init`（Sim 不 reset / VL 打 1 拍 reset），契约 S-3 + §2.3 + C-2 已回写 [S-3]
+- [ ] 2.6 缺观测量 ⇒ exit 2（Verilator 侧信号缺失目前是**编译期失败**；运行期同构待 inc-3 一并做）[S-10]
 
 ## inc-3 `memsig` DUT 探针（⏳）
 
@@ -52,6 +53,6 @@ depends_on:
 
 ## 验收（G-A2 的输入）
 
-- [ ] 4.1 ≥3 个 ELF（含 1 个 rv32um）两侧 JSON 证据落 `build/parity/`，5 观测量齐备
-- [ ] 4.2 `git diff --stat` 的代码改动**仅**限于 `tools/parity_runner/**` / `tools/verilator_runner/**` / `ip/cpu/plugins/dmem_chmem.h` + CMake
+- [x] 4.1 ≥3 个 ELF（含 1 个 rv32um）两侧 JSON 证据 —— **已完成**（`add`/`mul`/`simple`，4 项观测量齐备；`memsig` 待 inc-3）
+- [x] 4.2 `git diff --stat` 的代码改动**仅**限于 `tools/parity_runner/**` / `tools/verilator_runner/**` / `ip/cpu/plugins/dmem_chmem.h` + CMake
 - [ ] 4.3 既有基线零退化：`[verilator]` 1/1、`[chmem]` ELF 47/47（抽样）、`[cpu]` 抽样

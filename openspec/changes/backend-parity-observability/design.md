@@ -40,17 +40,20 @@ CppHDL 每创建节点都打 `CHINFO`，而 `include/utils/logger.h` **没有运
 
 ---
 
-## 2. 实测证据（inc-1）
+## 2. 实测证据（inc-1 + inc-2）
 
-| 项 | Simulator | Verilator |
-|---|---|---|
-| `rv32ui-p-add` `cycles` | **478** | **478** ✅ |
-| `tohost` | 1 | 1 ✅ |
-| DAG `node_count` | 2485 | —（待 inc-2） |
-| `names_hash` | `d2b048bdbed141ff` | —（待 inc-2） |
-| `regs` hash | `72c91fd2b209cdff` | —（待 inc-2） |
-| `pchash` | `830b6af580cdf64e`（478 samples） | —（待 inc-2） |
-| 时长 | **52.8 s / 478 拍 ⇒ ≈ 9.1 拍/s** | 秒级（含 Verilog 生成+编译） |
+| 项 | Simulator | Verilator | 判定 |
+|---|---|---|---|
+| `rv32ui-p-add` `cycles` | 478 | 478 | ✅ |
+| `rv32um-p-mul` `cycles` | 472 | 472 | ✅ |
+| `rv32ui-p-simple` `cycles` | 38 | 38 | ✅ |
+| `tohost`（3 ELF） | 1 | 1 | ✅ |
+| `regs`（x1..x31 hash，3 ELF） | — | — | ✅ 逐位相等 |
+| `pchash`（逐拍 PC 流，3 ELF） | — | — | ✅ 逐位相等 |
+| 31 个寄存器原始值 | — | — | ✅ 全等（diff 为空） |
+| `pc_head`（前 8 拍） | `0x80000004…0x80000020` | 同 | ✅ offset = 0 |
+| determinism（`node_count` / `names_hash`） | 2485 / `d2b048bdbed141ff` | 同 | ✅（同一 DAG） |
+| 时长 | ≈ 53 s / 478 拍 ⇒ **≈ 9.1 拍/s** | 秒级（含 Verilog 生成+编译） | — |
 
 ### ★ 2.1 吞吐结论（推翻 ADR 的 575 拍/s）
 
@@ -58,15 +61,32 @@ CppHDL 每创建节点都打 `CHINFO`，而 `include/utils/logger.h` **没有运
 - ⇒ `branchbench --cycles 2000000` 在 Simulator 侧 ≈ **61 小时/档** ⇒ 不可行。
 - ⇒ 契约 S-15 已改：Simulator 侧 branchbench cap **≤ 20k 拍**，否则登记「仅 Verilator 侧可跑」豁免。
 
-### 2.2 reset 相位的意外发现
+### 2.2 ★★ 初始状态语义（本轮最重要的发现，推翻了原方案）
 
-Verilator 侧默认打 1 拍 `reset` pulse（`sim_main.cpp:117-127`），Simulator 侧不打 —— 但 `rv32ui-p-add` 两侧 **cycles 同为 478**。说明当前 reset pulse **不扰动计数**.
+本轮先按契约草案试了 `--reset-pulse 0`（两边都不 reset），结果是：
+- `cycles` **仍然相等**（478）—— 因为 dmem 窗口对 base 不敏感
+- 但 `pc_head = 0x4, 0x8, …`（丢了 `0x80000000` 基址）、`x30 = 0x1000`（应为 `0x80001000`）⇒ **`regs`/`pchash` 全不等**
 
-★ 但**仍按 S-3 统一为 `reset_mode=none`**（inc-2 给 Verilator 加开关）：不把"恰好没炸"当成契约。
+查生成 Verilog 得到根因：
+```verilog
+always_ff @(posedge default_clock or posedge default_reset) begin
+    if (!default_reset) pc <= mux_select_206;
+    else                pc <= 32'h80000000;   // ★ init 值只在复位分支赋
+end
+```
+⇒ 生成的 Verilog **没有 `initial`**，跳过复位脉冲 ⇒ `pc` 从 0 起。
+而 Simulator 侧 `Simulator::reset()` 的实现是「**把非 literal 槽位全部清零**」（`simulator.cpp:422-441`），**不加载 init**
+⇒ 既有的 47-ELF harness 因此**故意不调 reset**（`test_cpu_chmem_vendored_elf.cpp:157-161` 的注释说法"加载 rst_val"其实不准确）。
 
----
+**定案（已回写契约 S-3 / §2.3 / C-2）**：`init_semantics = ctor-init`
+- Simulator：不 reset（保留 ctor init）
+- Verilator：打 **1 拍** reset（复位分支加载**同一批** ctor init 值）
+- 两条路径字面不同、**语义等价** ⇒ 用 `pchash` + `regs` 逐位相等作等价证据（3/3 ELF 已验证）
+- `--reset-pulse 0` 降级为**诊断**，并加 stderr 警告
 
-## 3. inc-2：Verilator 侧观测量导出
+★ 方法论教训：`cycles` 相等**不足以**证明等价（478 vs 478 掩盖了完全不同的初始状态）—— 这正好实证了 ADR-089 D2 的「④ 弱于 ⑤」判据排序。
+
+## 3. inc-2：Verilator 侧观测量导出（✅ 已落）
 
 - 改 `tools/verilator_runner/sim_main.cpp`：新增 `cf_read_reg()`（`reg_1..31`，实测信号名待定）、逐拍 PC 滚动 hash、以及 `--json` 输出
 - `--reset-pulse=0`：新增开关，**默认行为不变**（保护 48/48 基线）
