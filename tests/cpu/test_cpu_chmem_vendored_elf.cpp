@@ -78,6 +78,8 @@ static const ElfTestCase kCases[] = {
     {"rv32ui-p-slt",   "rv32ui-p-slt"},
     {"rv32ui-p-slti",  "rv32ui-p-slti"},
     {"rv32ui-p-sltiu", "rv32ui-p-sltiu"},
+    // ★ ADR-089 D4: Verilator 侧有而 Simulator 侧无 ⇒ 补齐（两侧 corpus 交集）
+    {"rv32ui-p-simple", "rv32ui-p-simple"},
     {"rv32ui-p-sltu",  "rv32ui-p-sltu"},
     {"rv32ui-p-sra",   "rv32ui-p-sra"},
     {"rv32ui-p-srai",  "rv32ui-p-srai"},

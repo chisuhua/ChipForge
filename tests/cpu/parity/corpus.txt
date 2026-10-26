@@ -1,9 +1,11 @@
 # 双后端差分 parity 门禁 —— 语料清单（单一来源，契约 S-13）
-# 格式: name<TAB>kind<TAB>relpath<TAB>layer   （# 起注释；空行忽略）
-#   kind  : elf | branchbench
-#   layer : pr | night   （pr = PR 级快子集；night = 夜间全量）
-# ★ 两侧 MUST 都从这里取 ⇒ 门禁断言「两侧实际执行集合 == 本清单」（集合不对称 ⇒ ERROR）
+# 格式: name<TAB>kind<TAB>relpath<TAB>layer[<TAB>max_cycles]   （# 起注释；空行忽略）
+#   kind      : elf | branchbench
+#   layer     : pr | night   （pr = PR 级快子集；night = 夜间全量）
+#   max_cycles: 可选第 5 列 —— per-case cycle cap 覆写（缺省按 kind 取 DEFAULT_CAPS）
+# ★ 两侧 MUST 都从这里取 ⇒ 门禁断言「两侧 harness 的 kCases ⊇ 清单」
 # ★ relpath 相对**仓库根**
+# ★ branchbench 的 4 个 ELF 是 CMake 构建产物（target branchbench_elfs）⇒ 跑批前须先 cmake --build
 
 rv32ui-p-add	elf	tests/cpu/riscv_tests/elf/rv32ui-p-add	pr
 rv32ui-p-addi	elf	tests/cpu/riscv_tests/elf/rv32ui-p-addi	night
@@ -18,6 +20,7 @@ rv32ui-p-slli	elf	tests/cpu/riscv_tests/elf/rv32ui-p-slli	night
 rv32ui-p-slt	elf	tests/cpu/riscv_tests/elf/rv32ui-p-slt	night
 rv32ui-p-slti	elf	tests/cpu/riscv_tests/elf/rv32ui-p-slti	night
 rv32ui-p-sltiu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sltiu	night
+rv32ui-p-simple	elf	tests/cpu/riscv_tests/elf/rv32ui-p-simple	night
 rv32ui-p-sltu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sltu	night
 rv32ui-p-sra	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sra	night
 rv32ui-p-srai	elf	tests/cpu/riscv_tests/elf/rv32ui-p-srai	night
