@@ -55,4 +55,4 @@ depends_on:
 
 - [x] 4.1 ≥3 个 ELF（含 1 个 rv32um）两侧 JSON 证据 —— **已完成且扩到 5 个 corpus**（3 ELF + branchbench m0/m2），**5 项观测量 + 确定性判据全齐且逐位相等**
 - [x] 4.2 `git diff --stat` 的代码改动**仅**限于 `tools/parity_runner/**` / `tools/verilator_runner/**` / `ip/cpu/plugins/dmem_chmem.h` + CMake
-- [ ] 4.3 既有基线零退化：`[verilator]` 1/1、`[chmem]` ELF 47/47（抽样）、`[cpu]` 抽样
+- [x] 4.3 既有基线零退化 —— ★ **实测全绿**：`[verilator]` **48/48 PASS**（96 assertions）· `[vendored-elf]` **47/47 PASS**（16410 assertions，与既有基线数字一致）· `[keys]/[alu][semantics]/[mmu-chmem-basic]/[cpu-chmem-keys]` 22 case / 352 assertions PASS
