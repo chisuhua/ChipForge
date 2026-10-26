@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.1（2026-10-26，builder；v1.1 = C-1/C-2 裁决落定 + A2a increment 1 实测吞吐入契约）**
+> **Status**: ✅ **v1.2（2026-10-26，builder；v1.2 = A2a inc-2 的初始状态/相位实测更正 + O-1/O-2 闭合）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -67,12 +67,23 @@
 | V2-6 | 每次调用都 `generate_verilog()` + `verilator --cc` + `g++` 编译（**无按 config 缓存**） | `tools/verilator_runner/cpu_verilator_sim.cpp`（编译流程段） |
 | V2-7 | CLI 全集：`--elf` `--verilog` `--work-dir` `--cycles` `--enable-mmu` `--mmu-mode` `--enable-cache` `--stats` `--stats-base` `--stats-len` `--no-bp` `--no-bp-gshare` `--no-bp-uncond` `--btb-entries` | `tools/verilator_runner/cpu_verilator_sim.cpp:129-186` |
 | V2-8 | branchbench 跑批：`--elf build/branchbench_m{0..3}.elf --cycles 2000000 [--no-bp] --stats`，判定靠 **tohost 校验和**（≠1）而非退出码 | `tools/measure_branchbench.sh:39-56,255-290` |
-| V2-9 | 信号名 → Verilog 名带前缀下划线（`pc` → `top__DOT___pc`）⇒ `reg_1` 很可能为 `top__DOT___reg_1`（★ **未实测**，见 O-2） | `sim_main.cpp:80` |
+| V2-9 | 信号名 → Verilog 名带前缀下划线：`pc` → `top__DOT___pc`、`reg_N` → `top__DOT___reg_N`（★ **已实测确认**：生成 Verilog 声明 `logic [31:0] _reg_30;`，Verilator 头 `IData/*31:0*/ top__DOT___reg_30`） | `sim_main.cpp:80` + 2026-10-26 实测 |
 
-### 2.3 ★ 相位差（本节最重要的事实结论）
+### 2.3 ★ 初始状态与相位（本节最重要的事实结论；2026-10-26 实测更正）
 
-| 侧 | 一拍的结构 | 采样点 | reset |
+| 侧 | 一拍的结构 | 采样点 | 初始状态从哪来 |
 |---|---|---|---|
+| Simulator | `tick()` = comb → (posedge, negedge) → comb | `tick()` 返回后 | ★ **构造期初始化**（`ch_reg` ctor 的 init 值；`Simulator::reset()` 只是**把非 literal 槽位清零**，**不**加载 init） |
+| Verilator | `clk=1;eval(); clk=0;eval();` | 第二次 `eval()` 后 | ★ **复位边沿**（`else pc <= 32'h80000000;` —— 生成的 Verilog 里 init 值**只在 reset 分支**赋） |
+
+⇒ ★★ **两侧一拍同构、采样相位 offset = 0**（3 个 ELF 实测：`pchash` 逐位相等，`pc_head` 首位即 `0x80000004`）。
+⇒ ★★ **但"初始状态"的加载路径不同**，且**不可统一成同一字面模式**：
+- ✗ **不能两边都不 reset** —— 生成的 Verilog 没有 `initial`，跳过复位脉冲 ⇒ `pc` 从 **0** 起（实测：`x30 = 0x1000` 而非 `0x80001000`）⇒ ★ **`--reset-pulse 0` 不是 parity 兼容配置**（本轮已加 stderr 警告）
+- ✗ **不能两边都调 `Simulator::reset()`** —— 它把槽位**清零**，会丢掉 `pc` 的 init `0x80000000`（既有 47-ELF harness 就是因此**故意不 reset**）
+- ✓ **正确口径 = `init_semantics = ctor-init`**：Simulator 走"不 reset ⇒ 保留 ctor init"；Verilator 走"1 拍 reset ⇒ 复位分支加载**同一批** ctor init 值"。两条路径**语义等价**，MUST 以 `pchash` + `regs` 逐位相等作为等价证据（本轮 3/3 ELF 已验证）。
+⇒ ★ **`--reset-pulse 0` 只能作诊断用途**，报告里 MUST 标 `reset_mode = "pulse0(diagnostic)"`，MUST NOT 与 Simulator 结果比对。
+
+---|---|---|---|
 | Simulator | `tick()` = comb → (posedge, negedge) → comb | `tick()` 返回后 | ★ **不打 reset**（既有 harness 有意跳过，S2-11） |
 | Verilator | `clk=1;eval; clk=0;eval` | 第二个 `eval()` 后 | ★ **打 1 拍 reset pulse**（V2-4） |
 
@@ -109,18 +120,20 @@
 
 ---
 
-### S-3 采样相位与对齐（★ 禁自适应）
+### S-3 采样相位、初始状态与对齐（★ 禁自适应）
 
 **要求**
-- Simulator 采样点 = `sim->tick()` 返回后；Verilator 采样点 = `clk=0` 的 `eval()` 之后（V2-3）。
-- **offset MUST 为 0**（不做位移对齐）。★ **MUST NOT** 在比对器里实现「找最佳 offset」「最长公共子序列对齐」之类自适应逻辑 —— 那会把真实的 **1 拍延迟分歧**（`c27543d` 那一类）静默吞掉。
-- `reset_mode` MUST 两侧一致，默认 **`none`**（Simulator 既有行为为准）；Verilator 侧经**新增开关**实现，默认行为不变。
+- Simulator 采样点 = `sim->tick()` 返回后；Verilator 采样点 = `clk=0` 的 `eval()` 之后（V2-3）⇒ **offset MUST 为 0**。
+- ★ **MUST NOT** 在比对器里实现「找最佳 offset」「LCS 对齐」之类自适应逻辑 —— 那会把真实的 **1 拍延迟分歧**（`c27543d` 那一类）静默吞掉。
+- ★★ **初始状态口径 = `init_semantics = ctor-init`**：
+  - Simulator：**不调用** `Simulator::reset()`（它只清零，会丢 `pc` 的 init `0x80000000`）
+  - Verilator：**打 1 拍 reset 脉冲**（生成的 Verilog 只在复位分支加载 init 值）
+  - ⇒ 两者**语义等价**，但**字面模式不同** ⇒ 报告 MUST 分别记录 `reset_mode = "sim:ctor-init"` / `"vl:reset-pulse-1"`
+- ★ **`--reset-pulse 0` MUST NOT 用于 parity 比对**（实测：`pc` 从 0 起、`x30` 变 `0x1000`）⇒ 仅诊断用途，报告标 `pulse0(diagnostic)`。
 - 若实测发现恒定 offset `k ≠ 0` ⇒ MUST 记录到本节 + 走 architect，**MUST NOT** 就地补偿。
 
-**验收方式**：变异对照（把 Simulator 侧某机制延迟 +1 拍 ⇒ MUST 报差异，而不是被判成 offset）；人工（相位结论签字）。
-**归属**：A2a（实测 + 重基线）。
-
----
+**验收方式**：变异对照（把 Simulator 侧某机制延迟 +1 拍 ⇒ MUST 报差异，而不是被判成 offset）· 等价性证据（3 个 ELF 的 `pchash`/`regs` 逐位相等）· 人工（相位结论签字）。
+**归属**：A2a。
 
 ### S-4 观测量 ① `tohost`
 
@@ -422,9 +435,9 @@ branchbench_m0	branchbench	build/branchbench_m0.elf
 | id | 事项 | 现状 | 谁定 |
 |---|---|---|---|
 | **C-1** | 确定性不符归 `FAIL` 还是 `ERROR` | ✅ **已裁决（2026-10-26，Oracle 建议 + 用户采纳）：归 `ERROR(2)` + `error_kind = determinism_mismatch`** ⇒ `ADR-089` 升 v1.3 同步 D2/V-1/V-2 三处措辞；A3 的「既存分歧清单」只收 exit 1 | ✅ 已闭合 |
-| **C-2** | `reset_mode = none` 需要 Verilator 侧新增开关（默认行为不变） | ✅ **已裁决（2026-10-26 用户）：`reset_mode = none`**；★ 且 increment 1 实测发现 `rv32ui-p-add` 在「Simulator 无 reset」与「Verilator 打 1 拍 pulse」下 **cycles 同为 478** ⇒ reset pulse 当前未扰动计数，但**仍按 S-3 统一为 none**（不依赖"恰好没炸"） | ✅ 已闭合（Verilator 开关待 A2a inc-2 落） |
-| **O-1** | PC 采样实测 offset | 🟡 **部分证据（inc-1）**：同 ELF 两侧 `cycles` 同为 **478**（Simulator 478 / Verilator 478）⇒ 至少总拍数无偏移；`pchash` 比对待 Verilator 侧导出（inc-2） | A2a inc-2 |
-| **O-2** | Verilator 侧 `reg_1..31` 的实际信号名 | 推测 `top__DOT___reg_1` | A2a |
+| **C-2** | 两侧初始状态如何统一 | ★★ **已裁决并实测修正（2026-10-26）**：原方案「两侧都 `reset_mode=none`」**被实测推翻** —— 生成的 Verilog 只在复位分支加载 init（`else pc <= 32'h80000000;`），跳过脉冲则 `pc` 从 0 起（`x30=0x1000`）。正确口径 = **`init_semantics = ctor-init`**：Simulator 不 reset（保 ctor init）/ Verilator 打 1 拍 reset（加载同一批 init）⇒ 3/3 ELF 的 `pchash`/`regs`/31 个寄存器逐位相等 | ✅ 已闭合 |
+| **O-1** | PC 采样实测 offset | ✅ **已实测 = 0**：`add`/`mul`/`simple` 三个 ELF 的 `pchash` 与 `pc_head`（首位 `0x80000004`）**逐位相等** | ✅ 已闭合 |
+| **O-2** | Verilator 侧 `reg_1..31` 的实际信号名 | ✅ **已实测 = `top__DOT___reg_N`**（生成 Verilog 声明 `logic [31:0] _reg_30;` / Verilator 头 `IData/*31:0*/`）⇒ 31 个寄存器逐位读取成功 | ✅ 已闭合 |
 | **O-3** | `memsig` 探针的触发条件（哪个 stage / 哪个 payload 组）与 hash 常数 | 语义已定（S-6），机制细节待实现 | A2a |
 | **O-4** | Verilog 构建缓存形态（复用 `--work-dir` vs hash 目录） | 未定 | A4 |
 
