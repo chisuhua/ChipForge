@@ -1,7 +1,7 @@
 {
   "schema_version": "role-v1",
-  "current_role": "planner",
-  "updated_at": "2026-10-26T08:42:27Z",
+  "current_role": "builder",
+  "updated_at": "2026-10-26T09:53:07Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
@@ -125,6 +125,12 @@
       "at": "2026-10-26T08:42:27Z",
       "by": "user",
       "trigger": "用户指令『然后切到planner给出对实现目标态的完整路线图，在planner给出路线图后，停下来让我审查』—— 目标态已由 architect 定案（ADR-089 + ADR-088 v1.4 §10）"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-26T09:53:07Z",
+      "by": "user",
+      "trigger": "用户确认「G-A0 通过，切 builder 进行实施推进」⇒ 开工阶段 A1（parity-gate-spec 零代码契约）"
     }
   ]
 }
