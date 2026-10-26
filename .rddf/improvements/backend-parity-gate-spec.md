@@ -1,6 +1,6 @@
 ---
 id: backend-parity-gate-spec
-status: proposed
+status: in-progress
 initiative: wave5-isa-coverage-and-bp
 priority: P0
 phase: phase-4
@@ -11,6 +11,9 @@ review_by: 2026-11-09
 ---
 
 # backend-parity-gate-spec — 双后端差分 parity 门禁的契约落盘（零代码）
+
+> ✅ **A1 已落（2026-10-26，change `parity-gate-spec`）**：契约正文 = `docs/architecture/parity-gate-contract.md`（**S-1…S-16**）。
+> ★ 本草案的 AC-1~AC-8 是**立项时的验收面**；契约正文才是**执行期唯一引用来源**（两处若冲突，以契约为准并回改本文件）。
 
 > **定位**：★ **阶段 A1** —— 在写任何门禁代码**之前**，先把「什么算一致、怎么比、什么算例外、缺数据怎么办」钉死。
 > **来源**：ADR-089（双后端差分 parity 门禁，✅ Accepted 2026-10-26）+ ADR-088 v1.4 §10（目标态与三段路径）。
