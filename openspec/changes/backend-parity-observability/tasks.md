@@ -41,18 +41,18 @@ depends_on:
 - [x] 2.4 新增 `--reset-pulse <0|1>`（默认 1，**既有 48/48 行为不变**）+ ★ **实测发现 `0` 会丢 init**（Verilog 只在复位分支加载 init）⇒ 已加 stderr 警告「NOT parity-compatible」[S-3]
 - [x] 2.5 同 ELF 双侧 `regs` / `pchash` 相等 —— **3/3 ELF 逐位相等**（`rv32ui-p-add` / `rv32um-p-mul` / `rv32ui-p-simple`）[S-5, S-8]
 - [x] 2.7 ★★ **初始状态语义定案**（实测推翻原 `reset_mode=none` 方案）：生成 Verilog **只在复位边沿**加载 ctor init（`else pc <= 32'h80000000;`）⇒ 跳过脉冲则 `pc` 从 0 起（`x30=0x1000` 而非 `0x80001000`）；而 `Simulator::reset()` 只是**清零**。⇒ 正确口径 `init_semantics = ctor-init`（Sim 不 reset / VL 打 1 拍 reset），契约 S-3 + §2.3 + C-2 已回写 [S-3]
-- [ ] 2.6 缺观测量 ⇒ exit 2（Verilator 侧信号缺失目前是**编译期失败**；运行期同构待 inc-3 一并做）[S-10]
+- [x] 2.6 缺观测量 ⇒ exit 2（Verilator 侧信号缺失 = **编译期失败**（引用不存在的 `top__DOT__mem_sig` 直接编译不过）⇒ 不会静默读 0）；★ 并统一 **TIMEOUT ⇒ exit 2**（此前 Verilator 侧返回 1，与 Simulator 侧不一致）[S-10]
 
 ## inc-3 `memsig` DUT 探针（⏳）
 
-- [ ] 3.1 `dmem_chmem.h` 内新增只读累加（复用已存在的 `word_addr` / `store_wdata` / `is_store_active`），导出 named reg `mem_sig` / `mem_sig_updates` [S-6]
-- [ ] 3.2 自校验：写发生过但 `mem_sig_updates == 0` ⇒ exit 2（防「签名恒 0 全绿」）[S-6]
-- [ ] 3.3 变异对照：改 1 字节 store 数据 ⇒ `memsig` MUST 变；删除写 ⇒ `mem_sig_updates` MUST 变 [S-6]
-- [ ] 3.4 ★ **零 cycle 影响验证**：加探针前后同 ELF `cycles` 不变（否则说明探针进了关键路径） [S-6]
-- [ ] 3.5 两侧 `memsig` 相等 [S-6]
+- [x] 3.1 `dmem_chmem.h` 内新增只读累加（复用已存在的 `word_addr` / `store_wdata` / `is_store_active`），导出 named reg `mem_sig` / `mem_sig_updates`（★ 显式取值写法 `ch_uint<32> v(reg)` —— 直接 `reg * X` 会走编译期值路径导致 reg 被 codegen 裁掉）[S-6]
+- [x] 3.2 自校验：写发生过但 `mem_sig_updates == 0` ⇒ exit 2（防「签名恒 0 全绿」）—— ★ **两侧都实现**（Simulator runner + Verilator parity 入口）[S-6]
+- [x] 3.3 变异对照：① `mix` 里的 `store_wdata` 取反 ⇒ `memsig` MUST 变（实测 `a55f52c5`→`8fcc53ba`）② 强制 `sig_upd` 恒 0 ⇒ 两侧 MUST 判「假绿」ERROR（实测 rc=2 + 消息一致）[S-6]
+- [x] 3.4 ★ **零 cycle 影响验证**：`rv32ui-p-add` 478 / `rv32um-p-mul` 472 / `rv32ui-p-simple` 38 加探针前后**不变**（探针只观测、不进 datapath）[S-6]
+- [x] 3.5 两侧 `memsig` 相等 —— **5/5 corpus**（3 ELF + branchbench m0/m2）`memsig`/`memsig_updates` 逐位相等 [S-6]
 
 ## 验收（G-A2 的输入）
 
-- [x] 4.1 ≥3 个 ELF（含 1 个 rv32um）两侧 JSON 证据 —— **已完成**（`add`/`mul`/`simple`，4 项观测量齐备；`memsig` 待 inc-3）
+- [x] 4.1 ≥3 个 ELF（含 1 个 rv32um）两侧 JSON 证据 —— **已完成且扩到 5 个 corpus**（3 ELF + branchbench m0/m2），**5 项观测量 + 确定性判据全齐且逐位相等**
 - [x] 4.2 `git diff --stat` 的代码改动**仅**限于 `tools/parity_runner/**` / `tools/verilator_runner/**` / `ip/cpu/plugins/dmem_chmem.h` + CMake
 - [ ] 4.3 既有基线零退化：`[verilator]` 1/1、`[chmem]` ELF 47/47（抽样）、`[cpu]` 抽样

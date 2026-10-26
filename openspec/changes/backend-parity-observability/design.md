@@ -40,20 +40,22 @@ CppHDL 每创建节点都打 `CHINFO`，而 `include/utils/logger.h` **没有运
 
 ---
 
-## 2. 实测证据（inc-1 + inc-2）
+## 2. 实测证据（inc-1 + inc-2 + inc-3）
 
-| 项 | Simulator | Verilator | 判定 |
-|---|---|---|---|
-| `rv32ui-p-add` `cycles` | 478 | 478 | ✅ |
-| `rv32um-p-mul` `cycles` | 472 | 472 | ✅ |
-| `rv32ui-p-simple` `cycles` | 38 | 38 | ✅ |
-| `tohost`（3 ELF） | 1 | 1 | ✅ |
-| `regs`（x1..x31 hash，3 ELF） | — | — | ✅ 逐位相等 |
-| `pchash`（逐拍 PC 流，3 ELF） | — | — | ✅ 逐位相等 |
-| 31 个寄存器原始值 | — | — | ✅ 全等（diff 为空） |
-| `pc_head`（前 8 拍） | `0x80000004…0x80000020` | 同 | ✅ offset = 0 |
-| determinism（`node_count` / `names_hash`） | 2485 / `d2b048bdbed141ff` | 同 | ✅（同一 DAG） |
-| 时长 | ≈ 53 s / 478 拍 ⇒ **≈ 9.1 拍/s** | 秒级（含 Verilog 生成+编译） | — |
+### 2.0 ★ 5/5 corpus 全观测量逐位相等（最终状态）
+
+| corpus | determinism | cycles | tohost | regs | pchash | memsig | memsig_updates |
+|---|---|---|---|---|---|---|---|
+| `rv32ui-p-add` | ✅ 2511 / `67205f7d…` | 478 / 478 | 1 / 1 | ✅ | ✅ | `7c01` / `7c01` | 1 / 1 |
+| `rv32um-p-mul` | ✅ | 472 / 472 | 1 / 1 | ✅ | ✅ | `7c01` / `7c01` | 1 / 1 |
+| `rv32ui-p-simple` | ✅ | 38 / 38 | 1 / 1 | ✅ | ✅ | `7c01` / `7c01` | 1 / 1 |
+| `branchbench_m0` | ✅ | 3000 / 3000 | 0 / 0 | ✅ | ✅ | `a55f52c5` / `a55f52c5` | 9 / 9 |
+| `branchbench_m2` | ✅ | 3000 / 3000 | 0 / 0 | ✅ | ✅ | `a55f52c5` / `a55f52c5` | 9 / 9 |
+
+- ★ `memsig` 在 3 个 ELF 上同为 `7c01`：**这三个测试各只写一次**（写 `tohost=1`）⇒
+  签名只折叠了那一次写（word `0x400`、data `1`）⇒ 这是**预期**的，不是 bug；
+  branchbench（**9 次写**）才体现多写序列 ⇒ `a55f52c5`。
+- ★ 退出码两侧统一：ELF PASS ⇒ `0/0`；branchbench 在 3000 拍内未写 tohost ⇒ **两侧都 2**（TIMEOUT = ERROR，契约 S-10）。
 
 ### ★ 2.1 吞吐结论（推翻 ADR 的 575 拍/s）
 
@@ -92,9 +94,42 @@ end
 - `--reset-pulse=0`：新增开关，**默认行为不变**（保护 48/48 基线）
 - ★ 信号名 MUST 实测：`pc` 在 Verilog 里是 `top__DOT___pc`（前缀下划线）⇒ `reg_1` 很可能是 `top__DOT___reg_1`；名称缺失 MUST **编译期/运行期硬失败**，不得静默读 0
 
-## 4. inc-3：`memsig` DUT 探针
+## 4. inc-3：`memsig` DUT 探针（✅ 已落）
 
-- 落点：`ip/cpu/plugins/dmem_chmem.h`（`word_addr` / `store_wdata` / `is_store_active` 三个表达式**已在该处存在**，无需新增 payload）
-- 产物：两个 named reg ⇒ `mem_sig`（滚动 hash）+ `mem_sig_updates`（计数，用于自校验：写发生过但计数为 0 ⇒ ERROR）
-- ★ 选择理由：① 两侧读**同一 DAG 的两个 reg** ⇒ 天然可比 ② 不需要 host 内存通道（Simulator 侧没有）③ 不需要重 vendor 47 个 ELF（guest 校验和方案的成本）
-- ⚠️ 风险：`mem_sig` 是 **32/64-bit 状态**，会让 Verilog 多一条 hash 组合链 ⇒ 需测对 47 ELF 的 cycle 数**零影响**（若有影响，说明它进了关键路径，须改为纯观测寄存器）
+### 4.1 落点
+
+`ip/cpu/plugins/dmem_chmem.h` 的写路径旁（`mem.write(...)` 之后）：复用该处**已有**的
+`word_addr` / `store_wdata` / `is_store_active` 三个表达式，**不新增 payload**、**不改 datapath**。
+
+```
+mix  = word_addr * 31 + store_wdata + sig_updates * 0x9E3779B1
+sig' = sig * 16777619 ^ mix        （仅在 is_store_active 时生效）
+```
+⇒ 导出 `mem_sig` / `mem_sig_updates` 两个 named reg ⇒ 两侧读**同一 DAG 的两个 reg**。
+
+### 4.2 ★ 两个必须记住的坑（都踩过）
+
+| 坑 | 现象 | 根因 | 正确写法 |
+|---|---|---|---|
+| **reg 被 codegen 裁掉** | 网表里**根本没有** `mem_sig`（`grep` 0 命中），但 Simulator 侧能按名解析 | `ch_reg` **继承自 `ch_uint`** ⇒ 直接 `reg * X` 走 **ch_uint 的编译期值**路径（恒 0）⇒ 表达式退化成常量 ⇒ reg 无驱动逻辑 ⇒ 不在 eval list ⇒ codegen 不发射 | 显式取值：`ch_uint<32> v(reg);`（同 `ibus_chmem.h` 的 `flush_count`） |
+| **改了头文件但 runner 没重建** | 重建 `parity_sim_runner` 后 `cpu_verilator_sim` 仍用旧头文件 ⇒ 误判「探针没生效」 | Verilator 侧 Verilog 由 `cpu_verilator_sim`（CMake target）生成，**不是**运行期编译 | 改 `ip/**` 头文件后必须**同时**重建 `cpu_verilator_sim` |
+
+⇒ ★ 为此给 runner 加了诊断项 `--dump-nodes <substr>`：打印 DAG 节点 + **是否在 eval list**
+（因为 codegen 只发射 eval list 里的节点 ⇒ 「DAG 里有」≠「网表里有」）。
+
+### 4.3 变异对照（契约 S-6 的验收形式）
+
+| 变异 | 期望 | 实测 |
+|---|---|---|
+| `mix` 里的 `store_wdata` 取反 | `memsig` MUST 变（证明对写数据敏感） | `a55f52c5` → `8fcc53ba` ✅ |
+| `sig_upd` 强制恒 0 | 两侧 MUST 判「假绿」ERROR（rc=2 + 消息） | 两侧 rc=2，消息一致 ✅ |
+
+### 4.4 零 cycle 影响
+
+加探针前后 `rv32ui-p-add` 478 / `rv32um-p-mul` 472 / `rv32ui-p-simple` 38 —— **全部不变**
+⇒ 探针只观测、不进 datapath。DAG `node_count` 2485 → **2511**（+26，两侧同步变化 ⇒ 确定性判据仍相等）。
+
+### 4.5 附带修正
+
+- Verilator parity 路径的 **TIMEOUT 退出码** 1 → **2**（此前与 Simulator 侧不一致；契约 S-10 规定 TIMEOUT = ERROR）
+- 两侧都补上 ③ 的**假绿自校验**（`tohost != 0` 但 `mem_sig_updates == 0` ⇒ ERROR）
