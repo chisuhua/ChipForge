@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.4（2026-10-26，builder；v1.4 = A2b 比对器落盘 + S-15 缓存条款实测更正 + §7 覆盖矩阵填实）**
+> **Status**: ✅ **v1.5（2026-10-27，builder；v1.5 = A3 语料接入 + ★ partial 语义（cap 截断）新增 + per-case cap + 清单第 5 列）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -236,12 +236,29 @@ loop:
 ### S-9 判定规则与"禁降级"
 
 **要求**
-- PASS 条件（全部成立）：S-2 确定性一致 · 5 观测量两侧相等（或命中合规例外）· 无 `ERROR`。
+- PASS 条件（全部成立）：S-2 确定性一致 · **completion 一致**（S-9a）· 5 观测量两侧相等（或命中合规例外）· 无 `ERROR`。
 - 判据强度：`pchash` > `cycles` + `regs`/`memsig` > 仅 `tohost` ⇒ ★ **MUST NOT** 因某项不可采而"降级通过"（不可采 = `ERROR`）。
 - 例外命中 MUST 精确匹配 `(observation, corpus 作用域, mechanism)`；`corpus_scope: ["*"]` 的条目 MUST 附 `justification`（S-11）。
 
-**验收方式**：机检（构造 3 组输入：全等 ⇒ PASS；单观测不等 ⇒ FAIL；观测缺失 ⇒ ERROR）。
-**归属**：A2b。
+#### ★★ S-9a **partial 语义（v1.5 新增 —— 堵一个真实假绿通道）**
+
+case 在 cycle cap 处被截断（两侧 `done=false`）时，`tohost`（两侧都是 `0`）与 `cycles`（两侧都是 `cap`）
+**相等但无判别力** ⇒ ★ **MUST NOT** 把「两者相等」计为通过证据。
+
+| 情形 | 判定 | 理由 |
+|---|---|---|
+| 两侧都 `done=true` | 常规 5 观测量比对 | 完整执行 |
+| ★ **两侧都 `done=false`**（cap 截断） | **partial** ⇒ `tohost`/`cycles` 标 **vacuous**（不计入承重判据）⇒ 承重判据 = `regs` + `memsig` + `pchash` | 截断下 `tohost`/`cycles` 恒等 ⇒ 恒等**不是**证据 |
+| ★ **两侧 `done` 不一致** | **FAIL** / `completion_mismatch` | 一后端跑完、另一后端没跑完 ⇒ **真分歧**（不是门禁故障）⇒ MUST NOT 记为 `ERROR` |
+| 任一侧 `done` 字段缺失 | `ERROR` / `completion_missing` | fail-closed |
+
+★ **partial 本身不降级 verdict**：partial case 仍 MUST 满足承重判据（`regs`/`memsig`/`pchash`）全等；
+但报告 MUST 标 `partial_cases` + 每 case 的 `vacuous_observations` ⇒ ★ **不得**把 partial 静默呈现为「完整通过」。
+★ 现状：branchbench 4 档在 Simulator 侧 cap ≤ 20k 拍 ⇒ **必然 partial**（完整需 ~86k 拍 ⇒ 61 h/档，S-15）⇒
+⇒ 这 4 档的承重判据 = `regs` + `memsig` + `pchash`（`pchash` = 逐拍 PC 流 ⇒ 仍是最强判据）。
+
+**验收方式**：机检（构造 3 组输入：全等 ⇒ PASS；单观测不等 ⇒ FAIL；观测缺失 ⇒ ERROR）+ ★ partial 四情形（v1.5）。
+**归属**：A2b（判定实现）· A3（语料接入后暴露并修）。
 
 ---
 
@@ -300,7 +317,10 @@ loop:
 ### S-13 语料清单的单一来源
 
 **要求**
-- 清单文件：`tests/cpu/parity/corpus.txt`，每行 `name<TAB>kind<TAB>relpath<TAB>layer`，`#` 起注释；`kind ∈ {elf, branchbench}` · `layer ∈ {pr, night}`。★ **归属细化（v1.4）**：**A2b 落「格式 + 种子清单」**（47 ELF + 4 branchbench = **51 case**）· **A3 落「扩到 48**（补 `rv32ui-p-simple`）**+ 首跑」**。
+- 清单文件：`tests/cpu/parity/corpus.txt`，每行 `name<TAB>kind<TAB>relpath<TAB>layer[<TAB>max_cycles]`，`#` 起注释；
+  `kind ∈ {elf, branchbench}` · `layer ∈ {pr, night}` · `max_cycles`（**可选第 5 列**，v1.5）= per-case cycle cap 覆写。
+  ★ **归属细化（v1.5）**：**A2b 落「格式 + 种子清单」**（47 ELF + 4 branchbench = 51 case）
+  · **A3 落「扩到 52**（补 `rv32ui-p-simple` ⇒ 48 ELF + 4 branchbench）**+ 首跑」**。
 - ★ 两侧 harness MUST **都从这一个文件**读取；MUST NOT 各自维护 C++ 数组。
 - 门禁 MUST 断言两侧 harness 对清单的覆盖，且 **v1.4 起按方向性判定**：
   - **清单 ⊄ 某侧 `kCases`** ⇒ `ERROR` / `corpus_mismatch`（该 case 不会被那一侧跑 ⇒ 差分缺一侧 ⇒ **真漏检**）
@@ -332,16 +352,23 @@ loop:
 
 **要求**
 - **PR 层**：ELF 子集 **≤ 8**（MUST 含 `add`/`sub`/`lw`/`sw`/`beq` 类 + 1 个 rv32um）+ branchbench **0 档**。
-- **夜间层**：**51 case = 47 ELF + 4 branchbench 档**（以 S-13 清单为准，全部覆盖）。
+- **夜间层**：**52 case = 48 ELF + 4 branchbench 档**（以 S-13 清单为准，全部覆盖）。
 - ★★ **Verilog 构建缓存（v1.4 更正 —— 原「按 config 缓存」被实测推翻）**：生成的 Verilog **把 ELF 的
   指令内存烤进了网表**（实测 `imem[32] = 32'h200193;`；两个 ELF 的网表差 640 行）⇒ **每个 ELF 的网表都不同** ⇒
   ★ **跨 ELF 无可复用** ⇒ 现实约束是「**每 corpus 一次编译**」。
-  ⇒ 时长预算据此重算：**PR 层 8 case ≈ 10 min**（Simulator ≈7 min + Verilator ≈3 min）·
-  **夜间 51 case ≈ 1 h**（Simulator ≈45 min + Verilator ≈17 min）。
+  ⇒ 时长预算据此重算（★ **v1.5 实测更正**）：**PR 层 8 case ≈ 6.5 min**（实测 `jobs=4`）·
+  **夜间 52 case ≈ 45~60 min**（实测 `jobs=4`；★ 串行 ≈ 3 h ⇒ 门禁 MUST 支持并行）。
+  ★ 成本分布（实测）：Simulator 侧 ≈ 9~10 拍/s ⇒ ELF ≈ 30~60 s/例 · branchbench 20k 拍 ≈ **33 min/例**（4 档 ≈ 2.2 h，串行主导项）。
   ★ 要真正省掉 Verilator 侧编译，必须把 ELF 从 **elaboration 期**移出（imem 初始化改为运行期加载）
   ⇒ 属 DUT/上游级改动 ⇒ 登记为开放项 **O-5**（不在本期）。
 - ★ 分层（v1.4 落实）：清单 `layer` 列 + `--layer pr|night|all` 驱动；PR 层的 case 集合 MUST ⊆ 清单。
-- ★★ **branchbench 在 Simulator 侧的 cap MUST ≤ 20,000 拍**（实测 ≈ 9.1 拍/s ⇒ 20k ≈ 37 min/档）；`--cycles 2,000,000`（Verilator 侧现状默认）在 Simulator 侧 ≈ 61 小时/档，**不可行** ⇒ 若某档无法在 cap 内到达 done，MUST 登记为「该 corpus 仅 Verilator 侧可跑」的显式豁免（走 S-11），**MUST NOT** 静默跳过。
+- ★★ **per-case cycle cap（v1.5 新增）**：ELF 与 branchbench 的完成需求差 ~30 倍（ELF 最长 959 拍 vs branchbench ~86k 拍）
+  ⇒ ★ **MUST NOT** 用单一全局 cap：cap 过大 ⇒ ELF 白跑；cap 过小 ⇒ branchbench 恒 partial。
+  ⇒ 门禁 MUST 按 `kind` 取默认 cap（`elf`=3000 · `branchbench`=20000，契约 S-15）· 清单第 5 列可覆写。
+- ★★ **branchbench 在 Simulator 侧的 cap MUST ≤ 20,000 拍**（实测 ≈ 9~10 拍/s ⇒ 20k ≈ **33~37 min/档**）；`--cycles 2,000,000`（Verilator 侧现状默认）在 Simulator 侧 ≈ 61 小时/档，**不可行**。
+  ⇒ ★ **cap 截断 ⇒ 该 case 为 partial**（走 S-9a：`tohost`/`cycles` vacuous，承重判据 = `regs`/`memsig`/`pchash`）⇒ **MUST NOT** 静默跳过，也 **MUST NOT** 登记成「仅 Verilator 侧可跑」的豁免（两侧**都**能跑 partial）。
+  ⇒ ★ **实测更正（v1.5）**：4 档 branchbench 的 `tohost` **在两侧都恒为 0**（未跑到 done）⇒ 若按旧口径把
+  「两侧 `tohost` 相等」计为通过证据 ⇒ 就是**假绿** ⇒ 这正是 S-9a 的来源。
 - 时长阈值：★ **本期不设未实测的硬阈值**；A4 MUST 先把实测 p95 写进报告 `timings`，再据此定阈值。
 
 **验收方式**：机检（分层集合 ⊆ S-13 清单；`--layer` 只执行对应层）× 人工（A4 定时长阈值）。
@@ -361,20 +388,24 @@ loop:
 
 ---
 
-## 4. 语料清单格式（S-13 细化）
+## 4. 语料清单格式（S-13 细化 · v1.5 加第 5 列）
 
 ```text
 # tests/cpu/parity/corpus.txt
-# name<TAB>kind<TAB>relpath   （# 起注释；空行忽略）
-rv32ui-p-add	elf	tests/cpu/riscv_tests/elf/rv32ui-p-add
+# name<TAB>kind<TAB>relpath<TAB>layer[<TAB>max_cycles]   （# 起注释；空行忽略）
+rv32ui-p-add	elf	tests/cpu/riscv_tests/elf/rv32ui-p-add	pr
 ...
-rv32ui-p-simple	elf	tests/cpu/riscv_tests/elf/rv32ui-p-simple
-rv32um-p-mul	elf	tests/cpu/riscv_tests/elf/rv32um-p-mul
-branchbench_m0	branchbench	build/branchbench_m0.elf
+rv32ui-p-simple	elf	tests/cpu/riscv_tests/elf/rv32ui-p-simple	night
+rv32um-p-mul	elf	tests/cpu/riscv_tests/elf/rv32um-p-mul	pr
+branchbench_m0	branchbench	build/branchbench_m0.elf	night
 ```
 
 - `relpath` 相对**仓库根**（两侧 harness 都以 `CMAKE_SOURCE_DIR` 为基准解析）。
-- branchbench 的 `--cycles` cap MUST 由清单外的配置给出（默认 2,000,000，与 `measure_branchbench.sh` 一致）；★ 若 Simulator 侧实测单档 > 10 min ⇒ 该档默认归夜间层。
+- `layer` ∈ {`pr`, `night`}（S-15 分层）。
+- ★ `max_cycles`（**可选第 5 列**，v1.5）= per-case cycle cap **覆写**；缺省按 `kind` 取
+  `elf`=3000 · `branchbench`=20000（S-15）。★ **MUST NOT** 用单一全局 cap（两类需求差 ~30 倍）。
+- ★ branchbench 的 4 个 ELF 是 **CMake 构建产物**（target `branchbench_elfs`）⇒ **不在版本控制内**
+  ⇒ 跑批前 MUST 先 `cmake --build build` ⇒ 门禁 MUST 做 pre-flight 存在性检查（缺失 ⇒ `ERROR`，fail-closed）。
 
 ---
 
