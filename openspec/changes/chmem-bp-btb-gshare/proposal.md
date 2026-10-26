@@ -3,7 +3,7 @@ initiative: wave6-linux-and-productization
 priority: P1
 version_target: v1.0.0
 status: ready
-created_from: docs/architecture/bp-btb-gshare-design-brief.md
+created_from: ip/cpu/docs/bp-btb-gshare-design-brief.md
 created_from_version: v2.2
 adr:
   - ADR-088
@@ -102,7 +102,7 @@ depends_on:
 
 ## References
 
-- 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` v2.2
+- 架构方案简报（权威）：`ip/cpu/docs/bp-btb-gshare-design-brief.md` v2.2
 - 执行文件：`.rddf/plans/chmem-bp-btb-gshare.md`（★ 顶部有 **v2.2 覆盖声明**，逐条作废旧 Goal/Task/AC）
 - 前置：`chmem-branch-microbench-fix` · `chmem-bp-btb-gshare-poc`
 - 机制结论：`tests/cpu/test_cpu_chmem_bp_poc.cpp`
@@ -110,4 +110,4 @@ depends_on:
 ## 规格来源（spec preamble 的归档副本）
 
 > Capability topic: `chmem-bp-btb-gshare`（CH_MEM 后端的分支预测器）。
-> 上游 = ADR-088 v1.2 §3 BP 行 + 架构简报 `docs/architecture/bp-btb-gshare-design-brief.md` v2.2。
+> 上游 = ADR-088 v1.2 §3 BP 行 + 架构简报 `ip/cpu/docs/bp-btb-gshare-design-brief.md` v2.2。

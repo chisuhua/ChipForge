@@ -3,7 +3,7 @@ initiative: wave6-linux-and-productization
 priority: P1
 version_target: v0.11.0
 status: ready
-created_from: docs/architecture/bp-btb-gshare-design-brief.md
+created_from: ip/cpu/docs/bp-btb-gshare-design-brief.md
 created_from_version: v2.2
 adr:
   - ADR-088
@@ -75,14 +75,14 @@ depends_on: []
 
 ## References
 
-- 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` §2.4 / §4.1
+- 架构方案简报（权威）：`ip/cpu/docs/bp-btb-gshare-design-brief.md` §2.4 / §4.1
 - 已归档的 0c：`openspec/changes/archive/2026-10-24-chmem-branch-microbench/`
 - 基准 CSV：`soc/cpu/docs/dse/branchbench-baseline-matrix.csv`
 
 ## 规格来源（spec preamble 的归档副本）
 
 > Capability topic: `chmem-branch-microbench-fix`（分支微基准的**工作量污染修正** + **档名方向修正**）。
-> 上游 = `docs/architecture/bp-btb-gshare-design-brief.md` §2.4 / §4.1。
+> 上游 = `ip/cpu/docs/bp-btb-gshare-design-brief.md` §2.4 / §4.1。
 
 ## ★ 实施结果（2026-10-24，已完成）
 

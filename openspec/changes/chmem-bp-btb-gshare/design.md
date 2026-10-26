@@ -1,6 +1,6 @@
 # Design — chmem-bp-btb-gshare
 
-> 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` v2.2
+> 架构方案简报（权威）：`ip/cpu/docs/bp-btb-gshare-design-brief.md` v2.2
 > ★ 本文件是简报 §3.4.2 的**明文义务**落地：五级 mux 嵌套契约 + 三步时序 + payload 契约。
 
 ---
@@ -59,7 +59,7 @@ flush = hold_z | (taken_buf & !spec_ok_buf) | mispredict_A_buf
 
 ★ **`spec_ok_buf` 的定义 = 「投机被证明正确」（情形 C）**，而不是「投机臂确实生效」（= `pv & pt`）：
 ★ 后者在**情形 F** 下也为真 ⇒ 会让 F 的错路**不被抑制** ⇒ 泄漏。
-⇒ ★ 该定义与 `docs/architecture/bp-btb-gshare-design-brief.md` §3.4.2 / AC-6 的字面表述**不一致**
+⇒ ★ 该定义与 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §3.4.2 / AC-6 的字面表述**不一致**
 ⇒ ★ **裁决 A1（architect）**；★ 实施侧已取 `case_c` 这一侧（更保守 ⇒ 只可能多 flush ⇒ 不可能假绿）。
 
 ### 0.5 范围修订（★ **A5 决策：2026-10-26，用户裁定**）

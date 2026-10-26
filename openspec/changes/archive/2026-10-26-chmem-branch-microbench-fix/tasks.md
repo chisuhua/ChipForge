@@ -11,7 +11,7 @@ status: in-progress
 # Tasks — chmem-branch-microbench-fix
 
 > **定位**: B1 ② `chmem-bp-btb-gshare` 的**硬前置**（独立 change）。修正 0c 微基准的**工作量污染** + **档名方向反向**。
-> **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` §2.4 / §4.1 / §5.5
+> **权威规格**: `ip/cpu/docs/bp-btb-gshare-design-brief.md` §2.4 / §4.1 / §5.5
 > **不可触碰**: `ip/**`（零生产代码改动）· ② 的任何代码
 
 ## Implementation

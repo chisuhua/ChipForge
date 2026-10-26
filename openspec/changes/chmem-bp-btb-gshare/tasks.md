@@ -15,7 +15,7 @@ depends_on:
 # Tasks — chmem-bp-btb-gshare
 
 > **定位**: B1 ② 主体。实现 **BTB + Bimodal 2-bit PHT**（★ GShare / RAS **不在本期**，见架构简报 §3.1）。
-> **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` v2.2 §2.1 / §3.2 / §3.3 / §3.4 / §4.3 / §5.1 / §5.5
+> **权威规格**: `ip/cpu/docs/bp-btb-gshare-design-brief.md` v2.2 §2.1 / §3.2 / §3.3 / §3.4 / §4.3 / §5.1 / §5.5
 > ★ **两个前置：✅ 已归档（2026-10-26）** —— `2026-10-26-chmem-branch-microbench-fix`（12/12 完成）+ `2026-10-26-chmem-bp-btb-gshare-poc`（**13/17 AC 闭合**；★ 4 项未闭合 AC-F2-2 / 10 / 11 / 15 的原因与归属见该 change 的**归档注记**）⇒ ★ **开工门禁已解除** ⇒ ★ 继承项：**AC-F2-11（无条件跳转与条件分支分开统计）/ AC-F2-15（无条件跳转占比报告）⇒ 归本 change 的 Task 2h**（★ 其余两项 AC-F2-2 / AC-F2-10 归 S4 / ADR-088 §5.2）⇒ ★ **MUST NOT** 把「可开工」读成「可跳过前置的验收口径」
 > ★ **执行文件** `.rddf/plans/chmem-bp-btb-gshare.md` 顶部有 **v2.1 覆盖声明**（★ **v2.3 覆盖声明尚未落到该文件** —— ★ **该文件是 builder 的执行 SSOT** ⇒ ★ **MUST NOT** 只读本 change 的 `tasks.md` / `design.md` 就开工 ⇒ ★ **builder 开工前 MUST 先把本 change 的 v2.3 覆盖声明同步进 plan 文件**（含其 owner 表里「flush 双分量」「四情形 select 链」两条作废标注）⇒ ★ **同步清单见本 change 的「★ planner 交接清单」段**
 

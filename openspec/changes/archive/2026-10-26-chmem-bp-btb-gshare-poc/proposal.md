@@ -3,7 +3,7 @@ initiative: wave6-linux-and-productization
 priority: P1
 version_target: v0.11.0
 status: ready
-created_from: docs/architecture/bp-btb-gshare-design-brief.md
+created_from: ip/cpu/docs/bp-btb-gshare-design-brief.md
 created_from_version: v2.2
 adr:
   - ADR-088
@@ -75,11 +75,11 @@ depends_on:
 
 ## References
 
-- 架构方案简报（权威）：`docs/architecture/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §3.4.2 / §4.2
+- 架构方案简报（权威）：`ip/cpu/docs/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §3.4.2 / §4.2
 - 前置：`chmem-branch-microbench-fix`
 - 机制结论：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（8 case / 51 assertions 全绿）
 
 ## 规格来源（spec preamble 的归档副本）
 
 > Capability topic: `chmem-bp-btb-gshare-poc`（CH_MEM 分支预测的**机制可行性 PoC**）。
-> 上游 = `docs/architecture/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §4.2。
+> 上游 = `ip/cpu/docs/bp-btb-gshare-design-brief.md` §2.1 / §2.5 / §4.2。
