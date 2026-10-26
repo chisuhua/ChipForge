@@ -128,6 +128,17 @@ class BranchPlugin : public PluginBase {
   ///   (它们的方向恒为 taken ⇒ 无需方向学习) ⇒ 由 BP 用 BRANCH_TAKEN 区分。
   inline static Payload<ch::core::ch_bool> IS_BRANCH{"cpu.is_branch"};
 
+  /// IS_JAL —— 「本条指令是 `jal`」（★ chmem-bp-btb-gshare **② 主体增量 1**）
+  /// ★ **用途**：BTB 表项的 `is_unconditional` 位的**来源**（增量 1 让 `jal` 建项
+  ///   且**恒 taken** 预测 ⇒ 不占 PHT 表项）。
+  /// ★ `j`（= `jal x0, offset`）与 `jal` **同 opcode** ⇒ 本信号**同时覆盖 `jal` 与 `j`**。
+  /// ★ ★ **`jalr` / `ret` 不含在内** —— `ret` = `jalr x0, 0(x1)` ⇒ JALR opcode ⇒
+  ///   目标随运行时变化 ⇒ 静态 BTB 项必错 ⇒ ★ **AC-14：`jalr` MUST NOT 建项**
+  ///   （要覆盖 `ret` 必须先有 RAS ⇒ 增量 2 ⇒ 见 ② 主体 Task 2g）。
+  /// ★ 来源已在 `:203` 算出（`decoded.opcode == OP_JAL`）⇒ 此处**导出**即可
+  ///   （★ BP 侧**不可能**从 opcode 反推 —— branch 节点未导出 opcode）。
+  inline static Payload<ch::core::ch_bool> IS_JAL{"cpu.is_jal"};
+
   /// BRANCH_TAKEN_RAW —— **未被 flush 抑制**的分支结果 (chmem-bp-btb-gshare-poc)
   /// ★ `BRANCH_TAKEN` 是**被 flush 抑制后**的值（`taken = taken && !flush`）
   ///   ⇒ 错路指令的 taken 结果**已被抹掉** ⇒ 用它做 PHT 方向学习会学错方向。
@@ -269,6 +280,10 @@ class BranchPlugin : public PluginBase {
       //   taken **结果**, 不是「是不是分支」) ⇒ 在 flush 抑制前后都成立。
       //   供 BP 的 PHT 更新路径使用 (chmem-bp-btb-gshare-poc Task 1)。
       n->operator()(IS_BRANCH) = ch::core::ch_bool(is_branch);
+      // ★ IS_JAL: 「本条指令是 `jal`」（★ 含 `j`；★ **不含** `jalr`/`ret`）
+      //   —— 供 BTB 的 `is_unconditional` 位（② 主体增量 1）使用。
+      //   ★ 与 flush 无关（flush 抑制的是 taken **结果**，不是「是不是跳转」）。
+      n->operator()(IS_JAL) = ch::core::ch_bool(is_jal);
 
       // ── 5. CtrlLink flush 信号注册 ──
       // 当分支跳转时 flush 后续流水级指令 (Spike 7 HLT detection pattern)

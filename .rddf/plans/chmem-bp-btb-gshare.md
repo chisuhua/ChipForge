@@ -295,7 +295,7 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 
 - [ ] **Step 1: BTB 0 拍查表** —— ★ **必须 `aread`（0 拍），MUST NOT 用 `sread`**（sread ⇒ 预测与真实分支结果同拍到达 ⇒ 价值归零）；★ 读地址 = `bits<7,0>(pc_reg) & literal(M-1)`（`pc_reg` 被 `<<=` 驱动 ⇒ proxy 可用，PoC P-2P 已证）
 - [ ] **Step 2: 产出 payload** —— `pred_target`(32b) / `pred_taken`(1b) / `pred_valid`(1b) ⇒ mode-aware `uint_t<N>`（禁裸 `bool`，ADR-040 §10.5）
-- [ ] **Step 3: 方向合成** —— `pred_taken = pred_valid && (is_unconditional || pht_counter ≥ 2)`（★ `is_unconditional` 位必需 ⇒ `jal` 才可预测）
+- [x] **Step 3: 方向合成** —— `pred_taken = pred_valid && (is_unconditional || pht_counter ≥ 2)`（★ `is_unconditional` 位必需 ⇒ `jal` 才可预测）★ **2026-10-26 已完成（增量 1）** ⇒ 见下三条实现细节
   - ★ **v2.3.1 增量 1 的三处实现细节**（★ **62b 编码已含 `is_unconditional`（bit[3]，PoC `branch_predictor_chmem.h:160-163`）⇒ NOT 加位、NOT 重算位宽**）：① **branch plugin 导出 jal 判别 payload**（`branch_chmem.h` 的 `is_jal` ⇒ 新增 `IS_JAL` / `IS_UNCOND`；★ `jalr` MUST NOT 含在内）；② **ch 写路径 MUST 补写 `is_unconditional` 位**（★ PoC `:417` 的 `packed_w = tgt_shifted | pc_shifted | valid_at` **未写该位** ⇒ 与 host 侧 `pack_entry`（`:210-218` 写了）**语义漂移**）；③ **BTB 写使能**从 `taken & is_branch & !flushed` 扩为「`taken & !flushed & (is_branch | is_jal)`」（★ `jalr` 仍不建项）
 - [ ] **Step 4: 存预测记录** —— `ch_reg` 组（pred_taken / pred_target / pred_valid）⇒ 跨拍保持（PoC P-1 已证）
 
@@ -320,7 +320,7 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 
 ### Task 2f: ★ GShare 移植（★ v2.3 新增 —— **增量 3**，★ **移植**：TLM 参考**已有**）
 
-- [ ] **Step 1: 移植来源** —— ★ TLM 参考 `ip/cpu/plugins/branch_predictor.h` 的 `gshare_predict` / `gshare_update` / `global_history_`（`GHR_BITS=8` / `GSHARE_SZ` 表）⇒ ★ **移植**（★ **不是新设计** ⇒ 成本低）⇒ ★ **历史文档写的「13-bit」与代码不符 ⇒ 以代码为准**
+- [ ] **Step 1: 移植来源** —— ★ **2026-10-26 由「条件性」转为「本期做」**（★ 实测：增量 1 后净收益率 **78.3% < 84.5%** ⇒ AC-16 的「不达标 ⇒ MUST 拉回 GShare」分支被触发；★ 还差 **6.2pp ≈ 7440 cycles**）⇒ ★ TLM 参考 `ip/cpu/plugins/branch_predictor.h` 的 `gshare_predict` / `gshare_update` / `global_history_`（`GHR_BITS=8` / `GSHARE_SZ` 表）⇒ ★ **移植**（★ **不是新设计** ⇒ 成本低）⇒ ★ **历史文档写的「13-bit」与代码不符 ⇒ 以代码为准**
 - [ ] **Step 2: CH_MEM 侧的历史寄存器** —— `ch_reg<ch_uint<8>>` 跨拍保持（★ PoC 已证 `ch_reg` 可跨拍保持）⇒ 索引 = `(pc ^ ghr) & literal(M-1)`
 - [ ] **Step 3: 更新时机** —— 与 Bimodal **同一拍**更新（★ 顺序契约：branch NORMAL → 消费方 branch LATE）⇒ ★ **MUST NOT** 注册新 stage 名
 - [ ] **Step 4: 单元锚** —— GShare 索引 = `pc ^ ghr`（★ 断**值**不只断存在）⇒ 变异「改成纯 pc 索引 ⇒ RED」
@@ -335,8 +335,15 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 ### Task 2h: ★★ 增量分档的量收益（★ v2.3 新增 —— **A5 决策**：「先扩 `is_unconditional` + `jal` 覆盖并量收益，再定 GShare」）
 
 - [ ] **Step 1: 开关面（MUST 钉死机制 —— metis）** —— 开关面 = ★ **工厂布尔参数 + CLI flag**（★ **先例**：`cpu_factory_chmem.h:113` 的 `enable_bp` —— elaboration 期定形 DAG、进程内固定、CLI 透传 ⇒ 单 binary 多次运行即可逐档测量）⇒ ★ **MUST NOT** 用编译期宏（⇒ 重编译 ×3 + 宏矩阵爆炸）⇒ ★ **MUST NOT** 发明运行期可重配 mux（CH_MEM 静态 elaboration ⇒ 白付每拍一级 select）⇒ 三档 ⇒ 3 个布尔（如 `bp_uncond` / `bp_gshare` / `bp_ras`）+ ★ **生效值回显**
-- [ ] **Step 2: 测量矩阵（防「偷工只跑一档」）** —— 每档 MUST 跑 ① **Dhrystone on/off 双跑**（各 ~20s）② **branchbench 4 档 on/off 双跑**（各 ~55s）⇒ ★ 单档 ≈ **~4.5 分钟**（不含 build）⇒ ★ 三档 ≈ 15 分钟 ⇒ ★ **MUST NOT** 只跑一档就下结论
-- [ ] **Step 3: 判据（fail-closed）** —— 净收益率（★ **两种分母同报、判定取较小值**：分母 = `N_taken_total` 与分母 = `FLUSH(off)`；★ **A6 未裁决** ⇒ 取小）⇒ ★ 门槛 **84.5%**（★ **量纲提醒**：该数字出处是「TLM–CH_MEM 差距闭合率」`101470/120066`，与净收益率**不同量纲** ⇒ A6 MUST 明确）⇒ ★ **MUST NOT** 用 branchbench 的「校验和逐位相等」当增量生效的证据（★ 那 4 档每 iter 只 1 条条件分支 ⇒ `jal` 覆盖的增量收益在 branchbench 上**结构性为零** ⇒ branchbench 只承担**零退化**角色）
+- [x] **Step 2: 测量矩阵（防「偷工只跑一档」）** —— 每档 MUST 跑 ① **Dhrystone on/off 双跑**（各 ~20s）② **branchbench 4 档 on/off 双跑**（各 ~55s）⇒ ★ 单档 ≈ **~4.5 分钟**（不含 build）⇒ ★ **三档全测 ≈ 15 分钟** ⇒ ★ **MUST NOT** 只跑一档就下结论 ★ **2026-10-26 增量 1 档已完成并落表**：
+  | 配置 | DHrystone cycles | FLUSH_COUNT | 净收益率 | branchbench 4 档 cycles |
+  |---|---|---|---|---|
+  | BP=off | 914544 | 120065 | — | 86034 / 88034 / 86534 / 87056 |
+  | BP=on，增量 1 关（= PoC 行为） | 846500 | 52021 | 56.67% | 84038 / 84040 / 84787 / 85037 |
+  | **BP=on，增量 1 开** | **820513** | **26034** | **78.3%** | **78041 / 78043 / 78791 / 79041** |
+  ⇒ ★ **ΔFLUSH ≡ Δcycles ≡ 25987** ⇒ ★ 净收益率 **56.67% → 78.3%（+21.6pp）** ⇒ ★ 与 Step 5 的静态上界估算「~80%」**吻合**
+  ⇒ ★★ **未达 84.5%** ⇒ ⇒ **GShare（Task 2f）转本期** ⇒ ★★ **实测更正**：「branchbench 上 `jal` 覆盖收益**结构性为零**」是**错的**（★ 静态分析只数了 `jal`，**漏了 `j`** ⇒ `j` = `jal x0` 同 opcode ⇒ 也在覆盖范围 ⇒ 4 档全部改善 ~6000 拍）⇒ ⇒ **branchbench 与 DHrystone 双证**
+⇒ ★★ **【2026-10-26 实测更正】** ★ 原判断「branchbench 的『校验和逐位相等』不能当增量生效的证据（增量收益在 branchbench 上**结构性为零**）」是**错的** ⇒ ★ 实测：增量 1 在 branchbench 4 档**全部改善 ~6000 拍**（78041/78043/78791/79041）且**校验和逐位不变**（103/183/147/101）⇒ ⇒ ★ **branchbench 是有效的增量生效证据**（★ 根因：静态分析**漏了 `j`** 站点 —— `j` = `jal x0` 同 opcode）⇒ ⇒ ★ 判据 = **branchbench + DHrystone 双证**
 - [ ] **Step 4: 决策 + 落点** —— 达标 ⇒ 绝对值门禁可恢复 ⇒ 剩余增量显式结案；不达标 ⇒ **MUST** 把下一档拉进本期 ⇒ ★ 三档全部用尽仍不达标 ⇒ 按 **P-3 临时口径**结案 + 移交后续 change ⇒ ★ **MUST NOT** 让本 change 因 AC 不可满足而**无法归档** ⇒ ★ 决策 MUST 落 **ADR-088 §5.3.2**（净收益率结论 + 绝对值门禁结论**分两件事**落）
 - [ ] **Step 5: 收益上界参考（★ 只供量级参考，不参与判据）** —— DHrystone `.text` 55 个分支站点 = 无条件 36（`ret` 16 / `jal` 15 / `j` 5）+ 条件 19 ⇒ BP=on 后残余 flush **26.0/iter 绝大部分是无条件跳转**（BTB 写使能 = `taken & is_branch` ⇒ `jal`/`ret` 从不建项）⇒ 增量 1 覆盖 `jal`/`j`（20/36）⇒ ★ **静态上界 ≈ 14/iter ≈ 28,000 cycles** ⇒ ★ **实测低于该上界 NOT 判 FAIL**（★ 真实命中率与 `ret` 占比未知）
 

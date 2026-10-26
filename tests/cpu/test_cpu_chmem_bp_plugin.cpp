@@ -95,6 +95,7 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
     BranchTakenRaw,
     BranchFlushed,
     IsBranch,
+    IsJal,
     BranchTarget,
   };
 
@@ -105,6 +106,11 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
     /// ★ 本段的取指地址；★ **哨兵值 0 = 用 `br_pc_`**
     ///   （⇒ 当前无法表达「取指地址真的是 0」；本套测试用不到，但须知晓该协议）
     std::uint32_t fetch_pc = 0;
+    /// ★ 本段内指令**是不是条件分支**（★ 默认 true ⇒ 增量 1 之前的行为）
+    /// ★ 位置在 `fetch_pc` **之后** ⇒ ★ 既有的位置初始化（R10 等）**保持有效**
+    bool is_branch = true;
+    /// ★ 本段内指令**是不是 `jal`/`j`**（★ 增量 1：目标静态 ⇒ 可建 BTB 项 ⇒ 恒 taken）
+    bool is_jal = false;
   };
 
   FakeCpuDriver(std::uint32_t br_pc, std::uint32_t br_target,
@@ -173,8 +179,17 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
       if (skip_payload_ != SkipPayload::BranchFlushed) {
         n->operator()(BrPlugin::BRANCH_FLUSHED) = flushed;
       }
+      // ★ IS_BRANCH / IS_JAL = **随 tick 变化的活表达式**（★ 增量 1 需要区分
+      //   「条件分支」与「`jal`/`j`」⇒ BTB 写使能才可扩为 (is_branch | is_jal)）
+      const ch::core::ch_bool is_branch = phase_value(
+          [](const Phase& p) { return p.is_branch; });
+      const ch::core::ch_bool is_jal = phase_value(
+          [](const Phase& p) { return p.is_jal; });
       if (skip_payload_ != SkipPayload::IsBranch) {
-        n->operator()(BrPlugin::IS_BRANCH) = ch::core::ch_bool(true);
+        n->operator()(BrPlugin::IS_BRANCH) = is_branch;
+      }
+      if (skip_payload_ != SkipPayload::IsJal) {
+        n->operator()(BrPlugin::IS_JAL) = is_jal;
       }
       if (skip_payload_ != SkipPayload::BranchTarget) {
         n->operator()(RvKey::BRANCH_TARGET) = cf::plugin::uint_t<32>(tgt);
@@ -231,16 +246,17 @@ class FakeCpuDriver : public cf::plugin::PluginBase {
 std::unique_ptr<ch::Simulator> make_sim(
     cf::plugin::PipeBuilder& pb,
     std::vector<FakeCpuDriver::Phase> phases,
-    bool bp_first = false) {
+    bool bp_first = false,
+    bool enable_uncond = true) {
   if (bp_first) {
     // ★ 反序注册（BP 在生产者之前）—— 用于验证 **fail-fast**（不静默降级）
-    pb.register_plugin(std::make_unique<Btb>(256u));
+    pb.register_plugin(std::make_unique<Btb>(256u, enable_uncond));
     pb.register_plugin(std::make_unique<FakeCpuDriver>(
         0x8000010cu, 0x80000118u, std::move(phases)));
   } else {
     pb.register_plugin(std::make_unique<FakeCpuDriver>(
         0x8000010cu, 0x80000118u, std::move(phases)));
-    pb.register_plugin(std::make_unique<Btb>(256u));
+    pb.register_plugin(std::make_unique<Btb>(256u, enable_uncond));
   }
   pb.build();
   REQUIRE(pb.elaborate().has_value());
@@ -581,6 +597,166 @@ TEST_CASE("bp_plugin_R10_lookup_follows_live_fetch_pc", "[cpu][chmem][bp][plugin
   //   （多跑几拍确保已越过相位边界）
   for (int i = 0; i < 6; ++i) REQUIRE_NOTHROW(sim->tick());
   REQUIRE(read_u1(*sim, valid) == 0u);
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 8) ★★ 增量 1（② 主体）：`is_unconditional` 位 + `jal`/`j` 建项
+//    ★ 三处实现细节（② 主体 tasks.md 的 Task 2c Step 3 + AC-29）：
+//      ① branch plugin 导出 `IS_JAL`（`jal`/`j`，**不含** `jalr`/`ret`）
+//      ② ch 写路径 MUST 补写 `is_unconditional` 位（★ PoC 现状**未写** ⇒
+//         读侧 `uncond_bit` 恒 0 ⇒ `jal` 永不被预测 ⇒ 且与 host 侧 `pack_entry`
+//         **语义漂移** ⇒ 缺口 #5「双实现」的具体化）
+//      ③ BTB 写使能扩为 `taken & !flushed & (is_branch | is_jal)`
+//    ★ `jal` **不占 PHT 表项** ⇒ PHT 写使能仍是 `is_branch & !flushed`
+//      ⇒ ⇒ `jal` 场景下 PHT counter **恒 0** ⇒ 预测方向**只可能**来自
+//         `uncond_bit` ⇒ ★ 这正是本组 case 的鉴别力来源
+// ═════════════════════════════════════════════════════════════════════════════
+
+// R11 | ★ `jal`/`j` **建项**且 `is_unconditional=1` ⇒ **恒 taken 预测**
+//      （★ PHT counter 恒 0 ⇒ 方向只可能来自 uncond 位 ⇒ 若 ch 写路径不写该位
+//        ⇒ 预测恒 not-taken ⇒ RED）
+TEST_CASE("bp_plugin_R11_jal_creates_unconditional_entry",
+          "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r11");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  // ★ 全程 `jal`（is_branch=false ⇒ 不占 PHT ⇒ counter 恒 0；is_jal=true）
+  auto sim = make_sim(pb, {{1000u, /*taken=*/true, /*flushed=*/false,
+                            /*fetch_pc=*/0u, /*is_branch=*/false,
+                            /*is_jal=*/true}});
+
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+  const auto taken_cell = fnode->operator()(BP_PRED_TAKEN);
+  const auto target = fnode->operator()(BP_PRED_TARGET);
+
+  for (int i = 0; i < 4; ++i) REQUIRE_NOTHROW(sim->tick());
+
+  // ★ 建项 ⇒ 命中
+  REQUIRE(read_u1(*sim, valid) == 1u);
+  // ★★ 方向 = **恒 taken**（★ 鉴别力：uncond 位没写 ⇒ counter=0 ⇒ 预测 not-taken ⇒ RED）
+  REQUIRE(read_u1(*sim, taken_cell) == 1u);
+  // ★ 目标仍是分支目标（BTB 项内容正确）
+  REQUIRE(read_u32(*sim, target) == 0x80000118u);
+}
+
+// R12 | ★ `jalr`/`ret`（is_branch=false 且 is_jal=false）⇒ **不建项**
+//      ⇒ 走顺序取指（AC-14：目标随运行时变化 ⇒ 静态 BTB 项必错）
+TEST_CASE("bp_plugin_R12_jalr_creates_no_entry",
+          "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r12");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto sim = make_sim(pb, {{10000u, /*taken=*/true, /*flushed=*/false,
+                            /*fetch_pc=*/0u, /*is_branch=*/false,
+                            /*is_jal=*/false}});
+
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+
+  for (int i = 0; i < 4; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, valid) == 0u);   // ★ 未建项 ⇒ 未命中
+}
+
+// R13 | ★★ **同槽覆盖 ⇒ `is_unconditional` 位翻转** ⇒ 方向来源从「无条件」切到「PHT」
+//      ★ 场景：tick 0~1 是 `jal`（建项，uncond=1，PHT 不更新 ⇒ counter 恒 0）
+//        ⇒ tick 2 起同 PC 的**条件分支** taken ⇒ 覆盖写（uncond=0）+ counter 0→1
+//      ⇒ ★ tick 3 的预测 MUST = not-taken（uncond=0 且 counter=1 < 2）
+//        ⇒ ★ 若覆盖写**没清** uncond 位（stale 1）⇒ 预测恒 taken ⇒ RED
+TEST_CASE("bp_plugin_R13_same_slot_overwrite_clears_uncond_bit",
+          "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r13");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto sim = make_sim(pb,
+                       {{2u, /*taken=*/true, /*flushed=*/false,
+                         /*fetch_pc=*/0u, /*is_branch=*/false, /*is_jal=*/true},
+                        {1000u, /*taken=*/true, /*flushed=*/false,
+                         /*fetch_pc=*/0u, /*is_branch=*/true, /*is_jal=*/false}});
+
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+  const auto valid = fnode->operator()(BP_PRED_VALID);
+  const auto taken_cell = fnode->operator()(BP_PRED_TAKEN);
+
+  // ★★ **采样口径（本组 case 的时序基准）**：主机构造器读到的 cell 值 = **该拍结束
+  //   后**的状态（★ 读的是 signal 值 ⇒ 已含本拍的 branch 阶段写入）⇒
+  //   ⇒ 「tick k 的读数」= 第 k 拍的**末态**（不是该拍 fetch 时刻的值）。
+  //   ★ 实测序列（uncond 覆盖 + PHT 递增）：tick0/1 = taken（uncond=1）·
+  //     tick2 = not-taken（uncond 已被覆盖为 0 + counter=1）· tick3+ = taken（counter≥2）
+  // ---- 阶段 1：`jal` 建项（uncond=1，counter 恒 0）⇒ 预测恒 taken ----
+  for (int i = 0; i < 2; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, valid) == 1u);
+  REQUIRE(read_u1(*sim, taken_cell) == 1u);
+
+  // ---- 阶段 2：条件分支覆盖同槽 ⇒ uncond=0 + counter=1 ⇒ 预测 not-taken ----
+  REQUIRE_NOTHROW(sim->tick());            // ★ 覆盖写发生在**本拍** ⇒ 末态即生效
+  REQUIRE(read_u1(*sim, valid) == 1u);      // 表项仍在
+  // ★★ 关键采样点：uncond 已被覆盖为 0 ⇒ 方向改由 PHT 决定（counter=1 ⇒ not-taken）
+  //   ⇒ 若覆盖写**没清** uncond 位（stale 1）⇒ 预测恒 taken ⇒ RED
+  REQUIRE(read_u1(*sim, taken_cell) == 0u);
+}
+
+// R14 | ★★ **host `pack_entry` 与 ch 写路径的语义等价**（缺口 #5「双实现漂移」锚）
+//      ★ host 侧两变体：`is_unconditional=true` ⇒ 方向恒 taken；
+//        `is_unconditional=false` ⇒ 方向由 PHT 决定（counter=0 ⇒ not-taken）
+//      ★ ch 侧：R11 的 `jal` 行为 == host 的 uncond=true 语义
+//      ⇒ ★ **两者 MUST 不同** ⇒ 证明 ch 写路径真的写/清了 uncond 位
+TEST_CASE("bp_plugin_R14_host_pack_entry_matches_ch_write_path",
+          "[cpu][chmem][bp][plugin]") {
+  ch::core::context ctx("bp_r14");
+  ctx.set_as_current_context();
+  ch::core::ctx_swap guard(&ctx);
+
+  // ---- host 侧：两变体的 uncond 位 ----
+  std::uint32_t tag30 = 0, target30 = 0;
+  bool valid = false, uncond = false;
+  const std::uint64_t w_uncond =
+      Btb::pack_entry(0x8000010cu, 0x80000118u, /*is_unconditional=*/true);
+  Btb::unpack_entry(w_uncond, &tag30, &target30, &valid, &uncond);
+  REQUIRE(valid);
+  REQUIRE(uncond);                      // ★ host 侧：uncond=true
+  const std::uint64_t w_cond =
+      Btb::pack_entry(0x8000010cu, 0x80000118u, /*is_unconditional=*/false);
+  Btb::unpack_entry(w_cond, &tag30, &target30, &valid, &uncond);
+  REQUIRE(valid);
+  REQUIRE_FALSE(uncond);                // ★ host 侧：uncond=false
+
+  // ---- ch 侧：`jal` ⇒ 恒 taken（== host 的 uncond=true 语义）----
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto sim = make_sim(pb, {{1000u, /*taken=*/true, /*flushed=*/false,
+                            /*fetch_pc=*/0u, /*is_branch=*/false,
+                            /*is_jal=*/true}});
+  auto* fnode = pb.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode != nullptr);
+  const auto taken_cell = fnode->operator()(BP_PRED_TAKEN);
+  for (int i = 0; i < 4; ++i) REQUIRE_NOTHROW(sim->tick());
+  REQUIRE(read_u1(*sim, taken_cell) == 1u);   // == host uncond=true 的语义
+
+  // ---- ch 侧：条件分支（counter=0）⇒ not-taken（== host uncond=false 的语义）----
+  ch::core::context ctx2("bp_r14b");
+  ctx2.set_as_current_context();
+  ch::core::ctx_swap guard2(&ctx2);
+  cf::plugin::PipeBuilder pb2(&ctx2);
+  auto sim2 = make_sim(pb2, {{1000u, /*taken=*/true, /*flushed=*/false,
+                              /*fetch_pc=*/0u, /*is_branch=*/true,
+                              /*is_jal=*/false}});
+  auto* fnode2 = pb2.node_of_logic_stage("fetch").get();
+  REQUIRE(fnode2 != nullptr);
+  const auto taken_cell2 = fnode2->operator()(BP_PRED_TAKEN);
+  // ★ **1 拍**：末态的 counter = 1（< 2 ⇒ PHT 判 not-taken）⇒ 方向**不**来自 uncond
+  //   （★ 2 拍则 counter=2 ⇒ PHT 判 taken ⇒ 失去对照意义 ⇒ 采样点 MUST 是 1 拍）
+  REQUIRE_NOTHROW(sim2->tick());
+  REQUIRE(read_u1(*sim2, taken_cell2) == 0u);
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM

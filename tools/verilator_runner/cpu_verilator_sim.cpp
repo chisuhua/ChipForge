@@ -117,6 +117,10 @@ struct Options {
   //  - --btb-entries N: 逻辑条目数 M ∈ {16,32,64,128,256}（越界 fail-fast）
   bool enable_bp = true;
   std::uint32_t btb_entries = 256;
+  // chmem-bp-btb-gshare ② 主体增量 1: `jal`/`j` 建 BTB 项（恒 taken 预测）
+  //  - bp_uncond: 默认 true；--no-bp-uncond 关掉 ⇒ 用于「量收益」对比
+  //    （② 主体 Task 2h 的「逐档独立测量」）
+  bool bp_uncond = true;
 };
 
 bool parse_args(int argc, char** argv, Options& opts) {
@@ -145,6 +149,9 @@ bool parse_args(int argc, char** argv, Options& opts) {
       opts.stats_len = static_cast<std::uint32_t>(std::atoi(argv[++i]));
     } else if (a == "--no-bp") {
       opts.enable_bp = false;
+    } else if (a == "--no-bp-uncond") {
+      // ★ 增量 1 开关（② 主体 Task 2h）：关掉 `jal`/`j` 建项 ⇒ 回到增量 1 之前
+      opts.bp_uncond = false;
     } else if (a == "--btb-entries" && i + 1 < argc) {
       // ★ N2: `atoi` 容忍尾串（`16abc` ⇒ 静默取 16）⇒ MUST 校验完整解析
       const char* num = argv[++i];
@@ -170,6 +177,7 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::printf("  --stats-base <h> histogram window base (default 0x80000000)\n");
       std::printf("  --stats-len <n>  histogram slots of 4 bytes (default 256)\n");
       std::printf("  --no-bp          disable the branch predictor (default: enabled)\n");
+      std::printf("  --no-bp-uncond  disable jal/j BTB entries (increment-1 switch)\n");
       std::printf("  --btb-entries <n> BP logical entries N in {16,32,64,128,256}\n");
       std::printf("\n");
       std::printf("Note: --enable-cache requires L1Cache CH_MEM (see change\n");
@@ -195,7 +203,8 @@ bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf)
       opts.mmu_mode,
       opts.enable_cache,
       opts.enable_bp,
-      opts.btb_entries);
+      opts.btb_entries,
+      opts.bp_uncond);
   if (!pb) {
     std::fprintf(stderr, "build_cpu failed\n");
     return false;
@@ -269,7 +278,9 @@ int main(int argc, char** argv) {
   //   (否则「flag 未生效却测出无差异」的假绿通道是开着的)
   // ★ N4: 关态**不**回显 entries（否则易被脚本误读为「生效值」）
   if (opts.enable_bp) {
-    std::fprintf(stderr, "BP=on btb_entries=%u\n", opts.btb_entries);
+    // ★ 增量 1 的生效值也回显（★ 测量脚本据此断言 flag 确实生效）
+    std::fprintf(stderr, "BP=on btb_entries=%u bp_uncond=%s\n", opts.btb_entries,
+                 opts.bp_uncond ? "on" : "off");
   } else {
     std::fprintf(stderr, "BP=off\n");
   }

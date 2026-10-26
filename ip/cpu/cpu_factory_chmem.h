@@ -111,7 +111,12 @@ class CpuFactoryChmem {
       //    与 enable_mmu/enable_cache 的三态语义不同, 避免 nullopt 与「显式关闭」撞车
       //  - btb_entries: optional<uint32_t>（运行期逻辑条目数 M ∈ {16..256}）⇒ **需要**三态
       bool enable_bp = true,
-      std::optional<std::uint32_t> btb_entries = std::nullopt) {
+      std::optional<std::uint32_t> btb_entries = std::nullopt,
+      // chmem-bp-btb-gshare ② 主体增量 1: `jal`/`j` 建 BTB 项 + `is_unconditional` 位
+      //  - bp_uncond: **普通 bool**（默认 true）⇒ `jal`/`j` 建 BTB 项且**恒 taken** 预测
+      //    ⇒ **不占 PHT 表项**；false ⇒ 回到增量 1 之前的行为 ⇒ 用于**量收益**对比
+      //  ★ 与 enable_bp 同款：**elaboration 期定形**，非运行期信号
+      bool bp_uncond = true) {
     (void)memory;
 
     // Phase 6d P2 fail-fast: L1Cache CH_MEM 实装 owner 未分配 (wave4 P2 placeholder).
@@ -362,7 +367,8 @@ class CpuFactoryChmem {
     if (enable_bp) {
       const std::uint32_t entries = btb_entries.value_or(256u);
       pb->register_plugin(
-          std::make_unique<cf::cpu::plugins::BranchPredictorPluginChmem<T>>(entries));
+          std::make_unique<cf::cpu::plugins::BranchPredictorPluginChmem<T>>(
+              entries, bp_uncond));
     }
     pb->register_plugin(std::move(dmem));
 
@@ -481,8 +487,20 @@ class CpuFactoryChmem {
       T* memory = nullptr,
       T initial_pc = T{0x80000000},
       bool preload_elf = false,
-      const std::vector<uint8_t>& elf_image = {}) {
-    auto pb = build_cpu(ctx, memory, initial_pc, preload_elf, elf_image);
+      const std::vector<uint8_t>& elf_image = {},
+      // ★★ ② 主体须知 #9：**全部参数 MUST 转发** —— 现状此处**只转发 5 个**，
+      //   而 `build_cpu` 有 11 个 ⇒ `enable_mmu` / `mmu_mode` / `enable_cache` /
+      //   `enable_bp` / `btb_entries` / `bp_uncond` **全部被静默丢弃**
+      //   ⇒ ⇒ 「参数没生效」的假绿通道。★ **MUST NOT** 留作 known gap。
+      std::optional<bool> enable_mmu = std::nullopt,
+      std::optional<std::string> mmu_mode = std::nullopt,
+      std::optional<bool> enable_cache = std::nullopt,
+      bool enable_bp = true,
+      std::optional<std::uint32_t> btb_entries = std::nullopt,
+      bool bp_uncond = true) {
+    auto pb = build_cpu(ctx, memory, initial_pc, preload_elf, elf_image,
+                        enable_mmu, mmu_mode, enable_cache, enable_bp,
+                        btb_entries, bp_uncond);
     pb->elaborate(*ctx);
     pb->to_verilog(verilog_path);
     return pb;

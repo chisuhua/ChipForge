@@ -168,8 +168,15 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
   static constexpr std::uint32_t kTargetShift = 34;
   static constexpr std::uint64_t kMask30 = 0x3FFFFFFFull;
 
-  explicit BranchPredictorPluginChmem(std::uint32_t logical_entries = kBtbEntries)
-      : logical_entries_(logical_entries) {
+  /// ★ `enable_uncond`（★ ② 主体**增量 1** 开关，默认 true）：
+  ///   true  ⇒ `jal`/`j` **建 BTB 项**且表项带 `is_unconditional=1` ⇒ 恒 taken 预测
+  ///           （⇒ 不占 PHT 表项）；
+  ///   false ⇒ 回到增量 1 之前的行为（**只有条件分支建项**）⇒ 用于**量收益**对比。
+  /// ★ 是 **C++ 编译期常量**（elaboration 期定形 DAG）⇒ **不是**运行期信号 ⇒
+  ///   ★ 不涉及 ADR-040 §10.5 的「活节点」纪律（那是针对**信号**的）。
+  explicit BranchPredictorPluginChmem(std::uint32_t logical_entries = kBtbEntries,
+                                      bool enable_uncond = true)
+      : logical_entries_(logical_entries), enable_uncond_(enable_uncond) {
     // ★ SF1 修正: 合法域是**精确集合** {16,32,64,128,256} —— 不是区间。
     //   原检查只挡 `<16` / `>256` ⇒ `logical_entries=17` 静默通过 ⇒
     //   索引 mask = `&17` ⇒ index ∈ {0,16} ⇒ **静默半坏**。
@@ -230,6 +237,8 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
 
  private:
   std::uint32_t logical_entries_;
+  /// ★ 增量 1 开关（见 ctor 的说明）
+  bool enable_uncond_ = true;
 
   // ── 表载体 ────────────────────────────────────────────────────────────
   using BtbMem = ch::core::ch_mem<ch::core::ch_uint<64>, kBtbEntries>;
@@ -355,6 +364,7 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
     require_payload("BRANCH_TAKEN_RAW", brn->payloads().has(BrPlugin::BRANCH_TAKEN_RAW));
     require_payload("BRANCH_FLUSHED", brn->payloads().has(BrPlugin::BRANCH_FLUSHED));
     require_payload("IS_BRANCH", brn->payloads().has(BrPlugin::IS_BRANCH));
+    require_payload("IS_JAL", brn->payloads().has(BrPlugin::IS_JAL));
     require_payload("BRANCH_TARGET", brn->payloads().has(RvKey::BRANCH_TARGET));
 
     const ch::core::ch_bool taken =
@@ -366,6 +376,9 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
         ch::core::ch_bool(brn->operator()(BrPlugin::BRANCH_FLUSHED));
     const ch::core::ch_bool is_branch =
         ch::core::ch_bool(brn->operator()(BrPlugin::IS_BRANCH));
+    // ★ 增量 1: 「本条指令是 `jal`/`j`」（★ **不含** `jalr`/`ret` ⇒ AC-14）
+    const ch::core::ch_bool is_jal =
+        ch::core::ch_bool(brn->operator()(BrPlugin::IS_JAL));
     const ch::core::ch_uint<32> br_target =
         ch::core::ch_uint<32>(brn->operator()(RvKey::BRANCH_TARGET));
 
@@ -386,12 +399,18 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
       if (!btb_wp_) {
         btb_wp_ = std::make_shared<std::optional<typename BtbMem::write_port>>();
       }
-      // ★ 「无条件跳转」= taken 但**不是**条件分支 (is_branch=false) ⇒ jal/jalr
-      //   ★ 但 jalr 不建项 ⇒ 需区分 jal 与 jalr —— 用 opcode 不可得（branch 节点
-      //   未导出）⇒ 保守：**只有 is_branch（条件分支）建项**；jal 的方向问题
-      //   留给主体 change（它需要 jal/jalr 的 opcode 区分）
+      // ★★ **增量 1（② 主体）**：`jal`/`j` **建项**（目标静态 ⇒ 不会陈旧）
+      //   ⇒ 写使能 = `taken & !flushed & (is_branch | is_jal)`
+      //   ★ `jalr`/`ret` 仍**不建项**（AC-14：目标随运行时变化 ⇒ 静态项必错
+      //     ⇒ 需 RAS ⇒ 增量 2 ⇒ 见 ② 主体 Task 2g）
+      // ★ `enable_uncond_ == false` ⇒ 回到增量 1 之前（**只有条件分支建项**）
+      //   ⇒ 用于「量收益」对比（② 主体 Task 2h）。
+      ch::core::ch_bool jal_en(false);
+      if (enable_uncond_) {
+        jal_en = ch::core::ch_bool(is_jal);
+      }
       // ★ B7: **错路指令 MUST NOT 写 BTB**（否则把错路 target 写进表项）
-      const ch::core::ch_bool write_en = taken & is_branch & (!flushed);
+      const ch::core::ch_bool write_en = taken & (!flushed) & (is_branch | jal_en);
       ch::core::ch_uint<64> wdata(ch::core::ch_literal<0, 64>{});
       // ★ 打包必须是**活**表达式 (tag 来自 br_pc, target 来自 br_target)
       //   ⇒ 全部用 ch 表达式拼装, **MUST NOT** 转 C++ 标量 (会折成常量)
@@ -414,7 +433,15 @@ class BranchPredictorPluginChmem : public cf::plugin::PluginBase {
       const ch::core::ch_uint<64> valid_at = ch::core::shl<64>(
           ch::core::ch_uint<64>(ch::core::ch_literal<1, 64>{}),
           ch::core::ch_uint<64>(ch::core::ch_literal<kValidBit, 64>{}));
-      ch::core::ch_uint<64> packed_w(tgt_shifted | pc_shifted | valid_at);
+      // ★★ **增量 1**：BTB 表项的 **`is_unconditional` 位**（bit[3]）
+      //   ★ 现状（PoC）**未写该位** ⇒ 读侧 `uncond_bit` 恒 0 ⇒ `jal` 永不被预测
+      //     ⇒ ★ 与 host 侧 `pack_entry`（**写了**该位）**语义漂移**（缺口 #5）
+      //   ★ 值必须是**活**表达式 ⇒ `ch_uint<1>(jal_en)` 复用 `jal_en` 的 impl 指针
+      //     （★ MUST NOT `static_cast<bool>` ⇒ 会折成 elaboration 期常量）
+      const ch::core::ch_uint<64> uncond_at = ch::core::shl<64>(
+          ch::core::ch_uint<64>(ch::core::ch_uint<1>(jal_en)),
+          ch::core::ch_uint<64>(ch::core::ch_literal<kUncondBit, 64>{}));
+      ch::core::ch_uint<64> packed_w(tgt_shifted | pc_shifted | valid_at | uncond_at);
       wdata = packed_w;
       *btb_wp_ = btb.write(idx, wdata, write_en, "btb_write");
     }
