@@ -252,7 +252,7 @@ U-mode (user) ← Application 运行
 | 能力 | 来源 | 关联 PoC |
 |------|------|---------|
 | RV32A atomic（LR/SC + AMO* 6 类）| — | PoC-5 |
-| BTB 4K-entry + GShare 13-bit + RAS 8-entry | — | PoC-6 |
+| BTB 4K-entry + GShare（★ **2026-10-26 更正：历史文档写「13-bit」与代码不符 ⇒ 以代码为准** —— TLM 参考 `branch_predictor.h` = `GHR_BITS=8` / `GSHARE_SZ=16`，索引 `(pc ^ ghr) & (kGshareSize-1)` ⇒ **mask 在 XOR 之后 ⇒ 有效历史 = 4 bit**）+ RAS 8-entry | — | PoC-6 |
 | PLIC + CLINT 中断控制 | — | PoC-7 |
 | FreeRTOS demo 10M cycle 稳定 | — | PoC-7 |
 | **HARD 门禁**: FPGA CoreMark/MHz 与 VexiiRiscv single-issue 偏差 ≤10%（v1.0.0 阶段 FPGA 板级基础即满足 PoC-14，完整 Linux 板级推迟 v1.3.0）| 2026-09-29 新增 | **PoC-14** |
@@ -359,7 +359,8 @@ FMAX ≥ 100 MHz
 | **指令集** | RV32I（5 指令）| RV32I + rv32um | + RV32I ≥85% | RV32IMAC + RV32C | + rv32um 8/8（真 radix-2 M 扩展）| + RV32A | 同 v1.0.0 | + RV32F (soft-float) |
 | **Privilege** | M-only | M-only | M-only | M-only | 同 v0.10.0 | M+S+U | 同 v1.0.0 | 同 v1.2.0 |
 | **CSR** | 无 | 无 | mstatus/mtvec/mepc/mcause/mtval | + mcycle/minstret/Zicsr | 同 v0.10.0 | + sstatus/sepc/scause/stvec | + pmpcfg/pmpaddr | 同 v1.2.0 |
-| 分支预测 | B-type 6-op | 同 Phase 6d | + flush ROB recovery | Static | BTB 4K-entry（基础，PoC-6 CoreMark ≥1.9 解锁 DMIPS）| + GShare 13-bit + RAS 8-entry（完整）| 同 v1.0.0 | 同 v1.0.0 |
+| 分支预测 | B-type 6-op | 同 Phase 6d | + flush ROB recovery | Static | BTB 4K-entry（基础，PoC-6 CoreMark ≥1.9 解锁 DMIPS）| + GShare（★ **2026-10-26 更正：历史文档写「13-bit」与代码不符 ⇒ 以代码为准** —— `GHR_BITS=8` / `GSHARE_SZ=16`，索引 mask 在 XOR 之后 ⇒ **有效历史 4 bit**；CH_MEM 侧口径见 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §7 D10）+ RAS 8-entry（完整）| 同 v1.0.0 | 同 v1.0.0 |
+| ★ **一致性证据（parity）** | — | — | — | — | — | ★ **双后端差分门禁**（ADR-089：同一模型 × CppHDL Simulator / Verilator 差分执行）—— ★ **MUST 先于 B3（TLM 模式删除）** | 同 v1.0.0 | 同 v1.0.0 |
 | **Cache** | L1Cache 256×1 | 同 Phase 6d | 4-way LRU | L1D 4-way (LRU) + ICache (PoC-3, ADR-072) | 同 v0.10.0 | 同 v0.10.0 | 4-way RRIP | 同 v1.2.0 |
 | **MMU** | sv32 PTW FSM (5 状态) | PADDR-first 真消费 | + JSON 配置驱动 | sv32 (v0.9.0 沉淀) | CH_MEM 真 sv32（mmu-chmem Phase A-E）| + S-mode satp | 同 v1.0.0 | 同 v1.0.0 |
 | **Cycle 精度** | CppHDL sim + Verilator | + cycle counter | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 |
