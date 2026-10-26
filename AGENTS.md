@@ -2,6 +2,7 @@
 
 | id | status | phase_refs | theme |
 |---|---|---|---|
+| `feat-backend-parity-gate` | proposed | phase-4, phase-5 | 双后端差分 parity 门禁 —— 同一模型（CH_MEM）× 两后端（CppHDL Simulator / Verilator）差分执行 |
 | `feat-bp-btb-gshare` | active | phase-4, phase-5 | 分支预测 BTB + GShare + RAS (PoC-6 CoreMark ≥1.9) — defer → v1.0.0 (2026-10-19 决策) |
 | `feat-dhrystone-dmips-gate` | done | phase-4 | Dhrystone DMIPS/MHz ≥1.4 硬门禁 (mfc Phase G) — ✅ archived 2026-10-15 |
 | `feat-mfc-multi-cycle-fsm` | active | phase-2, phase-4 | MUL/DIV FSM 化 + ADR-082 negotiate 集成 |
