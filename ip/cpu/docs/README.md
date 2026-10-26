@@ -4,6 +4,7 @@
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
+| [bp-btb-gshare-design-brief.md](bp-btb-gshare-design-brief.md) | **CH_MEM 分支预测（BTB + Bimodal PHT + GShare）架构方案简报 (SSOT)** — 三档增量的范围/机制/时序契约/五级 mux 嵌套/AC 判据 + **2026-10-26 裁决 D8~D11**（判据 `cycles ≤ 813074`、GShare 索引口径、增量自身 fail-closed） | 🏁 **v2.3 (2026-10-26)**（★ 2026-10-26 由 `docs/architecture/` 迁入本目录） |
 | [rv64_readiness_gap.md](rv64_readiness_gap.md) | **RV64 就绪度缺口表 (SSOT)** — 4 层缺口（声明/骨架/ISA 语义/CH_MEM）+ 全部 file:line 证据 + RV64 实施准入清单 G1–G9 | 🟡 Active (ADR-087 配套) |
 | [multi_isa_architecture.md](multi_isa_architecture.md) | 多 ISA 架构设计：三层分离（core/arch/tlm+rtl）、ExecContext 接口、Plugin 分类体系 | **Active** |
 | [dse_architecture.md](dse_architecture.md) | **DSE 实现方案 (v1.0, 2026-06-17)** — 流水线深度/分支预测/MUL 延迟/ISA 扩展等可探索维度的完整代码改动路径, 含实证校核 (哪些是真 stub / 哪些是文档超前) | 🟡 Accepted (待实施 M4-DSE / M5-DSE) |
