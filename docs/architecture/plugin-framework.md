@@ -461,6 +461,8 @@ ctrl.halt_when([&] { return node.is_blocked(); })
 
 **设计意图**：为 Bundle 字段提供"位宽"概念。在 TLM 模式下，行为与标准整数类型完全一致；在未来的 RTL 模式（Phase 6）下，可由 `BundleMapper` 替换为 `ch_uint<N>`，但调用方代码不变。
 
+> ★★ **目标态提示（ADR-088 v1.4 §10 + ADR-089，2026-10-26 裁决）**：本节描述的 **TLM / CH_MEM 双模**是**过渡形态**。★ 目标态 = **单模**（`uint_t<N>` 恒等于 `ch::core::ch_uint<N>`，编译期模态开关消失）+ **双后端**（CppHDL Simulator / Verilator）⇒ ★ **TLM 模式的删除时点 = ADR-088 §5.2 的 B3**（硬前置：① 双后端差分 parity 门禁已绿（ADR-089）② CI 具备 build 能力 ③ TLM 参考实现语义已抽成规格 ④ 覆盖平价台账已冻结为 CH_MEM 覆盖边界规格）⇒ ★ 在此之前，**TLM 模式仍是唯一的亚秒级回归环**（432 case ≈ 0.6s；CH_MEM Simulator vendored 47 ≈ 1594s）⇒ ★ **MUST NOT** 在 B3 之前删除本节的 TLM 分支。
+
 借鉴：
 - **VexRiscv `Stageable[T]`** + 泛型位宽模式。
 - **CppHDL `ch_state_machine`** 内部位宽切换。
