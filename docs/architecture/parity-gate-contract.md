@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.2（2026-10-26，builder；v1.2 = A2a inc-2 的初始状态/相位实测更正 + O-1/O-2 闭合）**
+> **Status**: ✅ **v1.3（2026-10-26，builder；v1.3 = A2a inc-3 的 ③ memsig 落定 + 两例变异对照 + 5/5 corpus 全观测量对齐）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -54,6 +54,8 @@
 | S2-12 | 跨阶段 payload key 命名：`cpu.pc` / `cpu.mem_addr` / `cpu.mem_data` / `cpu.mem_size` / `cpu.rd_data` / `cpu.rd_idx` … | `ip/cpu/core/payload_common.h:118-170` |
 | ★ S2-13 | **实测吞吐 ≈ 9.1 拍/s**（`rv32ui-p-add`：478 拍 / **52.8 s** / DAG **2485** 节点）⇒ `--no-bp` 与默认 BP 无显著差异（200 拍：21 s vs 24 s）⇒ 瓶颈是解释器本身 | A2a increment 1 实测（`tools/parity_runner`） |
 | ★ S2-14 | ★ **ADR-089 早前引用的「575 拍/s」高估约 60×** ⇒ 一切「按拍数估时长」的预算 MUST 以本行为准 | 同上 |
+| ★ S2-15 | ★ **`ch_reg` 继承自 `ch_uint`** ⇒ 直接写 `reg * X` 会走 **ch_uint 的编译期值**路径（恒 0）⇒ 表达式退化成常量 ⇒ 该 reg 被 codegen 裁掉（网表里根本没有它）⇒ ★ **读 reg 必须显式取值** `ch_uint<N> v(reg);`（同 `ibus_chmem.h` 的 `flush_count` 写法） | `CppHDL/include/core/reg.h:32-60`、`lnode/reg.tpp` |
+| ★ S2-16 | ★ **codegen 只发射 eval list 里的节点**（`verilogwriter` 用 `ctx_->get_eval_list()`）⇒ 「DAG 里有」≠「网表里有」⇒ 排查用 `parity_sim_runner --dump-nodes <substr>`（打印节点 + 是否在 eval list） | `CppHDL/src/codegen_verilog.cpp:65-82` |
 
 ### 2.2 Verilator 侧
 
@@ -165,16 +167,35 @@
 
 **要求**
 - ★ **MUST 是 DUT 内自算**，**MUST NOT** 依赖 host 全内存 dump（Simulator 侧无此通道，S2-5）。
-- 落法（首选，= `ADR-089` D2 ③ 的"DUT 自算签名"）：在 CH_MEM 侧新增**只读探针**（观测内存写通道的 `addr` / `data` / 写使能），每次**对内存的写操作恰好计入一次**，滚动更新一个 32/64-bit 寄存器，导出为 named reg `mem_sig`；同拍再导出一个计数器 `mem_sig_updates`。
-- ★ 两侧读的是**同一 DAG 的两个 named reg** ⇒ 天然可比（不需要任何 host 侧内存镜像）。
-- **自校验（fail-closed）**：若 `mem_sig_updates == 0` 而 DUT 实际发生过写（由 `tohost` 写入或 dmem 侧计数交叉验证）⇒ `ERROR`（防止"签名恒 0 全绿"的假绿）。
-- `memsig` 的滚动 hash 函数 MUST 在契约/实现里固定（建议 `h = h*1099511628211 ^ (addr*31 + data)`，A2a 定稿后回写本节）。
-- 备选（增强项，不在本期）：guest 侧校验和（需改 ELF harness ⇒ `ADR-089` D2 已登记为"待上游/增强"）。
+- **落法（已实装）**：`ip/cpu/plugins/dmem_chmem.h` 在**写路径旁**挂一个只读累加器（复用该处已有的
+  `word_addr` / `store_wdata` / `is_store_active`，**不新增 payload**），导出两个 named reg：
+  - `mem_sig`（32-bit 滚动签名）· `mem_sig_updates`（32-bit 写次数）
+  - ★ 两侧读的是**同一 DAG 的两个 named reg** ⇒ 天然可比（无需任何 host 镜像）
+  - ★ 生成的 Verilog 里对应 `logic [31:0] mem_sig;` + `assign _mem_sig = mem_sig;`
+    ⇒ host 经 `--public-flat-rw` 读 `top__DOT__mem_sig` / `top__DOT__mem_sig_updates`
+- **签名函数（MUST 固定，A2a 定稿）**（32-bit 模运算）：
+  ```
+  mix    = word_addr * 31 + store_wdata + sig_updates * 0x9E3779B1
+  sig'   = sig * 16777619 ^ mix          （sig' 仅在 is_store_active 时生效）
+  ```
+  ★ `word_addr` 是**字**地址；`store_wdata` 是 **sub-word RMW 之后的最终字面值**；
+  ★ 计入 `sig_updates`（写次数）是为区分「同一 (addr,data) 但发生在不同时刻」。
+  ★ 条件与 `mem.write()` 的写使能**同源**（`is_store_active`）⇒ 被 flush 掉的 store 不计（它本就没进内存）。
+- **自校验（fail-closed，MUST）**：若「`tohost` 已被写过（≠0）但 `mem_sig_updates == 0`」
+  ⇒ 签名是**假绿** ⇒ 门禁 MUST 判 **ERROR(2)**，**MUST NOT** 接受「两边都是 0」。
+  ★ 两侧都 MUST 实现该自校验（Simulator runner + Verilator parity 入口）。
+- 备选（增强项，不在本期）：guest 侧校验和（需改 ELF harness ⇒ 成本高）。
 
-**验收方式**：变异对照（改 1 字节 store 数据 ⇒ `memsig` MUST 变；删除写 ⇒ `mem_sig_updates` MUST 变）；机检（`mem_sig_updates` 与 dmem 侧写次数对账）。
+**验收方式**
+- 变异对照 ①：把 `mix` 里的 `store_wdata` 取反 ⇒ `memsig` MUST 变
+  （实测 `a55f52c5` → `8fcc53ba` ⇒ 签名对写数据**敏感**）
+- 变异对照 ②：把 `sig_upd` 强制恒 0 ⇒ 两侧 MUST 判 **ERROR(2)** 并打印
+  `mem_sig_updates == 0 ... false green`（实测两侧 rc=2 且消息一致）
+- 机检：同 ELF 两侧 `memsig` / `memsig_updates` 相等
+- ★ **零 cycle 影响**：加探针前后同 ELF 的 `cycles` MUST 不变
+  （实测 `rv32ui-p-add` 478 / `rv32um-p-mul` 472 / `rv32ui-p-simple` 38 全部不变）
+
 **归属**：A2a。
-
----
 
 ### S-7 观测量 ④ `cycles`（总拍数，标量）
 
@@ -395,7 +416,7 @@ branchbench_m0	branchbench	build/branchbench_m0.elf
   "per_case": [
     {
       "name": "rv32ui-p-add",
-      "observations": { "tohost": 1, "regs": "…", "memsig": "…", "cycles": 455, "pchash": "…" },
+      "observations": { "tohost": 1, "regs": "…", "memsig": "…", "memsig_updates": 1, "cycles": 455, "pchash": "…" },
       "first_divergence": { "metric": "cycles", "cycle_index": 0, "sim_value": 455, "vl_value": 456 },
       "verdict": "FAIL"
     }
