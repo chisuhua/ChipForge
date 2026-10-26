@@ -1,7 +1,7 @@
 {
   "schema_version": "role-v1",
-  "current_role": "planner",
-  "updated_at": "2026-10-25T22:53:48Z",
+  "current_role": "builder",
+  "updated_at": "2026-10-26T02:58:28Z",
   "updated_by": "user",
   "session_id": "ses_ebd10896effeIBebOAJUcXVV3E",
   "history": [
@@ -107,6 +107,12 @@
       "at": "2026-10-25T22:53:48Z",
       "by": "user",
       "trigger": "用户指令『切planner角色并列出后续任务还有哪些』"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-26T02:58:28Z",
+      "by": "user",
+      "trigger": "用户选择『切 builder：先同步 plan + 归档两个前置，再开 ② 主体』（planner 侧已交付：v2.3/v2.3.1 规格 + metis gap 落盘 + 裁决包）"
     }
   ]
 }
