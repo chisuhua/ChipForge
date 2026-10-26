@@ -50,6 +50,29 @@ theme: TLM 后端退役 — CH_MEM 单后端收敛 (B0 冻结 → B1 承载力 �
 | **B2 语义裁决**（phase-5） | ADR-088 §语义裁决表 5 子系统逐条表态；M 扩展 cycle 裁决明确；DMIPS 判据改绑 Verilator 后端 |
 | **B3 删除**（phase-5） | CppTLM 链接归零；TLM-only 业务文件归零；全量 ctest 4 entries PASS + 5 架构门禁 PASS；`run_chipforge_tests.sh` 默认入口改指 CH_MEM |
 
+### 2.1 ★ B1 的 BP 子项：**机制已成立，收益尚不足以恢复绝对值门禁**（2026-10-26 实测）
+
+> **数据源**：前置2 PoC（`chmem-bp-btb-gshare-poc`，2026-10-26 收口）+ Dhrystone 真实负载对照（CH_MEM/Verilator 后端）。
+
+| 指标 | BP=off | BP=on | Δ |
+|---|---|---|---|
+| Dhrystone cycles | 914544 | **846500** | **−68044（−7.4%）** |
+| Dhrystone FLUSH_COUNT | 120065 | 52021 | **−68044** |
+| Dhrystone DMIPS/MHz | 1.24467 | **1.34472** | **+8.0%** |
+| branchbench 4 档 Δcycles | — | — | **1996 / 3994 / 1747 / 2019**（4 档全改善，校验和**逐位不变**） |
+
+⇒ ★★ **两条对 objective 直接生效的结论**：
+
+1. **★ ADR-088 §5.3.1 的根因（「CH_MEM 无 BP ⇒ 每条 taken 分支都要 flush」）被直接实测坐实**：
+   `FLUSH(off) = 120065` ≈ TLM–CH_MEM 的 cycle 差距 `120066`（`914544 − 794478`）⇒ **差距几乎全部是 taken 分支的 flush 气泡**
+   ⇒ 且 **完美预测的理论上限 = `914544 − 120065 = 794479` ≈ TLM 的 `794478`（差 1 拍）** ⇒ ★ **「CH_MEM 追平 TLM」在数学上可达**
+   ⇒ 且 **ΔFLUSH 与 Δcycles 逐位相等**（68044）⇒ 每个被消除的 taken 气泡**恰 1 拍**（在真实负载上同样成立）。
+2. ★★ **绝对值门禁（DMIPS ≥ 1.4）仍差 33426 拍（3.95%）**：达 1.4 需 cycles ≤ `2000e6/(1757×1.4)` = **813074**
+   ⇒ 需闭合 TLM–CH_MEM 差距的 **84.51%**（`101470/120066`）⇒ 当前闭合 **56.7%**（`68044/120065`）
+   ⇒ ⇒ ★ **B1 的 BP 子项尚未解锁 P-6**（绝对值门禁）⇒ ⇒ **后续必须靠「覆盖面 + 方向精度」而非「有没有 BP」**
+   ⇒ ⇒ **三档增量**（`is_unconditional`+`jal` / RAS / GShare）见 `feat-bp-btb-gshare` 的 phase-5 段与
+   `openspec/changes/chmem-bp-btb-gshare` 的 **Task 7 / AC-27**（★ **A5 决策**：先扩覆盖并量收益，再定 GShare）。
+
 ## 3. 架构依据
 
 - **ADR-083**：CppTLM 是 legacy 仿真内核，「业务 IP 不使用 ch_stream / Module / Port / ModuleFactory」—— 本 objective 是其定性结论的**执行计划**（B0 阶段出 v1.1 修订补冻结条款 + 退役时间线）
@@ -121,3 +144,4 @@ theme: TLM 后端退役 — CH_MEM 单后端收敛 (B0 冻结 → B1 承载力 �
 | 日期 | 事件 |
 |------|------|
 | 2026-10-23 | 立项。architect 阶段 RV64 符合性审查确认「实现 = RV32IM + Zicsr，声明层宣称 RV64GC」→ ADR-087 Proposed；Oracle 架构咨询定性为「架构收敛，非清理」→ 定 4 阶段 B0/B1/B2/B3；用户明示「路线图只要 CH_MEM 版本，移除不能生成 Verilog 的老版本」 |
+| 2026-10-26 | **B1 的 BP 子项收口**：前置2 PoC（`chmem-bp-btb-gshare-poc`）机制判定 = **成立**（Δcycles 4 档全改善 + 校验和逐位不变 + ΔFLUSH≡Δcycles）⇒ ★ **Dhrystone 真实负载**：cycles 914544→846500（−7.4%）、DMIPS 1.24467→1.34472（+8.0%）⇒ ★ **但绝对值门禁（1.4）未恢复**（需闭合 84.56%，当前 56.7%）⇒ ★ 缺口从「有没有 BP」转为「覆盖面 + 方向精度」⇒ **三档增量**（`is_unconditional`+`jal` / RAS / GShare）按实测收益排序（**A5 决策**）⇒ ★ ADR-088 §5.3.1 根因被直接实测坐实（`FLUSH(off)=120065` ≈ TLM 差距 `120066`；完美预测上限 ≈ TLM 逐位）|

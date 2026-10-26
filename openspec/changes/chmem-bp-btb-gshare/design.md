@@ -5,6 +5,86 @@
 
 ---
 
+## 0. ★★★ v2.3 覆盖声明（2026-10-26，**优先级高于本文件以下全部内容**）
+
+> **来源**：前置2 PoC（`chmem-bp-btb-gshare-poc`）的实施期实测 ⇒ **5 处机制规格缺陷** + **1 处范围决策**。
+> **依据**：PoC 的 15 个单点变异对照（14 RED）+ 12 case / 143 assertions 单元锚 + Dhrystone 真实负载对照。
+> ★ **本节每条都给了「实施侧已取的一侧」**（PoC 已落地并逐位验证）⇒ 实施者**照此实现**；
+> ★ 但 ★ **规格裁决权归 architect**（A1 / A3 / A4 / A5 / A6，见 `chmem-bp-btb-gshare-poc/tasks.md` 的裁决表）
+> ⇒ ★ **本 change 的 `tasks.md` / `design.md` 已按本节同步**（不再重复旧表述）。
+
+### 0.1 五级链的 `bp_predict` 项 MUST 取 **`bp_next`**（★ 不是裸 `pred_target`）
+
+```
+bp_next = select( pred_valid & pred_taken, pred_target, pc + 4 )   ← 「当前取指指令 pc_reg(N) 的投机」
+next_pc = select( trap_redirect,        trap_target,     ← 最高（protocol rev.14）
+              select( branch_actual,     actual_target,   ← 分支实际结果（含误预测纠错）
+                select( freeze_hold,     hold_pc,
+                  select( bp_predict,    bp_next,         ← ★ v2.3：由 pred_target 改为 bp_next
+                           pc + 4 ) ) ) )
+```
+
+★ **为什么**（PoC B-1，功能正确性）：若 `bp_predict` 项取**裸 `pred_target`**，则「抑制当前分支自身 redirect」
+与「保留**下一条指令**的投机」无法同时表达 ⇒ 场景：**分支 B1（预测 taken→P、实际 taken→P ⇒ 情形 C），
+而 P 处本身又是一条被正确预测 taken 的分支 B2（预测→Q）** ⇒ 裸 `pred_target` 会让 PC 落到 P+4
+⇒ **Q 永不被取**（走错路）⇒ 且情形 C 使 `spec_ok=1` ⇒ **错路指令不被 flush** ⇒ **store/写回副作用泄漏**
+⇒ 校验和发散。★ 该场景在 branchbench 4 档与 vendored ELF 47 个上**结构性不可达** ⇒ 端到端抓不住
+⇒ 由 PoC 单元锚 R8 锁定。
+
+### 0.2 情形清单 MUST 含 **情形 F**（★ 简报未列的规格缺口）
+
+★ **情形 F = 预测 taken 到 P / 实际 taken 到 T（P ≠ T）**（陈旧 BTB 项、`jalr` 建项、动态目标分支）
+⇒ **投机目标 P 本身是错路**（不是 fall-through）⇒ MUST 纠到实际目标 T 且 **MUST flush**
+⇒ 实现上**不需要独立选择臂**：`case_c` 因「目标不一致」恒 false ⇒ 自然落到 `actual_taken` 臂 + `spec_ok=0` ⇒ flush 生效。
+
+### 0.3 一切情形判定 MUST 排除「**被解析指令本身在错路上**」（★ PoC B-2）
+
+★ `BRANCH_TAKEN` 是**被 flush 掩码后**的值（`branch_chmem.h`：`taken = taken & !flush`）
+⇒ **错路指令**的 taken 恒读作 0 ⇒ `case_a = pv & pt & !br_taken` 里的 `!br_taken` **恒真**
+⇒ `case_a` 在错路指令上**误触发** ⇒ ① PC 跳到错路的 fall-through（PC 出轨）② `mispredict_A_buf` 置位
+⇒ **过度 flush** ⇒ 抑制**正确路径**的指令 ⇒ **双向副作用泄漏**。
+⇒ ★ 修法：`case_a = (!flushed) & pv & pt & (!br_taken)`（`flushed` = branch plugin 的 `BRANCH_FLUSHED`）
+⇒ ★ `case_b` / `case_c` 要求 `br_taken=1` ⇒ 掩码后恒 0 ⇒ **自动安全**。
+⇒ ★ `BRANCH_FLUSHED` 缺失 MUST **fail-fast**（抛异常），MUST NOT 静默降级为 false。
+
+### 0.4 FLUSH 判据是**门控**，不是「替换分量」（★ §1.2 表格末行的旧表述作废）
+
+```
+flush = hold_z | (taken_buf & !spec_ok_buf) | mispredict_A_buf
+```
+
+★ 「`br_taken_buf` 分量**替换**为 `mispredict_buf` 分量」**是错的** ⇒ 那会让「未投机而实际跳转」
+（BTB miss / 情形 B / `jalr`）的 fall-through **副作用泄漏** ⇒ 校验和不等。
+⇒ ★ 门控式判据在 **BP 关闭时** ≡ `taken_buf` ⇒ **零退化**（逐位相同）。
+
+★ **`spec_ok_buf` 的定义 = 「投机被证明正确」（情形 C）**，而不是「投机臂确实生效」（= `pv & pt`）：
+★ 后者在**情形 F** 下也为真 ⇒ 会让 F 的错路**不被抑制** ⇒ 泄漏。
+⇒ ★ 该定义与 `docs/architecture/bp-btb-gshare-design-brief.md` §3.4.2 / AC-6 的字面表述**不一致**
+⇒ ★ **裁决 A1（architect）**；★ 实施侧已取 `case_c` 这一侧（更保守 ⇒ 只可能多 flush ⇒ 不可能假绿）。
+
+### 0.5 范围修订（★ **A5 决策：2026-10-26，用户裁定**）
+
+★ **决策**：**先扩 `is_unconditional` + `jal`/`jalr` 覆盖并量收益，再定 GShare** ⇒ 本 change 拆成
+**三个可独立开关、可独立测量的增量**（见 `tasks.md` 的 **Task 7**）：
+
+| 增量 | 内容 | 参考实现 | 本期定位 |
+|---|---|---|---|
+| **增量 1** | BTB 增 `is_unconditional` 位 + `jal`/`j` **建项**（恒 taken 预测 ⇒ **不占 PHT**） | ★ TLM 参考**无**该位 ⇒ **新增设计** | ★ **本期做**（AC-17 已在规格内） |
+| **增量 2** | **RAS** 8-entry（`jalr` → `ret` 模式预测）⇒ 才谈得上 `jalr` 覆盖 | ★ TLM 参考**无** RAS ⇒ **新增设计** | ⏳ **先量增量 1 的收益再定** |
+| **增量 3** | **GShare**（GHR XOR 索引 PHT） | ★ TLM 参考**有**（`branch_predictor.h` 的 `gshare_predict` / `gshare_update` / `global_history_`，`GHR_BITS=8`）⇒ **移植**（★ **不是新设计** ⇒ 成本远低于先前假设） | ⏳ **先量增量 1(+2) 的收益再定** |
+
+★ **决策规则（可判定）**：若「增量 1（+2）」在 Dhrystone 上的**净收益率 ≥ 84.5%** ⇒ 绝对值门禁可恢复
+⇒ GShare/RAS 可延后；**否则** ⇒ MUST 把 GShare 拉回本期（AC-1 范围放开）。
+★ 净收益率的**分母口径**归 **A6**（裁决项）⇒ ★ 实测数据见 `tasks.md` 的 Task 7。
+
+### 0.6 场景维度**尚未完备**（★ MUST NOT 声称「场景覆盖完备」）
+
+★ 情形 A~F 是**单指令分类** ⇒ **不含**两个已证实会造成功能缺口的维：
+① 「被解析指令本身在错路上」（0.3）② 「分支的 target 本身又是一条分支」（0.1）。
+⇒ ★ 本 change MUST 把**链式投机**与**错路指令**列为**必测场景**（端到端负载结构性不可达 ⇒ 只能靠单元锚）。
+
+---
+
 ## 1. 取址决策的五级嵌套（★ 契约）
 
 ### 1.1 为什么由本 change 给规格
@@ -28,7 +108,7 @@ next_pc = select( trap_redirect,        trap_target,     ← 最高（protocol r
 |----|------|------|
 | BP 预测项的位置 | ★ **在 `freeze` 之下、`seq` 之上** | ① `freeze`（PTW stall）期间 PC 必须**保持**；若 BP 预测项在 freeze 之上 ⇒ 预测会在 walk 期间把 PC 推走 ⇒ 恢复路径要多记一份 pre-hold PC ⇒ 复杂度 > 收益 ② 不违反 protocol rev.14 已 APPROVE 的不变量 |
 | mispredict 纠错的位置 | 与 `branch_actual` **同层**（mispredict 优先于 actual） | 纠错目标 `pc_lag+4` vs actual target ⇒ 纠错更具体 ⇒ 优先 |
-| **FLUSH 的双分量** | ★ 「`br_taken_buf` 分量**替换**为 `mispredict_buf` 分量，**`hold_z` 分量保留**」 | protocol §2.2 定 `FLUSH = br_taken_buf \| hold_z` ⇒ 若整体替换则与 PTW stall 语义相撞 |
+| ~~**FLUSH 的双分量**~~ | ★★ **作废（v2.3 §0.4）** —— 「替换分量」是**错的**（⇒ fall-through 副作用泄漏）⇒ ★ 正确形态 = **门控**：`flush = hold_z \| (taken_buf & !spec_ok_buf) \| mispredict_A_buf` | ★ BP 关闭时 ≡ `taken_buf` ⇒ **零退化**（逐位相同） |
 
 ### 1.3 合入顺序约束
 
@@ -38,7 +118,7 @@ next_pc = select( trap_redirect,        trap_target,     ← 最高（protocol r
 |---|------|------|
 | 1 | `csr-chmem-trap-pc-jump`（trap 项）落地 | protocol rev.14 的既有项 |
 | 2 | ★ **本 change** 在其基础上**插入** `bp_predict` 项 | 必须**基于**已落地的 5 项 mux 扩展 |
-| — | ★ 若本 change 先于 trap 项落地 ⇒ **必须预留 trap 插入位**（否则后续 trap 项无法插入 ⇒ 返工） |
+| — | ★ 若本 change 先于 trap 项落地 ⇒ **必须预留 trap 插入位** | ★ 必须在源码里**留出 trap 项的位置**（否则后续 trap 项无处插入 ⇒ 返工）|
 
 ⇒ ★ **登记（本 change 实现 MUST 满足的可判定形式）**：`update_pc` 的 `next_pc` MUST 是**可 grep 的多层 select 链**，且**源码中 MUST 出现一个具名的 trap 项**（例如 `trap_redirect` / `trap_target` 标识）⇒ 这样后续 `csr-chmem-trap-pc-jump` 落地时有**可插入的位置**（★ **MUST NOT** 只写「注释 + 结构预留」—— 注释不可机检 ⇒ 后续 trap 项无处插入 ⇒ 返工）
 
@@ -111,7 +191,8 @@ branch LATE(N+1):
     ★ 写 pc_reg(N+2)  —— ★★ **4 项显式 select 链**:
         select( 情形A, pc_lag(N+1) + 4,                        <- 纠回 fall-through
           select( 情形B, actual_target(N+1),                   <- 跳到真实目标 (暖机主路径!)
-            select( 情形C, pc_reg(N+1) + 4,                    <- 抑制自身 redirect (顺序推进)
+            select( 情形C, bp_next(N+1),                       <- ★ v2.3 §0.1: 由 pc_reg+4 改为 bp_next
+                                                            <-    (抑制自身 redirect **且保留下一级投机**)
               select( actual_taken(N+1), actual_target(N+1),   <- 无预测时的正常行为
                       pc_reg(N+1) + 4 ) ) ) )
 ```
