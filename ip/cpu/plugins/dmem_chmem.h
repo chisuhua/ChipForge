@@ -72,6 +72,19 @@ class DMemPlugin : public PluginBase {
   std::unique_ptr<ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>> mem_;
   std::unique_ptr<ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>::read_port> tohost_probe_port_;
 
+  // ── ③ memsig 探针（双后端差分 parity 门禁 · 契约 S-6）────────────────────
+  //  目的：观测量 ③「内存签名」**不能**用 host 全内存 dump —— Simulator 侧
+  //  `Simulator::get_memory()` 是空 stub（且被未启用的 ENABLE_MEMORY_API 包住）
+  //  ⇒ 无 host 读出通道。故改为 **DUT 内自算**：每次**真正生效的写**（含
+  //  sub-word RMW 后的最终字面值）滚动更新一个 hash 寄存器，另计一个写次数。
+  //  ★ 两侧读的是**同一 DAG 的两个 named reg** ⇒ 天然可比（无需任何 host 镜像）。
+  //  ★ `mem_sig_updates` 是**自校验**锚：若「写发生过但计数为 0」⇒ 签名是假绿
+  //    （门禁 MUST 判 ERROR，不接受"两边都是 0"）。
+  //  ★ 必须**恰好计入一次**且不重复：计数条件与 `mem.write()` 的写使能完全同源
+  //    （`is_store_active`），被 flush 掉的 store 不计（它本就没进内存）。
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> mem_sig_;
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> mem_sig_updates_;
+
   ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>& get_mem() {
     if (!mem_) {
       std::vector<uint32_t> init(kMemWords, 0);
@@ -91,6 +104,22 @@ class DMemPlugin : public PluginBase {
       mem_ = std::make_unique<ch::core::ch_mem<ch::core::ch_uint<32>, kMemWords>>(init, "dmem");
     }
     return *mem_;
+  }
+
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_mem_sig() {
+    if (!mem_sig_) {
+      mem_sig_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "mem_sig");
+    }
+    return *mem_sig_;
+  }
+
+  ch::core::ch_reg<ch::core::ch_uint<32>>& get_mem_sig_updates() {
+    if (!mem_sig_updates_) {
+      mem_sig_updates_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "mem_sig_updates");
+    }
+    return *mem_sig_updates_;
   }
 
   void mem_access(PipeBuilder& pb) {
@@ -210,6 +239,34 @@ class DMemPlugin : public PluginBase {
                            select(is_sh, sh_new, sb_new));
     auto is_store_active = (is_sb || is_sh || is_sw) && !flush;
     mem.write(word_addr, store_wdata, is_store_active, "store_write");
+
+    // ③ memsig：滚动签名（契约 S-6）。★ 只观测、不参与 datapath ⇒ 不改任何
+    //   既有行为（cycle 数 MUST 不变 —— 由 A2a inc-3 的「零 cycle 影响」验收）。
+    //   hash = sig * 16777619 (FNV-1a 32-bit prime) ^ (word_addr * 31 + store_wdata)
+    //   ⇒ 覆盖「写了哪一字（addr）+ 写了什么（data）」，sub-word store 用 RMW
+    //   之后的最终字面值（`store_wdata` 已是合并结果）。
+    {
+      auto& sig = get_mem_sig();
+      auto& sig_upd = get_mem_sig_updates();
+      // ★ 必须**显式取值**（`ch_uint<32> v(reg)`）—— `ch_reg` 继承自 `ch_uint`，
+      //   直接写 `sig * X` 会走 ch_uint 的**编译期值**路径（恒 0）⇒ 整条表达式
+      //   退化成常量 ⇒ reg 无驱动逻辑 ⇒ 被 codegen 裁掉（Verilog 里根本没有
+      //   `mem_sig`）。同款写法见 ibus_chmem.h 的 `flush_count`。
+      ch::core::ch_uint<32> sig_val(sig);
+      ch::core::ch_uint<32> sig_upd_val(sig_upd);
+      //   mix 额外纳入**写次数**（sig_upd_val）：否则「同一 (addr,data) 但发生在
+      //   不同时刻」的多笔写会得到同一条轨迹的相同折叠值 ⇒ 区分度不足。
+      auto mix = (word_addr * ch::core::ch_uint<32>(ch::core::ch_literal<31, 32>{}))
+                 + store_wdata
+                 + (sig_upd_val * ch::core::ch_uint<32>(ch::core::ch_literal<0x9E3779B1, 32>{}));
+      auto sig_next = select(is_store_active,
+                             (sig_val * ch::core::ch_uint<32>(ch::core::ch_literal<16777619, 32>{})) ^ mix,
+                             sig_val);
+      sig <<= sig_next;
+      sig_upd <<= select(is_store_active,
+                         sig_upd_val + ch::core::ch_uint<32>(ch::core::ch_literal<1, 32>{}),
+                         sig_upd_val);
+    }
 
     // Phase 6d.4: tohost probe — always-on async read at fixed word offset.
     // Emits a named proxy node ("tohost_probe_data_proxy") so the test can
