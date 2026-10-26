@@ -461,9 +461,19 @@ branchbench_m0	branchbench	build/branchbench_m0.elf	night
       "observations": { "tohost": 1, "regs": "…", "memsig": "…", "memsig_updates": 1, "cycles": 455, "pchash": "…" },
       "first_divergence": { "metric": "cycles", "cycle_index": 0, "sim_value": 455, "vl_value": 456 },
       "verdict": "FAIL"
+    },
+    {
+      "name": "branchbench_m0",
+      "observations": { "tohost": 0, "regs": "…", "memsig": "…", "memsig_updates": 9, "cycles": 20000, "pchash": "…" },
+      "completion": { "sim_done": false, "vl_done": false, "partial": true },
+      "vacuous_observations": ["tohost", "cycles"],
+      "cap": 20000,
+      "verdict": "PASS"
     }
   ],
   "exceptions_applied": ["EX-0001"],
+  "partial_cases": ["branchbench_m0", "branchbench_m1", "branchbench_m2", "branchbench_m3"],
+  "jobs": 4,
   "timings": { "sim_ms": 0, "vl_build_ms": 0, "vl_run_ms": 0 }
 }
 ```
@@ -484,13 +494,14 @@ branchbench_m0	branchbench	build/branchbench_m0.elf	night
 | S-6 | A2a | `ip/cpu/plugins/dmem_chmem.h` 探针 → `mem_sig` / `mem_sig_updates`；两侧各自读取 + 假绿自校验 | 变异 ①数据取反（`a55f52c5`→`8fcc53ba`）②计数恒 0 ⇒ 两侧 rc=2；零 cycle 影响；5/5 相等 | ✅ |
 | S-7 | A2a | 两侧同构循环（`step → cycles+=1 → sample → break on done`） | 5/5 `cycles` 相等 | ✅ |
 | S-8 | A2a | 两侧逐拍 FNV-1a over PC + `pc_samples` | 5/5 `pchash` 相等；相位 offset = 0 | ✅ |
-| S-9 | A2b | `judge()`（纯函数：强度序比对 + `first_divergence` + 禁降级） | `--self-test` 9 例 | ✅ |
+| S-9 | A2b | `judge()`（纯函数：强度序比对 + `first_divergence` + 禁降级） | `--self-test` 13 例 | ✅ |
+| ★ S-9a | A3 | `judge()` 的 completion 分支（两侧截断 ⇒ vacuous；不一致 ⇒ FAIL；缺失 ⇒ ERROR） | `--self-test` 4 例 + **实跑 branchbench_m0 20k 拍**（`partial=True` + 5 观测逐位相等） | ✅ |
 | S-10 | A2b | `main()` 三态返回；VL parity 路径 TIMEOUT → 2 | 负向 N1~N5（均 rc=2）；branchbench 两侧 rc=2 | ✅ |
 | S-11 | A2b | `load_exceptions()`（未知/容差字段拒收 · 5+3 字段 · `issue_url` · `justification` · 过期失效 · 合成例外必存在） | 负向 N1/N2/N3 + `--self-test`（过期 / 作用域 / 豁免） | ✅ |
 | S-12 | A2b | `load_exceptions()` 规模软限（>10 ⇒ WARNING，不阻断） | 过期 → FAIL（self-test） | ⚠️ 规模护栏 ✅；**commit message 引 `ADR-089` 的机检未实现** ⇒ A4 |
-| S-13 | A2b（种子）/ A3（扩充） | `tests/cpu/parity/corpus.txt`（51 case + `layer`）+ `check_corpus_against_harnesses()`（方向性判定） | 负向 N4（清单缺覆盖 ⇒ ERROR）/ N5（格式坏 ⇒ ERROR）；`rv32ui-p-simple` ⇒ WARNING | ✅（48 的收口归 A3） |
+| S-13 | A2b（种子）/ A3（扩充 ✅） | `tests/cpu/parity/corpus.txt`（**52 case** + `layer` + 可选 `max_cycles`）+ `check_corpus_against_harnesses()`（方向性判定）+ `check_corpus_files_exist()`（pre-flight） | 负向 N4/N5；★ **两侧 kCases 48 == 48 零漂移**（两侧方向都干净） | ✅ |
 | S-14 | A2b | `build/parity/report.json`（S-14 全字段 + 逐 case `determinism`） | 结构校验（顶层 / per_case / 观测量键齐备） | ✅ |
-| S-15 | A2b | `--layer pr\|night\|all` + 清单 `layer` 列 | PR 层 8 case 实测 **≈10 min**；★ 缓存条款已按实测更正 | ✅ |
+| S-15 | A2b + A3 | `--layer pr\|night\|all` + 清单 `layer` 列 + **per-case cap**（第 5 列 / 按 `kind` 默认）+ `--jobs` 并行 | PR 层 8 case 实测 **6.5 min**（`jobs=4`）；★ 缓存条款已按实测更正 | ✅ |
 | S-16 | 全部 | 三个 change 的 `tasks.md` 均引 `[S-x]` + 本矩阵 | — | ✅ |
 
 ## 8. 开放项（★ 需 architect 确认 / 需 A2a 实测）
