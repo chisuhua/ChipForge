@@ -1,6 +1,6 @@
 # ADR-088: TLM 后端退役 — 冻结契约与语义裁决锚（TLM Backend Retirement: Freeze Contract & Semantic Adjudication Anchor）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-24）** —— B0（`chmem-tlm-backend-freeze`，已归档）立冻结契约与治理锚；**B2 语义裁决已完成**（§3 五行正式表态 + §7 ADR-080 范围重定义 + §5.2 BP 专项前置）；**v1.2 追加 §5.3「性能门禁在 CH_MEM 后端的承接判据」**（实测驱动：CH_MEM DMIPS 1.24467 < 1.4 ⇒ 根因 = CH_MEM 数据通路缺 load-use 通路 ⇒ **不重校准判据**，改补能力）
+> **Status**: ✅ **Accepted（v1.4，2026-10-26）** —— B0（`chmem-tlm-backend-freeze`，已归档）立冻结契约与治理锚；**B2 语义裁决已完成**（§3 五行正式表态 + §7 ADR-080 范围重定义 + §5.2 BP 专项前置）；**v1.2 追加 §5.3「性能门禁在 CH_MEM 后端的承接判据」**（实测驱动：CH_MEM DMIPS 1.24467 < 1.4 ⇒ 根因 = CH_MEM 数据通路缺 load-use 通路 ⇒ **不重校准判据**，改补能力）；★ **v1.3 追加**：§5.3.1 **根因表述修订**（★ 删掉被 E-1/E-2 证伪的「TLM 有 BTB ⇒ 预测命中不 flush」⇒ 改述为「**单遍重定向零代价 vs 两级取指 1 拍/次 taken 转移**」）+ §5.3.3 **三个独立结论**（C-1 净收益率 = 报告项 / C-2 绝对值门禁判据 = `cycles ≤ 813074` / C-3 增量自身 fail-closed）；★ **v1.4 追加**：★ **§10 目标态与三段迁移路径**（**一个模型（CH_MEM）+ 两个后端（CppHDL Simulator / Verilator）+ 一道差分门禁**）+ §5.2 **删除判据新增第 6/7 条**（差分门禁已绿 + CI build 能力）⇒ ★ 配套 **ADR-089**（双后端差分 parity 门禁，✅ Accepted 2026-10-26）
 > **版本历史**: v1.0（2026-10-24，B0，🚧 Proposed）→ v1.1（2026-10-24，B2 裁决完成，✅ Accepted）→ **v1.2（2026-10-24，性能门禁承接裁决，✅ Accepted）**
 > **类别**: 架构治理 / 后端退役
 > **关联 ADR**: ADR-040 v3.0（TLM→HDL 移植性约束，§10.1 双后端语义必须一致 / §10.2 差异必须显式契约化）· ADR-083（Plugin-style 单一 source of truth，§2.3 CppTLM=legacy / §4.3 拒绝「TLM 模式作为长期模式」）· ADR-046（多周期协议引擎豁免）· ADR-087（ISA 声明真实性，§D4 护栏形态随 TLM 退役切换）
@@ -66,7 +66,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 |------|------|
 | baseline 锚点 | 固定 sha（**不用 `main`**）⇒ 切分支不影响判定；换锚点必须显式改文件并在本 ADR 记录 |
 | 函数定义识别 | 行首匹配 `static` / `inline` / `virtual` / `template` 或「返回类型 + 标识符 + `(`」的行；**排除** `if`/`for`/`while`/`switch`/`catch`/`return`/`sizeof` 与注释行 |
-| 白名单 | `.rddf/state/tlm-freeze-allowlist.txt`，每行 3 段：`<文件:行> | <原因> | <CH_MEM 是否需同步: 是\|否\|不适用>`（+ 登记人/日期） |
+| 白名单 | `.rddf/state/tlm-freeze-allowlist.txt`，每行 3 段：`<文件:行> \| <原因> \| <CH_MEM 是否需同步: 是\|否\|不适用>`（+ 登记人/日期） |
 | 违规行为 | 新增函数定义**未登记** ⇒ 脚本 **exit 1** 并报出 `文件:行` + 签名 + 登记提示 |
 | 累计阈值 | 白名单 > 5 条 ⇒ 输出「需 ADR-088 复审」提示（不自动阻断） |
 | CI 层 | `continue-on-error: true`（**warn 级**，不阻塞 PR）—— 脚本层与 CI 层是两层语义 |
@@ -145,8 +145,10 @@ ADR-083（Accepted 2026-10-08）已定性：
 2. **覆盖平价达成** —— §4 台账中该子系统相关条目的状态已可接受（`covered` / 明确 `not-covered` 且归属「不做」）。
    - ⚠️ **BP 专项前置（B2 added）**：BP 相关文件（`ip/cpu/plugins/branch_predictor.{h,cpp}`）**不适用「不做」出口**。删除前 MUST 同时满足：① `branch_predictor_chmem.h` 存在**且已被 CH_MEM 工厂注册**；② CoreMark harness 在 `cpu_verilator_sim --elf` 路径跑通并产出 `CoreMark/MHz` 实测值（依 §3 BP 行）。缺任一 ⇒ 不得删除。
 3. **语义裁决完成** —— §3 表中该子系统的 B2 正式表态已给出。
-4. **CI 有可回归的自动测试** —— 对应能力在 CH_MEM 侧有回归锚（当前测试不进 CI ⇒ B3 需先解决 CI 盲区或提供等价门禁）。
+4. **CI 有可回归的自动测试** —— 对应能力在 CH_MEM 侧有回归锚（当前测试不进 CI ⇒ B3 需先解决 CI 盲区或提供等价门禁）。★ **可判定化（v1.4）**：完成形式 = ★ **差分门禁在 CI 中被执行且结果被回读**（⇒ CI 侧分层 corpus：PR 级快子集 + 夜间全量）。
 5. **三道前置缺一不可** —— ①②③ 任一未满足 ⇒ 不得删除。
+6. ★★ **【v1.4 追加】双后端差分 parity 门禁已上线且全绿** —— 依 **ADR-089** D6 阶段 C 的硬前置 ①：★ 「删掉 463 个 TLM-only case 后没有任何自动机制能发现语义退化」这一盲区，只能由**同一输入的确定性双后端差分执行**补上 ⇒ ★ **差分门禁未上线 ⇒ 不得删任何 TLM-only case**（判据：ADR-089 的 V-1~V-6 全部 PASS）。
+7. ★★ **【v1.4 追加】CI 具备 build 能力** —— ADR-088 §5.2 判据 4 的**可判定化**：★ 现状 CI **不构建项目** ⇒ 门禁 step 恒 SKIP ⇒ 差分门禁若也不在 CI 中执行 ⇒ 判据 4 与判据 6 都会退化为「本机成立」⇒ ★ **判据 4 的完成形式 = 差分门禁在 CI 中被执行且结果被回读**。
 
 
 ### 5.3 性能门禁在 CH_MEM 后端的承接判据（v1.2 裁决，2026-10-24）
@@ -162,9 +164,10 @@ ADR-083（Accepted 2026-10-08）已定性：
 | 高依赖密度 workload | Dhrystone 794478 → 914544（**1.151**） | 差距**与依赖密度相关** ⇒ 与「纯 stall 策略」一致 |
 | 组合通路特性 | CH_MEM 无 stage 寄存器（`cpu_factory_chmem.h` 8-plugin 全组合）⇒ load 数据同拍组合可得；`dmem_chmem.h:156` 读口为 **async**（同拍可得） | load-use 在组合通路下**不需** stall ⇒ 怀疑对象转向 RAW 检测 |
 | ★PoC 证伪（2026-10-24 实施期） | 把 CH_MEM 侧 RAW stall 临时置为恒 false（`hazard_chmem.h` 的 `halt_when(result)` ⇒ `halt_when(ch_bool(false))`）后重建重测 | **cycles 完全不变（914544）** ⇒ **RAW stall 不是根因**，P-2 的前提被推翻（PoC 已撤销，代码复原） |
-| ★分支密度对照（2026-10-24） | 比率随分支密度单调上升：无分支 `add` 1.037 / `addi` 1.034 · `jal` 1.078 · `beq` 1.098 · `bne` 1.105 · **Dhrystone 1.151**；delta 120066 cycles ÷ 2000 iter = **60 拍/迭代** ≈ 30 分支 × 2 拍 flush 代价 | **根因 = CH_MEM 无分支预测**（TLM 侧有 BTB `branch_predictor.h` ⇒ 预测命中不 flush；CH_MEM 侧无 BP ⇒ 每条 taken 分支都要 flush 流水线）⇒ **与 B1 ② BP 同源** |
+| ★分支密度对照（2026-10-24） | 比率随分支密度单调上升：无分支 `add` 1.037 / `addi` 1.034 · `jal` 1.078 · `beq` 1.098 · `bne` 1.105 · **Dhrystone 1.151**；delta **120066** cycles ÷ 2000 iter = **60 拍/迭代** | **根因 = CH_MEM 无分支预测** ⇒ 与 B1 ② BP 同源 |
+| ★★ **根因表述修订（2026-10-26，architect —— 删掉已被 E-1/E-2 证伪的归因）** | ★ **原表述「TLM 侧有 BTB ⇒ 预测命中不 flush」** —— **已被证伪**：E-1 读码显示 TLM 的 `branch_predictor.h` 预测结果**被丢弃**（`:126-129` 注释「M2 阶段: 仅存储预测结果」+ 空函数体）+ `flush_when([]{return false;})` 恒 false；E-2 **临时摘掉 TLM 的 BP 注册**（`cpu_factory.h:517`）后重建重测 ⇒ cycles **794478 → 794478（逐位不变）**、DMIPS **1.43277 → 1.43277（逐位不变）** | ★ **正确根因 = 单遍模型重定向零代价 vs CH_MEM 两级取指每次 taken 转移 1 拍额外取指**（E-4：TLM writeback LATE 在同一 tick 内写回 fetch 节点 ⇒ 重定向零延迟；CH_MEM 两级取指 ⇒ 每条 taken 转移 1 拍气泡）⇒ ★ 气泡总量 = E-3 实测的 **taken 控制转移 120065 次 × 1 拍**（★ **不是**「30 分支 × 2 拍」—— 旧表述把每条转移算成 2 拍，与 E-3 的逐拍统计矛盾）⇒ ★ 交叉验证：`914544 − 120065 = 794479 ≈ TLM 的 794478`（残差 1 拍）⇒ **CH_MEM 与 TLM 的全部差距被「计数到的重定向」完全吸收**（⚠️ 「794479 + 120065 = 914544 逐位吻合」是分类恒等式，证明力为零，仅作自洽性检查） |
 
-⇒ **性质判定（v1.2 修订，2026-10-24 实施期 PoC 后）**：1.24467 的差距是 **CH_MEM 侧缺分支预测器的**能力缺失**（TLM 有 BTB ⇒ 预测命中不 flush；CH_MEM 无 BP ⇒ taken 分支逐条 flush）**，**不是**判据过时 ⇒ **P-1（不重校准判据）依然成立**；但 **P-2/P-4（补 load-use 通路）的前提已被 PoC 证伪 ⇒ 作废**。
+⇒ **性质判定（v1.2 修订，2026-10-24 实施期 PoC 后；★ v1.3 根因表述修订，2026-10-26）**：1.24467 的差距是 **CH_MEM 侧缺分支预测器的**能力缺失**（★ 根因表述以 §5.3.1 的「根因表述修订」行为准：**不是**「TLM 有 BTB ⇒ 预测命中不 flush」—— 该归因已被 E-1/E-2 证伪；★ 正确表述 = 「**单遍模型重定向零代价 vs CH_MEM 两级取指每次 taken 转移 1 拍额外取指**」），**不是**判据过时 ⇒ **P-1（不重校准判据）依然成立**；但 **P-2/P-4（补 load-use 通路）的前提已被 PoC 证伪 ⇒ 作废**。
 
 #### 5.3.2 裁决
 
@@ -177,7 +180,19 @@ ADR-083（Accepted 2026-10-08）已定性：
 | ~~**P-4**~~ | ~~P-2 的修法选型（精确化 RAW vs 真旁路）~~ → **随 P-2 一并作废**（PoC 已给出答案：**两者都不是根因**）。★**方法论留存**：本节的「PoC 先行、不预设修法」流程**有效**（避免了一次基于错误根因的 change 立项） |
 | **P-5** | **交付点 B（CoreMark 移植）**的中间验收改用**分支 microbenchmark**（可控预测率的 pattern 循环 ⇒ 直接测「命中/未命中 ⇒ flush 与 cycle 差异」），CoreMark 保留为最终载体且**允许顺延**（D1 的补充）⇒ ② 不被 CoreMark 移植的不确定性阻塞 |
 
-#### 5.3.3 与既有裁决的关系
+#### 5.3.3 ★★ 两个**独立**结论（v1.3 追加，2026-10-26 architect —— 裁决 D9 / D11）
+
+> ★ **为什么必须拆成两个**：v1.2 的 AC-16 把「净收益率达标」与「绝对值门禁达标」混成一件 ⇒ 实测二者**同向但不同阈值** ⇒ 用前者直接推出后者 = **假达标**。★ **v1.3 追加的实测进一步澄清：二者在数值上其实是同一条线**（见下）⇒ 但**概念上仍必须分开落**，否则报告口径与判定口径会继续互相污染。
+
+| # | 结论段 | 内容 | 判据 / 数据（2026-10-26 实测） |
+|---|--------|------|------------------------------|
+| **C-1** | **净收益率结论**（**报告项**） | 本期三档增量的实测净收益率 ⇒ ★ **MUST 两分母同报**（`N_taken_total` 与 `FLUSH(off)`）并**取值较小者**（fail-closed）⇒ ★ **MUST NOT** 用它直接推出「绝对值门禁恢复」 | 增量 1（`is_unconditional` + `jal`/`j` 建项）：`FLUSH(off)` 分母下 **78.3%**（`Δcycles = 94031 / 120065`）⇒ **未达 84.5%** ⇒ ⇒ **GShare（增量 3）按 A5 转本期** |
+| **C-2** | **绝对值门禁结论**（**判定项**） | 「DMIPS ≥ 1.4」是否**恢复** ⇒ ★ **判据 = `Dhrystone cycles ≤ 813074`**（**整数比较**；`dmips_per_mhz` 仅作回显 —— `dmips@813074 = 1.400000`，`dmips@813109 = 1.399940` ⇒ 按 813109 判会**误判达标**） | 增量 1 定稿：`cycles = 820513` · `dmips = 1.38731` ⇒ **距阈值 7439 拍（0.91%）** ⇒ **未恢复**（⇒ 增量 3 继续推进）<br>★ **三判据数值重合**：DMIPS 1.4 阈值 `2e9/(1757×1.4) = 813074.2337` ⇒ 整数 **813074**；差距闭合率精确口径 `101470/120066 = 84.5119%` ⇒ `914544 − 101470 = 813074` ⇒ ★ **同一条线** |
+| **C-3** | ★ **增量自身结论**（D11，fail-closed） | **每个增量 MUST 先证明自己不劣化**：同 build 报 `cycles(增量on)` 与 `cycles(增量off)`（其余开关相同）⇒ ★ MUST 满足 `cycles(on) ≤ cycles(off)` | ★ **增量 3 现状实装实测 = 822514**（比不开 GShare 的 820513 **慢 2001 拍**）+ branchbench 方向判据 RED ⇒ ⇒ **现状不满足 C-3** ⇒ ⇒ **索引对齐 + GHR 驱动源收窄是增量 3 的入场券，不是优化项**（口径见 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §7 D10）<br>⇒ ★ 若修完后仍不满足 ⇒ 该增量**显式结案为「本期不做」**（登记负收益实测与原因）⇒ 拉下一档 ⇒ ★ **MUST NOT** 让本 change 因 C-2 不可满足而**无法归档**（终局兜底 = P-3 临时口径 + 移交后续 change） |
+
+⇒ ★★ **两条结论 MUST 互不引用为前提**（C-1 是报告、C-2 是判定、C-3 是增量准入）⇒ ★ **MUST NOT** 用 C-1 推出 C-2（v1.2 的假达标路径）。
+
+#### 5.3.4 与既有裁决的关系
 
 - §3 M 扩展行「CH_MEM 组合式为规范（功能与 cycle 均是）」**不受影响** —— 本节裁决的是**性能门禁的达标路径**，不是 cycle 语义的可比性
 - §5.2 判据 4「CI 有可回归的自动测试」**仍未满足**（★2026-10-24 实施后自查更正）：交付点 A / 0c 交付的 warn 级 CI 门禁 step 是**挂载点（hook）** —— CI 的 `architecture-gates.yml` **不构建项目**（其唯一 cmake 是构建 Verilator 本身）⇒ 该 step **恒走 SKIP** ⇒ **目前零实际保护**。⇒ 「**CI 具备 build 能力**」登记为 **B3 前置**（与 §5.2 判据 4 并列）
@@ -249,8 +264,51 @@ ADR-083（Accepted 2026-10-08）已定性：
 | 门禁复跑（删文件后） | `violations=0`，candidates 35 → **31**（4 个死代码退出检测面） |
 | 5 架构门禁 | verify_adr ✅ · verify_plugin_decision 8/8 ✅ · check_plugin_portability 13/13 ✅ · doc_link_check 0 broken ✅ · roadmap-r9-check 11 fragments ✅ |
 
-### 10. 相关文档
+### 10. ★★★ 目标态与三段迁移路径（v1.4 裁决，2026-10-26 architect）
 
+> ★ **本节回答「TLM 退役之后，项目靠什么保证模型是对的」** ⇒ 与 **ADR-089（双后端差分 parity 门禁）** 配套 ⇒ ★ 两者 MUST 一起读。
+
+#### 10.1 目标态（★ 最终架构走向）
+
+| 层 | 目标态 | 现状 → 目标 |
+|---|---|---|
+| **模型** | **只有一种**：CH_MEM（`pb.elaborate(ctx)` 发射 lnode DAG） | 双模（TLM-mode + CH_MEM-mode）⇒ **单模** ⇒ ★ `cf::plugin::uint_t<N>` 恒等于 `ch::core::ch_uint<N>` ⇒ **编译期模态开关消失** |
+| **后端** | **两个**：① CppHDL Simulator（解释执行 DAG）② Verilator（`ch::toVerilog(ctx)` → Verilog → Verilator） | 同 ⇒ **不变**（但从「平行可选」升级为「**同一模型的两个后端**」） |
+| **一致性证据** | ★ **同一输入的确定性双后端差分执行**（ADR-089） | 台账计数代理（463 条，**已在漂**：292 vs 282）⇒ **机器可判的差分执行** |
+| **回归速度** | CI 具备 build 能力后，差分门禁在 CI 中执行 | TLM 快环 432 case ≈ **0.6s**；CH_MEM Simulator vendored 47 ≈ **1594s**；Verilator dhrystone 端到端 **18.85s** ⇒ ★ **TLM 模式删除后快环消失** ⇒ CI build 能力成为**硬前置** |
+| **测试语料** | Simulator 侧 + Verilator 侧**同一 corpus**（vendored 47 + branchbench 4 档，Dhrystone 后置） | 两侧跑**不同 corpus、不同 oracle、从不互比** ⇒ **同一 corpus 差分** |
+
+⇒ ★★ **一句话目标态**：**一个模型、两个后端、一道差分门禁**；TLM 是**过渡期的第三条腿**（提供亚秒级快环），★ **不是** parity 的第三条腿。
+
+#### 10.2 三段迁移路径（★ 与 ADR-089 D6 同源）
+
+| 阶段 | 内容 | 归属 | 门禁 |
+|---|---|---|---|
+| **阶段 A** | ★ **新增双后端差分 parity 门禁**（不动 TLM 模式） | `feat-backend-parity-gate`（★ planner 落） | ADR-089 V-1~V-6 全 PASS |
+| **阶段 B** | ★ **台账重新定性**：从「迁移追踪器」⇒「**CH_MEM 覆盖边界规格**」（冻结） | `feat-tlm-backend-retirement`（主体 owner） | `check_coverage_parity_ledger.sh` PASS + 头部计数与条目级实测一致 |
+| **阶段 C** | ★ **删 TLM 模式**（B3）：`uint_t` 模态消失 · `pb.run()` 快环消失 · `src/cf_plugin/bridge/` + TLM-only 文件删除 | `feat-tlm-backend-retirement`（B3） | §5.2 判据 1~7 全满足（★ **含 v1.4 新增的判据 6 差分门禁已绿 + 判据 7 CI build 能力**） |
+
+⇒ ★ **阶段 A MUST 先于阶段 C**（Q3 裁决）⇒ ★ 阶段 A **独立于** TLM 退役 ⇒ ★ 它**立刻**能抓到今天不可见的后端分歧（例：上游 `c27543d` 修的 `aread` 1 拍滞后那一类）。
+
+#### 10.3 ★ 阶段 C 的 5 条硬前置（缺一不得删 TLM 模式）
+
+| # | 前置 | 为什么是硬前置 |
+|---|---|---|
+| ① | ★ **阶段 A 差分门禁已上线且全绿**（ADR-089 V-1~V-6） | 删掉 463 个 TLM-only case 后，「没有任何自动机制能发现语义退化」—— 差分门禁是**唯一**替代证据 |
+| ② | ★ **CI 具备 build 能力**（§5.2 判据 4 的可判定化） | TLM 快环（0.6s）在阶段 C 消失 ⇒ 若 CI 仍不构建 ⇒ **零保护** |
+| ③ | ★ **TLM 参考实现的语义已抽成规格** | 例：BP 的 GShare 语义（`ip/cpu/plugins/branch_predictor.h` 的 `gshare_predict`/`gshare_update`/`global_history_`）是**当前唯一**参考实现 ⇒ 删除前须抽成文档（样板见 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §3.1 / §7 D10） |
+| ④ | ★ **台账已冻结为覆盖边界规格** | 「CH_MEM 故意不覆盖什么 + 为什么」是**规格**（`jalr` 多地址 / TID 线程隔离 / `reset` / `custom_btb_size` 的 M 域）⇒ 冻结后**不可删** |
+| ⑤ | ★★ **门禁体系自身改版**（2026-10-26 双审新增 —— **治理层自噬**） | ★ `tools/check_plugin_portability.sh` 的 Check 2 / 5 / 6 / 7 / 13 **全部建立在双模前提上** ⇒ 删 TLM 模态后：★ **Check 2 / 7 会「真空 PASS」**（TLM 文件集合为空 ⇒ **最坏的假绿形态**）⇒ MUST 改写为单模语义（Check 5 仍有效；Check 13 随模态消失而**显式退役**）⇒ ★ 空集合 MUST 触发脚本**显式报告「该检查已退役」**，MUST NOT 静默 PASS ⇒ `tools/check_tlm_freeze.sh` + `.rddf/state/tlm-freeze-*` 显式退役 ⇒ ADR-040 升 v4.0（移除 TLM 分支语义）· ADR-083 / AGENTS.md 双模表述清除 ⇒ ★ **验收形式 = 变异自检**（注入一个旧 Check 5 能抓的 `if(ch_bool)` ⇒ 新检查 MUST 仍 RED） |
+
+#### 10.4 ★ 阶段 C 的**结构性收益**（为什么要做，而不只是为了少一套代码）
+
+1. ★ **「全绿但语义为零」的双实现漂移族整族消失** —— ADR-040 §10.5/§10.6（payload key 模态 / 生产者-消费者顺序）、host `pack_entry` vs ch 写路径、R8/R11/R13 类锚 —— 今天为抓这类漂移而存在的部分锚（`[keys]` 4 case + `[alu][semantics]` 6 case）的一半将变成历史 ⇒ 测试预算可还给真实功能覆盖。
+2. ★ **「一条 ISA 两条 cycle 语义」的根除** —— M 扩展（radix-2 多周期 vs 组合式 1 拍）等**设计差异**不再需要「两个模型互相解释」。
+3. ★ **parity 语义从人工计数转为机器判定** ⇒ 台账漂移不再影响结论。
+
+### 11. 相关文档
+
+- ADR-089（双后端差分 parity 门禁，✅ Accepted 2026-10-26）— ★ 本节 §10 的配套契约
 - ADR-040 v3.0（TLM→HDL 移植性约束）· ADR-083（Plugin-style 单一 source of truth）· ADR-046（FSM 豁免）· ADR-087（ISA 声明真实性）
 - `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B0–B3 编排 + 13 条验收）
 - `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G1/G2/G3 门禁）
