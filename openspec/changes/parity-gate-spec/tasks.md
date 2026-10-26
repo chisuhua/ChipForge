@@ -62,4 +62,4 @@ depends_on: []
 - [x] 4.3 `bash tools/verify_adr.sh` PASS（ADR-089 v1.2 一致）
 - [x] 4.4 `openspec change validate parity-gate-spec` valid
 - [x] 4.5 **零代码决议**：`git diff --stat` 不含 `ip/**` `src/**` `tests/**` `tools/**`
-- [ ] 4.6 architect 签：C-1（确定性分类）/ C-2（reset 统一）两项开放项确认
+- [x] 4.6 architect 签：★ **C-1 = ERROR(2)**（Oracle 建议 + 用户采纳 ⇒ ADR-089 v1.3）· ★ **C-2 = `reset_mode=none`**（用户裁决）⇒ 两项闭合（2026-10-26）
