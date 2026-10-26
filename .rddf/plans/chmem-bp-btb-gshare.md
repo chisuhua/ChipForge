@@ -1,8 +1,9 @@
 # ② chmem-bp-btb-gshare — 执行文件
 
 > **change**: `chmem-bp-btb-gshare`
-> **规模**: 中 · **前置**: ① `chmem-verilator-perf-harness` ✅ **已归档**（2026-10-24，交付点 A）· ② ★**`chmem-branch-microbench-fix`（PENDING —— 修 0c 的工作量污染 + 档名反向）** · ③ ★**`chmem-bp-btb-gshare-poc`（PENDING —— 机制 PoC）** ⇒ ★ **本 change 的两个前置尚未完成 ⇒ 主体 MUST NOT 开工**（架构简报 §4 的硬门禁）
-> 
+> **规模**: 中-大 · **前置**: ① `chmem-verilator-perf-harness` ✅ **已归档**（2026-10-24，交付点 A）· ② `chmem-branch-microbench-fix` ✅ **已归档**（2026-10-26）· ③ `chmem-bp-btb-gshare-poc` ✅ **已归档**（2026-10-26，机制 PoC 8 case / 单元锚 14 case 205 assertions 全绿）⇒ ★ **开工门禁已解除**（2026-10-26 实测确认）
+> **增量分档执行路径**: `.rddf/plans/chmem-bp-btb-gshare-increments.md`（★ 三档增量 + 决策点 + 收口；**2026-10-26 v2 审查修订版**，取代外部草稿 `/home/ubuntu/.opencode/plan/02b-*.md`）
+>
 > ⚠️ **原 P-2 前置（`chmem-load-use-bypass`）已于 2026-10-24 作废**（实施期 PoC 证伪：禁用 CH_MEM 侧 RAW stall 后 cycles **完全不变** 914544 ⇒ load-use **不是**差距根因；真根因 = **CH_MEM 无分支预测**，见 ADR-088 v1.2 §5.3.1）⇒ **不存在待落地的 load-use 前置**。**绝对值 1.4 门禁的恢复条件 = 本 change 自身落地**（ADR-088 v1.2 §5.3.2 **P-6**：与本 change 同源）⇒ 不再是外部依赖，而是本 change 的**交付物**
 > **路线图**: `feat-bp-btb-gshare`（已改绑 CH_MEM-only + 归 B1 第 5 项）· `feat-tlm-backend-retirement` B1 第 5 项
 > **上游裁决**: ADR-088 v1.1 §3 BP 行（**CH_MEM-only 且必须做；不适用 §5.2「不做」出口**）+ §5.2 BP 专项删除前置（双前置）
@@ -14,7 +15,7 @@
 ## ★★★ v2.1 覆盖声明（architect 2026-10-24，**优先级高于本文件以下全部内容**）
 
 > ⚠️ **本文件的 Goal / Task 3 / Task 4 / Task 5.5 / AC-1 / AC-8 旧文本 / Task 6 Step 4 / Task 7 Step 3-4 已被 architect 双审后的 v2.1 简报
-> （`docs/architecture/bp-btb-gshare-design-brief.md`）**逐条覆盖**。**
+> （`ip/cpu/docs/bp-btb-gshare-design-brief.md`）**逐条覆盖**。**
 > ★ **理由**：builder 按本文件的 checklist 执行 ⇒ 若不划掉，实施者会去实现 GShare/RAS（GShare 还会触发 PHT 体积膨胀 ⇒ 触发 Task 5.5 的新阻塞），
 > 并会自行发明阈值（「阈值由 0c 微基准基线确定」是**循环表述** —— 基线给的是绝对 cycle，不是信号强度）。
 
@@ -50,7 +51,7 @@
 
 ### ★ 引用
 
-- **架构方案简报（权威）**：`docs/architecture/bp-btb-gshare-design-brief.md`（v2.1）
+- **架构方案简报（权威）**：`ip/cpu/docs/bp-btb-gshare-design-brief.md`（v2.1）
 - **实施边界简报**：`.rddf/plans/chmem-bp-btb-gshare-brief.md`（⚠️ 其 §1.3「BP 开关面用 `optional<bool>`」与 §3.3「ch_mem 深度编译期 ⇒ 建议固定容量」**已被 v2.2 覆盖** ⇒ 以 v2.2 为准）
 - **Task 1 的 PoC 与机制结论**：`tests/cpu/test_cpu_chmem_bp_poc.cpp`（8 case / 51 assertions 全绿）· 本文件 §Task 1.5
 
@@ -116,7 +117,7 @@ flush = hold_z | (taken_buf & !spec_ok_buf) | mispredict_A_buf
 
 ★ **`spec_ok_buf` 的定义 = 「投机被证明正确」（情形 C）**，而不是「投机臂确实生效」（= `pv & pt`）：
 ★ 后者在**情形 F** 下也为真 ⇒ 会让 F 的错路**不被抑制** ⇒ 泄漏。
-⇒ ★ 该定义与 `docs/architecture/bp-btb-gshare-design-brief.md` §3.4.2 / AC-6 的字面表述**不一致**
+⇒ ★ 该定义与 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §3.4.2 / AC-6 的字面表述**不一致**
 ⇒ ★ **裁决 A1（architect）**；★ 实施侧已取 `case_c` 这一侧（更保守 ⇒ 只可能多 flush ⇒ 不可能假绿）。
 
 ### 0.5 范围修订（★ **A5 决策：2026-10-26，用户裁定**）
@@ -130,9 +131,11 @@ flush = hold_z | (taken_buf & !spec_ok_buf) | mispredict_A_buf
 | **增量 2** | **RAS** 8-entry（`jalr` → `ret` 模式预测）⇒ 才谈得上 `jalr` 覆盖 | ★ TLM 参考**无** RAS ⇒ **新增设计** | ⏳ **先量增量 1 的收益再定** |
 | **增量 3** | **GShare**（GHR XOR 索引 PHT） | ★ TLM 参考**有**（`branch_predictor.h` 的 `gshare_predict` / `gshare_update` / `global_history_`，`GHR_BITS=8`）⇒ **移植**（★ **不是新设计** ⇒ 成本远低于先前假设） | ⏳ **先量增量 1(+2) 的收益再定** |
 
-★ **决策规则（可判定）**：若「增量 1（+2）」在 Dhrystone 上的**净收益率 ≥ 84.5%** ⇒ 绝对值门禁可恢复
-⇒ GShare/RAS 可延后；**否则** ⇒ MUST 把 GShare 拉回本期（AC-1 范围放开）。
-★ 净收益率的**分母口径**归 **A6**（裁决项）⇒ ★ 实测数据见 `tasks.md` 的 Task 7。
+★ **决策规则（可判定 —— 2026-10-26 v3 修订，D9 待签批）**：★ **推进判据 = Dhrystone `cycles ≤ 813074`（整数比较）= DMIPS/MHz ≥ 1.4**
+- 推导（**不依赖 A6**）：`DMIPS/MHz = 2000×1e6 / (1757×cycles) ≥ 1.4` ⇒ `2e9/(1757×1.4) = 813074.2337` ⇒ **整数阈值 813074**（★ `dmips@813074 = 1.400000`、`dmips@813109 = 1.399940` ⇒ ★ **MUST 用整数比较，不用 `dmips_per_mhz` 的 `%.5f` 打印值**）
+- ★ **三口径数值重合**：AC-16 的差距闭合率精确口径 `101470/120066 = 84.5119%` ⇒ `914544 − 101470 = 813074` ⇒ **「84.5%」与「DMIPS 1.4」是同一条线** ⇒ ★ A6 的分母之争**不影响推进判定**（只影响报告口径）
+- ★ 实测锚（2026-10-26，增量 1 定稿）：`cycles = 820513` · `dmips_per_mhz = 1.38731` ⇒ 距阈值 **7439 拍（0.91%）** ⇒ 增量 3（GShare）须再省 ≥ 7439 拍
+- ★ **净收益率（84.5%）降为报告项**：其分母口径仍归 **A6**（`N_taken_total` vs `FLUSH(off)` 同报取小 ⇒ AC-27）⇒ ★ **AC-16 的勾选仍 MUST 等 A6**，但**增量分档的推进不再被 A6 阻塞**（两者 MUST 分两件事落）
 
 ### 0.7 ★ v2.3.1 增量（2026-10-26，metis 实施前 gap 分析的产物 —— **同样优先于以下全部内容**）
 
@@ -320,14 +323,26 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 
 ### Task 2f: ★ GShare 移植（★ v2.3 新增 —— **增量 3**，★ **移植**：TLM 参考**已有**）
 
-- [ ] **Step 1: 移植来源** —— ★ **2026-10-26 由「条件性」转为「本期做」**（★ 实测：增量 1 后净收益率 **78.3% < 84.5%** ⇒ AC-16 的「不达标 ⇒ MUST 拉回 GShare」分支被触发；★ 还差 **6.2pp ≈ 7440 cycles**）⇒ ★ TLM 参考 `ip/cpu/plugins/branch_predictor.h` 的 `gshare_predict` / `gshare_update` / `global_history_`（`GHR_BITS=8` / `GSHARE_SZ` 表）⇒ ★ **移植**（★ **不是新设计** ⇒ 成本低）⇒ ★ **历史文档写的「13-bit」与代码不符 ⇒ 以代码为准**
+- [ ] **Step 1: 移植来源** —— ★ **2026-10-26 由「条件性」转为「本期做」**（★ 实测：增量 1 后 `cycles = 820513` / `dmips = 1.38731` ⇒ **未达 DMIPS 1.4**（阈值 = `cycles ≤ 813074`）⇒ AC-16 的「不达标 ⇒ MUST 拉回 GShare」分支被触发；★ 还差 **7439 拍 ≈ 0.91%**）⇒ ★ TLM 参考 `ip/cpu/plugins/branch_predictor.h` 的 `gshare_predict` / `gshare_update` / `global_history_`（`GHR_BITS=8` / `GSHARE_SZ` 表）⇒ ★ **移植**（★ **不是新设计** ⇒ 成本低）⇒ ★ **历史文档写的「13-bit」与代码不符 ⇒ 以代码为准**
 - [ ] **Step 2: CH_MEM 侧的历史寄存器** —— `ch_reg<ch_uint<8>>` 跨拍保持（★ PoC 已证 `ch_reg` 可跨拍保持）⇒ 索引 = `(pc ^ ghr) & literal(M-1)`
+- [ ] **Step 2b: ★★ 索引时序对齐（2026-10-26 审查新增 —— BLOCKER，D10 待签批）** —— ★ 预测在 **fetch NORMAL** 用 `pc_reg` 本拍值（`ibus_chmem.h:260` 的 `BP_PC`），更新在 **branch NORMAL** 用 `pc_lag` = **上一拍** `pc_reg`（`ibus_chmem.h:249`；时序见 `ibus_chmem.h:149-150`）⇒ **同一条分支的预测与更新相差 1 拍** ⇒ GHR 在此期间已移位（`branch_predictor_chmem.h:592-593`）⇒ ★ **更新的表项 ≠ 预测读的表项** ⇒ **GShare 学不到**（甚至被污染成随机 true ⇒ 负收益）
+  ⇒ ★★ **论证口径（v3 更正）**：★ **不得**用「TLM 是同拍 ⇒ 现实现偏离参考」作理由 —— 实测 TLM 参考的 predict 挂 **fetch NORMAL**（`branch_predictor.h:121-131`）、update 挂 **execute LATE**（`:134-144`），且 predict 结果在 TLM 流水线里**未被消费**（`:127-129`）⇒ TLM 的闭环性只在**单元测试口径**下成立 ⇒ ★ **正确理由 = 「读写同一表项」是 GShare 兑现收益的内在要求**，与参考是否同拍无关
+  ⇒ ★ **修法（MUST）**：`ghr_snap_`（`ch_reg<ch_uint<8>>`）在 fetch NORMAL 写 `<本拍 ghr>`；GShare **update 侧索引**改读 `ghr_snap_` 的**当前值**（= 上一拍 GHR = 预测该分支时的 GHR）⇒ ★ 与既有 `pred_*_buf_`（`ibus_chmem.h:146-168`，「fetch 写、下一拍 branch 读」的 1 拍快照）**同构**，已由 R11–R14 验证
+  ⇒ ★ **MUST NOT** 直接沿用 `get_ghr()` 的当前值做更新索引（= 现在的实装形态）
+- [ ] **Step 2c: ★★ GHR 驱动源收窄（v3 新增，D10）** —— `ghr_en = is_branch & !flushed`（★ **去掉 `jal_en`**）：① TLM 参考的 `update()` 只在 `OpClass::BRANCH` 时调用（`branch_predictor.h:138`）⇒ `jal`/`jalr` **从不**进 GHR；② 现实现把 jal 恒移入 1 ⇒ 无信息量的恒定比特**稀释只有 4 bit 的有效历史**；③ ★ 会破坏 Task 2h 的 2×2 正交性（`enable_uncond_` 同时改变 GHR 构成 ⇒ 归因污染）
 - [ ] **Step 3: 更新时机** —— 与 Bimodal **同一拍**更新（★ 顺序契约：branch NORMAL → 消费方 branch LATE）⇒ ★ **MUST NOT** 注册新 stage 名
 - [ ] **Step 4: 单元锚** —— GShare 索引 = `pc ^ ghr`（★ 断**值**不只断存在）⇒ 变异「改成纯 pc 索引 ⇒ RED」
+- [ ] **Step 4b: ★★ 读改写闭环锚 R18 + 观测口（v3 重写 —— 2026-10-26 双审后）** —— ★ 缺口：R15（索引值）/ R16（GHR 序列）/ R17（开关关闭）**都断不到「更新的表项 == 预测读的表项」** ⇒ 现实现可全绿而无收益
+  ⇒ ★★ **③ 观测口（先落，否则 R15–R19 物理上写不出来）**：现有 `get_gshare()` / `get_ghr()` 与 `gshare_rp_fetch_` 均在 `private:`（`branch_predictor_chmem.h:250`）之后 ⇒ 测试不可达 ⇒ **MUST 新增 3 个 payload**（值用 `uint_t<8>`，不改访问层级）：`BP_GSHARE_IDX`（fetch NORMAL，预测索引）/ `BP_GSHARE_UPD_IDX`（branch NORMAL，更新索引）/ `BP_GHR`（fetch NORMAL，当前 GHR）
+  ⇒ ★ **R18 判据（v3 改写 —— 原「计数器 ≥2」不可判定）**：恒 PC（`fetch_pc=0` ⇒ 用 `br_pc_`）+ **每拍 `is_branch=1 & taken=1`**（GHR 每拍必移位）⇒ 逐拍断言 `BP_GSHARE_UPD_IDX(t) == BP_GSHARE_IDX(t−1)`（★ 现有夹具 `Phase{end_tick,taken,flushed,fetch_pc,is_branch,is_jal}` 即可构造，**无需扩展夹具**）
+  ⇒ ★ 为什么不能用原写法：索引 mask=15 ⇒ GHR 低 4 位 4 拍内**饱和** ⇒ 稳态下修复版与 M19 的索引**重合** ⇒ M19 不 RED；瞬态期每次预测索引又都是「先读后写」⇒ 计数器恒 0 ⇒ 修复版也不 ≥2 ⇒ **该判据与「M19 MUST RED」不可同时成立**
+  ⇒ ★ **变异 M19** = 更新索引改回 `get_ghr()` 当前值（= Step 2b 的反例）⇒ **R18 MUST RED**
+- [ ] **Step 4c: ★ R19 GHR 驱动源锚（v3 新增）** —— 驱动 `is_branch=0 & is_jal=1` 的段 ⇒ `BP_GHR` 逐拍**不变**；★ **M20** = `ghr_en = (is_branch OR jal_en) & !flushed`（= Step 2c 的反例）⇒ **R19 MUST RED**
+  ⇒ ★ 锚文件 = `tests/cpu/test_cpu_chmem_bp_plugin.cpp`（R15–R19 同文件；R15–R17 / M16–M18 的定义见 `.rddf/plans/chmem-bp-btb-gshare-increments.md` §3.2 的锚清单表）
 
 ### Task 2g: ★ RAS 8-entry（★ v2.3 新增 —— **增量 2**，★ **新增设计**：TLM 参考**无**）
 
-- [ ] **Step 1: 前置判定** —— ★ **MUST 先看 Task 2h 的实测** ⇒ 若增量 1（+2f）已达净收益率 ≥ 84.5% ⇒ ★ **本 Task 显式结案为「本期不做」**（并登记）⇒ ★ **MUST NOT** 无条件开工
+- [ ] **Step 1: 前置判定** —— ★ **MUST 先看 Task 2h 的实测** ⇒ 若增量 1（+2f）已达 **`cycles ≤ 813074`（= DMIPS 1.4；D9 待签批）** ⇒ ★ **本 Task 显式结案为「本期不做」**（并登记）⇒ ★ **MUST NOT** 无条件开工
 - [ ] **Step 2: RAS 结构** —— 8-entry return-address stack（push on `jal`/`jalr` call、pop on `ret`）⇒ ★ **新增设计**（TLM 参考无 ⇒ 无可对照实现 ⇒ 成本高 ⇒ 排在最后）
 - [ ] **Step 3: `jalr` 建项** —— ★ 仅在 RAS 可用时 `jalr`/`ret` 才 MAY 建 BTB 项（★ AC-14：否则 `jalr` MUST NOT 建项 ⇒ `ret` 亦然）
 - [ ] **Step 4: 单元锚** —— call/ret 配对正确率 100%（★ 断**值**：栈顶地址逐拍比对）
@@ -343,8 +358,9 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
   | **BP=on，增量 1 开** | **820513** | **26034** | **78.3%** | **78041 / 78043 / 78791 / 79041** |
   ⇒ ★ **ΔFLUSH ≡ Δcycles ≡ 25987** ⇒ ★ 净收益率 **56.67% → 78.3%（+21.6pp）** ⇒ ★ 与 Step 5 的静态上界估算「~80%」**吻合**
   ⇒ ★★ **未达 84.5%** ⇒ ⇒ **GShare（Task 2f）转本期** ⇒ ★★ **实测更正**：「branchbench 上 `jal` 覆盖收益**结构性为零**」是**错的**（★ 静态分析只数了 `jal`，**漏了 `j`** ⇒ `j` = `jal x0` 同 opcode ⇒ 也在覆盖范围 ⇒ 4 档全部改善 ~6000 拍）⇒ ⇒ **branchbench 与 DHrystone 双证**
+  ⇒ ★ **AC-27 双分母（fail-closed，2026-10-26 审查补）**：★ 上表的净收益率分母 = **`FLUSH(off)` = 120065** ⇒ ★ MUST 同报 **`N_taken_total`** 口径并**取值较小者** ⇒ ★★ **v3 实测更正：`N_taken_total` 计数器全仓不存在** —— `--stats` 只输出 `BP_STATS hit=/miss=/pred_taken=`（`cpu_verilator_sim.cpp:381`），plugin 侧 `taken_count_` 计的是 **pred_taken**（`branch_predictor_chmem.h:733`）⇒ ★ **双分母需要新代码**（plugin 累计 actual-taken + `sim_main.cpp` 读出口 + runner 打印 `BP_TAKEN_TOTAL=` + 脚本缺字段 fail-closed）⇒ ★ **本表当前缺该列 ⇒ 增量 3 的量收益表 MUST 补齐**；★ 且 `tasks.md:117` 的 AC-27 已 `[x]` 而其 fail-closed 条款未满足 ⇒ 须按 increments 文件 §4 的 2.6 处置
 ⇒ ★★ **【2026-10-26 实测更正】** ★ 原判断「branchbench 的『校验和逐位相等』不能当增量生效的证据（增量收益在 branchbench 上**结构性为零**）」是**错的** ⇒ ★ 实测：增量 1 在 branchbench 4 档**全部改善 ~6000 拍**（78041/78043/78791/79041）且**校验和逐位不变**（103/183/147/101）⇒ ⇒ ★ **branchbench 是有效的增量生效证据**（★ 根因：静态分析**漏了 `j`** 站点 —— `j` = `jal x0` 同 opcode）⇒ ⇒ ★ 判据 = **branchbench + DHrystone 双证**
-- [ ] **Step 4: 决策 + 落点** —— 达标 ⇒ 绝对值门禁可恢复 ⇒ 剩余增量显式结案；不达标 ⇒ **MUST** 把下一档拉进本期 ⇒ ★ 三档全部用尽仍不达标 ⇒ 按 **P-3 临时口径**结案 + 移交后续 change ⇒ ★ **MUST NOT** 让本 change 因 AC 不可满足而**无法归档** ⇒ ★ 决策 MUST 落 **ADR-088 §5.3.2**（净收益率结论 + 绝对值门禁结论**分两件事**落）
+- [ ] **Step 4: 决策 + 落点** —— ★ **判据（2026-10-26 v3，D9 待签批）**：`Dhrystone cycles ≤ 813074`（整数比较，= DMIPS ≥ 1.4）⇒ 达标 ⇒ 绝对值门禁可恢复 ⇒ 剩余增量显式结案；不达标 ⇒ **MUST** 把下一档拉进本期 ⇒ ★ 三档全部用尽仍不达标 ⇒ 按 **P-3 临时口径**结案 + 移交后续 change ⇒ ★ **MUST NOT** 让本 change 因 AC 不可满足而**无法归档** ⇒ ★ 决策 MUST 落 **ADR-088 §5.3.2**（净收益率结论 + 绝对值门禁结论**分两件事**落）；★ **裁决表 MUST 4 行齐全**（on/off × uncond/gshare，含同 build `--no-bp` 对照行），缺行 ⇒ **不裁决**
 - [ ] **Step 5: 收益上界参考（★ 只供量级参考，不参与判据）** —— DHrystone `.text` 55 个分支站点 = 无条件 36（`ret` 16 / `jal` 15 / `j` 5）+ 条件 19 ⇒ BP=on 后残余 flush **26.0/iter 绝大部分是无条件跳转**（BTB 写使能 = `taken & is_branch` ⇒ `jal`/`ret` 从不建项）⇒ 增量 1 覆盖 `jal`/`j`（20/36）⇒ ★ **静态上界 ≈ 14/iter ≈ 28,000 cycles** ⇒ ★ **实测低于该上界 NOT 判 FAIL**（★ 真实命中率与 `ret` 占比未知）
 
 ### Task 3 / Task 4: ★**已作废**（不再实施）
@@ -381,7 +397,8 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 ### Task 7: 收口
 
 - [ ] **Step 1: 8 门禁** —— 全绿（`check_plugin_portability.sh` 的 Check 5/7/13 是本 change 的主要抓手）
-- [ ] **Step 2: 全量回归** —— `run_chipforge_tests.sh --all` ⇒ 0 退化
+- [ ] **Step 2: 全量回归** —— `run_chipforge_tests.sh --all` ⇒ 0 退化（★ **2026-10-26 新增前置**：`verilator_perf_baseline` 因 perf 基线陈旧**必 FAIL**（实测 820513 / DMIPS 1.38731 vs 基线 846500）⇒ ★ **MUST 先按 increments 文件路径 4.1 重录基线再跑本步**，否则「0 退化」不可达；★ 实测 `chipforge_tests_chmem` 单 entry **2856s（3.4× 文档基线 833s）** ⇒ 预留 **~50min**）
+- [ ] **Step 2b: 变异证据入库（2026-10-26 审查新增）** —— 把 `/tmp/opencode/pcmux_mut/run3.sh` 的变异配方落进 `tests/cpu/test_cpu_chmem_bp_plugin.cpp` 注释或 increments 文件 ⇒ ★ **MUST NOT** 只留 `/tmp` 引用（不可复现）
 - [ ] **Step 3: 台账更新（★v2：条数修正 + 族级同步）** —— **14 条** BP 相关条目逐条重判（10 条 `not-covered` + 4 条 `partial`）：10 条 → `covered`（CH_MEM 锚 = `branch_predictor_chmem.h` + 新 case + 实测）；4 条 `partial` → `covered`/`partial`（视 CH_MEM 是否实现对应语义）；3 条 TID → `not-covered` + 「CH_MEM 侧无框架级多线程 TID 机制」显式理由。
   - ⚠️ **必须同时改台账 §2 族级表**（`cpu` 族判定行）—— 条目级三态是**从族级继承**的（台账 §2 注记）⇒ 只改条目不改族级 ⇒ 台账自相矛盾，且 `check_coverage_parity_ledger.sh` **只查条目不查族级** ⇒ 漂移会静默通过
   - ⇒ 重判判据：**14 条条目态 + §2 族级判定行** 同时更新，且 `check_coverage_parity_ledger.sh` 仍 PASS
@@ -392,7 +409,7 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 
 ## Acceptance
 
-- [ ] AC-1: `ip/cpu/plugins/branch_predictor_chmem.h` 存在且实现 **BTB（256×64b，62b 打包：tag30+target30+valid+is_unconditional）+ Bimodal 2-bit PHT（256×2b）**；★ **GShare / RAS 明确不在范围内**（依架构简报 v2.1 §3.1）
+- [ ] AC-1: `ip/cpu/plugins/branch_predictor_chmem.h` 存在且实现 **BTB（256×64b，62b 打包：tag30+target30+valid+is_unconditional）+ Bimodal 2-bit PHT（256×2b）**；★ **2026-10-26 v2 更正**：原「GShare / RAS 明确不在范围内（依架构简报 v2.1 §3.1）」**已失效** ⇒ 增量范围由 **A5 决策 + Task 2h 实测**决定（增量 1 已落地；增量 3 因 78.3% 未达门槛已转本期）⇒ ★ **范围以 `openspec/changes/chmem-bp-btb-gshare/tasks.md` 的 AC-1 / AC-16 / AC-27 为唯一权威**
 - [ ] AC-2: `cpu_factory_chmem.h` **已注册** `BranchPredictorPluginChmem`（`grep` 可验），且 canonical ordering 断言 PASS
 - [ ] AC-3: ★**BP 相关 14 条台账条目全部重判完毕**（10 条 `not-covered` + 4 条 `partial`：`not_taken_returns_zero` / `multiple_addresses` / `reset` / `per_thread_ghr_isolation`）⇒ 每条有明确态 + CH_MEM 锚点 + 显式理由；且台账 **§2 族级判定行同步更新**（族级继承规则）
 - [ ] AC-4: ★ **BTB miss ⇒ 不预测**（不跳转、不 flush、不改 PC）⇒ ★ **MUST NOT** 用「static predict fallback」措辞（与主体 tasks AC-4 冲突；且 v1 该措辞隐含「miss 也改 PC」⇒ 语义错误）
@@ -444,7 +461,7 @@ payload；在 branch LATE 参与 PC-mux；branch stage 的真实信号驱动 BTB
 | `tools/measure_branchbench.sh` | ✓ owner（改名 / 按表头取列 / 捕获 stderr） | ✓ **仅追加** `--bp=on\|off` flag 行 + 生效值断言 | ✗（硬门禁） | ★ **捕获 stderr 归前置1**（否则假绿通道开着）⇒ 前置2 只加 flag |
 | `tools/verilator_runner/*` | ✓ `--stats` 框架 + `pc_changes`/PC 直方图（★ **NOT** retired） | ✓ **FLUSH 计数** + **retired 计数** + BP flag | ✓ `--no-bp` / `--btb-entries` + 回显 | ★ **框架归前置1**，增量归后两者，**MUST NOT** 另起一套 |
 | `ip/cpu/plugins/branch_predictor_chmem.h` | ✗（禁 `ip/**`） | ✓ **创建**（最小版） | ★ **v2.3.1 增量扩展为完整版**（★ 原写「**重写**」与「前置2 已建的版本 MUST **增量扩展**」**直接打架** ⇒ 现取**增量扩展**） | ★ 前置2 的 PoC 版 **MUST NOT** 被主体当作已完成；★ **MUST 保留**前置2 已验证的机制点（`bp_next` 情形 C 臂 / 门控 flush / `!flushed` 情形门控 / payload fail-fast / 5 个 `ch_reg` 纠错记录）⇒ 见 ② 主体 **AC-28**；★ 主体 AC-1 MUST 检查**完整功能**（非文件存在）；★ PoC 残留的**删除/重写责任归主体**；★ `tests/cpu/test_cpu_chmem_bp_poc.cpp` 的 8 case **在主体后 MUST 仍绿** |
-| `ip/cpu/plugins/branch_chmem.h`（导出 jal/jalr 判别 payload） | ✗ | ✓ **首次改**（`BRANCH_TAKEN_RAW` / `BRANCH_FLUSHED` / `IS_BRANCH` 三个 payload） | ✓ **二次改**：★ **增量 1 的「无条件」信号当前无来源**（`branch_chmem.h:201-203` 已算出 `is_jal`/`is_jalr` 但**未导出**）⇒ **MUST** 新增导出（`IS_JAL` / `IS_UNCOND`）⇒ ★ **MUST NOT** 让 BP 侧从 opcode 反推（branch 节点未导出 opcode） | ★ 主体 owner | 
+| `ip/cpu/plugins/branch_chmem.h`（导出 jal/jalr 判别 payload） | ✗ | ✓ **首次改**（`BRANCH_TAKEN_RAW` / `BRANCH_FLUSHED` / `IS_BRANCH` 三个 payload） | ✓ **二次改**：★ **增量 1 的「无条件」信号当前无来源**（`branch_chmem.h:201-203` 已算出 `is_jal`/`is_jalr` 但**未导出**）⇒ **MUST** 新增导出（`IS_JAL` / `IS_UNCOND`）⇒ ★ **MUST NOT** 让 BP 侧从 opcode 反推（branch 节点未导出 opcode） | ★ 主体 owner |
 | `ip/cpu/plugins/ibus_chmem.h`（`update_pc` 的 mux + flush） | ✗ | ✓ **首次改**（五级 mux + ★ **flush 门控**（`hold_z \| (taken_buf & !spec_ok_buf) \| mispredict_A_buf`；★ 「双分量」表述已作废）+ FLUSH 计数） | ✓ **二次改**（补完整语义 + 过时注释 #8） | ★ **同函数两次改** ⇒ 前置2 的版本 MUST 可被主体**增量扩展**（MUST NOT 要求主体重写）⇒ ★ 主体 MUST 继承前置2 的**四情形 select 链**结构 |
 | `ip/cpu/cpu_factory_chmem.h`（注册 + 开关 + 参数转发） | ✗ | ✓ **首次注册**（BP 开关） | ✓ **补全**（4 参数转发修复 #9 + 完整注册） | ★ 同上 ⇒ 增量扩展 |
 | `docs/architecture/tlm-coverage-parity-ledger.md` | ✗（硬禁） | ✗（硬禁） | ✓ owner | ✅ 闭合 |

@@ -2,7 +2,7 @@
 
 > **change**: `chmem-bp-btb-gshare-poc`（B1 ② 的**机制 PoC**）
 > **规模**: 小-中 · **前置**: `chmem-branch-microbench-fix`（★ 修 0c 的工作量污染）
-> **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` **v2.2** §2.1.2 / §3.4.2 / §4.2
+> **权威规格**: `ip/cpu/docs/bp-btb-gshare-design-brief.md` **v2.2** §2.1.2 / §3.4.2 / §4.2
 > **设计文档**: `openspec/changes/chmem-bp-btb-gshare/design.md`（五级 mux 契约 + 三步时序 + flush 门控）
 > ★ **AC 清单**: `openspec/changes/chmem-bp-btb-gshare-poc/tasks.md`（AC-F2-1 … AC-F2-17）
 > ★ **owner 表**: 见本 change 的 tasks.md（★ 本 change = 前置2 owner：`branch_predictor_chmem.h` 最小版 / `ibus_chmem.h` 首次改 / `cpu_factory_chmem.h` 首次注册 / FLUSH 计数）

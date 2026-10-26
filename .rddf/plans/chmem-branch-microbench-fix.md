@@ -2,7 +2,7 @@
 
 > **change**: `chmem-branch-microbench-fix`（B1 ② 的**地基修正**）
 > **规模**: 小 · **前置**: 无
-> **权威规格**: `docs/architecture/bp-btb-gshare-design-brief.md` **v2.2** §2.4 / §4.1
+> **权威规格**: `ip/cpu/docs/bp-btb-gshare-design-brief.md` **v2.2** §2.4 / §4.1
 > ★ **AC 清单**: `openspec/changes/chmem-branch-microbench-fix/tasks.md`（AC-F1-1 … AC-F1-7）
 > ★ **owner 表**: 见本 change 的 tasks.md（★ 本 change = 前置1 owner：`branchbench.c` / 基线 CSV 建列 / `measure_branchbench.sh` / `--stats` 框架 + `pc_changes`/PC 直方图（★ **NOT** retired —— retired 需 flush ⇒ 归前置2））
 
