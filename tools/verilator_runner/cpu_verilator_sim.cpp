@@ -17,6 +17,7 @@
 #ifdef CF_PLUGIN_USE_CH_MEM
 
 #include <cstdint>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -117,6 +118,8 @@ struct Options {
   //  - --btb-entries N: 逻辑条目数 M ∈ {16,32,64,128,256}（越界 fail-fast）
   bool enable_bp = true;
   std::uint32_t btb_entries = 256;
+  std::string json_path;      // "" => no JSON fragment
+  int reset_pulse = 1;        // 1 = legacy (reset for 1 cycle); 0 = parity mode
   // chmem-bp-btb-gshare ② 主体增量 1: `jal`/`j` 建 BTB 项（恒 taken 预测）
   //  - bp_uncond: 默认 true；--no-bp-uncond 关掉 ⇒ 用于「量收益」对比
   //    （② 主体 Task 2h 的「逐档独立测量」）
@@ -140,6 +143,15 @@ bool parse_args(int argc, char** argv, Options& opts) {
       opts.mmu_mode = argv[++i];
     } else if (a == "--enable-cache") {
       opts.enable_cache = true;
+    } else if (a == "--json" && i + 1 < argc) {
+      opts.json_path = argv[++i];
+    } else if (a == "--reset-pulse" && i + 1 < argc) {
+      const int v = std::atoi(argv[++i]);
+      if (v != 0 && v != 1) {
+        std::fprintf(stderr, "--reset-pulse expects 0 or 1 (got %d)\n", v);
+        return false;
+      }
+      opts.reset_pulse = v;
     } else if (a == "--stats") {
       opts.stats = true;
     } else if (a == "--stats-base" && i + 1 < argc) {
@@ -172,7 +184,10 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::printf("  --enable-mmu     emit plumbing-only no-op MMU hook (CH_MEM stub)\n");
       std::printf("  --mmu-mode <s>   mmu mode string for the log only (default \"bare\")\n");
       std::printf("  --enable-cache   fail-fast: L1Cache CH_MEM not implemented\n");
-      std::printf("  --stats          print PC_HIST lines (per-cycle PC value histogram,\n");
+      std::printf("  --json <path>    write a parity observation fragment (A2a inc-2)\n");
+  std::printf("  --reset-pulse <0|1>  reset for 1 cycle before running (default 1;\n");
+  std::printf("                   --reset-pulse=0 mirrors the Simulator baseline, contract S-3)\n");
+  std::printf("  --stats          print PC_HIST lines (per-cycle PC value histogram,\n");
       std::printf("                   INCLUDING speculative fetches - NOT a fetch/retire count)\n");
       std::printf("  --stats-base <h> histogram window base (default 0x80000000)\n");
       std::printf("  --stats-len <n>  histogram slots of 4 bytes (default 256)\n");
@@ -193,8 +208,32 @@ bool parse_args(int argc, char** argv, Options& opts) {
   return !opts.elf_path.empty();
 }
 
+// Determinism fingerprint of the elaboration (contract S-2): identical on the
+// Simulator side (tools/parity_runner) because both drivers elaborate the same
+// build_cpu configuration. Note this is taken from the DAG in THIS process —
+// not from the emitted netlist — so the two sides are directly comparable.
+struct Determinism {
+  std::uint64_t node_count = 0;
+  std::uint64_t names_hash = 0;
+};
+
+namespace {
+constexpr std::uint64_t kFnvOffset = 1469598103934665603ull;
+constexpr std::uint64_t kFnvPrime = 1099511628211ull;
+std::uint64_t det_hash_names(std::vector<std::string> names) {
+  std::sort(names.begin(), names.end());
+  std::uint64_t h = kFnvOffset;
+  for (const auto& n : names) {
+    for (char c : n) h = (h ^ static_cast<std::uint8_t>(c)) * kFnvPrime;
+    h = (h ^ 0xFFu) * kFnvPrime;  // separator (same as parity_sim_runner)
+  }
+  return h;
+}
+}  // namespace
+
 // Build the CH_MEM CPU with the vendored ELF preloaded and emit Verilog.
-bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf) {
+bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf,
+                      Determinism* det) {
   ch::core::context ctx("cpu_verilator_sim");
   ch::core::ctx_swap guard(&ctx);
   auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(
@@ -214,6 +253,15 @@ bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf)
   std::string mkdir_work = "mkdir -p " + opts.work_dir;
   if (!run_shell(mkdir_work)) return false;
   pb->elaborate(ctx);
+  if (det) {
+    std::vector<std::string> names;
+    names.reserve(ctx.get_nodes().size());
+    for (const auto& node : ctx.get_nodes()) {
+      if (node) names.push_back(node->name());
+    }
+    det->node_count = static_cast<std::uint64_t>(names.size());
+    det->names_hash = det_hash_names(std::move(names));
+  }
   pb->to_verilog(opts.verilog_path);
   return true;
 }
@@ -279,8 +327,8 @@ int main(int argc, char** argv) {
   // ★ N4: 关态**不**回显 entries（否则易被脚本误读为「生效值」）
   if (opts.enable_bp) {
     // ★ 增量 1 的生效值也回显（★ 测量脚本据此断言 flag 确实生效）
-    std::fprintf(stderr, "BP=on btb_entries=%u bp_uncond=%s\n", opts.btb_entries,
-                 opts.bp_uncond ? "on" : "off");
+    std::fprintf(stderr, "BP=on btb_entries=%u bp_uncond=%s\n",
+                 opts.btb_entries, opts.bp_uncond ? "on" : "off");
   } else {
     std::fprintf(stderr, "BP=off\n");
   }
@@ -295,7 +343,8 @@ int main(int argc, char** argv) {
   auto p = elf_name.rfind('/');
   if (p != std::string::npos) elf_name = elf_name.substr(p + 1);
 
-  if (!generate_verilog(opts, elf)) return 1;
+  Determinism det;
+  if (!generate_verilog(opts, elf, &det)) return 1;
   if (!build_libvtop(opts)) return 1;
 
   std::string so = opts.work_dir + "/obj_dir/libVtop.so";
@@ -317,6 +366,100 @@ int main(int argc, char** argv) {
 
   void* top = new_vtop();
   int rc;
+
+  // ── Parity path (A2a inc-2): used when a JSON fragment is requested or when
+  //    reset_mode must match the Simulator baseline (--reset-pulse=0).
+  //    The legacy paths below stay byte-identical so the 48-ELF baseline is
+  //    not perturbed.
+  if (opts.reset_pulse == 0) {
+    // ★ Measured 2026-10-26: the emitted Verilog loads ch_reg init values ONLY
+    //   on the reset edge (`else pc <= 32'h80000000;`). Skipping the pulse
+    //   therefore starts PC at 0 (x30 becomes 0x1000 instead of 0x80001000) --
+    //   cycles can still "match" because the dmem window is base-agnostic.
+    //   => reset_pulse=0 is NOT parity-compatible; keep it as a diagnostic.
+    std::fprintf(stderr,
+                 "WARNING: --reset-pulse 0 skips ch_reg initialisation (Verilog "
+                 "loads init only on the reset edge) => NOT parity-compatible\n");
+  }
+
+  if (!opts.json_path.empty() || opts.reset_pulse == 0) {
+    struct CfParityObs {
+      std::uint64_t tohost;
+      std::uint64_t cycles;
+      std::uint64_t regs_hash;
+      std::uint64_t pchash;
+      std::uint64_t pc_samples;
+      std::uint32_t timed_out;
+      std::uint32_t pc_head[8];
+      std::uint32_t regs_raw[31];
+    };
+    auto* run_parity = reinterpret_cast<int (*)(void*, std::uint32_t, int,
+                                                CfParityObs*)>(
+        dlsym(handle, "cf_run_sim_parity"));
+    if (!run_parity) {
+      std::fprintf(stderr, "dlsym cf_run_sim_parity failed: %s\n", dlerror());
+      delete_vtop(top);
+      dlclose(handle);
+      return 1;
+    }
+    CfParityObs obs{};
+    rc = run_parity(top, opts.max_cycles, opts.reset_pulse, &obs);
+    delete_vtop(top);
+    dlclose(handle);
+
+    char hex_regs[24], hex_pc[24], hex_det[24];
+    std::snprintf(hex_regs, sizeof(hex_regs), "%016llx",
+                  static_cast<unsigned long long>(obs.regs_hash));
+    std::snprintf(hex_pc, sizeof(hex_pc), "%016llx",
+                  static_cast<unsigned long long>(obs.pchash));
+    std::snprintf(hex_det, sizeof(hex_det), "%016llx",
+                  static_cast<unsigned long long>(det.names_hash));
+
+    std::string json;
+    json += "{\n";
+    json += "  \"backend\": \"verilator\",\n";
+    json += "  \"elf\": \"" + elf_name + "\",\n";
+    json += "  \"reset_mode\": \"" +
+            std::string(opts.reset_pulse ? "pulse1" : "none") + "\",\n";
+    json += "  \"determinism\": { \"node_count\": " +
+            std::to_string(det.node_count) + ", \"names_hash\": \"" + hex_det +
+            "\" },\n";
+    json += "  \"observations\": {\n";
+    json += "    \"tohost\": " + std::to_string(obs.tohost) + ",\n";
+    json += "    \"regs\": \"" + std::string(hex_regs) + "\",\n";
+    json += "    \"cycles\": " + std::to_string(obs.cycles) + ",\n";
+    json += "    \"pchash\": \"" + std::string(hex_pc) + "\",\n";
+    json += "    \"pc_samples\": " + std::to_string(obs.pc_samples) + ",\n";
+    json += "    \"memsig\": null\n";
+    json += "  },\n";
+    json += "  \"pc_head\": [";
+    for (int i = 0; i < 8; ++i) {
+      json += (i ? ", " : "") + std::to_string(obs.pc_head[i]);
+    }
+    json += "],\n";
+    json += "  \"regs_raw\": [";
+    for (int i = 0; i < 31; ++i) {
+      json += (i ? ", " : "") + std::to_string(obs.regs_raw[i]);
+    }
+    json += "],\n";
+    json += "  \"done\": " +
+            std::string(obs.timed_out ? "false" : "true") + ",\n";
+    json += "  \"timeout\": " +
+            std::string(obs.timed_out ? "true" : "false") + "\n";
+    json += "}\n";
+
+    if (!opts.json_path.empty()) {
+      std::ofstream out(opts.json_path);
+      if (!out) {
+        std::fprintf(stderr, "cannot write %s\n", opts.json_path.c_str());
+        return 2;
+      }
+      out << json;
+    }
+    std::fputs(json.c_str(), stdout);
+    return rc;
+  }
+
   if (opts.stats) {
     auto* run_stats =
         reinterpret_cast<int (*)(void*, std::uint32_t, const char*,

@@ -334,6 +334,7 @@ int main(int argc, char** argv) {
   const auto t0 = std::chrono::steady_clock::now();
   std::uint64_t pchash = kFnvOffset;
   std::uint64_t pc_samples = 0;
+  std::uint32_t pc_head[8] = {0, 0, 0, 0, 0, 0, 0, 0};  // first 8 samples
   std::uint64_t tohost_val = 0;
   std::uint64_t cycles = 0;
   bool timed_out = false;
@@ -350,7 +351,9 @@ int main(int argc, char** argv) {
       obs_error = !pc_v ? "pc slot missing" : "tohost slot missing";
       break;
     }
-    pchash = fnv_u32le(pchash, static_cast<std::uint32_t>(*pc_v));
+    const auto pc_u32 = static_cast<std::uint32_t>(*pc_v);
+    if (pc_samples < 8) pc_head[pc_samples] = pc_u32;
+    pchash = fnv_u32le(pchash, pc_u32);
     ++pc_samples;
     tohost_val = *th_v;
 
@@ -374,6 +377,7 @@ int main(int argc, char** argv) {
 
   // ── final regs hash (contract S-5: x1..x31, 32-bit LE, ascending) ───────
   std::uint64_t regs_hash = kFnvOffset;
+  std::uint32_t regs_raw[31] = {0};
   {
     const auto& dm = sim->data_map();
     for (int i = 1; i < kNumX; ++i) {
@@ -382,7 +386,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "observation error: reg_%d slot missing\n", i);
         return 2;
       }
-      regs_hash = fnv_u32le(regs_hash, static_cast<std::uint32_t>(*v));
+      regs_raw[i - 1] = static_cast<std::uint32_t>(*v);
+      regs_hash = fnv_u32le(regs_hash, regs_raw[i - 1]);
     }
   }
 
@@ -420,6 +425,16 @@ int main(int argc, char** argv) {
   json += "    \"pc_samples\": " + std::to_string(pc_samples) + ",\n";
   json += "    \"memsig\": null\n";
   json += "  },\n";
+  json += "  \"pc_head\": [";
+  for (int i = 0; i < 8; ++i) {
+    json += (i ? ", " : "") + std::to_string(pc_head[i]);
+  }
+  json += "],\n";
+  json += "  \"regs_raw\": [";
+  for (int i = 0; i < 31; ++i) {
+    json += (i ? ", " : "") + std::to_string(regs_raw[i]);
+  }
+  json += "],\n";
   json += "  \"done\": " + std::string(done ? "true" : "false") + ",\n";
   json += "  \"timeout\": " + std::string(timed_out ? "true" : "false") + ",\n";
   json += "  \"timings\": { \"sim_ms\": " + std::to_string(sim_ms) + " }\n";

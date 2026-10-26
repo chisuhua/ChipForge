@@ -56,6 +56,78 @@ constexpr std::uint32_t kToHostWord = 0x400;  // dmem[(0x80001000 - 0x80000000)/
 
 }  // anonymous namespace
 
+// ── Double-backend parity observations (A2a inc-2) ──────────────────────
+// Field names/semantics MUST match tools/parity_runner/parity_sim_runner.cpp
+// exactly — the comparator (A2b) reads both JSON fragments by the same keys.
+struct CfParityObs {
+  std::uint64_t tohost;       // last sampled tohost value
+  std::uint64_t cycles;       // tick count up to (and including) the done cycle
+  std::uint64_t regs_hash;    // x1..x31, 32-bit LE ascending, FNV-1a 64
+  std::uint64_t pchash;       // per-cycle ordered FNV-1a over the sampled PC
+  std::uint64_t pc_samples;   // number of PC samples folded into pchash
+  std::uint32_t timed_out;    // 1 => cycle cap reached without done bit
+  std::uint32_t pc_head[8];   // first 8 PC samples (diagnostics / S-8)
+  std::uint32_t regs_raw[31]; // x1..x31 raw values (diagnostics)
+};
+
+namespace {
+
+constexpr std::uint64_t kFnvOffset = 1469598103934665603ull;
+constexpr std::uint64_t kFnvPrime = 1099511628211ull;
+
+inline std::uint64_t fnv_u8(std::uint64_t h, std::uint8_t b) {
+  return (h ^ b) * kFnvPrime;
+}
+inline std::uint64_t fnv_u32le(std::uint64_t h, std::uint32_t v) {
+  for (int i = 0; i < 4; ++i) {
+    h = fnv_u8(h, static_cast<std::uint8_t>((v >> (8 * i)) & 0xFFu));
+  }
+  return h;
+}
+
+// reg_1..reg_31 are emitted as top-level `_reg_N` by CppHDL codegen (verified:
+// the emitted Verilog declares `_reg_0`..`_reg_31`, same `_`-prefix convention
+// as `_pc`). Read through --public-flat-rw.
+inline std::uint32_t read_reg(Vtop* vtop, int idx) {
+  auto* r = vtop->rootp;
+  switch (idx) {
+    case 1: return r->top__DOT___reg_1;
+    case 2: return r->top__DOT___reg_2;
+    case 3: return r->top__DOT___reg_3;
+    case 4: return r->top__DOT___reg_4;
+    case 5: return r->top__DOT___reg_5;
+    case 6: return r->top__DOT___reg_6;
+    case 7: return r->top__DOT___reg_7;
+    case 8: return r->top__DOT___reg_8;
+    case 9: return r->top__DOT___reg_9;
+    case 10: return r->top__DOT___reg_10;
+    case 11: return r->top__DOT___reg_11;
+    case 12: return r->top__DOT___reg_12;
+    case 13: return r->top__DOT___reg_13;
+    case 14: return r->top__DOT___reg_14;
+    case 15: return r->top__DOT___reg_15;
+    case 16: return r->top__DOT___reg_16;
+    case 17: return r->top__DOT___reg_17;
+    case 18: return r->top__DOT___reg_18;
+    case 19: return r->top__DOT___reg_19;
+    case 20: return r->top__DOT___reg_20;
+    case 21: return r->top__DOT___reg_21;
+    case 22: return r->top__DOT___reg_22;
+    case 23: return r->top__DOT___reg_23;
+    case 24: return r->top__DOT___reg_24;
+    case 25: return r->top__DOT___reg_25;
+    case 26: return r->top__DOT___reg_26;
+    case 27: return r->top__DOT___reg_27;
+    case 28: return r->top__DOT___reg_28;
+    case 29: return r->top__DOT___reg_29;
+    case 30: return r->top__DOT___reg_30;
+    case 31: return r->top__DOT___reg_31;
+    default: return 0u;  // x0 is not observed (contract S-5)
+  }
+}
+
+}  // namespace
+
 extern "C" {
 
 void* cf_new_vtop() { return new Vtop; }
@@ -231,6 +303,80 @@ int cf_run_sim_stats(void* top, std::uint32_t max_cycles, const char* elf_name,
   const bool pass = done && (tohost_raw == 1);
   const char* name = elf_name ? elf_name : "?";
   std::printf("TOHOST=%u CYCLES=%u ELF=%s %s\n", tohost_raw, cycles, name,
+              !done ? "TIMEOUT" : (pass ? "PASS" : "FAIL"));
+  return pass ? 0 : 1;
+}
+
+// ── Double-backend parity observations (A2a inc-2) ─────────────────────────
+//
+// Contract: docs/architecture/parity-gate-contract.md S-3/S-5/S-7/S-8.
+// Field names/semantics MUST match tools/parity_runner/parity_sim_runner.cpp
+// exactly — the comparator (A2b) reads both JSON fragments by the same keys.
+
+
+// Parity-mode run: identical loop shape to cf_run_sim / parity_sim_runner,
+// plus the ②/⑤ observations. `reset_pulse = 0` reproduces the Simulator-side
+// baseline (which never resets, to keep the PC init value) — contract S-3.
+int cf_run_sim_parity(void* top, std::uint32_t max_cycles, int reset_pulse,
+                      CfParityObs* out) {
+  auto* vtop = static_cast<Vtop*>(top);
+
+  if (reset_pulse) {
+    vtop->default_clock = 0;
+    vtop->default_reset = 1;
+    vtop->eval();
+    vtop->default_clock = 1;
+    vtop->eval();
+    vtop->default_reset = 0;
+    vtop->default_clock = 0;
+    vtop->eval();
+  }
+
+  std::uint32_t tohost_raw = 0;
+  std::uint32_t done_bit = 0;
+  std::uint64_t cycles = 0;
+  std::uint64_t pchash = kFnvOffset;
+  std::uint64_t pc_samples = 0;
+  std::uint32_t pc_head[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+  for (std::uint32_t i = 0; i < max_cycles && done_bit == 0; ++i) {
+    vtop->default_clock = 1;
+    vtop->eval();
+    vtop->default_clock = 0;
+    vtop->eval();
+    ++cycles;
+
+    const auto pc_now = vtop->rootp->top__DOT___pc;
+    if (pc_samples < 8) pc_head[pc_samples] = pc_now;
+    pchash = fnv_u32le(pchash, pc_now);
+    ++pc_samples;
+
+    tohost_raw = vtop->rootp->top__DOT__dmem[kToHostWord];
+    done_bit = tohost_raw & 0x1u;
+  }
+
+  std::uint64_t regs_hash = kFnvOffset;
+  std::uint32_t regs_raw[31] = {0};
+  for (int i = 1; i <= 31; ++i) {
+    regs_raw[i - 1] = read_reg(vtop, i);
+    regs_hash = fnv_u32le(regs_hash, regs_raw[i - 1]);
+  }
+
+  if (out) {
+    out->tohost = tohost_raw;
+    out->cycles = cycles;
+    out->regs_hash = regs_hash;
+    out->pchash = pchash;
+    out->pc_samples = pc_samples;
+    out->timed_out = (done_bit == 0) ? 1u : 0u;
+    for (int i = 0; i < 8; ++i) out->pc_head[i] = pc_head[i];
+    for (int i = 0; i < 31; ++i) out->regs_raw[i] = regs_raw[i];
+  }
+
+  const bool done = (done_bit != 0);
+  const bool pass = done && (tohost_raw == 1);
+  std::printf("TOHOST=%u CYCLES=%llu %s\n", tohost_raw,
+              static_cast<unsigned long long>(cycles),
               !done ? "TIMEOUT" : (pass ? "PASS" : "FAIL"));
   return pass ? 0 : 1;
 }
