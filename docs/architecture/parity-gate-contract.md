@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.0（2026-10-26，builder，change `parity-gate-spec`）**
+> **Status**: ✅ **v1.1（2026-10-26，builder；v1.1 = C-1/C-2 裁决落定 + A2a increment 1 实测吞吐入契约）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -52,6 +52,8 @@
 | S2-10 | `tohost` 探针节点名 = `tohost_probe_data_proxy`（固定 word 偏移的 `aread` 探针） | `ip/cpu/plugins/dmem_chmem.h:214-222` |
 | S2-11 | 现有 ELF 测试：**每拍** `get_value_by_name("tohost_probe_data_proxy")` + 自数 `cycles`；`kMaxCycles = 1500`；★ **不调 `sim->reset()`**（reset 会用 `rst_val` 覆盖 PC 初值 `0x80000000`） | `tests/cpu/test_cpu_chmem_vendored_elf.cpp:43,157-172` |
 | S2-12 | 跨阶段 payload key 命名：`cpu.pc` / `cpu.mem_addr` / `cpu.mem_data` / `cpu.mem_size` / `cpu.rd_data` / `cpu.rd_idx` … | `ip/cpu/core/payload_common.h:118-170` |
+| ★ S2-13 | **实测吞吐 ≈ 9.1 拍/s**（`rv32ui-p-add`：478 拍 / **52.8 s** / DAG **2485** 节点）⇒ `--no-bp` 与默认 BP 无显著差异（200 拍：21 s vs 24 s）⇒ 瓶颈是解释器本身 | A2a increment 1 实测（`tools/parity_runner`） |
+| ★ S2-14 | ★ **ADR-089 早前引用的「575 拍/s」高估约 60×** ⇒ 一切「按拍数估时长」的预算 MUST 以本行为准 | 同上 |
 
 ### 2.2 Verilator 侧
 
@@ -294,6 +296,7 @@ loop:
 - **PR 层**：ELF 子集 **≤ 8**（MUST 含 `add`/`sub`/`lw`/`sw`/`beq` 类 + 1 个 rv32um）+ branchbench **0 档**。
 - **夜间层**：49 corpus（47 ELF + 4 档分支微基准 = 51 − ?，以 S-13 清单为准全部覆盖）。
 - ★ Verilog 构建产物 MUST **按 config 缓存**（key = 插件集 + 参数 hash，目录 `build/parity/vl_cache/<key>/`）；同一 config 的 47 ELF MUST 只编译一次（V2-6 现状每 ELF 都重编译，直接采纳会爆预算）。
+- ★★ **branchbench 在 Simulator 侧的 cap MUST ≤ 20,000 拍**（实测 ≈ 9.1 拍/s ⇒ 20k ≈ 37 min/档）；`--cycles 2,000,000`（Verilator 侧现状默认）在 Simulator 侧 ≈ 61 小时/档，**不可行** ⇒ 若某档无法在 cap 内到达 done，MUST 登记为「该 corpus 仅 Verilator 侧可跑」的显式豁免（走 S-11），**MUST NOT** 静默跳过。
 - 时长阈值：★ **本期不设未实测的硬阈值**；A4 MUST 先把实测 p95 写进报告 `timings`，再据此定阈值。
 
 **验收方式**：机检（缓存命中率 = N-1/N；分层集合 ⊆ S-13 清单）；人工（A4 定阈值）。
@@ -418,9 +421,9 @@ branchbench_m0	branchbench	build/branchbench_m0.elf
 
 | id | 事项 | 现状 | 谁定 |
 |---|---|---|---|
-| **C-1** | 确定性不符归 `FAIL` 还是 `ERROR` | `ADR-089` D2 用词「FAIL」；本契约按三态语义归 **ERROR**（`determinism_mismatch`）⇒ 行为一致（都不再比对），仅分类不同 | architect |
-| **C-2** | `reset_mode = none` 需要 Verilator 侧新增开关（默认行为不变） | 两侧现状不同（S2-11 vs V2-4）⇒ 必须统一 | architect（同意后 A2a 落） |
-| **O-1** | PC 采样实测 offset | 原理推测 0，未实测 | A2a |
+| **C-1** | 确定性不符归 `FAIL` 还是 `ERROR` | ✅ **已裁决（2026-10-26，Oracle 建议 + 用户采纳）：归 `ERROR(2)` + `error_kind = determinism_mismatch`** ⇒ `ADR-089` 升 v1.3 同步 D2/V-1/V-2 三处措辞；A3 的「既存分歧清单」只收 exit 1 | ✅ 已闭合 |
+| **C-2** | `reset_mode = none` 需要 Verilator 侧新增开关（默认行为不变） | ✅ **已裁决（2026-10-26 用户）：`reset_mode = none`**；★ 且 increment 1 实测发现 `rv32ui-p-add` 在「Simulator 无 reset」与「Verilator 打 1 拍 pulse」下 **cycles 同为 478** ⇒ reset pulse 当前未扰动计数，但**仍按 S-3 统一为 none**（不依赖"恰好没炸"） | ✅ 已闭合（Verilator 开关待 A2a inc-2 落） |
+| **O-1** | PC 采样实测 offset | 🟡 **部分证据（inc-1）**：同 ELF 两侧 `cycles` 同为 **478**（Simulator 478 / Verilator 478）⇒ 至少总拍数无偏移；`pchash` 比对待 Verilator 侧导出（inc-2） | A2a inc-2 |
 | **O-2** | Verilator 侧 `reg_1..31` 的实际信号名 | 推测 `top__DOT___reg_1` | A2a |
 | **O-3** | `memsig` 探针的触发条件（哪个 stage / 哪个 payload 组）与 hash 常数 | 语义已定（S-6），机制细节待实现 | A2a |
 | **O-4** | Verilog 构建缓存形态（复用 `--work-dir` vs hash 目录） | 未定 | A4 |
