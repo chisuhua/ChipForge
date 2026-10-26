@@ -1,6 +1,6 @@
 # ADR-089 — 双后端差分 parity 门禁（同一模型 × 两后端）
 
-> **Status**: ✅ **Accepted（v1.0，2026-10-26，architect 主持）**
+> **Status**: ✅ **Accepted（v1.2，2026-10-26，architect 主持；v1.2 = A1 实施期代码事实更正，见 D2 ②）**
 > **上游**: ADR-083（Plugin-style 单一 source of truth）· ADR-040 v2.0（CH_MEM 是新正道）· ADR-088（TLM 后端退役；本 ADR 是其 **B3 删除的前置契约**）
 > **下游**: `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A）· `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（阶段 B/C）· `objective-ip-cpu-tlm-backend-retirement`（B3 门禁）
 > **执行文件（待 planner 落）**: `.rddf/plans/`（阶段 A 的 change 计划，★ 归 builder 起草）
@@ -57,7 +57,7 @@
 | # | 观测量 | 强度 | 说明 |
 |---|---|---|---|
 | ① | `tohost` | bit-exact | 现状保留（最弱判据） |
-| ② | 最终寄存器堆（`x1..x31`） | **bit-exact** | 最强功能判据，成本低；★ Verilator 侧经 `--public-flat-rw` 读 `reg_0..31`（`reg_file_chmem.h:166-169` 显式命名）；Simulator 侧经 `get_signal_id_by_name` + `data_map()` 直读 |
+| ② | 最终寄存器堆（`x1..x31`） | **bit-exact** | 最强功能判据，成本低；★ Verilator 侧经 `--public-flat-rw` 读 `reg_0..31`（`reg_file_chmem.h:166-169` 显式命名）；★ Simulator 侧 ⇒ **一次性**遍历 `ctx()->get_nodes()` 按 `node->name()` 解 id，再 `static_cast<uint64_t>(data_map().at(id))` 直读（`sdata_type::operator uint64_t()` 是 **explicit**，`types.h:96`；`data_map_t` = `unordered_map<uint32_t, sdata_type>`，`ast/instr_base.h:15`） ⇒ ★★ **MUST NOT** 用 `get_signal_id_by_name`（它只查 **trace 注册表** `signals_`（`simulator.h:557`），而 trace **默认关**（`Simulator(ctx, trace_on=false)`）⇒ 不可作通用解析器）；★ **MUST NOT** 每拍 `get_value_by_name`（`simulator.cpp:455-470` 实测 O(nodes) 线性扫描） |
 | ③ | ★ **DUT 自算内存签名（mailbox）** | **bit-exact** | ★ **首选落法 = DUT 侧自算签名写 mailbox**（branchbench 的 tohost 已是 32-bit 校验和形态 ⇒ 同款）⇒ ★ **不是** host 全内存 dump（★ **Simulator 侧 `Simulator::get_memory()` 是空 stub** 且被未启用的 `ENABLE_MEMORY_API` 包住 ⇒ 无 host 读出通道）⇒ host dump 留作**增强项**（待上游实装或 dmem 探针阵列）⇒ 白名单登记「host dump = 待上游」 |
 | ④ | **总 cycle 数（标量）** | **bit-exact** | ★ **措辞更正**：标量无「逐拍」可言 ⇒ ★ **「逐拍相等」的语义全部归 ⑤**；④ 只做「总拍数相等」 |
 | ⑤ | ★ **逐拍采样 PC 流 hash** | **bit-exact** | ★ **逐拍判据的载体**；★ 轨迹定义（采样点 = fetch / commit？采样率？）**归 A1 细则**，且 MUST 钉死采样相位（Simulator = `tick()` 返回后；Verilator = `clk 1→0` eval 对之后） |
@@ -174,12 +174,12 @@
 
 1. ⚠️ **阶段 C 会删掉唯一的亚秒级回归环**：实测 TLM binary **432 case ≈ 0.6s** vs CH_MEM Simulator **vendored 47 ≈ 1594s（~34s/ELF）** vs Verilator（dhrystone 端到端含 Verilog 生成 + Verilator 编译）**18.85s** ⇒ ⇒ **CI build 能力必须先到位**（D6 硬前置 ②）。
 2. ⚠️ **差分门禁的运行成本**：每 corpus 需两后端各跑一次 ⇒ Verilator 侧每次都要 Verilog 生成 + 编译 ⇒ 门禁时长须预算（★ 用 vendored 47 + branchbench 4 档起步 ⇒ 与 Q2 一致）。
-4. ⚠️ **例外白名单有被滥用的风险** ⇒ 纪律：每条例外须带 **5 项**（机制说明 / 上游状态+issue 链接 / 变异对照 / **收敛期限** / **corpus 作用域**）；★ 白名单 MUST 由 **architect** 审（不得由实施者自行扩张）；★ 条目数 > N ⇒ 强制 architect 复审；★ 常驻 1 条合成例外防机制腐化。
+3. ⚠️ **例外白名单有被滥用的风险** ⇒ 纪律：每条例外须带 **5 项**（机制说明 / 上游状态+issue 链接 / 变异对照 / **收敛期限** / **corpus 作用域**）；★ 白名单 MUST 由 **architect** 审（不得由实施者自行扩张）；★ 条目数 > N ⇒ 强制 architect 复审；★ 常驻 1 条合成例外防机制腐化。
 4. ⚠️ **「Verilator 每次都要生成 + 编译」是现状的坏成本模型**（`cpu_verilator_sim.cpp:202-260` 每次调用都 `generate_verilog()` + `verilator --cc` + `g++`）⇒ ★ **MUST NOT** 把该现状写成契约约束 ⇒ ★ **harness MUST 按 config 缓存 Verilog 构建产物**（同 config 的 47 ELF 只 build 一次）⇒ ★ 否则门禁时长预算直接爆炸。
 5. ⚠️ **elaboration 确定性不是免费性质** ⇒ Verilator 侧按名采集（`--public-flat-rw`）⇒ 上游若改了信号名/发射顺序 ⇒ **静默错位** ⇒ ★ 确定性判据（D2）必须先于观测量比对。
 6. ⚠️ **CI build 能力是必要但不充分** —— 它解决「有没有保护」，不解决「开发者本地快环」⇒ ★ **补强方案 = 单元级快车道**：CH_MEM Simulator 的**单元级**测试（`[keys]` / `[alu][semantics]` / `[mmu-chmem-basic]` 这类不跑 ELF 的）本身比 ELF 端到端快几个量级（★ 1594s 的大头是 47 个 ELF 的 context + elaborate + 仿真）⇒ ★ **PR 级快环 = CH_MEM 单元级 + 小子集 ELF 差分**；全量差分进夜间 ⇒ ★ 该方案**不依赖 TLM 存活**。
 7. ★ **待测项（不进任何承诺）**：CppHDL Simulator 自带 JIT 通道（`simulator.h:90-97` `set_jit_enabled` / `try_jit_compile`）⇒ 若可用可大幅压缩 Simulator 时长 ⇒ 阶段 C 前值得花 ~0.5 人日实测（★ 现状未知 ⇒ **MUST NOT** 写进工期承诺）。
-4. ⚠️ **cycle 逐拍相等可能要求上游 CppHDL 多轮对齐**（像 `c27543d` 那样）⇒ 阶段 A 的工期不确定 ⇒ ★ **兜底**：例外白名单（带收敛计划）⇒ **MUST NOT** 用容差替代。
+8. ⚠️ **cycle 逐拍相等可能要求上游 CppHDL 多轮对齐**（像 `c27543d` 那样）⇒ 阶段 A 的工期不确定 ⇒ ★ **兜底**：例外白名单（带收敛计划）⇒ **MUST NOT** 用容差替代。
 
 ---
 
