@@ -11,6 +11,8 @@ phase_refs: [phase-4, phase-5]
 
 **目标**：ChipForge 只保留 CH_MEM 单一仿真/实现后端（可生成 Verilog → Verilator），退役 TLM（C++ 直仿）后端。
 
+> ★★ **2026-10-26 目标态定案（architect + planner）**：**一个模型（CH_MEM）+ 两个后端（CppHDL Simulator / Verilator）+ 一道双后端差分 parity 门禁** ⇒ ★ **TLM 是过渡期的第三条腿**（提供亚秒级快环），★ **不是** parity 的一条腿 ⇒ ★ **一致性证据从「463 条台账计数」换成「同一输入的确定性双后端差分执行」**（ADR-089）⇒ ★ 本 feature 的阶段划分改为 **A/B/C 三段**（见下），B3（阶段 C）**加 5 条硬前置** ⇒ 详见 `objective-backend-parity-and-single-model`（完整路线图）与 ADR-088 v1.4 §10。
+
 **当前状态（2026-10-23 实测）**：项目已把 CH_MEM 定为"新正道"（ADR-040 v2.0），但仓库仍以 TLM 为主干 —— 双后端不仅重复，而且**已经产生同 ISA 不同语义**：
 
 | 子系统 | TLM 侧 | CH_MEM 侧 | 后果 |
@@ -98,6 +100,11 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 - [ ] **B1 决策定案**：6 个决策问题已由 architect 定案 ✅（2026-10-24）—— 详见 [`tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/tlm-retirement-b1-capacity-plan.md) §5（含 change 立项清单 + 顺序）
 - [ ] **B1**：CH_MEM 侧 LSU 全宽度 + MMU PTW walk FSM + MMU exception handler 注册 + BP CH_MEM 版 全部落地
 - [x] **B2**：ADR-088 §语义裁决表 5 个子系统逐条表态，M 扩展 cycle 裁决明确 ✅ **已完成**（2026-10-24，architect 主持，ADR-088 升 **v1.1 Accepted**）：M 扩展 = CH_MEM 组合式为规范（功能+cycle）· CSR = CH_MEM 为规范 · MMU PTW = 现在不接线（回退 vaddr = 已知临时降级，归 `chmem-ptw-walk`）· BP = CH_MEM-only 且必须做（不适用「不做」出口）· MMU exception handler = 必须注册。附带裁决：**ADR-080 范围重定义**（→ 后端间对拍）
+- [ ] **B3 前置（v1.4 追加）**：★ **双后端差分 parity 门禁已上线且全绿**（ADR-089 V-1~V-6）—— ⇒ ★ **未通过 ⇒ 不得删任何 TLM-only case**（删掉 463 个 case 后「没有任何自动机制能发现语义退化」⇒ 差分门禁是唯一替代证据；ADR-088 §5.2 判据 6）
+- [ ] **B3 前置（v1.4 追加）**：★ **CI 具备 build 能力**（ADR-088 §5.2 判据 4 的可判定化 = 差分门禁**在 CI 中被执行**且结果被回读）⇒ ⇒ CI 侧只跑分层 corpus 快子集，全量夜间
+- [ ] **B3 前置（v1.4 追加）**：★ **TLM 参考实现的语义已抽成规格**（例：BP 的 GShare 语义 ⇒ 已抽到 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §3.1 / §7 D10）
+- [ ] **B3 前置（v1.4 追加）**：★ **覆盖平价台账已冻结为「CH_MEM 覆盖边界规格」**（阶段 B：`coverage-ledger-refreeze`）⇒ 冻结后**不可删**（它回答「CH_MEM 故意不覆盖什么、为什么」）
+- [ ] **阶段 B（v1.4 新增）**：★ **台账重新定性** —— 从「迁移追踪器」⇒「**CH_MEM 覆盖边界规格**」（Q4 裁决，ADR-089 D5）⇒ 头部 partial **292 → 282** 修正 + not-covered 项理由补全 + **冻结标记**（只增不改）⇒ ★ **parity 语义完全交给差分门禁**，台账**不再**被引用为一致性证据
 - [ ] **B3**：CppTLM 链接依赖归零（`nm -C build/bin/chipforge_tests_chmem | grep -c cpptlm` = 0）
 - [ ] **B3**：TLM-only 业务文件归零（`find ip/ -name "*.h" -not -name "*_chmem.h"` 逐个确认无 TLM-only 残留）
 - [ ] **B3 前置（B2 added）**：BP 删除双前置 —— ① `branch_predictor_chmem.h` 存在**且已注册进 CH_MEM 工厂**；② CoreMark harness 在 `cpu_verilator_sim --elf` 跑通并产出 `CoreMark/MHz` 实测（缺一不得删，依 ADR-088 §5.2 BP 专项）
@@ -106,7 +113,9 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 
 ## 关联
 
-- **ADR-088**（TLM 后端退役冻结契约与语义裁决锚，✅ v1.1 Accepted）— 本 feature 的**治理锚**：冻结条款（§2）· 5 子系统语义表态（§3）· 台账格式（§4）· B3 删除判据（§5）· ADR-080 范围重定义（§7）
+- **ADR-089**（双后端差分 parity 门禁，✅ Accepted 2026-10-26）— ★ **阶段 A 的架构授权** + ★ **B3 删除判据 6 的来源**（差分门禁未绿 ⇒ 不得删任何 TLM-only case）
+- **ADR-088 v1.4 §10**（目标态与三段迁移路径，✅ Accepted 2026-10-26）— ★ 终态定义 + 阶段 C 的 5 条硬前置
+- **ADR-088**（TLM 后端退役冻结契约与语义裁决锚，✅ v1.4 Accepted）— 本 feature 的**治理锚**：冻结条款（§2）· 5 子系统语义表态（§3）· 台账格式（§4）· B3 删除判据（§5）· ADR-080 范围重定义（§7）· **目标态与三段路径（§10）**
 - **ADR-087**（ISA 声明真实性，✅ v1.1 Accepted）— §D4 护栏形态随 TLM 退役切换（切换条件 = Change 2 单一来源落地；在此之前 TLM 侧护栏必须保留）
 - **ADR-083**（Plugin-style 单一 source of truth）— 本 feature 是其"CppTLM = legacy"定性的执行计划；v1.1 已补"冻结条款 + 退役时间线"
 - **ADR-040 v2.0**（TLM→HDL 移植性约束）— "CH_MEM 是新正道"支持本方向；B3 完成后需 v3.0 移除 TLM 分支语义（远期）
