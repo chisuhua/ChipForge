@@ -88,7 +88,7 @@ DBG halt_when PTW_ACTIVE=1 (return true=STALL)      ← cycle 1 起永久 stall
 |---|---|
 | 只 F1 (load_config 解析 enable_mmu) | 5 测试 config 显式声明 `enable_mmu: true`, 写 MMU 真翻译 → 仍 stall |
 | 只 F2 (config 改 false) | `CPUConfig::enable_mmu` 默认 true 不动, MMUPlugin 仍注册 → 仍 stall |
-| 只 F3a (Bare shortcut 守卫) | 默认 satp=Sv39 MODE=8, Bare 守卫激活条件是 `sv_mode==Bare || satp_mode==0` — 真 Sv39 仍走 strict judgment → 仍 stall |
+| 只 F3a (Bare shortcut 守卫) | 默认 satp=Sv39 MODE=8, Bare 守卫激活条件是 `sv_mode==Bare \|\| satp_mode==0` — 真 Sv39 仍走 strict judgment → 仍 stall |
 | 只 F3b (halt_when 守卫) | `SATP_MODE==0` 守卫激活; 默认 satp=8<<60 MODE=8, 不满足 → 仍 stall |
 
 所以必须**四修**:

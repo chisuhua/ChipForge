@@ -76,7 +76,7 @@
 | 1 | `HazardPlugin::scoreboard_` 假设一个架构寄存器只有一个飞行中写入者 | `hazard.h:152-153` | 返回 `HazardKind` enum + `tid` 参数 → **D.3** |
 | 2 | `BranchPredictorPlugin::global_history_` 是单一 uint8_t | `branch_predictor.h:215` | 模板化 `N_THREADS` + `tid` 参数 → **D.4** |
 | 3 | `RegFilePlugin::kNumRegs=32` 和 `RD_IDX` payload 是 `uint_t<5>` | `reg_file.h:69`, `payload_common.h:139` | 模板化 `N_REGS` (已在 D.2 覆盖) |
-| 4 | `payload_common.h` 的 `XLEN == 32 || 64` 静态断言 | `payload_common.h:114-118` | 推迟到跨 ISA 工作开始时 (E.7) |
+| 4 | `payload_common.h` 的 `XLEN == 32 \|\| 64` 静态断言 | `payload_common.h:114-118` | 推迟到跨 ISA 工作开始时 (E.7) |
 | 5 | `CtrlLink::halt_when` 语义升级 | `ctrl_link.h:24-96` | 不改 `CtrlLink` (E.3) |
 | 6 | `RiscvDecodePlugin` 的特定 decode 逻辑 | `decode.h:56-88` | 不需要改 (E.4) |
 

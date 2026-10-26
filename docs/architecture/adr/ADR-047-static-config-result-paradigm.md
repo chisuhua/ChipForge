@@ -85,7 +85,7 @@ ChipForge v0.5.0 (Phase 6d 收官) 的 cf::plugin 框架静态配置 API 全部 
 |-------|---------|
 | **Check 10** | 禁止静态配置头文件 `throw std::*/PluginException`（exceptions: `payload.h`、`ctrl_link.h`） |
 | **Check 11** | P0 API 签名同步（**10 个** API 必须包含 `Result` 或 `expected`，不能还是 `void`） |
-| **Check 12** | C++23 编译标志强制（**4 个** CMake 文件不能出现 `cxx_std_(17|20)`） |
+| **Check 12** | C++23 编译标志强制（**4 个** CMake 文件不能出现 `cxx_std_(17\|20)`） |
 
 ---
 
