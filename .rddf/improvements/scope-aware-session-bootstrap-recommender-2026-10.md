@@ -111,7 +111,7 @@ SKILL.md 5 处漂移 = markdown 塞事实的必然结果
 | AC-5 | `gates.sh:56` **不含硬编码 target 数字** (S3 零漂移解) | `grep "target: 40/40" tools/bootstrap/sections/gates.sh` 0 命中 |
 | AC-6 | AGENTS.md:99 mfc 段"锁定不 archive" 0 命中 | `grep "锁定不 archive" AGENTS.md` 0 命中 |
 | AC-7 | 5 架构 gate + R9 check = 6 gate 全绿 | 跑 `bash tools/verify_adr.sh && tools/verify_plugin_decision.sh && tools/check_plugin_portability.sh && tools/doc_link_check.sh && tools/roadmap-r9-check.sh` |
-| AC-8 | 0 业务代码改动 (`src/`, `ip/`, `tests/`, `bundles/`, `include/` 0 命中) | `git diff --name-only | grep -E "^(src\|ip\|tests\|bundles\|include)/"` 空 |
+| AC-8 | 0 业务代码改动 (`src/`, `ip/`, `tests/`, `bundles/`, `include/` 0 命中) | `git diff --name-only \| grep -E "^(src\|ip\|tests\|bundles\|include)/"` 空 |
 
 ## 4. Capabilities (能力增量)
 
