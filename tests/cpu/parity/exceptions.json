@@ -1,0 +1,16 @@
+{
+  "schema_version": "parity-exceptions-v1",
+  "exceptions": [
+    {
+      "id": "synthetic-self-test",
+      "synthetic": true,
+      "observation": "regs",
+      "corpus_scope": ["__synthetic__"],
+      "mechanism": "常驻 fixture：验证白名单机制本身不会随真实例外清零而腐化（契约 S-11）。★ 本条目不计入真实例外计数。",
+      "upstream_status": "by-design",
+      "mutation_control": "python3 tools/parity/parity_gate.py --self-test",
+      "sunset": "2099-12-31",
+      "owner": "parity-gate"
+    }
+  ]
+}

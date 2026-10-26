@@ -1,0 +1,58 @@
+# 双后端差分 parity 门禁 —— 语料清单（单一来源，契约 S-13）
+# 格式: name<TAB>kind<TAB>relpath<TAB>layer   （# 起注释；空行忽略）
+#   kind  : elf | branchbench
+#   layer : pr | night   （pr = PR 级快子集；night = 夜间全量）
+# ★ 两侧 MUST 都从这里取 ⇒ 门禁断言「两侧实际执行集合 == 本清单」（集合不对称 ⇒ ERROR）
+# ★ relpath 相对**仓库根**
+
+rv32ui-p-add	elf	tests/cpu/riscv_tests/elf/rv32ui-p-add	pr
+rv32ui-p-addi	elf	tests/cpu/riscv_tests/elf/rv32ui-p-addi	night
+rv32ui-p-and	elf	tests/cpu/riscv_tests/elf/rv32ui-p-and	night
+rv32ui-p-andi	elf	tests/cpu/riscv_tests/elf/rv32ui-p-andi	night
+rv32ui-p-auipc	elf	tests/cpu/riscv_tests/elf/rv32ui-p-auipc	night
+rv32ui-p-lui	elf	tests/cpu/riscv_tests/elf/rv32ui-p-lui	night
+rv32ui-p-or	elf	tests/cpu/riscv_tests/elf/rv32ui-p-or	night
+rv32ui-p-ori	elf	tests/cpu/riscv_tests/elf/rv32ui-p-ori	pr
+rv32ui-p-sll	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sll	night
+rv32ui-p-slli	elf	tests/cpu/riscv_tests/elf/rv32ui-p-slli	night
+rv32ui-p-slt	elf	tests/cpu/riscv_tests/elf/rv32ui-p-slt	night
+rv32ui-p-slti	elf	tests/cpu/riscv_tests/elf/rv32ui-p-slti	night
+rv32ui-p-sltiu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sltiu	night
+rv32ui-p-sltu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sltu	night
+rv32ui-p-sra	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sra	night
+rv32ui-p-srai	elf	tests/cpu/riscv_tests/elf/rv32ui-p-srai	night
+rv32ui-p-srl	elf	tests/cpu/riscv_tests/elf/rv32ui-p-srl	night
+rv32ui-p-srli	elf	tests/cpu/riscv_tests/elf/rv32ui-p-srli	night
+rv32ui-p-sub	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sub	pr
+rv32ui-p-xor	elf	tests/cpu/riscv_tests/elf/rv32ui-p-xor	night
+rv32ui-p-xori	elf	tests/cpu/riscv_tests/elf/rv32ui-p-xori	night
+rv32ui-p-beq	elf	tests/cpu/riscv_tests/elf/rv32ui-p-beq	pr
+rv32ui-p-bge	elf	tests/cpu/riscv_tests/elf/rv32ui-p-bge	night
+rv32ui-p-bgeu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-bgeu	night
+rv32ui-p-blt	elf	tests/cpu/riscv_tests/elf/rv32ui-p-blt	night
+rv32ui-p-bltu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-bltu	night
+rv32ui-p-bne	elf	tests/cpu/riscv_tests/elf/rv32ui-p-bne	night
+rv32ui-p-jal	elf	tests/cpu/riscv_tests/elf/rv32ui-p-jal	pr
+rv32ui-p-jalr	elf	tests/cpu/riscv_tests/elf/rv32ui-p-jalr	night
+rv32ui-p-lb	elf	tests/cpu/riscv_tests/elf/rv32ui-p-lb	night
+rv32ui-p-lbu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-lbu	night
+rv32ui-p-ld_st	elf	tests/cpu/riscv_tests/elf/rv32ui-p-ld_st	night
+rv32ui-p-lh	elf	tests/cpu/riscv_tests/elf/rv32ui-p-lh	night
+rv32ui-p-lhu	elf	tests/cpu/riscv_tests/elf/rv32ui-p-lhu	night
+rv32ui-p-lw	elf	tests/cpu/riscv_tests/elf/rv32ui-p-lw	pr
+rv32ui-p-sb	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sb	night
+rv32ui-p-sh	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sh	night
+rv32ui-p-sw	elf	tests/cpu/riscv_tests/elf/rv32ui-p-sw	pr
+rv32ui-p-st_ld	elf	tests/cpu/riscv_tests/elf/rv32ui-p-st_ld	night
+rv32um-p-mul	elf	tests/cpu/riscv_tests/elf/rv32um-p-mul	pr
+rv32um-p-mulh	elf	tests/cpu/riscv_tests/elf/rv32um-p-mulh	night
+rv32um-p-mulhsu	elf	tests/cpu/riscv_tests/elf/rv32um-p-mulhsu	night
+rv32um-p-mulhu	elf	tests/cpu/riscv_tests/elf/rv32um-p-mulhu	night
+rv32um-p-div	elf	tests/cpu/riscv_tests/elf/rv32um-p-div	night
+rv32um-p-divu	elf	tests/cpu/riscv_tests/elf/rv32um-p-divu	night
+rv32um-p-rem	elf	tests/cpu/riscv_tests/elf/rv32um-p-rem	night
+rv32um-p-remu	elf	tests/cpu/riscv_tests/elf/rv32um-p-remu	night
+branchbench_m0	branchbench	build/branchbench_m0.elf	night
+branchbench_m1	branchbench	build/branchbench_m1.elf	night
+branchbench_m2	branchbench	build/branchbench_m2.elf	night
+branchbench_m3	branchbench	build/branchbench_m3.elf	night
