@@ -1,6 +1,6 @@
 # ADR-089 — 双后端差分 parity 门禁（同一模型 × 两后端）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-26，architect 主持；v1.2 = A1 实施期代码事实更正，见 D2 ②）**
+> **Status**: ✅ **Accepted（v1.3，2026-10-26，architect 主持；v1.2 = A1 代码事实更正 · v1.3 = C-1 归类裁决 + 吞吐实测更正）**
 > **上游**: ADR-083（Plugin-style 单一 source of truth）· ADR-040 v2.0（CH_MEM 是新正道）· ADR-088（TLM 后端退役；本 ADR 是其 **B3 删除的前置契约**）
 > **下游**: `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A）· `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（阶段 B/C）· `objective-ip-cpu-tlm-backend-retirement`（B3 门禁）
 > **执行文件（待 planner 落）**: `.rddf/plans/`（阶段 A 的 change 计划，★ 归 builder 起草）
@@ -66,7 +66,7 @@
 ⇒ ★ **「逐拍相等」在机制上可达**：Simulator 的 `tick()` = 时序求值 + 组合收敛，与生成 Verilog 的 `always_ff @(posedge)` + 组合 settle 是**同一个时钟同步抽象**（CppHDL 核心契约）⇒ 2026-10-21 上游 `c27543d`（`aread` 1 拍滞后）是该契约的一次**违约并被修复** ⇒ ★ 「逐拍相等」是**上游契约的回归断言**，不是不可达的理想。
 
 ⇒ ★ **fail-closed 纪律**：任一观测量**缺失 / 不可采集 / 被截断** ⇒ **判 FAIL**，**MUST NOT** 跳过或降级（沿用项目既有 `dropped` / `FLUSH_COUNT` fail-closed 风格）。
-⇒ ★★ **前置条件（v1.1 更正 —— 措辞不可实现 ⇒ 改为「同输入 + 确定性」）**：★ 「同一次 elaboration 的产物」**字面不可实现**（Simulator 在测试进程、Verilog 在 runner 进程 ⇒ 必然是**两次 elaboration**）⇒ 真实约束 = ★ **同一输入**（同插件集 / 同配置 / 同 ELF）的**确定性 elaboration** ⇒ ★ **确定性判据（先于任何观测量比对）**：两侧的 **DAG node_count + 顶层信号名名单 hash** MUST 一致 ⇒ 否则 **FAIL**（★ 否则上游发射顺序漂移会导致按名采集静默错位 ⇒ 配置漂移会被误报成「后端分歧」）。
+⇒ ★★ **前置条件（v1.1 更正 —— 措辞不可实现 ⇒ 改为「同输入 + 确定性」）**：★ 「同一次 elaboration 的产物」**字面不可实现**（Simulator 在测试进程、Verilog 在 runner 进程 ⇒ 必然是**两次 elaboration**）⇒ 真实约束 = ★ **同一输入**（同插件集 / 同配置 / 同 ELF）的**确定性 elaboration** ⇒ ★ **确定性判据（先于任何观测量比对）**：两侧的 **DAG node_count + 顶层信号名名单 hash** MUST 一致 ⇒ 否则 **门禁判红**（★ 三态语义下归 **ERROR**，`error_kind = determinism_mismatch`；★ **MUST NOT** 计入「后端分歧清单」 —— 2026-10-26 Oracle 裁决：这是**配置/上游漂移**，不是后端语义分歧；若判 FAIL(1) 恰好制造本条要防的那个误报）。★ 依据：上游发射顺序漂移会导致按名采集静默错位 ⇒ 配置漂移会被误报成「后端分歧」。
 
 ### D3 ★ 对齐规则（Q1 裁决）：**逐拍相等为默认 + 例外白名单**
 
@@ -173,7 +173,9 @@
 ### 负面 / 成本
 
 1. ⚠️ **阶段 C 会删掉唯一的亚秒级回归环**：实测 TLM binary **432 case ≈ 0.6s** vs CH_MEM Simulator **vendored 47 ≈ 1594s（~34s/ELF）** vs Verilator（dhrystone 端到端含 Verilog 生成 + Verilator 编译）**18.85s** ⇒ ⇒ **CI build 能力必须先到位**（D6 硬前置 ②）。
-2. ⚠️ **差分门禁的运行成本**：每 corpus 需两后端各跑一次 ⇒ Verilator 侧每次都要 Verilog 生成 + 编译 ⇒ 门禁时长须预算（★ 用 vendored 47 + branchbench 4 档起步 ⇒ 与 Q2 一致）。
+2. ⚠️ **差分门禁的运行成本**：每 corpus 需两后端各跑一次 ⇒ Verilator 侧每次都要 Verilog 生成 + 编译 ⇒ 门禁时长须预算（★ 用 vendored 47 + branchbench 4 档起步）。
+   ★★ **2026-10-26 实测更正（A2a increment 1）**：**本文档早前引用的「Simulator ≈ 575 拍/s」高估约 60×** —— `rv32ui-p-add`（478 拍 / DAG 2485 节点）实测 **52.8 s** ⇒ **≈ 9.1 拍/s**，且 `--no-bp` 与默认 BP **无显著差异**（200 拍：21 s vs 24 s）⇒ 瓶颈是解释器本身，不是 BP。
+   ⇒ ★ **直接后果**：`branchbench --cycles 2000000` 在 Simulator 侧**根本不可行**（≈ 61 小时/档）⇒ Simulator 侧 branchbench 的 cap MUST 重定为 **≤ 20k 拍（≈ 37 min/档）**，否则该 corpus 只能在 Verilator 侧跑并登记豁免（见契约 S-15）。
 3. ⚠️ **例外白名单有被滥用的风险** ⇒ 纪律：每条例外须带 **5 项**（机制说明 / 上游状态+issue 链接 / 变异对照 / **收敛期限** / **corpus 作用域**）；★ 白名单 MUST 由 **architect** 审（不得由实施者自行扩张）；★ 条目数 > N ⇒ 强制 architect 复审；★ 常驻 1 条合成例外防机制腐化。
 4. ⚠️ **「Verilator 每次都要生成 + 编译」是现状的坏成本模型**（`cpu_verilator_sim.cpp:202-260` 每次调用都 `generate_verilog()` + `verilator --cc` + `g++`）⇒ ★ **MUST NOT** 把该现状写成契约约束 ⇒ ★ **harness MUST 按 config 缓存 Verilog 构建产物**（同 config 的 47 ELF 只 build 一次）⇒ ★ 否则门禁时长预算直接爆炸。
 5. ⚠️ **elaboration 确定性不是免费性质** ⇒ Verilator 侧按名采集（`--public-flat-rw`）⇒ 上游若改了信号名/发射顺序 ⇒ **静默错位** ⇒ ★ 确定性判据（D2）必须先于观测量比对。
@@ -198,9 +200,9 @@
 ## Verification
 
 - [ ] **V-1** parity 门禁在 **两侧交集 47 ELF** + branchbench 4 档上运行：②③⑤ bit-exact、**⑤ 逐拍 PC 流相等**、④ 总 cycle 数相等（例外白名单为空或每条合规）
-  - ★ **三态语义（v1.1 补）**：★ 任一侧 **TIMEOUT / runner 进程崩溃（segfault 等）⇒ 判 FAIL**（fail-closed）⇒ ★ **MUST NOT** 计入「后端分歧清单」（那是**门禁自身故障**，不是后端语义差异）⇒ 门禁 MUST 区分「FAIL（分歧）」与「ERROR（门禁自身故障）」两种退出码
+  - ★ **三态语义（v1.1 补）**：★ 任一侧 **TIMEOUT / runner 进程崩溃（segfault 等）⇒ 门禁判红**（fail-closed；★ 三态语义下归 **ERROR(2)**）⇒ ★ **MUST NOT** 计入「后端分歧清单」（那是**门禁自身故障**，不是后端语义差异）⇒ 门禁 MUST 区分「FAIL（分歧）」与「ERROR（门禁自身故障）」两种退出码
   - ★ **全绿的语义（v1.1 澄清）**：★ 「白名单非空时全绿」= ★ **已知分歧已被登记**，★ **MUST NOT** 理解为「两后端已等价」⇒ 阶段 C 前置①「差分门禁全绿」**允许**带未收敛的已知分歧进入（★ 但每条 MUST 有收敛期限；★ 期限到期 ⇒ 自动升级为「真 bug」类 ⇒ 阻塞阶段 C）
-- [ ] **V-2** 门禁 **fail-closed 验证**：★ **每个观测量各做一次** fail-closed 用例（**≥5 例**，不是「关闭一个」即可）⇒ 门禁 MUST FAIL（而非跳过）⇒ ★ 外加：确定性判据（node_count + 信号名单 hash）不符 ⇒ MUST FAIL（**先于**任何观测量比对）
+- [ ] **V-2** 门禁 **fail-closed 验证**：★ **每个观测量各做一次** fail-closed 用例（**≥5 例**，不是「关闭一个」即可）⇒ 门禁 MUST 判红（★ 归 **ERROR(2)**，而非跳过）⇒ ★ 外加：确定性判据（node_count + 信号名单 hash）不符 ⇒ MUST FAIL（**先于**任何观测量比对）
 - [ ] **V-3** 门禁**变异对照**：★ 至少 2 例 —— ① 把 Simulator 侧某机制的时序改 1 拍（如复现 `aread` 1 拍滞后）② 改 1 字节内存写（⇒ 内存签名不同）⇒ 门禁 MUST RED（证明门禁有鉴别力，而非「两边都过就绿」）
 - [ ] **V-4** 例外白名单机制生效：★ 登记一条**合规**例外 ⇒ 门禁仍 PASS 且该例外在报告中可见 ⇒ ★ 登记一条**缺字段**（5 项任缺）的例外 ⇒ 门禁 MUST FAIL ⇒ ★ 登记一条**过期**（收敛期限已到）的例外 ⇒ 门禁 MUST FAIL（并升级为真 bug 类）⇒ ★ **常驻合成例外**（验证机制本身不随清零而腐化）⇒ 门禁 MUST PASS 且不计入真实例外计数
 - [ ] **V-5** 阶段 C 前置检查：★ 前置 ①②④ **可由脚本判定**；★ 前置 ③（TLM 参考语义抽成规格）为 **architect 判断题** ⇒ ★ **判定物 = 逐子系统规格清单**（BP GShare ✓ 已抽到 `ip/cpu/docs/bp-btb-gshare-design-brief.md` §3.1/§7 D10 · **M 扩展 radix-2 语义** / **CSR stub 语义** / **MMU PTW walk 语义** 逐项列出）+ architect 签认 ⇒ ★ 前置 ⑤（门禁体系改版）以**变异自检**判定（见 D6）
