@@ -36,10 +36,17 @@
 //    module.h:13 的 build_hierarchical_name **缺 inline** ⇒ 任何 2+ TU
 //    include <ch.hpp> 即链接失败 (multiple definition)。
 //    ⇒ 只 include 需要的具体头 (ADR-091 G-1 的同款约束: 框架头亦不得 include ch.hpp)。
+#include <ast/ast_nodes.h>
 #include <codegen_verilog.h>
 #include <core/context.h>
+#include <core/interpreter_backend.h>
 #include <core/io.h>
 #include <core/uint.h>
+
+#include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/plugin_exception.h"
+
+#include <type_traits>
 
 #include <cstdio>
 #include <fstream>
@@ -103,3 +110,102 @@ TEST_CASE("ports: ch_in without current context is silently null (ADR-091 G-1 B)
   //   （若上游将来改成 fail-fast，本断言会红 ⇒ 届时 G-1 的断言可放宽）
   REQUIRE(without_ctx.impl() == nullptr);
 }
+
+
+// ===========================================================================
+// 以下 4 个 case 是 **ADR-091 §D5 G-1 / G-5a 的契约测试**（S1 的 RED 面）
+// ===========================================================================
+
+// ★★ 下面 4 个 case 依赖 `cf::plugin::PipeBuilder` 的 **CH_MEM 模态** API
+//    （`PipeBuilder(ctx*)` / `to_verilog` / `create_simulator` 全在
+//     `pipe_builder.h` 的 `#ifdef CF_PLUGIN_USE_CH_MEM` 内）
+//    ⇒ TLM binary 编译时跳过；★ CH_MEM binary 需**显式**加入
+//      `tests/CMakeLists.txt` 的 `CHMEM_TEST_SOURCES`（★ K4 实测知识：
+//      TLM binary 是 GLOB_RECURSE 自动收集，CH_MEM binary 是显式列表）
+#ifdef CF_PLUGIN_USE_CH_MEM
+
+TEST_CASE("ports: PipeBuilder declare_in/out land in netlist top-level ports",
+          "[ports][chmem]") {
+  ch::core::context ctx("pb_ports");
+  cf::plugin::PipeBuilder pb(&ctx);
+
+  auto cpu_req = pb.declare_out<ch::core::ch_uint<32>>("cpu_req");
+  auto cpu_rsp = pb.declare_in<ch::core::ch_uint<32>>("cpu_rsp");
+  REQUIRE(cpu_req.impl() != nullptr);
+  REQUIRE(cpu_rsp.impl() != nullptr);
+
+  // ★ 驱动 cpu_req（output 需 driver 才会被发射）
+  // ★★ **赋值 MUST 在 ctx_swap 保护下做** —— 否则字面量创建会失败
+  //    （实测：[ERROR] No active context for literal creation ⇒ output 无 driver
+  //     ⇒ 网表里该 output 的值是未定义/X ⇒ ★ 假绿通道）
+  {
+    ch::core::ctx_swap guard(&ctx);
+    cpu_req = ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{});
+  }
+
+  const std::string vpath = "/tmp/opencode/pb_ports_top.v";
+  ch::toVerilog(vpath, &ctx);
+  REQUIRE(port_declared_in_verilog(vpath, "cpu_req"));
+  REQUIRE(port_declared_in_verilog(vpath, "cpu_rsp"));
+}
+
+TEST_CASE("ports: PipeBuilder with null ctx fails closed on declare", "[ports][chmem]") {
+  // ★ G-1c：ctx 为 null MUST 抛异常 —— MUST NOT 静默不建节点
+  //   （ch_logic_in 构造是 `if (ctx) {...}` ⇒ 无 ctx 时静默跳过 ⇒ 假绿通道）
+  cf::plugin::PipeBuilder pb(nullptr);
+  REQUIRE_THROWS_AS(pb.declare_in<ch::core::ch_uint<32>>("null_in"),
+                    cf::plugin::PluginException);
+  REQUIRE_THROWS_AS(pb.declare_out<ch::core::ch_uint<32>>("null_out"),
+                    cf::plugin::PluginException);
+}
+
+TEST_CASE("ports: G-1d — driven ch_in is not a top-level port", "[ports][chmem]") {
+  // ★ G-1d（行为判据）：有内部 driver 的 `ch_in` **不是**顶层端口
+  //   （上游 verilator_backend.cpp:617 的 skip 逻辑：inputimpl::driver() != nullptr
+  //     ⇒ 不进 port_access_；codegen 侧同样不发射为顶层 input）
+  //
+  // ★ 注：`ch_in` 的「值赋值不可用」**无法**用 is_assignable 检出
+  //   （其 operator= 是模板 + static_assert 在**函数体内** ⇒ 签名匹配 ⇒ 报 true）
+  //   ⇒ 真正的阻止发生在**实例化时**（编译错误）⇒ 本仓库改用**行为判据**。
+
+  // 编译期可检的部分：ch_out 可赋值（output 需内部 driver 才会被发射）
+  static_assert(std::is_assignable_v<ch::core::ch_out<ch::core::ch_uint<32>>&,
+                                      ch::core::ch_uint<32>>,
+                "ch_out MUST be assignable —— output 端口需要内部 driver");
+
+  ch::core::context ctx("driven_in");
+  {
+    ch::core::ctx_swap guard(&ctx);
+    ch::core::ch_in<ch::core::ch_uint<32>> driven("driven_in_port");
+    REQUIRE(driven.impl() != nullptr);
+
+    // ★ 制造内部 driver：把该 input 端口接到一个内部节点上
+    auto* driver_node = ctx.create_output(32, "driven_in_driver",
+                                          std::source_location::current());
+    REQUIRE(driver_node != nullptr);
+    auto* in_node = static_cast<ch::core::inputimpl*>(driven.impl());
+    in_node->set_driver(driver_node);
+  }
+
+  const std::string vpath = "/tmp/opencode/driven_in_top.v";
+  ch::toVerilog(vpath, &ctx);
+  // ★ 被内部驱动的 ch_in MUST NOT 出现在顶层端口列表
+  REQUIRE_FALSE(port_declared_in_verilog(vpath, "driven_in_port"));
+}
+
+TEST_CASE("ports: create_simulator accepts an injected backend", "[ports][chmem]") {
+  ch::core::context ctx("pb_backend");
+  cf::plugin::PipeBuilder pb(&ctx);
+
+  // ★ G-5a：注入后端 ⇒ active_backend_name() 反映该后端
+  auto sim = pb.create_simulator(std::make_unique<ch::InterpreterBackend>());
+  REQUIRE(sim.has_value());
+  REQUIRE(sim.value()->active_backend_name() == "interpreter");
+
+  // ★ nullptr ⇒ 保持既有行为（向后兼容）
+  auto sim_default = pb.create_simulator();
+  REQUIRE(sim_default.has_value());
+  REQUIRE(sim_default.value()->active_backend_name() != "interpreter");
+}
+
+#endif  // CF_PLUGIN_USE_CH_MEM

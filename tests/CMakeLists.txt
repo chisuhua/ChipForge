@@ -161,6 +161,9 @@ set(CHMEM_TEST_SOURCES
     # chmem-bp-btb-gshare Task 1 可行性 PoC (硬门禁: 全绿才允许进 Task 2)
     # — ch_reg 跨拍 / ch_mem 动态索引 / 2-bit PHT / 越界读=0 / 活节点
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_chmem_bp_poc.cpp
+    # ADR-091 S1 (backend-parity-open-core): PipeBuilder 顶层端口声明契约
+    # (G-1) + 后端注入契约 (G-5a) —— ★ CH_MEM binary 是**显式列表** ⇒ 须显式加入
+    ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_pipe_builder_ports.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES
