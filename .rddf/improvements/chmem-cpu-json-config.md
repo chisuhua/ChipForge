@@ -266,8 +266,10 @@ struct CpuConfigChmem {
 | 首轮超时原因 | `--timeout-s 3600` 被 4 路 sim + `chipforge_tests_chmem` + **外部 CppHDL perf 套件**（load average 8.96→15.87）争抢；sim 单档满核需 ~2222 s，实际只拿到 ~52% CPU ⇒ >3600 s |
 | 复跑参数 | `--timeout-s 5400`、清场后 4 路独占 ⇒ 全 PASS |
 
-★ **遗留改进项（另开）**：门禁的 `--timeout-s` 是**全局单一超时**，而 `branchbench` 单档满核就需 ~2222 s
-（余量仅 1.6×）⇒ 任何机时争抢都会误报 TIMEOUT。应改为「按 `max_cycles` 与实测吞吐推导」的 per-kind 超时。
+★ **遗留改进项（已修，2026-10-27 合并后）**：门禁的 `--timeout-s` 曾是**全局单一超时**，而 `branchbench`
+单档满核就需 ~2222 s（余量仅 1.6×）⇒ 任何机时争抢都会误报 TIMEOUT。⇒ **已在 `main` 上修为
+per-case 推导**（`max(300, cap/9.0*3)` ⇒ elf 1000 s / branchbench 6666 s；`--self-test` 13 → 16 例），
+契约升至 **v1.8**。
 
 ### ⬜ 未达成（★ 下一会话的待办）
 
