@@ -89,11 +89,12 @@
 - **明确不用的场景**：
   - ❌ 业务 IP 不继承 `cpptlm::ChStreamModuleBase` / `cpptlm::SimObject`
   - ❌ 业务 IP 不调 `REGISTER_MODULE("TypeName", ClassName)`
-  - ❌ 业务 IP 不写 `ch_stream<T>` 跨阶段通信
+  - ❌ 业务 IP 不写 **CppTLM 组件范式**（`ChStreamModuleBase` / `StreamAdapter`）跨阶段通信
+  - ✅ **核内跨阶段**用 `Payload<T>`；★ **IP 间**用 **CppHDL 的 `ch_stream<T>`**（ADR-092 §D4）
 
 ### 4.2 业务 IP 跨阶段通信替代
 
-`cf::plugin::Payload<T>` + `PipeNode` 替代 `ch_stream<T>`：
+`cf::plugin::Payload<T>` + `PipeNode` 替代 **CppTLM 的 stream 组件范式**（★ 核内跨阶段；★ IP 间另用 CppHDL 的 `ch_stream<T>`，见 ADR-092 §D4）：
 
 ```cpp
 // 业务代码 — TLM 模式
