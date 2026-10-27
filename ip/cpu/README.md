@@ -76,6 +76,40 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 | icache_latency_cycles | int (0-32) | 1 | ICache 命中延迟 |
 | dcache_latency_cycles | int (0-32) | 1 | DCache 命中延迟 |
 
+## CH_MEM 配置面（P2, 2026-10-27）
+
+> ★ 上表是 **TLM 侧**（`CpuFactory` + `CPUConfig`）的参数面。CH_MEM 侧（`CpuFactoryChmem`）
+> **不复用** `CPUConfig`（能力集不同 + 依赖隔离，理由见 `configs/cpu_config_chmem.h` 文件头）
+> ⇒ 有独立的配置结构 `CpuConfigChmem` 与独立 JSON 解析层。
+
+| 文件 | 职责 |
+|------|------|
+| `configs/cpu_config_chmem.h` | `CpuConfigChmem` struct + `validate_cpu_config_chmem()`；**零外部依赖**（不拉 nlohmann 进工厂头） |
+| `configs/cpu_config_chmem_json.h` | JSON 解析 + **TLM-only 字段逐项带原因拒绝**（一次报告全部问题，非首错即返） |
+| `configs/cpu_chmem_default.json` | 可直接使用的默认配置示例 |
+| `configs/cpu_params_schema.json` | 每个 params 字段带 `x-chmem-supported` / `x-chmem-note`；顶层 `x-chmem-extra-fields` 登记 CH_MEM 独有旋钮 |
+
+**CH_MEM 实际可配的 8 个旋钮**：`name` / `initial_pc` / `enable_bp` / `btb_entries` /
+`bp_uncond` / `enable_mmu`（plumbing-only）/ `mmu_mode`（仅 log）/ `enable_cache`（`true` ⇒ fail-fast throw）。
+
+★ **为什么是 fail-fast 拒绝而不是静默忽略**：`cpu-pipeline-tick-rca` 实测过 `load_config()`
+静默丢弃 8 个字段 ⇒ 「配置看起来生效、实际没生效」的排查成本极高 ⇒ CH_MEM 侧改为
+**不支持的字段一律 ERROR + 给出原因**。
+
+**用法**（两个 runner + 门禁都支持）：
+
+```bash
+# 单跑
+./build/bin/cpu_verilator_sim --elf <elf> --config ip/cpu/configs/cpu_chmem_default.json
+./build/bin/parity_sim_runner --elf <elf> --config ip/cpu/configs/cpu_chmem_default.json
+
+# 门禁：两侧 MUST 用同一份配置（否则比的是两种配置，不是两个后端）
+python3 tools/parity/parity_gate.py --layer pr --cpu-config ip/cpu/configs/cpu_chmem_default.json
+```
+
+★ `--config` 与配置类 flag（`--enable-mmu` / `--no-bp` / `--btb-entries` …）**互斥**
+（同时给 ⇒ rc=2）—— 静默覆盖 = 假绿通道。
+
 ## RiscV MMU Integration (mmu-cache-integration v0.2.0)
 
 当 `enable_mmu=true` 时, `CpuFactory::build_cpu()` 条件注册 `cf::cpu::plugins::RiscvMMUPlugin` (继承 `cf::ip::mmu::MMUPlugin`)。Plugin 在 `setup()` 中声明 3 个 RiscV hook substage:
