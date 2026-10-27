@@ -47,6 +47,8 @@
 #include "cf/plugin/result_macros.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/cpu_factory_chmem.h"
+// P2 (2026-10-27): JSON 配置面（与 cpu_verilator_sim 同款；工厂头不拖 nlohmann）
+#include "ip/cpu/configs/cpu_config_chmem_json.h"
 
 namespace {
 
@@ -127,6 +129,9 @@ struct Options {
   bool enable_bp = true;
   std::uint32_t btb_entries = 256;  // mirror cpu_verilator_sim default
   bool bp_uncond = true;
+  // P2: JSON 配置（与配置类 flag 互斥，静默覆盖 = 假绿通道）
+  std::string config_path;
+  std::vector<std::string> config_flags_seen;
   bool verbose = false;
   // Increment-1 scaffolding: memsig needs the DUT-side probe (increment 2).
   // Without this flag a missing observation is a hard ERROR (contract S-1/S-14).
@@ -145,6 +150,8 @@ void usage(const char* argv0) {
   std::printf("  --no-bp             disable branch prediction\n");
   std::printf("  --btb-entries <n>   logical BTB entries (one of 16/32/64/128/256)\n");
   std::printf("  --no-bp-uncond      disable unconditional-branch prediction\n");
+  std::printf("  --config <path>     load CPU config from JSON (CH_MEM schema;\n");
+  std::printf("                      mutually exclusive with the config flags above)\n");
   std::printf("  --json <path>       write the report fragment to <path>\n");
   std::printf("  --verbose           per-cycle trace to stderr\n");
   std::printf("  --allow-incomplete  permit not-yet-collected observations (memsig)\n");
@@ -170,20 +177,28 @@ bool parse_args(int argc, char** argv, Options* o) {
       o->max_cycles = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
     } else if (a == "--reset") {
       o->reset_mode = need("--reset");
+    } else if (a == "--config") {
+      o->config_path = need("--config");
     } else if (a == "--enable-mmu") {
       o->enable_mmu = true;
+      o->config_flags_seen.push_back(a);
     } else if (a == "--mmu-mode") {
       o->mmu_mode = need("--mmu-mode");
+      o->config_flags_seen.push_back(a);
     } else if (a == "--enable-cache") {
       o->enable_cache = true;
+      o->config_flags_seen.push_back(a);
     } else if (a == "--no-bp") {
       o->enable_bp = false;
+      o->config_flags_seen.push_back(a);
     } else if (a == "--btb-entries") {
       auto v = need("--btb-entries");
       if (v.empty()) return false;
       o->btb_entries = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
+      o->config_flags_seen.push_back(a);
     } else if (a == "--no-bp-uncond") {
       o->bp_uncond = false;
+      o->config_flags_seen.push_back(a);
     } else if (a == "--json") {
       o->json_path = need("--json");
     } else if (a == "--verbose") {
@@ -202,6 +217,18 @@ bool parse_args(int argc, char** argv, Options* o) {
   }
   if (o->elf_path.empty()) {
     std::fprintf(stderr, "--elf is required\n");
+    return false;
+  }
+  // P2: --config 与配置类 flag 互斥（静默择一 = 假绿通道）
+  if (!o->config_path.empty() && !o->config_flags_seen.empty()) {
+    std::fprintf(stderr,
+                 "--config is mutually exclusive with config flags "
+                 "(got --config +");
+    for (const auto& f : o->config_flags_seen) {
+      std::fprintf(stderr, " %s", f.c_str());
+    }
+    std::fprintf(stderr,
+                 ")\n  Move those settings into the JSON file instead.\n");
     return false;
   }
   if (o->reset_mode != "none") {
@@ -243,6 +270,34 @@ int main(int argc, char** argv) {
     return 2;  // contract S-10: ERROR (gate/environment fault, not divergence)
   }
 
+  // ── P2 (2026-10-27): 配置来源 —— JSON 或 CLI（互斥，见 parse_args） ──
+  cf::cpu::CpuConfigChmem cfg;
+  if (!opts.config_path.empty()) {
+    auto loaded = cf::cpu::load_cpu_config_chmem(opts.config_path);
+    if (!loaded) {
+      std::fprintf(stderr, "%s",
+                   cf::cpu::format_cpu_config_errors(loaded.error()).c_str());
+      return 2;
+    }
+    cfg = *loaded;
+  } else {
+    // CLI 路径: 与 P2 之前的行为**逐位等价**
+    cfg.initial_pc   = kElfBase;
+    cfg.enable_mmu   = opts.enable_mmu;
+    cfg.mmu_mode     = opts.mmu_mode;
+    cfg.enable_cache = opts.enable_cache;
+    cfg.enable_bp    = opts.enable_bp;
+    cfg.btb_entries  = opts.btb_entries;
+    cfg.bp_uncond    = opts.bp_uncond;
+  }
+  {
+    const std::string verr = cf::cpu::validate_cpu_config_chmem(cfg);
+    if (!verr.empty()) {
+      std::fprintf(stderr, "invalid CPU config: %s\n", verr.c_str());
+      return 2;
+    }
+  }
+
   auto elf = load_elf_file(opts.elf_path);
   if (elf.size() < 52 || elf[0] != 0x7F || elf[1] != 'E') {
     std::fprintf(stderr, "not an ELF: %s\n", opts.elf_path.c_str());
@@ -272,10 +327,9 @@ int main(int argc, char** argv) {
   ch::core::context ctx("parity_sim_runner");
   ch::core::ctx_swap guard(&ctx);
 
-  auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(
-      &ctx, nullptr, ch_uint<32>(kElfBase), /*preload_elf=*/true, elf,
-      opts.enable_mmu, opts.mmu_mode, opts.enable_cache,
-      opts.enable_bp, opts.btb_entries, opts.bp_uncond);
+  // P2: 统一走 config 重载（preload_elf 由 elf_image 非空推导 ⇒ 与旧的
+  //   `preload_elf=true` + 非空 elf 逐位等价）。
+  auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx, cfg, elf);
   if (!pb) {
     std::fprintf(stderr, "build_cpu failed\n");
     return 2;

@@ -33,6 +33,8 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/uint_t.h"
 #include "ip/cpu/cpu_factory_chmem.h"
+// P2 (2026-10-27): JSON 配置面。★ 只在本文件 include —— 工厂头不拖 nlohmann。
+#include "ip/cpu/configs/cpu_config_chmem_json.h"
 
 namespace {
 
@@ -124,12 +126,21 @@ struct Options {
   //  - bp_uncond: 默认 true；--no-bp-uncond 关掉 ⇒ 用于「量收益」对比
   //    （② 主体 Task 2h 的「逐档独立测量」）
   bool bp_uncond = true;
+
+  // ── P2 (2026-10-27) JSON 配置面 ──
+  // --config <path> 与下列配置类 flag **互斥**（静默覆盖 = 假绿通道）：
+  //   --enable-mmu / --mmu-mode / --enable-cache / --no-bp /
+  //   --no-bp-uncond / --btb-entries
+  std::string config_path;
+  std::vector<std::string> config_flags_seen;  // 被显式设置的配置类 flag
 };
 
 bool parse_args(int argc, char** argv, Options& opts) {
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
-    if (a == "--elf" && i + 1 < argc) {
+    if (a == "--config" && i + 1 < argc) {
+      opts.config_path = argv[++i];
+    } else if (a == "--elf" && i + 1 < argc) {
       opts.elf_path = argv[++i];
     } else if (a == "--verilog" && i + 1 < argc) {
       opts.verilog_path = argv[++i];
@@ -139,10 +150,13 @@ bool parse_args(int argc, char** argv, Options& opts) {
       opts.max_cycles = static_cast<std::uint32_t>(std::atoi(argv[++i]));
     } else if (a == "--enable-mmu") {
       opts.enable_mmu = true;
+      opts.config_flags_seen.push_back(a);
     } else if (a == "--mmu-mode" && i + 1 < argc) {
       opts.mmu_mode = argv[++i];
+      opts.config_flags_seen.push_back(a);
     } else if (a == "--enable-cache") {
       opts.enable_cache = true;
+      opts.config_flags_seen.push_back(a);
     } else if (a == "--json" && i + 1 < argc) {
       opts.json_path = argv[++i];
     } else if (a == "--reset-pulse" && i + 1 < argc) {
@@ -161,9 +175,11 @@ bool parse_args(int argc, char** argv, Options& opts) {
       opts.stats_len = static_cast<std::uint32_t>(std::atoi(argv[++i]));
     } else if (a == "--no-bp") {
       opts.enable_bp = false;
+      opts.config_flags_seen.push_back(a);
     } else if (a == "--no-bp-uncond") {
       // ★ 增量 1 开关（② 主体 Task 2h）：关掉 `jal`/`j` 建项 ⇒ 回到增量 1 之前
       opts.bp_uncond = false;
+      opts.config_flags_seen.push_back(a);
     } else if (a == "--btb-entries" && i + 1 < argc) {
       // ★ N2: `atoi` 容忍尾串（`16abc` ⇒ 静默取 16）⇒ MUST 校验完整解析
       const char* num = argv[++i];
@@ -174,6 +190,7 @@ bool parse_args(int argc, char** argv, Options& opts) {
         return false;
       }
       opts.btb_entries = static_cast<std::uint32_t>(v);
+      opts.config_flags_seen.push_back(a);
     } else if (a == "--help" || a == "-h") {
       std::printf("usage: %s --elf <path> [flags]\n", argv[0]);
       std::printf("  --elf            vendored rv32ui-p-* ELF path (required)\n");
@@ -194,6 +211,9 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::printf("  --no-bp          disable the branch predictor (default: enabled)\n");
       std::printf("  --no-bp-uncond  disable jal/j BTB entries (increment-1 switch)\n");
       std::printf("  --btb-entries <n> BP logical entries N in {16,32,64,128,256}\n");
+  std::printf("  --config <path> load CPU config from JSON (CH_MEM schema;\n");
+  std::printf("                  mutually exclusive with the config flags above;\n");
+  std::printf("                  see ip/cpu/configs/cpu_chmem_default.json)\n");
       std::printf("\n");
       std::printf("Note: --enable-cache requires L1Cache CH_MEM (see change\n");
       std::printf("      verilator-l1cache-e2e-coverage in wave4 P2 placeholder).\n");
@@ -204,6 +224,20 @@ bool parse_args(int argc, char** argv, Options& opts) {
       std::fprintf(stderr, "unknown arg: %s\n", a.c_str());
       return false;
     }
+  }
+
+  // P2 (2026-10-27): --config 与配置类 flag 互斥。
+  // ★ 静默择一 = 假绿通道（"配了 config 以为生效，其实被后面的 flag 覆盖"）。
+  if (!opts.config_path.empty() && !opts.config_flags_seen.empty()) {
+    std::fprintf(stderr,
+                 "--config is mutually exclusive with config flags "
+                 "(got --config +");
+    for (const auto& f : opts.config_flags_seen) {
+      std::fprintf(stderr, " %s", f.c_str());
+    }
+    std::fprintf(stderr,
+                 ")\n  Move those settings into the JSON file instead.\n");
+    return false;
   }
   return !opts.elf_path.empty();
 }
@@ -232,18 +266,14 @@ std::uint64_t det_hash_names(std::vector<std::string> names) {
 }  // namespace
 
 // Build the CH_MEM CPU with the vendored ELF preloaded and emit Verilog.
-bool generate_verilog(const Options& opts, const std::vector<std::uint8_t>& elf,
-                      Determinism* det) {
+bool generate_verilog(const Options& opts, const cf::cpu::CpuConfigChmem& cfg,
+                      const std::vector<std::uint8_t>& elf, Determinism* det) {
   ch::core::context ctx("cpu_verilator_sim");
   ch::core::ctx_swap guard(&ctx);
-  auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(
-      &ctx, nullptr, ch_uint<32>(kElfBase), true, elf,
-      opts.enable_mmu,
-      opts.mmu_mode,
-      opts.enable_cache,
-      opts.enable_bp,
-      opts.btb_entries,
-      opts.bp_uncond);
+  // P2 (2026-10-27): 统一走 config 重载 —— 无论配置来自 JSON 还是 CLI,
+  //   进入构建的唯一入口是 CpuConfigChmem（单一配置面, 不会出现
+  //   "JSON 解析了但 build_cpu 用的还是 CLI 值" 的双轨）。
+  auto pb = cf::cpu::CpuFactoryChmem<ch_uint<32>>::build_cpu(&ctx, cfg, elf);
   if (!pb) {
     std::fprintf(stderr, "build_cpu failed\n");
     return false;
@@ -314,21 +344,48 @@ int main(int argc, char** argv) {
 
   // ── BP 开关面的合法性检查 (fail-fast; 不得静默 clamp) ────────────────
   // ★ N3: `--no-bp` 时 `--btb-entries` 无意义 ⇒ 不校验（否则「明明关了还报错」）
-  if (opts.enable_bp && opts.btb_entries != 16 && opts.btb_entries != 32 &&
-      opts.btb_entries != 64 && opts.btb_entries != 128 &&
-      opts.btb_entries != 256) {
-    std::fprintf(stderr,
-                 "--btb-entries must be one of {16,32,64,128,256} (got %u)\n",
-                 opts.btb_entries);
-    return 2;
+  // ── P2 (2026-10-27): 配置来源 —— JSON 或 CLI, 二者互斥 ──
+  cf::cpu::CpuConfigChmem cfg;
+  if (!opts.config_path.empty()) {
+    auto loaded = cf::cpu::load_cpu_config_chmem(opts.config_path);
+    if (!loaded) {
+      std::fprintf(stderr, "%s",
+                   cf::cpu::format_cpu_config_errors(loaded.error()).c_str());
+      return 2;
+    }
+    cfg = *loaded;
+    std::fprintf(stderr, "CONFIG=%s name=%s bp=%d btb=%u uncond=%d\n",
+                 opts.config_path.c_str(), cfg.name.c_str(),
+                 static_cast<int>(cfg.enable_bp), cfg.btb_entries,
+                 static_cast<int>(cfg.bp_uncond));
+  } else {
+    // CLI 路径: 与 P2 之前的行为**逐位等价**
+    cfg.initial_pc   = kElfBase;
+    cfg.enable_mmu   = opts.enable_mmu;
+    cfg.mmu_mode     = opts.mmu_mode;
+    cfg.enable_cache = opts.enable_cache;
+    cfg.enable_bp    = opts.enable_bp;
+    cfg.btb_entries  = opts.btb_entries;
+    cfg.bp_uncond    = opts.bp_uncond;
   }
+
+  // P2: 收敛后的配置统一校验（CLI 路径也需要 —— config 路径在 load 时已校验）。
+  //   ★ 早于任何构建动作 ⇒ 干净返回 2，而不是在 build_cpu 里抛异常。
+  {
+    const std::string verr = cf::cpu::validate_cpu_config_chmem(cfg);
+    if (!verr.empty()) {
+      std::fprintf(stderr, "invalid CPU config: %s\n", verr.c_str());
+      return 2;
+    }
+  }
+
   // ★ 生效值回显 (stderr) ⇒ 测量脚本据此断言「flag 确实生效」
-  //   (否则「flag 未生效却测出无差异」的假绿通道是开着的)
+  //   ★ P2 起回显的是 **cfg 的生效值**（JSON 或 CLI 收敛后的唯一真相），
+  //     不再是 CLI 默认值 —— 否则走 --config 时会回显一串与事实无关的数字。
   // ★ N4: 关态**不**回显 entries（否则易被脚本误读为「生效值」）
-  if (opts.enable_bp) {
-    // ★ 增量 1 的生效值也回显（★ 测量脚本据此断言 flag 确实生效）
+  if (cfg.enable_bp) {
     std::fprintf(stderr, "BP=on btb_entries=%u bp_uncond=%s\n",
-                 opts.btb_entries, opts.bp_uncond ? "on" : "off");
+                 cfg.btb_entries, cfg.bp_uncond ? "on" : "off");
   } else {
     std::fprintf(stderr, "BP=off\n");
   }
@@ -344,7 +401,7 @@ int main(int argc, char** argv) {
   if (p != std::string::npos) elf_name = elf_name.substr(p + 1);
 
   Determinism det;
-  if (!generate_verilog(opts, elf, &det)) return 1;
+  if (!generate_verilog(opts, cfg, elf, &det)) return 1;
   if (!build_libvtop(opts)) return 1;
 
   std::string so = opts.work_dir + "/obj_dir/libVtop.so";
