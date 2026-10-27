@@ -71,7 +71,8 @@
 |  ----------------------------------------------------------------|
 |  extern/CppTLM 符号链接保留                                     |
 |  src/cf_plugin/bridge/{l1_cache,mmu,...}_bridge.cpp 适配层依赖  |
-|  业务 IP 不使用 ch_stream / Module / Port / ModuleFactory      |
+|  业务 IP 不使用 CppTLM 组件范式                                |
+|  (Module/Port/ModuleFactory/ChStreamModuleBase/StreamAdapter)  |
 +------------------------------------------------------------------+
 ```
 
@@ -161,14 +162,18 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 
 ### Bundle 与跨阶段 PayloadStore 是核心纽带
 
-业务 Bundle（如 `MemReqBundle`、`CacheReqBundle`）定义在 `bundles/`，基于 CppHDL 类型系统（`ch_uint<N>`、`ch_bool`、`bundle_base<Self>`）构建，但不依赖任何仿真引擎——这一性质保证 CH_MEM 模式下 Bundle 字段可直接映射为硬件信号。
+业务 Bundle 定义在 `bundles/`，基于 CppHDL 类型系统（`ch_uint<N>`、`ch_bool`、`bundle_base<Self>`）构建，但不依赖任何仿真引擎——这一性质保证 CH_MEM 模式下 Bundle 字段可直接映射为硬件信号。
 
-**Plugin-style 跨阶段通信**：业务 IP 不再使用 CppTLM `ch_stream<T>` 做模块内部数据流（详见 ADR-083）。取而代之的是 `cf::plugin::Payload<T>` + `PipeNode`：
+> ★ **命名更正（2026-10-28，ADR-092 §D7）**：代码里的实际类型名是 **`cf::bundles::MemReq` / `MemResp` / `CacheReq` / `CacheResp`** ⇒ ★ 本文档旧版写的 `MemReqBundle` / `CacheReqBundle` **在代码中不存在**（悬空引用）⇒ 一律按实际名书写。★ 新核（`ip/cpu/core`）的对外接口 bundle 真名 = **`CpuBusReq` / `CpuBusResp`**（ADR-091 §D3a.3）。
+
+**Plugin-style 跨阶段通信**：业务 IP 不再使用 **CppTLM 的 `ch_stream` / `ChStreamModuleBase` 组件范式** 做模块内部数据流（详见 ADR-083 v1.2 §4.2）。取而代之的是 `cf::plugin::Payload<T>` + `PipeNode`：
 
 - **TLM 模式**：`Payload<T>` 持 POD 值，`PipeNode::operator()` 返回值，`pb.run()` 每周期执行闭包 → 跨阶段值传递
 - **CH_MEM 模式**：`Payload<T>` 持 `ch::core::ch_uint<N>` 句柄，`pb.elaborate(ctx)` 一次性把阶段间数据流绑定为 lnode → elaboration DAG 自然形成 stage 之间的连接
 
-**为什么不用 `ch_stream<T>`**：D4 决策（2026-06-08）以来，`ch_stream<T>` 强握手语义对单周期同步流水线场景过度；`PipeBuilder::build()` + `Payload<T>` + `CtrlLink` 已验证可替代（ADR-037 v2.0 + ADR-040 v2.0 + L1Cache/MMU/CPU 实测）。
+**为什么核内不用 `ch_stream<T>`**：D4 决策（2026-06-08）以来，**强握手语义对单周期同步流水线场景过度**；`PipeBuilder::build()` + `Payload<T>` + `CtrlLink` 已验证可替代（ADR-037 v2.0 + ADR-040 v2.0 + L1Cache/MMU/CPU 实测）。
+
+> ★ **层次区分（ADR-092 §D4 / ADR-091 §D3a.1）**：★ **核内 stage 间** = `Payload<T>` + `PipeNode`（无握手，同拍数据通路）· ★ **IP 之间 / 核 ↔ 从设备** = ★ **CppHDL 的 `ch_stream<T>`**（带 `valid`/`ready` 握手）⇒ ★ **两者层次不同，不是竞争关系** ⇒ MUST NOT 以「采用 `ch_stream`」为理由删除 `Payload<T>`。
 
 > **历史背景**（Phase 1 早期）：本节之前描述了"CppHDL `__input(Bundle)` / `__output(Bundle)` 定义 RTL 端口"——这是 Phase 5 RTL 实体模型描述方式。在 Plugin-style + CH_MEM 架构下，**不再需要手工桥接**：业务代码用 `Payload<T>` 即可，CH_MEM 模式经 `pb.elaborate(ctx)` 自动产生 stage 间连接。
 
@@ -239,7 +244,7 @@ chipforge/
 
 ### PayloadStore 接口即 ISA 无关层
 
-> **核心改动（ADR-083, 2026-10-08）**：本节之前描述"ch_stream<Bundle> 接口即 ISA 无关层"——这是 Phase 1 早期假设。在 Plugin-style 架构下，IP 间通信介质是 `cf::plugin::Payload<T>` + `PipeNode`（而非 `ch_stream<T>`）。
+> **核心改动（ADR-083, 2026-10-08；★ v1.2 2026-10-28 补充层次区分）**：本节之前描述"ch_stream<Bundle> 接口即 ISA 无关层"——这是 Phase 1 早期假设。在 Plugin-style 架构下，★ **核内跨阶段**通信介质是 `cf::plugin::Payload<T>` + `PipeNode`；★ **IP 之间 / 核 ↔ 从设备**则采用 **CppHDL 的 `ch_stream<T>`**（ADR-092 §D4）⇒ ★ 「ISA 无关层」由 `Payload<T>` 承担，`ch_stream` 承担**接口契约**职责。
 
 **当前状态（Phase 6c/6d, 2026-10-08）**：
 
