@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实现期实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）**；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）**；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -209,8 +209,10 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1c** | ★ 端口创建 MUST **fail-closed 断言 ctx 非空** | ★ `ch_logic_in` 构造是 `if (ctx) { ctx->create_input(...); }` ⇒ ★ **无 current context 时静默不建节点**（`impl() == nullptr`）★ 实测确认 | ★ **假绿通道**：端口「消失」而不报错 ⇒ 网表少端口 ⇒ 门禁照绿 |
 | **G-1d** | ★ 端口**方向必须严格**：请求用 `ch_out`，响应用 `ch_in`；且 ★ `ch_in` **MUST NOT** 被内部逻辑赋值 | ★ 有内部 driver 的 `ch_in` **不是**顶层端口（上游 `verilator_backend.cpp:617` 的 skip：`inputimpl::driver() != nullptr` ⇒ 不进 `port_access_`；codegen 侧同理） | 端口**不进** `port_access_` ⇒ Verilator 后端**读不到** ⇒ 观测量采集失败 |
 | **G-1e** | ★ **端口的驱动赋值 MUST 在 `ctx_swap` 保护下做** | ★ 实测：赋值在保护外 ⇒ `[ERROR] No active context for literal creation` ⇒ `ch_logic_out::operator=` 报「output_node_ or src_lnode is null」⇒ ★ **output 端口进了网表但无 driver ⇒ 值未定义/X** | ★ **假绿通道**：端口「在但无值」⇒ 仿真读到 X ⇒ 门禁照绿 |
+| **G-1f** | ★ **bundle 字段 MUST NOT 带字面量初始化器** | ★ `AddrT address{0};` 在**默认构造时**就创建字面量节点 ⇒ 无 active context 时报「No active context for literal creation」⇒ 值退化为默认且**不报错** ⇒ 上游 `bundle/common_bundles.h` 的 `fifo_bundle` 同款做法（`T data;` 无初始化器） | ★ **假绿通道**（字段值静默为默认）· ★ **连带**：★ **老核 `bundles/mem_bundles.h` 有同样隐患**（`uint_t<64> address{0}`）⇒ 在 CH_MEM 下 include 它即报错 ⇒ ⇒ **新核 MUST NOT include 老 bundle**（⇒ 「不重名」纪律只能文档级，非机检 ⇒ 已诚实标注） |
+| **G-1g** | ★ **`as_master_direction()` / `as_slave_direction()` MUST 在 `ctx_swap` 保护内调用** | ★ 内部 `make_output`/`make_input` 会创建节点 ⇒ 无 active context 时报错 | 方向设置失败 ⇒ 端口方向错 ⇒ Verilator 后端读不到 |
 
-⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
 
 #### D5.1.1 ★ G-1d 的判据补正（★ 实测）
 

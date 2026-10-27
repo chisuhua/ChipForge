@@ -170,6 +170,36 @@
 `build_port_access_table()` 对 `size() > 64` 的 `type_input`/`type_output` 返回 `PortBitwidthOverflow`。
 ⇒ ★ `ch_stream` 的 **bundle 端口按字段展开**（`as_master_direction()` ⇒ `make_output(payload, valid)` + `make_input(ready)`）⇒ ★ **总宽 144-bit 的 `CpuBusReq` 不会触发** ⇒ 但 ★ **每字段 MUST ≤64 bit**（H-1）。
 
+### K8 — ★ `ch_bool` / `ch_uint` 的**字面量构造**也需要 active context
+
+`ch_uint<32>(ch_literal<0,32>{})` / `ch_bool(ch_literal<1,1>{})` 在**无 current context** 时
+⇒ `[ERROR] No active context for literal creation` ⇒ ★ **值为默认值且不报错**（实测：构造出的
+`ch_bool` 读出 `false` 而非 `true`）⇒ ⇒ ★ **一切 `ch_*` 字面量构造 MUST 在 `ctx_swap` 保护内做**
+（★ 与 G-1e 同族：端口驱动赋值也是同一根因）。
+
+### K9 — ★ `CH_BUNDLE_FIELDS_T` 宏要求作用域内 `using ch::core::bundle_base;`
+
+宏内部用的是**非限定名** `bundle_base<Self>` ⇒ MUST 在使用宏的命名空间里
+`using ch::core::bundle_base;`（★ 上游 `bundle/common_bundles.h:13` 同款做法）
+⇒ 否则报「expected nested-name-specifier before 'bundle_base'」。
+
+### K10 — ★ 类模板 + 默认参数：**类型位置**必须写 `<>`
+
+`CpuBusReq` 是类模板（宽度参数化）⇒ ★ CTAD 只在**变量声明**处生效
+⇒ ★ 在**类型位置**（`is_base_of_v<...>` / `decltype(...::field)` / 函数签名）必须写 `CpuBusReq<>`。
+
+### K11 — ★ bundle 头的 include **顺序**要紧
+
+`core/bundle/bundle_base.h` 依赖 `ch_width_v`（定义在 `core/traits.h`）
+⇒ ★ `traits.h` MUST 在 `bundle_base.h` **之前**；且 ★ `CH_BUNDLE_FIELDS_T` 宏在
+`core/bundle/bundle_meta.h` ⇒ 该头也要 include（★ `ch.hpp` 正是靠这个顺序让 bundle 可用 —— 而我们
+**不能** include `ch.hpp` ⇒ 必须显式补齐）。
+
+### K12 — ★ `ch_bool` 的 `operator bool` 是 explicit
+
+⇒ Catch2 的 `static_cast<bool>` **不适用**（编译错误）⇒ 用 `bool(x.operator bool())`
+或 `x == ch_bool(ch_literal<1,1>{})` 做比较。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。

@@ -38,10 +38,11 @@ depends_on:
 
 ## 2. Phase 2 — S2：`bus_iface_chmem.h`（G-4）+ 装配骨架
 
-- [ ] 2.1 [RED] `tests/cpu/schema/test_cpu_bus_iface.cpp`（新）：`CpuBusReq`/`CpuBusResp` 字段与宽度断言（★ 每字段 ≤64 bit）[ADR-091 §D6 H-1]
-- [ ] 2.2 [GREEN] 新建 `ip/cpu/core/bus_iface_chmem.h`：`bundle_base` 派生 + `CH_BUNDLE_FIELDS_T` + 纯 `ch::core::ch_uint`（★ 零 `cf::plugin::uint_t`）· ★ 真名 **MUST NOT** `MemReqBundle`（该名代码中不存在）[ADR-091 §D3a.3, §D6 H-1/H-4]
+- [x] 2.1 [RED] `tests/cpu/schema/test_cpu_bus_iface.cpp`（新）：`CpuBusReq`/`CpuBusResp` 字段与宽度断言（★ 每字段 ≤64 bit）[ADR-091 §D6 H-1]
+- [x] 2.2 [GREEN] 新建 `ip/cpu/core/bus_iface_chmem.h`：`bundle_base` 派生 + `CH_BUNDLE_FIELDS_T` + 纯 `ch::core::ch_uint`（★ 零 `cf::plugin::uint_t`）· ★ 真名 **MUST NOT** `MemReqBundle`（该名代码中不存在）[ADR-091 §D3a.3, §D6 H-1/H-4]
 - [ ] 2.3 [GREEN] 新建 `ip/cpu/core/cpu_core_chmem.h`：装配骨架（复用 `ip/cpu/arch/riscv/` + `ip/cpu/core/payload_common.h`）[ADR-091 §D1]
-- [ ] 2.4 零回归 + 八门禁
+  ⇒ ★ **推迟到 Phase 3**（★ 装配骨架需要 Phase 3 的端口数据通路才有意义 ⇒ 单独提交一个空骨架是纯形式）
+- [x] 2.4 零回归 + 八门禁
 
 ## 3. Phase 3 — S3：端口数据通路 + 顶层观测端口
 
