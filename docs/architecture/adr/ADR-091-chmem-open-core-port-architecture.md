@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过）**）**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实现期实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）**；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -208,8 +208,19 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1b** | ★ 框架头 **MUST NOT include `<ch.hpp>`** ⇒ 只 include 具体头（`core/io.h` · `core/uint.h` · `core/context.h`） | ★ `ch.hpp:10` include `module.h`，而 ★ `module.h:13` 的 `build_hierarchical_name` **缺 `inline`** ⇒ **任何 2+ TU include `<ch.hpp>` 即链接失败**（multiple definition）★ 实测触发 | ★ **新核多文件必然踩雷**（每个头都含 `ch.hpp` ⇒ 链接失败） |
 | **G-1c** | ★ 端口创建 MUST **fail-closed 断言 ctx 非空** | ★ `ch_logic_in` 构造是 `if (ctx) { ctx->create_input(...); }` ⇒ ★ **无 current context 时静默不建节点**（`impl() == nullptr`）★ 实测确认 | ★ **假绿通道**：端口「消失」而不报错 ⇒ 网表少端口 ⇒ 门禁照绿 |
 | **G-1d** | ★ 端口**方向必须严格**：请求用 `ch_out`，响应用 `ch_in`；且 ★ `ch_in` **MUST NOT** 被内部逻辑赋值 | ★ 有内部 driver 的 `ch_in` **不是**顶层端口（上游 `verilator_backend.cpp:617` 的 skip：`inputimpl::driver() != nullptr` ⇒ 不进 `port_access_`；codegen 侧同理） | 端口**不进** `port_access_` ⇒ Verilator 后端**读不到** ⇒ 观测量采集失败 |
+| **G-1e** | ★ **端口的驱动赋值 MUST 在 `ctx_swap` 保护下做** | ★ 实测：赋值在保护外 ⇒ `[ERROR] No active context for literal creation` ⇒ `ch_logic_out::operator=` 报「output_node_ or src_lnode is null」⇒ ★ **output 端口进了网表但无 driver ⇒ 值未定义/X** | ★ **假绿通道**：端口「在但无值」⇒ 仿真读到 X ⇒ 门禁照绿 |
 
-⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+
+#### D5.1.1 ★ G-1d 的判据补正（★ 实测）
+
+★ `ch_in` 的「值赋值不可用」**无法**用 `std::is_assignable` 检出 —— 其 `operator=` 是**模板** + `static_assert` 在**函数体内**（`io.h:239-243`）⇒ 签名匹配 ⇒ `is_assignable_v` 报 **true** ⇒ ★ 真正的阻止发生在**实例化时**（编译错误）⇒ ★ 本仓库的判据改为三项：
+
+| 判据 | 形式 |
+|---|---|
+| ① `ch_out` 可赋值 | 编译期 `static_assert(is_assignable_v<ch_out&, ch_uint>)` |
+| ② `ch_in` 值赋值编译失败 | 由 CppHDL 自身的实例化期 `static_assert` 保证（★ 本仓库不写会失败的编译） |
+| ③ ★ **行为判据**：`ch_in` 被内部驱动（`inputimpl::set_driver`）⇒ **MUST NOT** 出现在网表顶层端口 | 测试 case E（★ 实测通过） |
 
 #### D5.1.1 ★ PoC 实测的网表形态（★ 开放核的接口目标形态）
 
