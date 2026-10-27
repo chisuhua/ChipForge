@@ -1,6 +1,6 @@
 # ADR-092 — TLM 参考实现的冻结与演进停止（Phase-1）
 
-> **Status**: ✅ **Accepted（v1.0，2026-10-28，architect 主持；D0 决策链 D0-①~⑨ + R-1/R-2/R-3 + D-H-1/D-H-2/D-I-1 全部裁决）**
+> **Status**: ✅ **Accepted（v1.1，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~⑨ + R-1/R-2/R-3 + D-H-1/D-H-2/D-I-1 全部裁决；★ **v1.1 = 文档文本同步完成登记**（22 文件，见 §D7））**
 > **上游**: ADR-088 v1.4 §10（三段迁移路径；本 ADR 是其**阶段 C 的 Phase-1 准备**，★ **不**替代其 5 条硬前置）· ADR-083（Plugin-style 单一 source of truth；★ **v1.2 表述纠偏**见「相关」）· ADR-040 v3.0 · ADR-091 v1.0（CH_MEM 开放核形态）
 > **下游**: `tools/check_tlm_freeze.sh`（冻结门禁升级）· `ip/**`（32 个冻结文件）· `docs/architecture/tlm-frozen-reference.md`（参考基准清单，★ 新建）· `openspec/specs/tlm-coverage-parity-ledger/spec.md`（★ **D-I 的落点 = ADR-088 阶段 B 台账**）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留 ⇒ 本 ADR 取 **ADR-092**。
@@ -185,7 +185,10 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 - ✗ **`check_plugin_portability.sh` 的单模改版** ⇒ ADR-093
 - ✗ **二 binary → 一 binary 合并** ⇒ ADR-093
 - ✗ **`ch_stream` 的接口契约**（`CpuBusReq`/`CpuBusResp` 真名 + 握手语义）⇒ **ADR-091 增补**（D-J）
-- ✗ **ADR-083 的表述纠偏**（`ch_stream` 归类 / `MemReqBundle` 悬空引用）⇒ **ADR-083 v1.2**
+- ~~✗ **ADR-083 的表述纠偏**（`ch_stream` 归类 / `MemReqBundle` 悬空引用）~~ ⇒ ✅ **已完成（ADR-083 v1.2 + 文档文本同步，2026-10-28）**：
+  - ★ **ADR-083 v1.2**：§1.2 架构图（`ch_stream` 移出 CppTLM 框）+ §4.2 拒绝范围收窄 + Status/来源/关联 + §5.1 修订表
+  - ★ **文档文本同步（22 文件）**：`AGENTS.md` · `docs/GLOSSARY.md` · `docs/architecture/{overview,background-and-goals,code-framework-mapping,interface-design,tech-selection}.md` · `docs/templates/IP_TEMPLATE.md` · `docs/lessons/m1-m5-cpu-implementation.md` · `ip/{README,cpu,cache,memory,peripheral,interconnect}/README.md` · `ip/cpu/rtl/README.md` · `tests/bundles/README.md` · 4 份 `ip/cpu/configs/*.json` · `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`
+  - ★ **有意的边界**：★ **研究快照不改**（`docs/research/*` · `docs/architecture/plugin-research/*` = 历史留痕）· ★ **归档不改**（`openspec/changes/archive/*` · `openspec/specs/*` · `.rddf/roadmap/archive/*`）
 
 ---
 
@@ -233,6 +236,7 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 - [ ] **V-6** ★ **零回归**：★ TLM binary **1017 case** 与 CH_MEM binary **331 case** 计数**不变**；★ 现有 52 case parity 基线**逐位不变**（预载核不动）
 - [ ] **V-7** ★ **门禁无假绿**：★ `check_plugin_portability.sh` **全绿**且 ★ **Check 2/4/6/7/13 仍有效**（★ 判据：★ 注入一个旧 Check 5 能抓的 `if(ch_bool)` ⇒ MUST 仍 RED ⇒ 防「改完门禁反而松了」）
 - [ ] **V-8** ★ **双模仍在**：★ `CF_PLUGIN_USE_CH_MEM` 使用点 **167 处仍在**（⇒ 证明 Phase-1 未误触单模化）
+- [ ] **V-9** ★ **文档同步完成**：★ 22 个文件已同步（★ `AGENTS.md` + `docs/architecture/*` 5 篇 + `docs/GLOSSARY.md` + 模板 + lessons + 9 个 IP/README + `tests/bundles/README.md` + 4 份 configs JSON + 1 个 roadmap objective）⇒ ★ 复查「`不使用.*ch_stream`」类断言**仅剩已修正的合法表述**；★ **`MemReqBundle` 悬空引用在活文档中归零**（★ 设计文档**自带**该名字的 `struct` 定义处**保留** ⇒ 那是设计意图命名，非悬空）；★ **有意的边界**：研究快照 + 归档**未改**
 
 ---
 
