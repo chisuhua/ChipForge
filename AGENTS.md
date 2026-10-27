@@ -177,22 +177,23 @@ bash tools/run_chipforge_tests.sh --all
 | Family tag | 目录 | 内容 | 数量 |
 |-----------|------|------|------|
 | `[framework]` | `tests/framework/` | Plugin 基础组件（TLM 模式） | 124/124 PASS, 341 assertions（2026-10-20 实测；含 `[arith-poc]` 22 case 白盒 PoC） |
-| `[chmem]` | `tests/framework/` + `tests/cpu/` + `tests/mmu/` | CH_MEM 模式 elaboration + PoC + vendored ELF + MMU TLB + CPU/CSR key 模态 | 89 case = **89/89 PASS**（2026-10-22 实测；`chmem_vendored_elf_tohost1` 内 10 个 rv32ui load/store ELF 已由上游 CppHDL `c27543d` 修复；vendored_elf 47 section = 39 rv32ui 全 PASS + 8 rv32um 全 PASS）。另 `[arith-poc]` 24 case 白盒全 PASS + `[alu][semantics]` 6 case / 288 assertions（CH_MEM ALU 单元级语义锚，真跑 19 层 select 树）+ `[keys]` 4 case + `[mmu-chmem-basic]` 7 case + `[cpu-chmem-keys]` 5 case |
+| `[chmem]` | `tests/framework/` + `tests/cpu/` + `tests/mmu/` | CH_MEM 模式 elaboration + PoC + vendored ELF + MMU TLB + CPU/CSR key 模态 | 123 case = **123/123 PASS**（2026-10-27 实测；★ 随全套 164 case / 20133 assertions 全绿；`chmem_vendored_elf_tohost1` 内 10 个 rv32ui load/store ELF 已由上游 CppHDL `c27543d` 修复；vendored_elf 47 section = 39 rv32ui 全 PASS + 8 rv32um 全 PASS）。另 `[arith-poc]` 24 case 白盒全 PASS + `[alu][semantics]` 6 case / 288 assertions（CH_MEM ALU 单元级语义锚，真跑 19 层 select 树）+ `[keys]` 4 case + `[mmu-chmem-basic]` 7 case + `[cpu-chmem-keys]` 5 case |
+| `[chmem-config]` | `tests/cpu/schema/test_cpu_config_chmem.cpp` | CH_MEM CPU 的 **JSON 配置面**契约（P2）—— 默认值对齐 `build_cpu` · 两种 JSON 形态 · 32 项 TLM-only 字段**逐个带原因拒绝** · 未知字段被拒 · 类型错/值域/文件缺失/语法错各自独立 `ErrorKind` · schema 与拒绝表**双向一致** | **14/14 PASS, 254 assertions**（2026-10-27 实测，TLM + CH_MEM 两个 binary 各一遍）；★ 归属 `chipforge_tests` **与** `chipforge_tests_chmem` |
 | `[cpphdl]` | `tests/framework/test_cppHDL_hello_poc.cpp` | CppHDL 完整链路（ch_device/toVerilog/Simulator） | 6/6 PASS, 15 assertions |
 | `[elaborate]` | `tests/framework/` | PipeBuilder::elaborate() 4 API PoC | 全部 PASS |
 | `[verilator]` | `tests/cpu/test_cpu_verilator_sim.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 后端 48-ELF (40 rv32ui + 8 rv32um) suite tohost=1 | 1/1 case PASS (**48 ELF, 96 assertions, 全 PASS** — 2026-10-20 实测；含 8 rv32um 真 PASS，判据为严格 `TOHOST=1`，非 mask 假绿)。**历史（供追溯）**：2026-10-14 `verilator-mul-div-fsm-followup` 曾加 `& 0x1u` mask 对齐 riscv-tests harness 的 fail 协议（`gp = test_num \| 1`，LSB=1 表 fail）→ 造成"8/8 假绿"；2026-10-20 `8aa0314` 二次修订拆 done/pass 双判据 + TIMEOUT 三态，runner 恢复严格判定。**旧归因更正**："上游 CppHDL `ch_uint` 算术语义异常"已被 PoC `63bfc8a`/`03667fa` **证伪**（`14/4=3`、`3*4=12`）—— 真根因是 CH_MEM 数据通路未实现 M-op，已由 `chmem-mext-comb-datapath` 组合式落地修复。**cycle 不可比**：组合式 M-op 1 拍出结果，与 TLM radix-2（MUL=1c/MULH=3c/DIV=33c）不同构 → cycle parity 判据不适用，移交 `chmem-mext-fsm-cycle-parity` |
 | `[mmu-verilator]` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` *(在 `chipforge_tests_chmem`)* | Verilator 链路 MMU Bare 模式 plumbing (Phase 6d P2) | 3/3 case PASS (5 ELF cycle cap + elaboration + manual_elf), 26 assertions |
-| `[cache]` | `tests/cache/` | L1CachePlugin + Bridge + Adapter（5 个） |
-| `[cpu]` | `tests/cpu/` | CPU Plugin 单元测试 |
-| `[cpu-integration]` | `tests/cpu/integration/` | RISC-V 多 stage 集成（4 个） |
-| `[soc]` | `tests/soc/` | SoC JSON 拓扑 |
-| `[bundles]` | `tests/bundles/` | Bundle 定义测试 |
+| `[cache]` | `tests/cache/` | L1CachePlugin + Bridge + Adapter（5 个） | 25/25 PASS, 71 assertions（2026-10-27 实测） |
+| `[cpu]` | `tests/cpu/` | CPU Plugin 单元测试 | 137/137 PASS, 480 assertions（2026-10-27 实测） |
+| `[cpu-integration]` | `tests/cpu/integration/` | RISC-V 多 stage 集成（4 个） | 95/96 PASS, 65739/65740 assertions（2026-10-27 实测；★ 1 fail = `7stage_topology_from_config` **既存** infra drift，见 §已知测试状态） |
+| `[soc]` | `tests/soc/` | SoC JSON 拓扑 | 20/20 PASS, 179 assertions（2026-10-27 实测） |
+| `[bundles]` | `tests/bundles/` | Bundle 定义测试 | 9/9 PASS, 39 assertions（2026-10-27 实测） |
 
 > **测试 binary 归属（Oracle 2026-10-06 修订）**:
 > - `[framework]`/`[cache]`/`[cpu]`/`[cpu-integration]`/`[soc]`/`[bundles]`/`[mmu]`/`[riscv-tests]`/`[cpu-l1-mmu-demo]`/`[tlb-refill]` — 全部在 `chipforge_tests` (TLM binary)
 > - `[chmem]`/`[cpphdl]`/`[elaborate]`/`[verilator]`/`[mmu-verilator]` — **全部在 `chipforge_tests_chmem`** (CH_MEM binary, `-DCF_PLUGIN_USE_CH_MEM`)
 > - **推荐运行**:
->   - TLM 快速回归：`./build/bin/chipforge_tests` (432 catch2 instances / 67026 assertions, ~0.6s)
+>   - TLM 快速回归：`./build/bin/chipforge_tests` (507 catch2 instances / 67447 assertions, ~0.6s；★ **1 个 baseline-known FAIL**：`7stage_topology_from_config` —— `node_count == 9` vs 期望 17（`cpu_superscalar.json` 的 `enable_mmu=false` ⇒ MMU 的 10 个 substage 不注册 ⇒ **期望值本身是旧的**，AGENTS.md §已知测试状态 早已登记为 infra drift）
 >   - 全量 (TLM + CH_MEM + verilator + gate)：`bash tools/run_chipforge_tests.sh --all`
 >   - Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2)：
 >     ```bash
@@ -210,9 +211,10 @@ bash tools/run_chipforge_tests.sh --all
 ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 ```
 
-**CH_MEM 模式状态** (2026-09-20 实测):
+**CH_MEM 模式状态** (2026-10-27 HEAD 实测):
+- ✅ ★ **CH_MEM binary 全套 = 164 case / 20133 assertions 全绿**（2026-10-27 在 `main` 上清场后跑完；★ 覆盖 `[chmem]` / `[framework]` / `[cpu]` / `[cpphdl]` / `[elaborate]` / `[verilator]` / `[mmu-verilator]` / `[keys]` / `[alu]` / `[mmu]` / `[cache]` 全部 family）
 - ✅ `[cpphdl]` 6/6 PASS (W0 PoC 完整链路)
-- ✅ `[chmem]` 89 case = **89/89 PASS**（2026-10-22 实测；含 `[alu][semantics]` 6 case ALU 单元级语义锚 + `[mem-drift]` 1 case aread 0-cycle 对齐 pin + `[keys]` 4 case payload key 模式化锚 + `[mmu-chmem-basic]` 7 case MMU TLB 命中路径锚 + `[cpu-chmem-keys]` 5 case CPU/CSR payload key 模式化锚）。**历史（供追溯）**：2026-10-20 ~ 2026-10-21 上午为 72/73 PASS，1 failed = `chmem_vendored_elf_tohost1` 内 10 个 rv32ui load/store ELF（`lb`/`lbu`/`lh`/`lhu`/`lw`/`sb`/`sh`/`sw`/`ld_st`/`st_ld`）—— 上游 CppHDL `c27543d` 修复 `ch_mem::aread` 相对生成 Verilog 的 1 拍滞后后**全部转绿**（vendored ELF 47/47 PASS / 16410 assertions）
+- ✅ `[chmem]` 123 case = **123/123 PASS**（2026-10-27 实测；含 `[alu][semantics]` 6 case ALU 单元级语义锚 + `[mem-drift]` 1 case aread 0-cycle 对齐 pin + `[keys]` 4 case payload key 模式化锚 + `[mmu-chmem-basic]` 7 case MMU TLB 命中路径锚 + `[cpu-chmem-keys]` 5 case CPU/CSR payload key 模式化锚）。**历史（供追溯）**：2026-10-20 ~ 2026-10-21 上午为 72/73 PASS，1 failed = `chmem_vendored_elf_tohost1` 内 10 个 rv32ui load/store ELF（`lb`/`lbu`/`lh`/`lhu`/`lw`/`sb`/`sh`/`sw`/`ld_st`/`st_ld`）—— 上游 CppHDL `c27543d` 修复 `ch_mem::aread` 相对生成 Verilog 的 1 拍滞后后**全部转绿**（vendored ELF 47/47 PASS / 16410 assertions）
 - ✅ `[verilator]` 1/1 case PASS (**48 ELF, 96 assertions, 全 PASS** — 2026-10-20 实测；40 rv32ui + 8 rv32um，8 rv32um 真 PASS，判据为严格 `TOHOST=1`)。**归属 `chipforge_tests_chmem` binary**，TLM binary 无 `[verilator]` 测试（实测 `--list-tests [verilator]` 在 chipforge_tests 返回 0 case）。**历史（供追溯）**：PR1 修 pre-existing bug（`cpu_verilator_sim.cpp` 缺 `mkdir -p work_dir` 在 `pb->to_verilog()` 之前 → 1 行修复后 5/5 稳定）；PR2 22→40 rv32ui ELF（B' 提交 `5e82970` dmem aread 解同步 + `63a642f` sub-word ld/st RMW + `368d6c4` ALU/JALR/branch prereqs，修复 7 个 CH_MEM plugin bug）；PR3 40→48 ELF（`4dc5560b` 扩 8 rv32um + `verilator-mul-div-fsm-followup` 修 runner 协议加 `& 0x1u` mask —— **该 mask 造成"8/8 假绿"**，2026-10-20 `8aa0314` 二次修订拆 done/pass 双判据 + TIMEOUT 三态，runner 恢复严格 `TOHOST=1` 判定）。**旧归因更正**："上游 CppHDL `ch_uint` 算术语义异常（`CHANGELOG.md:443`）"已被 PoC `63bfc8a`/`03667fa` **证伪**（`14/4=3`、`3*4=12`）—— 真根因是 **CH_MEM 数据通路未实现 M-op**，已由 `chmem-mext-comb-datapath` 组合式落地修复。
 - ✅ `pipeline2_stall_matrix` 16/16 PASS (2-stage + stall/flush + Verilog `always_ff @(posedge)` 真实生成)
 - ✅ M3 PoC (`m3_poc_regfile_elaborate`/`m3_poc_alu_elaborate`) 13/13 PASS
@@ -433,7 +435,7 @@ bash tools/verify_adr.sh                           # ADR 漂移检查
 bash tools/verify_plugin_decision.sh                # D4 业务代码检查（~7 项）
 bash tools/check_plugin_portability.sh              # ADR-040 移植性检查（~4 项）
 bash tools/doc_link_check.sh                        # 文档死链检查
-bash tools/run_chipforge_tests.sh                   # 默认: TLM only (432 catch2 instances / 67026 assertions, ~0.6s, fast loop)
+bash tools/run_chipforge_tests.sh                   # 默认: TLM only (507 catch2 instances / 67447 assertions, ~0.6s, fast loop)
 bash tools/run_chipforge_tests.sh --all             # 全量: ctest 4 entries (TLM + CH_MEM + Verilator smoke + gate, ~167s)
 python tools/doc_checker.py --format text --verbose  # 文档健康检查
 pre-commit run --all-files                          # 格式化/空白/JSON 检查
