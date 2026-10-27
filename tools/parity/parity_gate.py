@@ -363,6 +363,10 @@ def run_simulator(case, opts):
     out = os.path.join(opts.work_dir, f"{case['name']}.sim.json")
     cmd = [opts.sim_bin, "--elf", case["relpath"], "--cycles", str(case_cap(case, opts)),
            "--json", out]
+    # P2 (2026-10-27): 可选的 JSON CPU 配置 —— 转发给两侧 runner。
+    #   ★ 只在显式给出时传：不给 ⇒ 走各 runner 的默认（与 P2 之前逐位一致）。
+    if getattr(opts, "cpu_config", ""):
+        cmd += ["--config", opts.cpu_config]
     proc, err = _run(cmd, opts.timeout_s)
     if err:
         return None, err
@@ -384,6 +388,9 @@ def run_verilator(case, opts):
     cmd = [opts.vl_bin, "--elf", case["relpath"], "--cycles", str(case_cap(case, opts)),
            "--work-dir", vdir, "--verilog", os.path.join(vdir, "top.v"),
            "--json", out]
+    # P2: 同 simulator 侧 —— 同一份 config 必须喂给两侧, 否则比的是两种配置。
+    if getattr(opts, "cpu_config", ""):
+        cmd += ["--config", getattr(opts, "cpu_config")]
     proc, err = _run(cmd, opts.timeout_s)
     if err:
         return None, err
@@ -511,6 +518,12 @@ def main(argv=None):
     ap.add_argument("--sim-bin", default=os.path.join("build", "bin", "parity_sim_runner"))
     ap.add_argument("--vl-bin", default=os.path.join("build", "bin", "cpu_verilator_sim"))
     ap.add_argument("--max-cycles", type=int, default=3000)
+    # P2 (2026-10-27): 可选 JSON CPU 配置（CH_MEM schema），转发给两侧 runner。
+    #   ★ 不给 ⇒ 两个 runner 各用自己的默认 ⇒ 与 P2 之前逐位一致。
+    #   ★ 给了 ⇒ 两侧 MUST 用同一份（否则比的是两种配置，不是两个后端）。
+    ap.add_argument("--cpu-config", default="",
+                    help="path to a CH_MEM CPU config JSON "
+                         "(see ip/cpu/configs/cpu_chmem_default.json)")
     ap.add_argument("--timeout-s", type=int, default=3600)
     ap.add_argument("--jobs", type=int, default=4,
                     help="并行度（两侧 runner 是独立子进程 ⇒ 线程池安全；默认 4）")
@@ -646,6 +659,9 @@ def main(argv=None):
         "reset_mode": "sim:ctor-init / vl:reset-pulse-1",
         "corpus_source": opts.corpus,
         "layer": opts.layer,
+        # P2 (2026-10-27): 记录本轮用的 CPU 配置来源 —— "" ⇒ 两个 runner 各用默认。
+        #   ★ 报告可复现性：没有这一行，事后无法判断 "这次跑的是哪套配置"。
+        "cpu_config": getattr(opts, "cpu_config", ""),
         # 同一个 build_cpu 配置 ⇒ 各 ELF 的 DAG 结构相同（node_count/names_hash 一致），
         # 逐 case 也记录一份，便于发现「某 case 的 DAG 漂了」。
         "determinism": per_case[0].get("determinism"),
