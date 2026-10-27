@@ -140,20 +140,29 @@ enum class ImplMode {
 
 // 模块继承 ChStreamModuleBase，不是 sc_module
 // （示例：cpptlm::CPUTLM 已被注册到 CppTLM ModuleFactory；项目自有 RISC-V ISS 处于设计中）
+//
+// ★★ v2 标注（2026-10-28，ADR-092 §D7 / ADR-083 v1.2）：
+//   ① 本例是 **legacy CppTLM 设想** ⇒ 其 `ch_stream<Bundle>` 成员与 `register_input` 登记
+//      **均不存在**（CppTLM 无 `ch_stream` 类型；`declarative-hybrid-framework.md:186`
+//      已就同一问题记录「原文档描述的 API 均不存在」）⇒ 本例仅作 **legacy 知识留存**，MUST NOT 当作可编译 API
+//   ② ★ **bundle 名更正**：`MemReqBundle` / `MemRespBundle` 在代码中不存在 ⇒ 实际是
+//      **`cf::bundles::MemReq` / `MemResp`**（`bundles/mem_bundles.h`）
+//   ③ ★ **目标态的接口层**见 ADR-091 §D3a：★ **CppHDL 的 `ch_stream<CpuBusReq>`**
+//      （`ip/cpu/core/bus_iface_chmem.h`，真名 `CpuBusReq`/`CpuBusResp`）★ **不是** CppTLM 组件范式
 class CpuTlmExample : public ChStreamModuleBase {
 public:
     CpuTlmExample(const std::string& name, EventQueue* eq)
         : ChStreamModuleBase(name, eq) {}
 
-    // ── ch_stream 是模块内部接口（设计视角）──
-    // 模块设计者从 ch_stream 角度思考数据流
+    // ── stream 是模块内部接口（设计视角）──
+    // 模块设计者从 stream 角度思考数据流
     // StreamAdapter 自动将其映射到 Port（框架视角）
 private:
-    // 内部 ch_stream 通道
-    ch_stream<MemReqBundle>  ibus_req_;    // 指令请求
-    ch_stream<MemRespBundle> ibus_resp_;   // 指令响应
-    ch_stream<MemReqBundle>  dbus_req_;    // 数据请求
-    ch_stream<MemRespBundle> dbus_resp_;   // 数据响应
+    // 内部 stream 通道（★ bundle 名见下方更正）
+    cpptlm_stream<MemReq>   ibus_req_;    // 指令请求
+    cpptlm_stream<MemResp>  ibus_resp_;   // 指令响应
+    cpptlm_stream<MemReq>   dbus_req_;    // 数据请求
+    cpptlm_stream<MemResp>  dbus_resp_;   // 数据响应
 
 public:
     void on_config_loaded() override {
