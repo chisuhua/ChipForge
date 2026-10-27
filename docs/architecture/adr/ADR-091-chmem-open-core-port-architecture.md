@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.0，2026-10-27，architect 主持；D0 决策链 D0-①~D0-⑨ 全部裁决）**
+> **Status**: ✅ **Accepted（v1.1，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；★ **v1.1 = 增补 §D3a（D-J `ch_stream` 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名 `CpuBusReq`/`CpuBusResp` + §D4 指向 ADR-092 Phase-2**）**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -28,7 +28,7 @@
 | **B-1** | `VerilatorBackend` 的 `port_access_` **只认顶层端口**（`type_input`/`type_output` 节点） | ⇒ 对 2 端口的核**几乎无用**；且现有 5 个观测量只能靠 `--public-flat-rw` 穿透内部层级读 `top__DOT___reg_N` / `top__DOT__dmem[0x400]`（**非契约路径**，内部节点名一变即断） |
 | **B-2** | 观测走内部 hack | ⇒ 门禁的观测路径**不稳定**（内部重构即打断门禁） |
 | **B-3** | 无对外接口 | ⇒ 无法接 Cache / MMU IP ⇒ SoC 级验证不存在 |
-| **B-4** | 每个 ELF 一份网表（网表随 ELF 变） | ⇒ 开放项 **O-4/O-5**（每 corpus 一次编译 / ELF 移出 elaboration 期）**无解** |
+| **B-4** | 每个 ELF 一份网表（网表随 ELF 变） | ⇒ 开放项 **O-4/O-5**（每 corpus 一次编译 / ELF 移出 elaboration 期）**无解**<br>★ **O-5 的归属正是「architect 评估」（契约 §8）⇒ 本 ADR 即该评估的产出**（见 D1「形态」） |
 
 ### 3. ★ 但上游 CppHDL **已有**「带端口的核 + 多后端」的完整设施（2026-10-27 调研）
 
@@ -75,7 +75,7 @@
 
 | 项 | 决策 |
 |---|---|
-| **形态** | ★ **开放核**（P1）：对外暴露 `ch_stream` 端口，取指/访存由外部供给 |
+| **形态** | ★ **开放核**（P1）：对外暴露 `ch_stream` 端口，取指/访存由外部供给<br>★ **本 ADR 同时是开放项 O-5 的架构解**（契约 §8：「让 Verilator 侧免掉『每 ELF 一次编译』：**把 ELF 从 elaboration 期移出**（imem 初始化改运行期加载）」，归属「architect 评估」）⇒ 开放核的 ELF 走**端口**而非 elaboration 期预载 ⇒ 网表不再随 ELF 变 ⇒ **O-4/O-5 一并解开** |
 | **实现位置** | ★ **`ip/cpu/core/`**（新目录）—— 形态差异**由目录表达**，不用版本号 |
 | **预载核** | ★ **原样不动**（`ip/cpu/plugins/*_chmem.h` + `cpu_factory_chmem.h`）⇒ 现有 52 case parity 基线**零风险** |
 | **退役** | 预载核的移除**待开放核通过全部测试后另行裁决**（★ 归 ADR-088 阶段 C，**不在本 ADR**） |
@@ -115,14 +115,48 @@ ip/cpu/core/
 ⇒ ★ **两种场景角色对称**（都是 slave）⇒ 替换实现即得 SoC。
 ⇒ ★ **验证实现 MUST 提供 ELF 加载**（imem 侧）+ 响应 dmem 读写请求。
 
-### D3 ★ 端口契约：`ch_stream<MemReqBundle>`（标准 bundle）
+### D3 ★ 端口契约：`ch_stream<CpuBusReq>`（标准 bundle）
 
 | 项 | 决策 |
 |---|---|
-| 端口形态 | ★ `ch::core::ch_stream<MemReq>` / `ch_stream<MemResp>`（**CppHDL 原生 bundle**） |
+| 端口形态 | ★ `ch::core::ch_stream<CpuBusReq>` / `ch_stream<CpuBusResp>`（**CppHDL 原生 bundle**）<br>★ **真名 = `CpuBusReq` / `CpuBusResp`**（D-B-2 裁决）⇒ ★ **不用 `MemReqBundle`** —— 该名字在代码里**不存在**（实际是 `cf::bundles::MemReq`）⇒ 沿用它会**继承悬空引用** |
 | 方向 | imem/dmem 请求 = 核为 **master**；响应 = 核为 **slave**（按 `as_master_direction()` / `as_slave_direction()`） |
 | 观测 | ★ **必须走顶层 `ch_out`**（上游 `rv32i_pipeline_top.h` 铁律：「观测 MUST 走顶层 `ch_out`（verilator 只能读顶层端口）」）⇒ `tohost` / `pc` / `regs` / `memsig` 全部从顶层端口读 ⇒ **退休 `--public-flat-rw` 穿透内部层级的读法** |
 | 旧 `bundles/mem_bundles.h` | ★ **不动**（POD 保留给预载核 + `src/cf_plugin/bridge/` + TLM 业务代码） |
+
+### D3a ★ D-J：`ch_stream` 的层次区分与接口契约（★ 增补，2026-10-28）
+
+> 依据 **ADR-092 §D4**（`ch_stream` 层次区分）+ **ADR-083 v1.2 §4.2**（拒绝范围收窄）。
+
+#### D3a.1 ★ 层次区分（★ MUST NOT 误删 `Payload<T>`）
+
+| 机制 | 作用域 | 语义 | 决策 |
+|---|---|---|---|
+| `Payload<T>` + `PipeNode` | ★ **核内 stage 之间** | 「跨 PipeNode 隔离（每个 PipeNode 有自己的 PayloadStore）」（`include/cf/plugin/payload.h:10`）⇒ 无握手，同拍数据通路 | ★ **保留不动** |
+| `ch_stream<T>` | ★ **IP 之间 / 核 ↔ 从设备** | `valid`/`ready`/`fire()`/`isStall()` ⇒ **有握手**的接口协议 | ★ **采用** |
+
+⇒ ★ **两者层次不同，不是竞争关系** ⇒ ★ **MUST NOT** 以「采用 `ch_stream`」为理由删除 `Payload<T>`。
+
+#### D3a.2 ★ 握手成本（★ MUST NOT 默认「握手免费」）
+
+ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步场景过度」⇒ ★ 跨 IP 接口采用 `ch_stream` 时，该成本**由接口契约显式承担**：
+
+| 项 | 决策 |
+|---|---|
+| `ready` 语义 | ★ **从设备可恒真**（`ready` 恒 1 ⇒ 退化为无阻塞流）⇒ ★ 单周期同步场景**不被握手拖慢** |
+| `valid` 语义 | ★ 请求方**必须**在 `valid=1` 时保持 `payload` 稳定（⇒ 契约测试 MUST 覆盖） |
+| 背压 | ★ 若从设备无法在本拍响应 ⇒ MUST 拉低 `ready` ⇒ ★ **CPU 侧 MUST 有 stall 机制**（★ 与 ADR-091 D8 S3 的外部驱动数据通路耦合） |
+| 判据 | ★ 握手成本 MUST 以「`ready` 恒真 vs 可拉低」两档**分别**测时序（★ 不得只测一档） |
+
+#### D3a.3 ★ 接口契约（`CpuBusReq` / `CpuBusResp`）
+
+| 项 | 决策 |
+|---|---|
+| 载荷类型 | ★ `CpuBusReq` / `CpuBusResp`（**新文件** `ip/cpu/core/bus_iface_chmem.h`，纯 `ch::core::ch_uint` + `bundle_base` 派生 + `CH_BUNDLE_FIELDS_T`） |
+| 字段宽度 | ★ **每字段 ≤ 64 bit**（ADR-091 H-1；★ `address`(64) / `data`(64) 恰好卡在上限 ⇒ **禁止再加宽**） |
+| 方向 | 请求 = 核为 **master**（`as_master_direction()`）· 响应 = 核为 **slave**（`as_slave_direction()`）⇒ ★ 逐字段展开 ⇒ 144-bit 总宽**不触发** `PortBitwidthOverflow` |
+| 与老核 bundle | ★ **无耦合**（老核的 `cf::bundles::MemReq` 保持 POD 不动 ⇒ ADR-092 §D-E 推迟到 Phase-2） |
+| 命名一致性 | ★ **MUST NOT** 复用 `MemReqBundle`（悬空引用）；★ 老核 JSON 里的 `"bundle": "MemReqBundle"` 修正归 ADR-092 §D7 / 本节配套文档同步 |
 
 ### D4 ★ 两套 bundle 并存（新核用新 bundle，老核代码不动）
 
@@ -132,6 +166,18 @@ ip/cpu/core/
 |---|---|---|---|
 | ★ **新（CH_MEM-only）** | `ip/cpu/core/bus_iface_chmem.h` | `ch::core::ch_uint<N>` + `bundle_base` 派生 + `CH_BUNDLE_FIELDS_T` | 新开放核 |
 | 旧（POD，双模） | `bundles/mem_bundles.h` | `cf::plugin::uint_t<N>` | 预载核 + bridge + TLM 业务代码 |
+
+⇒ ★★ **项目内部自证**：新核的 bundle 形态 = ★ **`bundles/README.md` 自己写的 Phase 5 计划**（不是本 ADR 的发明）：
+
+| `bundles/README.md` 原文 | 行 | 与本 ADR 的关系 |
+|---|---|---|
+| 「Phase 5 (RTL) \| BundleMapper 转换为 `ch_uint<N>` + `bundle_base<T>` 派生」 | `:103` | ⇒ 新核 = 执行该计划 |
+| 「RTL 模式 (Phase 5) 引入 `as_master/slave_direction()`」 | `:21` | ⇒ 新核端口的方向语义 = 该计划 |
+| 「Bundle 形态分阶段：Phase 1: POD / **Phase 5: `ch_uint<N>` + `bundle_base`** / Phase 6: 自动 codegen」 | `:22` | ⇒ 形态演进表 |
+
+⇒ ⇒ **Phase 5 计划因「预载核」而一直未触发**；本 ADR 让**新核**先行落地 Phase 5 形态，★ **老核的 Phase 1 形态保留 ⇒ 两阶段并存**（⇒ 老核退役时归阶段 C 收口）。
+
+⇒ ★ **老核 bundle 的单模化（`bundle_base` 化）归 ADR-092 Phase-2**（★ 本 ADR D5 的 G-3 门禁之一）⇒ ★ **本 ADR 期间老核 bundle 保持 POD 不动**。
 
 ⇒ ★ **「移除 TLM 兼容」在**新核范围内**生效，**不在框架层生效**：
 - `include/cf/plugin/uint_t.h` 的模态分支 **保持不动**（预载核需要）
@@ -146,7 +192,7 @@ ip/cpu/core/
 |---|---|---|---|
 | **G-1** | **端口声明能力**：`PipeBuilder` 无 `ch_in`/`ch_out` API | `include/cf/plugin/pipe_builder.h` 新增（★ 须在 `ctx_swap` 保护下创建端口节点，否则落到错误的 current context —— 上游 `device.h:13-19` 记录过该坑导致 node-id aliasing） | 1~2 人日 |
 | **G-5a** | **后端注入**：`create_simulator()` 无后端参数 | 新增 `create_simulator(std::unique_ptr<ch::IEvalBackend>)`（★ `nullptr` = 保持现有默认行为 ⇒ 向后兼容） | 0.5 人日 |
-| **G-4** | CH_MEM 版 bundle 定义 | `ip/cpu/core/bus_iface_chmem.h`（新） | 1~2 人日 |
+| **G-4** | CH_MEM 版 bundle 定义 | `ip/cpu/core/bus_iface_chmem.h`（新）⇒ ★ 真名 `CpuBusReq`/`CpuBusResp`（D3a.3） | 1~2 人日 |
 
 ⇒ ★ **框架层仍不引入「配置面」**（G-2）：配置归 `ip/cpu` 层（复用已落地的 `CpuConfigChmem`，见 `.rddf/improvements/chmem-cpu-json-config.md`）。
 ⇒ ★ **框架层仍不引入「DSE 维度抽象」**（G-3）：归 `ip/cpu/core/`（D7）。
@@ -191,7 +237,7 @@ ip/cpu/core/
 - ✗ **`check_plugin_portability.sh` 的 Check 2/7 改单模语义** ⇒ 归 ADR-088 硬前置⑤（★ 防「真空 PASS」）
 - ✗ **MMU PTW / L1Cache 的 CH_MEM 实装** ⇒ 归 `mmu-chmem-phase-b-c-launch` / `verilator-l1cache-e2e-coverage`
 - ✗ **DSE sweep 引擎换后端** ⇒ 归 P5
-- ✗ **`ch_stream` 表述纠偏（ADR-083 §1.2 图 + AGENTS.md）** ⇒ ★ **独立 ADR 修订**（D3 的前提，见「相关」）
+- ~~✗ **`ch_stream` 表述纠偏**~~ ⇒ ✅ **已完成（ADR-083 v1.2，2026-10-28）**：§1.2 架构图 + §4.2 拒绝范围 + Status/来源/关联 + §5.1 文档修订表<br>★ **余下**：`AGENTS.md` + `docs/architecture/*` 12 文件 + `docs/GLOSSARY.md` 的**实际文本同步** + ★ `MemReqBundle` 悬空引用修正（10 文档 + 4 JSON）⇒ 落点 = ADR-092 §D7 + 本 ADR D3a.3
 
 ---
 
@@ -250,11 +296,12 @@ ip/cpu/core/
 
 - **ADR-088 v1.4 §10**（目标态与三段迁移路径）—— 本 ADR 是 §10 阶段 C 的**先行准备**，但**不**替代阶段 C 的 5 条硬前置
 - **ADR-089 v1.4**（双后端差分 parity 门禁）—— 观测量集与 H-3 等价性自检的判据来源
-- **ADR-083**（Plugin-style 单一 source of truth）—— ★ §4.1「拒绝双副本」是 H-3 的由来；★ §1.2 架构图把 `ch_stream` 画在 CppTLM 框内（**与事实不符**：`ch_stream` 在 CppHDL）⇒ **表述纠偏另开 ADR 修订**（本 ADR D9 明确排除）
+- **ADR-083 v1.2**（Plugin-style 单一 source of truth）—— ★ §4.1「拒绝双副本」是 H-3 的由来；★★ **v1.2 已完成表述纠偏**（§1.2 架构图 `ch_stream` 归类 + §4.2 拒绝范围收窄）⇒ ★ 本 ADR D3a 的直接依据
+- **ADR-092**（TLM 参考实现的冻结与演进停止）—— ★ §D4（`ch_stream` 层次区分）· §D5（Phase-1 门禁）· §D6（Phase-2 准入门禁）· §D-E（老核 bundle 单模化推迟到 Phase-2）
 - **ADR-040 v3.0**（TLM→HDL 移植性约束）—— H-4 的依据
 - **ADR-085-D17**（CH_MEM 容量上限 / 节点爆炸）—— `kMemWords` 维度的风险约束
 - **ADR-087**（ISA 声明真实性）—— `xlen=64` fail-fast 的依据
-- `docs/architecture/parity-gate-contract.md` v1.6 —— 观测量与门禁契约
+- `docs/architecture/parity-gate-contract.md` **v1.8** —— 观测量与门禁契约（★ v1.7 补 `--cpu-config` 落点；★ v1.8 S-15 改 **per-case 超时推导**，修「全局单一超时 ⇒ branchbench 假红」）
 - `.rddf/improvements/chmem-cpu-json-config.md` —— 配置面（`CpuConfigChmem`）已落地，本 ADR 复用
 - `.rddf/roadmap/features/feat-backend-parity-gate.md` —— 阶段 A 载体
 - `openspec/changes/backend-parity-corpus/first-run-evidence.md` —— V-6 的基线来源
