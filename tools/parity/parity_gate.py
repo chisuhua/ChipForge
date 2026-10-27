@@ -556,10 +556,16 @@ def main(argv=None):
             print("verdict=ERROR error_kind=corpus_mismatch", file=sys.stderr)
             return 2
 
-    selected = [c for c in cases if opts.layer == "all" or c["layer"] == opts.layer
-                or c["layer"] == "night"]
+    # ★ 分层语义（契约 S-15）：
+    #   pr   = PR 级**快子集**（只跑 layer=pr 的 case）
+    #   night= 夜间**全量**（★ 跑**全部** case —— 契约 S-15「夜间层 = 52 case 全部覆盖」）
+    #   all  = 同 night（保留显式别名）
+    # ★ v1.5 实测修正：原实现 `--layer night` 只选 layer=night ⇒ **漏掉 PR 层的 8 个**
+    #   ⇒ 夜间层比 PR 层还小 ⇒ **语义反了**（首跑实测：报告只有 44 case 而非 52）。
     if opts.layer == "pr":
         selected = [c for c in cases if c["layer"] == "pr"]
+    else:
+        selected = list(cases)
     if opts.only:
         wanted = {n.strip() for n in opts.only.split(",") if n.strip()}
         selected = [c for c in selected if c["name"] in wanted]
