@@ -21,7 +21,7 @@
 - 构建系统：**CMake >= 3.16**
 - **设计模式**：**Plugin-style**（D4 决策，ADR-037 + ADR-083）——业务 IP 不再分别为 TLM 和 RTL 各写一份
 - **硬件后端**：**CppHDL**（CH_MEM 模式必依赖，提供 ch_uint/ch_reg/ch_mem + elaboration + Simulator + toVerilog + Verilator backend）
-- **Legacy 仿真内核**：**CppTLM**（保持依赖以兼容 bridge 适配层，业务 IP 不使用 ch_stream/Module/Port/ModuleFactory）
+- **Legacy 仿真内核**：**CppTLM**（保持依赖以兼容 bridge 适配层；★ 业务 IP 不使用 **CppTLM 组件范式**（`Module`/`Port`/`ModuleFactory`/`ChStreamModuleBase`/`StreamAdapter`）⇒ ★ **CppHDL 的 `ch_stream<T>` 可用**，见 ADR-083 v1.2 §4.2）
 - ISS 参考：**Spike**（官方黄金参考模型）
 
 ---
@@ -59,7 +59,8 @@
 **CppTLM v2.0** 仍作为外部依赖保留（`extern/CppTLM` 符号链接），**仅** Bridge 适配层（`src/cf_plugin/bridge/`）依赖：
 
 - Bridge 适配层用于桥接外部 CppTLM-based 系统到 ChipForge
-- CppTLM 核心特性（`ch_stream<T>` / `TransactionTracker` / `ModuleFactory`）**业务 IP 不使用**
+- CppTLM 核心特性（★ `ChStreamModuleBase` / `ChStreamInitiatorPort` / `ChStreamTargetPort` / `StreamAdapter` / `TransactionTracker` / `ModuleFactory`）**业务 IP 不使用**
+  ★ **注意**：★ CppTLM **没有** `ch_stream` 类型 —— `ch_stream<T>` 是 **CppHDL** 的 bundle（`bundle/stream_bundle.h`）⇒ 二者是**同名不同物**
 
 业务 IP 跨阶段通信由 `cf::plugin::Payload<T>` + `PipeNode` 替代。`ImplMode` enum 已在 doc-code-realignment 2026-06-17 废弃。
 
@@ -76,8 +77,9 @@ bundles/<bundle>.h
         |    -> ch::toVerilog(ctx) -> .v 文件
         |    -> verilator --cc -> VerilatorBackend 联合仿真
         |
-        +-- Legacy Bridge 适配层: cpptlm::ch_stream<Bundle>
+        +-- Legacy Bridge 适配层: cpptlm::ChStreamModuleBase + StreamAdapter
              (仅 src/cf_plugin/bridge/ 使用, 业务 IP 不使用)
+             ★ 更正: CppTLM 无 ch_stream 类型 (用 ChStream* 系列 + StreamAdapter)
 ```
 
 同一份 Bundle 定义 + 同一份 Plugin-style 业务代码，消除 TLM 与 CH_MEM/Verilog 之间的手工桥接层。
