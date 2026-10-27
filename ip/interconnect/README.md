@@ -36,10 +36,12 @@ Interconnect IP 负责 SoC 内各组件（CPU、Cache、Memory、Peripheral）�
 ### 3.1 端口定义
 | 端口名 | 方向 | 类型 | Bundle | 说明 |
 |--------|------|------|--------|------|
-| master_port[N] | in | ch_stream | MemReqBundle | 主设备请求 |
-| master_resp[N] | out | ch_stream | MemRespBundle | 主设备响应 |
-| slave_port[M] | out | ch_stream | MemReqBundle | 从设备请求 |
-| slave_resp[M] | in | ch_stream | MemRespBundle | 从设备响应 |
+| master_port[N] | in | ch_stream | `cf::bundles::MemReq` | 主设备请求 |
+| master_resp[N] | out | ch_stream | `cf::bundles::MemResp` | 主设备响应 |
+| slave_port[M] | out | ch_stream | `cf::bundles::MemReq` | 从设备请求 |
+| slave_resp[M] | in | ch_stream | `cf::bundles::MemResp` | 从设备响应 |
+
+> ★ **命名更正（ADR-092 §D7）**：`MemReqBundle` / `MemRespBundle` 在代码中不存在 ⇒ 实际是 `cf::bundles::MemReq` / `MemResp`。
 
 ### 3.2 地址路由
 基于 SoC 内存地图进行地址译码，将请求路由到正确的从设备。

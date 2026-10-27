@@ -48,8 +48,9 @@ CPU 测试 **不在** `ip/cpu/test/`（该目录已于 2026-06-17 删除），�
 ## 接口概要
 
 ### 对外端口
-- **IBus**（指令总线）：`ch_stream<MemReqBundle>` / `ch_stream<MemRespBundle>`
-- **DBus**（数据总线）：`ch_stream<MemReqBundle>` / `ch_stream<MemRespBundle>`
+- **IBus**（指令总线）：★ `ch_stream<cf::bundles::MemReq>` / `ch_stream<cf::bundles::MemResp>`
+- **DBus**（数据总线）：★ `ch_stream<cf::bundles::MemReq>` / `ch_stream<cf::bundles::MemResp>`
+  ★ **命名更正（ADR-092 §D7）**：旧文档写的 `MemReqBundle` / `MemRespBundle` **在代码中不存在**（实际是 `cf::bundles::MemReq` / `MemResp`）⇒ ★ 新核（`ip/cpu/core`）的对外接口 bundle 真名 = **`CpuBusReq` / `CpuBusResp`**（ADR-091 §D3a.3）
 - **IRQ**（中断输入）：外部中断信号接口
 
 ### ImplMode 支持

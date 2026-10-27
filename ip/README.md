@@ -45,8 +45,8 @@ ip/{name}/
 ```
 
 ## 通信接口
-所有 IP 通过 `ch_stream<Bundle>` 接口通信：
-- **MemReqBundle**：内存请求（地址、数据、操作类型）
+所有 IP 通过 ★ **CppHDL 的 `ch_stream<Bundle>`** 接口通信（★ **IP 之间 / 核 ↔ 从设备**；核内 stage 间另用 `Payload<T>` ⇒ ADR-092 §D4）：
+- ★ **`cf::bundles::MemReq`**：内存请求（address / data / is_write / burst_len / id）★ **代码里的实际名**（旧文档写的 `MemReqBundle` 不存在）
 - **MemRespBundle**：内存响应（数据、状态）
 - **SnoopBundle**：一致性侦听（多核场景）
 

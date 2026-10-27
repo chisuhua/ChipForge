@@ -36,8 +36,10 @@ Memory IP 提供主存储器建模，包括 SRAM（片上）和 DRAM（片外）
 ### 3.1 端口定义
 | 端口名 | 方向 | 类型 | Bundle | 说明 |
 |--------|------|------|--------|------|
-| req | in | ch_stream | MemReqBundle | 内存请求 |
-| resp | out | ch_stream | MemRespBundle | 内存响应 |
+| req | in | ch_stream | `cf::bundles::MemReq` | 内存请求 |
+| resp | out | ch_stream | `cf::bundles::MemResp` | 内存响应 |
+
+> ★ **命名更正（ADR-092 §D7）**：`MemReqBundle` / `MemRespBundle` 在代码中不存在 ⇒ 实际是 `cf::bundles::MemReq` / `MemResp`。
 
 ### 3.2 DMI 加速
 - TLM_ONLY 模式支持 DMI lookup

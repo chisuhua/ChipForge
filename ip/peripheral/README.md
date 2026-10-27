@@ -37,8 +37,10 @@ Peripheral IP 包含 SoC 的基础外设模块，提供中断控制、定时器�
 ### 3.1 统一寄存器访问接口
 | 端口名 | 方向 | 类型 | Bundle | 说明 |
 |--------|------|------|--------|------|
-| reg_req | in | ch_stream | MemReqBundle | 寄存器读写请求 |
-| reg_resp | out | ch_stream | MemRespBundle | 寄存器读写响应 |
+| reg_req | in | ch_stream | `cf::bundles::MemReq` | 寄存器读写请求 |
+| reg_resp | out | ch_stream | `cf::bundles::MemResp` | 寄存器读写响应 |
+
+> ★ **命名更正（ADR-092 §D7）**：`MemReqBundle` / `MemRespBundle` 在代码中不存在 ⇒ 实际是 `cf::bundles::MemReq` / `MemResp`。
 
 ### 3.2 中断输出
 | 端口名 | 方向 | 类型 | 说明 |

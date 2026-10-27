@@ -20,8 +20,10 @@
 
 | Bundle | 用途 | 使用方 |
 |--------|------|--------|
-| `MemReqBundle` | 内存请求 (地址/数据/操作类型) | CPU ↔ Cache ↔ Memory |
-| `MemRespBundle` | 内存响应 (数据/状态) | CPU ↔ Cache ↔ Memory |
+| ★ `cf::bundles::MemReq` | 内存请求 (address 64 / data 64 / is_write 1 / burst_len 8 / id 8) | CPU ↔ Cache ↔ Memory |
+| ★ `cf::bundles::MemResp` | 内存响应 (data 64 / id 8 / error 1 / last 1) | CPU ↔ Cache ↔ Memory |
+
+> ★ **命名更正（ADR-092 §D7，2026-10-28）**：旧文档写的 `MemReqBundle` / `MemRespBundle` **在代码中不存在** ⇒ 实际类型名如上（定义于 `bundles/mem_bundles.h`）。
 | `CacheReq` | Cache 抽象请求 (M5+ 内部用) | CPU ↔ L1Cache |
 | `CacheResp` | Cache 抽象响应 (M5+ 内部用) | CPU ↔ L1Cache |
 | `SnoopBundle` | 一致性侦听 (多核, Phase 6+ 推迟) | Cache ↔ Cache |

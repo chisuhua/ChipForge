@@ -13,6 +13,9 @@
 
 ## Bundle 共享
 RTL 版本复用 TLM 定义的 Bundle 类型：
-- `MemReqBundle`：内存请求
-- `MemRespBundle`：内存响应
+- ★ `cf::bundles::MemReq`：内存请求
+- ★ `cf::bundles::MemResp`：内存响应
+
+> ★ **本目录当前为空**（仅本 README）⇒ **手写 RTL 副本已废止**（ADR-083 §4.1「拒绝分别维护 TLM 副本 + RTL 副本」）；★ Verilator 后端由 **Plugin-style 代码经 `ch::toVerilog()` 生成**（ADR-088 §10 目标态）⇒ **本目录不得落地手写 `.v`**。
+> ★ **命名更正（ADR-092 §D7）**：旧文档写的 `MemReqBundle` / `MemRespBundle` 在代码中不存在。
 - 流水线内部：通过 CppHDL 的 `Wire<T>` 表达

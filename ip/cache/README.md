@@ -37,11 +37,13 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 ### 3.1 端口定义
 | 端口名 | 方向 | 类型 | Bundle | 说明 |
 |--------|------|------|--------|------|
-| cpu_req | in | ch_stream | MemReqBundle | CPU 侧请求 |
-| cpu_resp | out | ch_stream | MemRespBundle | CPU 侧响应 |
-| mem_req | out | ch_stream | MemReqBundle | 下级存储请求 |
-| mem_resp | in | ch_stream | MemRespBundle | 下级存储响应 |
-| snoop | in/out | ch_stream | SnoopBundle | 一致性侦听（多核） |
+| cpu_req | in | ch_stream | `cf::bundles::CacheReq` | CPU 侧请求 |
+| cpu_resp | out | ch_stream | `cf::bundles::CacheResp` | CPU 侧响应 |
+| mem_req | out | ch_stream | `cf::bundles::MemReq` | 下级存储请求 |
+| mem_resp | in | ch_stream | `cf::bundles::MemResp` | 下级存储响应 |
+| snoop | in/out | ch_stream | ★ 未实装 | 一致性侦听（多核） |
+
+> ★ **命名更正（ADR-092 §D7，2026-10-28）**：本表旧版写的 `MemReqBundle` / `MemRespBundle` / `SnoopBundle` **在代码中均不存在** ⇒ 实际类型是 `cf::bundles::CacheReq` / `CacheResp` / `MemReq` / `MemResp`（定义于 `bundles/mem_bundles.h`）· ★ `SnoopBundle` **未定义**（多核一致性未实装）⇒ 本行如实标注。
 
 ### 3.2 握手协议
 - valid/ready 背压握手
