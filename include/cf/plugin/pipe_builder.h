@@ -471,6 +471,60 @@ class PipeBuilder {
     if (!ctx_) return std::unexpected(PluginError::NullContextPtr);
     return std::make_unique<ch::Simulator>(ctx_);
   }
+
+  // ===== G-5a: 后端注入 (ADR-091 §D5) =====
+  // ★ 传入 backend ⇒ 仿真器用该求值后端（解释器 / Verilator / …）。
+  // ★ **nullptr ⇒ 保持既有行为**（默认 inlined 解释器 + JIT 管线）
+  //   ⇒ 既有调用方零改动，向后兼容。
+  Result<std::unique_ptr<ch::Simulator>> create_simulator(
+      std::unique_ptr<ch::IEvalBackend> backend) {
+    if (!ctx_) return std::unexpected(PluginError::NullContextPtr);
+    auto sim = std::make_unique<ch::Simulator>(ctx_);
+    if (backend) sim->set_backend(std::move(backend));
+    return sim;
+  }
+
+  // ===== G-1: 顶层端口声明 (ADR-091 §D5 + §D5.1) =====
+  // ★ 用途：让业务 IP 产出**带对外接口**的网表（而非仅 clock/reset 两端口的
+  //   封闭核）⇒ 这是 CPU 开放核 + SoC 互联 + VerilatorBackend 可用的共同前提。
+  //
+  // ★ **4 条实测约束**（ADR-091 v1.2 §D5.1，★ 均为实测得出，非推断）：
+  //   G-1a 本 API 位于 `#ifdef CF_PLUGIN_USE_CH_MEM` 内 ⇒ TLM 模式零 CppHDL 依赖
+  //   G-1b 本头 **MUST NOT** include `<ch.hpp>` —— 它 include 了 `module.h`，
+  //        而 `module.h` 的 `build_hierarchical_name` **缺 `inline`**
+  //        ⇒ **任何 2+ TU include `<ch.hpp>` 即链接失败**（multiple definition）
+  //        ⇒ 所需 `ch_in`/`ch_out` 类型由 `<simulator.h>` 间接引入的
+  //        `core/io.h` 提供（★ 已验证 simulator.h 不引入 module.h / ch.hpp）
+  //   G-1c ctx 为 null MUST **throw**（fail-closed）——
+  //        `ch_logic_in` 构造是 `if (ctx) { ctx->create_input(...); }`
+  //        ⇒ 无 ctx 时**静默不建节点**（不报错）⇒ 「端口消失而门禁照绿」的假绿通道
+  //   G-1d 端口**方向**由调用方负责：`ch_in` **MUST NOT** 被内部赋值
+  //        （有内部 driver 的 `ch_in` 不是顶层端口 ⇒ Verilator 后端读不到）
+  //
+  // ★ 端口节点 MUST 在 `ctx_swap(ctx_)` 保护下创建 —— 否则会落到错误的
+  //   current context（上游 `device.h:13-19` 记录过该坑导致 node-id aliasing）。
+
+  /// 声明一个顶层**输入**端口（如从设备的响应）。
+  /// ★ 返回的 `ch_in` **不可赋值**（编译期 static_assert 保护，见 G-1d）。
+  template <typename T>
+  ch::core::ch_in<T> declare_in(const std::string& name) {
+    if (!ctx_) {
+      throw PluginException(PluginError::NullContextPtr, "declare_in");
+    }
+    ch::core::ctx_swap guard(ctx_);
+    return ch::core::ch_in<T>(name, std::source_location::current());
+  }
+
+  /// 声明一个顶层**输出**端口（如核的请求）。
+  /// ★ 返回的 `ch_out` **可赋值**（output 端口需要内部 driver 才会被发射）。
+  template <typename T>
+  ch::core::ch_out<T> declare_out(const std::string& name) {
+    if (!ctx_) {
+      throw PluginException(PluginError::NullContextPtr, "declare_out");
+    }
+    ch::core::ctx_swap guard(ctx_);
+    return ch::core::ch_out<T>(name, std::source_location::current());
+  }
 #endif
 
   // plugins() —— 返回 plugin 列表只读引用 (M4.12, 供 CpuFactory 测试断言)
