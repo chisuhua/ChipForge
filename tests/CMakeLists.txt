@@ -164,6 +164,8 @@ set(CHMEM_TEST_SOURCES
     # ADR-091 S1 (backend-parity-open-core): PipeBuilder 顶层端口声明契约
     # (G-1) + 后端注入契约 (G-5a) —— ★ CH_MEM binary 是**显式列表** ⇒ 须显式加入
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_pipe_builder_ports.cpp
+    # ADR-091 S2 (backend-parity-open-core): 总线接口契约 (CpuBusReq/CpuBusResp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/schema/test_cpu_bus_iface.cpp
 )
 # 同样需要 catch_amalgamated.cpp 提供 main
 list(APPEND CHMEM_TEST_SOURCES
