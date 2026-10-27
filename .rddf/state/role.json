@@ -1,30 +1,10 @@
 {
   "schema_version": "role-v1",
   "current_role": "builder",
-  "updated_at": "2026-10-26T09:53:07Z",
+  "updated_at": "2026-10-27T08:44:45Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "general",
-      "at": "2026-10-16T11:30:00Z",
-      "by": "session-bootstrap"
-    },
-    {
-      "role": "builder",
-      "at": "2026-10-16T12:00:00Z",
-      "by": "user"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-22T14:21:48Z",
-      "by": "user"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-23T00:00:00Z",
-      "by": "user"
-    },
     {
       "role": "planner",
       "at": "2026-10-23T00:00:00Z",
@@ -131,6 +111,18 @@
       "at": "2026-10-26T09:53:07Z",
       "by": "user",
       "trigger": "用户确认「G-A0 通过，切 builder 进行实施推进」⇒ 开工阶段 A1（parity-gate-spec 零代码契约）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-27T07:17:52Z",
+      "by": "user",
+      "trigger": "用户指令「我想切 architect 梳理上面讨论的关键决策点，重新梳理给出要讨论的决策内容，一一讨论后生成相应的决策文档」"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-27T08:44:45Z",
+      "by": "user",
+      "trigger": "用户指令「先提交项目变更内容，并合入主线，然后在主线里再继续工作」⇒ 提交属实施类动作，切回 builder"
     }
   ]
 }

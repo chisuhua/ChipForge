@@ -1,0 +1,24 @@
+{
+  "schema_version": "arch-docs-v1",
+  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除。",
+  "arch_paths": [
+    "docs/architecture/adr",
+    "docs/architecture/adr.md",
+    "docs/architecture/interface-design.md",
+    "docs/architecture/overview.md",
+    "docs/architecture/parity-gate-contract.md",
+    "docs/architecture/testing-and-dse.md",
+    "docs/architecture/roadmap-evolution.md",
+    "ip/cpu/docs/adr",
+    "ip/mmu/docs/adr",
+    "ip/cache/docs/adr"
+  ],
+  "exclude_paths": [
+    "docs/architecture/tlm-coverage-parity-ledger.md",
+    "docs/architecture/plugin-research",
+    "build",
+    "3rdparty"
+  ],
+  "updated_at": "2026-10-27",
+  "updated_by": "architect"
+}
