@@ -1,6 +1,6 @@
 # ADR-089 — 双后端差分 parity 门禁（同一模型 × 两后端）
 
-> **Status**: ✅ **Accepted（v1.3，2026-10-26，architect 主持；v1.2 = A1 代码事实更正 · v1.3 = C-1 归类裁决 + 吞吐实测更正）**
+> **Status**: ✅ **Accepted（v1.4，2026-10-27，architect 主持；v1.2 = A1 代码事实更正 · v1.3 = C-1 归类裁决 + 吞吐实测更正 · ★ **v1.4 = A3 首跑结果：既存后端分歧清单 = 空**）**
 > **上游**: ADR-083（Plugin-style 单一 source of truth）· ADR-040 v2.0（CH_MEM 是新正道）· ADR-088（TLM 后端退役；本 ADR 是其 **B3 删除的前置契约**）
 > **下游**: `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A）· `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（阶段 B/C）· `objective-ip-cpu-tlm-backend-retirement`（B3 门禁）
 > **执行文件（待 planner 落）**: `.rddf/plans/`（阶段 A 的 change 计划，★ 归 builder 起草）
@@ -87,12 +87,35 @@
 
 | corpus | 规模 | 为何入选 / 后置 |
 |---|---|---|
-| ★ **vendored ELF 47（两侧交集）** | 47 | ★ **实测**：Simulator 侧 `test_cpu_chmem_vendored_elf.cpp` 的 `kCases` = 39 `rv32ui-p-*` + 8 `rv32um-p-*` = **47**（**无** `rv32ui-p-simple`）；Verilator 侧 `test_cpu_verilator_sim.cpp` = **48**（多 `rv32ui-p-simple`）⇒ ⇒ **「47」实为两侧交集**<br>★ **`rv32ui-p-simple` 的处置 = 补进 Simulator 侧 `kCases`（1 行）**（★ 该 ELF **已在** `tests/cpu/riscv_tests/elf/`）⇒ **不是**排除、**不是**例外<br>★ ★ **两侧 corpus MUST 抽成单一清单文件**（两 harness 各自读）⇒ ★ 门禁 MUST 断言「两侧实际执行集合 == 清单」（集合不对称 ⇒ FAIL）⇒ ★ 否则两份手维护的 C++ 数组必然再漂 |
-| ★ branchbench 4 档 | 4 | 可控预测率负载（always_not_taken / always_taken / pattern_6of8 / pseudo_random）⇒ 覆盖方向与 flush 语义 ⇒ **首批**<br>★ ⚠️ **Simulator 侧无 branchbench runner**（`tools/measure_branchbench.sh` 硬绑 `cpu_verilator_sim`）⇒ ★ **须新增**（估 ~1 工作日）+ 运行时表征（~0.5~1 工作日）<br>★ ⚠️ **时长风险**：Simulator ≈ 575 拍/s（据 Dhrystone ~914k 拍 ≈ 26.5 min 实测）⇒ branchbench `--cycles` 上限 2M ⇒ **单档可能近 1 小时** ⇒ ★ **4 档 × BP on/off 不可进 PR 级门禁** ⇒ MUST 重定 cap + 归**夜间层** |
+| ★ **vendored ELF 48（两侧交集）** | ★ **48** | ★ **实测（A3 已收口）**：Simulator 侧 `test_cpu_chmem_vendored_elf.cpp` 的 `kCases` = 40 `rv32ui-p-*` + 8 `rv32um-p-*` = **48**（★ **已补 `rv32ui-p-simple`**）；Verilator 侧 `test_cpu_verilator_sim.cpp` = **48** ⇒ ★ **两侧现已完全对齐（48 == 48，交集 48，零漂移）**<br>★ **`rv32ui-p-simple` 的处置 = 补进 Simulator 侧 `kCases`（1 行）**（★ 该 ELF **已在** `tests/cpu/riscv_tests/elf/`）⇒ **不是**排除、**不是**例外 ⇒ ★ **A3 已落地**<br>★ ★ **两侧 corpus MUST 抽成单一清单文件**（两 harness 各自读）⇒ ★ 门禁 MUST 断言「两侧实际执行集合 == 清单」（集合不对称 ⇒ FAIL）⇒ ★ 否则两份手维护的 C++ 数组必然再漂<br>★ **落地**：`tests/cpu/parity/corpus.txt` = **52 case = 48 ELF + 4 branchbench** |
+| ★ branchbench 4 档 | 4 | 可控预测率负载（always_not_taken / always_taken / pattern_6of8 / pseudo_random）⇒ 覆盖方向与 flush 语义 ⇒ **首批**<br>★ ⚠️ **Simulator 侧无 branchbench runner**（`tools/measure_branchbench.sh` 硬绑 `cpu_verilator_sim`）⇒ ★ **须新增**（估 ~1 工作日）+ 运行时表征（~0.5~1 工作日）<br>★ ⚠️ **时长风险**：★ **v1.4 吞吐实测更正**：Simulator **≈ 9~10 拍/s**（★ **不是** 575 拍/s —— 原值高估 ≈60×；实测 `rv32ui-p-add` 478 拍 / 52.8 s，branchbench 20k 拍 ≈ 37 min）⇒ branchbench 完整跑（~86k 拍）≈ **61 h/档** ⇒ ★ **4 档 × BP on/off 不可进 PR 级门禁** ⇒ ★ **cap 重定为 20k**（⇒ 该 4 档为 **partial**：承重判据 = `regs`+`memsig`+`pchash`，`tohost` 不可采）⇒ 归**夜间层**<br>★ **落地**：`tools/parity_runner/parity_sim_runner.cpp`（Simulator 侧通用 ELF runner）+ `--reset none` |
 | Dhrystone | 1 | 单 case 极长（CH_MEM 侧 ≈ 26.5 min）⇒ ★ **后置**（门禁稳定后接入，作为性能相关的第 5 个观测量载体） |
 | ★ 未来 | CoreMark 等 | 随交付点 B 接入 |
 
 ⇒ ★ corpus 的**两侧产物** MUST 可采集上述 5 个观测量 ⇒ 若某 corpus 暂不支持某观测量 ⇒ 该观测量对该 corpus **显式豁免**（登记在例外清单里，**MUST NOT** 静默跳过）。
+
+#### ★★ D4a **A3 首跑结果（2026-10-27，v1.4 新增 —— 阶段 A 的核心结论）**
+
+| 项 | 结果 |
+|---|---|
+| 语料 | **52 case = 48 ELF + 4 branchbench**（单一清单 `tests/cpu/parity/corpus.txt`） |
+| 跑批 | `--layer night --jobs 4` ⇒ ≈ **50 min**（4 核；Simulator 侧 9~10 拍/s 是瓶颈） |
+| 判定 | **52/52 PASS** ⇒ ★ **既存后端分歧清单 = 空**（真实例外数 **0**） |
+| 观测量 | 5 项**逐位相等**（含 `pchash` = **逐拍 PC 流 hash** ⇒ 最强判据） |
+
+⇒ ★★ **「今天两边都 `tohost==1` 但内部状态不同」这一担忧，被实测证伪**：
+两后端在 ALU / load-store / M 扩展 / 分支密集负载上**逐位一致** ⇒ ★ **阶段 A 的照妖镜没有照出分歧**。
+
+⇒ ★★ **但首跑同时暴露了 4 个门禁自身的真缺陷**（都已修）：
+① **partial 假绿**（两侧都被 cap 截断 ⇒ `tohost` 两侧恒 0 ⇒ 「相等」被误当通过证据）
+② **Verilator 产物串扰**（`--work-dir`/`--verilog` 全局共享 ⇒ 并行时后一个 case 覆盖前一个的网表 ⇒ **静默错测**）
+③ **per-case cap 缺失**（ELF ~1k 拍 vs branchbench ~86k 拍 ⇒ 单一全局 cap 必二选一失败）
+④ **分层语义反了**（`--layer night` 只选 `night` 层 ⇒ 漏 PR 层 8 条 ⇒ 夜间层比 PR 层还小）
+
+⇒ ★ **2 项未覆盖（诚实标注）**：
+① branchbench 4 档**只跑到 20k 拍**（未跑到 done ⇒ 完整校验和 `tohost` 未验证）⇒ 归开放项 **O-5**
+② **BP 相关路径未覆盖**（GShare 增量 3 的 WIP 已 stash ⇒ 本次跑的是 Bimodal + uncond BTB 状态）
+⇒ ★ 增量 3 定稿后 **MUST 重跑**（BP 逻辑变更 ⇒ 后端行为可能变）。
 
 ### D5 ★ 台账重新定性（Q4 裁决）：从「迁移追踪器」→「**CH_MEM 覆盖边界规格**」
 
