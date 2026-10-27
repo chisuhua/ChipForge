@@ -138,7 +138,7 @@ graph TD
 | **G-A0** | ★ **阶段 A 开工前（2026-10-26 用户裁决新增）** | ★ **parity 架构（ADR-089 + ADR-088 v1.4 §10）+ 本路线图经 Oracle + Metis 双审通过**；★ **判定物 = 两份审查报告落盘 `.rddf/reviews/` + 无未结 blocker 类条目 + 用户显式回复「G-A0 通过」** | **用户** · 报告齐后 **≤ 2 个工作日** | ★ **不开工**（★ 2026-10-26 用户明确：「不要立即开工，等 Oracle + Metis 双审查结束后开工」） |
 | **G-A1** | A1 契约完成后 | A1 契约已 archive（观测量采集接口 + 对齐规则 + 白名单 **5 字段** + fail-closed + 语料分层 + 报告格式 + **S-编号**） | architect 签 · PR 内 | ★ **不开 A2a**（防「先写工具后定口径」—— 已在 `chmem-spec-rewrite-and-doc-hygiene` 上吃过一次亏） |
 | **G-A2** | A2b 完成 | V-2（≥5 例）+ V-3（≥2 例）+ V-4 + **S-编号覆盖矩阵完整** | architect 签 · PR 内 | 返工 A2a/A2b |
-| **G-A3** | A3 完成 | **两侧交集 47 + branchbench 4 档**差分跑通 + **既存分歧清单归零或全部显式登记**（★ 判定物 = 白名单校验脚本 exit 0 + architect 逐条签认「有意例外」） | architect 签 · PR 内 | ★ **不得进入阶段 C**（ADR-088 §5.2 判据 6） |
+| **G-A3** | A3 完成 | **两侧交集 48 + branchbench 4 档**差分跑通（★ **实测 52/52 PASS，分歧清单 = 空**，证据见 `openspec/changes/backend-parity-corpus/first-run-evidence.md`） + **既存分歧清单归零或全部显式登记**（★ 判定物 = 白名单校验脚本 exit 0 + architect 逐条签认「有意例外」） | architect 签 · PR 内 | ★ **不得进入阶段 C**（ADR-088 §5.2 判据 6） |
 | **G-A4** | A4 完成 | 门禁在 CI 中被执行且结果被回读 + 分层 corpus 表 + 单元级快车道可跑 | architect 签 · PR 内 | 返工 A4（★ 阶段 C 前置②未满足） |
 | **G-B** | B1 完成 | ★ **计数修正 → 脚本 PASS → 再落冻结位**（★ 顺序不可颠倒）+ ★ **脚本新增「头部计数 == 条目级实测」等式校验**（★ 现状该脚本无此检测能力 ⇒ 292 vs 282 才会在「脚本 PASS」下长期存活 ⇒ 「脚本仍 PASS」**不构成证据**）+ 冻结时**拆两层**（not-covered+理由 ⇒ 规格正文；covered/partial ⇒ 历史附件） | 脚本 + architect | 返工 B1 |
 | **G-C** | B3 开工前 | ★ **5 条**硬前置（差分门禁绿 / CI build / 参考语义抽规格 / 台账冻结 / **门禁体系改版**）+ ADR-088 §5.2 判据 1~7 全满足（★ 前置③的判定物 = **逐子系统规格清单** + architect 签认） | architect · PR 内 | ★ **不得删任何 TLM-only case** |
