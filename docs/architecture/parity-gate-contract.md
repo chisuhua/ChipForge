@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.6（2026-10-27，builder；v1.6 = A3 首跑完成 + ★ 分层语义修正（night = 全量）+ 报告分析/重放工具）**
+> **Status**: ✅ **v1.7（2026-10-27，builder；v1.7 = P2 配置面穿透 —— `--cpu-config` 转发 + 报告 `cpu_config` 字段）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -510,8 +510,8 @@ branchbench_m0	branchbench	build/branchbench_m0.elf	night
 | S-11 | A2b | `load_exceptions()`（未知/容差字段拒收 · 5+3 字段 · `issue_url` · `justification` · 过期失效 · 合成例外必存在） | 负向 N1/N2/N3 + `--self-test`（过期 / 作用域 / 豁免） | ✅ |
 | S-12 | A2b | `load_exceptions()` 规模软限（>10 ⇒ WARNING，不阻断） | 过期 → FAIL（self-test） | ⚠️ 规模护栏 ✅；**commit message 引 `ADR-089` 的机检未实现** ⇒ A4 |
 | S-13 | A2b（种子）/ A3（扩充 ✅） | `tests/cpu/parity/corpus.txt`（**52 case** + `layer` + 可选 `max_cycles`）+ `check_corpus_against_harnesses()`（方向性判定）+ `check_corpus_files_exist()`（pre-flight） | 负向 N4/N5；★ **两侧 kCases 48 == 48 零漂移**（两侧方向都干净） | ✅ |
-| S-14 | A2b | `build/parity/report.json`（S-14 全字段 + 逐 case `determinism`） | 结构校验（顶层 / per_case / 观测量键齐备） | ✅ |
-| S-15 | A2b + A3 | `--layer pr\|night\|all` + 清单 `layer` 列 + **per-case cap**（第 5 列 / 按 `kind` 默认）+ `--jobs` 并行 | PR 层 8 case 实测 **6.5 min**（`jobs=4`）；★ 缓存条款已按实测更正 | ✅ |
+| S-14 | A2b（P2 扩 ✅） | `build/parity/report.json`（S-14 全字段 + 逐 case `determinism` + ★ 顶层 `cpu_config`） | 结构校验（顶层 / per_case / 观测量键齐备）；★ `cpu_config` 为空串 = 走各 runner 默认 | ✅ |
+| S-15 | A2b + A3（P2 扩 ✅） | `--layer pr\|night\|all` + 清单 `layer` 列 + **per-case cap**（第 5 列 / 按 `kind` 默认）+ `--jobs` 并行 + ★ `--cpu-config`（**同一份配置喂两侧**，否则比的是两种配置） | PR 层 8 case 实测 **6.5 min**（`jobs=4`）；★ 缓存条款已按实测更正；★ `--cpu-config` 与配置类 flag 互斥（静默覆盖 = 假绿通道） | ✅ |
 | S-16 | 全部 | 三个 change 的 `tasks.md` 均引 `[S-x]` + 本矩阵 | — | ✅ |
 
 ## 8. 开放项（★ 需 architect 确认 / 需 A2a 实测）
