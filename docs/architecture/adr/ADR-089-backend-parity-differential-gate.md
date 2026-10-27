@@ -183,6 +183,22 @@
 
 ---
 
+### 实现注记：CH_MEM 配置面穿透（P2，2026-10-27）
+
+> 这是**实现事实记录**，不是新决策（配置面本身不在本 ADR 的决策范围内）。
+
+门禁与两个 runner 现支持 `--cpu-config <path>`，把 **CH_MEM CPU 的 JSON 配置**（`CpuConfigChmem`，
+见 `ip/cpu/configs/cpu_config_chmem.h`）转发给两侧。
+
+- ★ **两侧 MUST 用同一份配置** —— 否则比的是「两种配置」而非「两个后端」⇒ 判据失去意义
+- ★ **`--cpu-config` 与配置类 flag（`--enable-mmu` / `--no-bp` / `--btb-entries` …）互斥**（同时给 ⇒ rc=2）
+  —— 静默覆盖 = 假绿通道
+- ★ 报告新增顶层 `cpu_config` 字段 ⇒ 事后可判断「这次跑的是哪套配置」；为空串 = 走各 runner 默认
+  （与 P2 之前逐位一致）
+- ★ **实测**：PR 层 8 case 逐位等价 · 全量 52 case **52/52 PASS**（determinism 指纹与 A3 基线逐位相同）
+
+---
+
 ## Consequences
 
 ### 正面
