@@ -75,7 +75,8 @@ theme: TLM 后端退役 — CH_MEM 单后端收敛 (B0 冻结 → B1 承载力 �
 
 ## 3. 架构依据
 
-- **ADR-083**：CppTLM 是 legacy 仿真内核，「业务 IP 不使用 ch_stream / Module / Port / ModuleFactory」—— 本 objective 是其定性结论的**执行计划**（B0 阶段出 v1.1 修订补冻结条款 + 退役时间线）
+- **ADR-083**（★ **v1.2 2026-10-28 表述纠偏**）：CppTLM 是 legacy 仿真内核，「业务 IP 不使用 **CppTLM 组件范式**（`Module`/`Port`/`ModuleFactory`/`ChStreamModuleBase`/`StreamAdapter`）」⇒ ★ **CppHDL 的 `ch_stream<T>` 可用**（IP 之间 / 核 ↔ 从设备；核内 stage 间仍用 `Payload<T>`）—— 本 objective 是其定性结论的**执行计划**（B0 阶段出 v1.1 修订补冻结条款 + 退役时间线）
+  ★ **配套**：**ADR-092**（TLM 参考实现的冻结与演进停止 = 本 objective 阶段 C 的 **Phase-1 准备**）
 - **ADR-040 v2.0**：「CH_MEM 是新正道」—— 直接支持收敛方向；B3 完成后需 v3.0 移除 TLM 分支语义（远期，记入 ADR-088）
 - **ADR-046**（FSM 豁免）：**强依赖** —— B1 的 PTW walk FSM / L1Cache refill FSM / M 扩展 FSM 版全走此豁免；收敛决策反而提高其使用密度
 - **ADR-087**（Proposed）：正交互补 + 交叉点（D4 护栏形态随 TLM 退役切换，需 v1.1 修订）
