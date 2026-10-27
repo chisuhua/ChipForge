@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.5（2026-10-27，builder；v1.5 = A3 语料接入 + ★ partial 语义（cap 截断）新增 + per-case cap + 清单第 5 列）**
+> **Status**: ✅ **v1.6（2026-10-27，builder；v1.6 = A3 首跑完成 + ★ 分层语义修正（night = 全量）+ 报告分析/重放工具）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -361,7 +361,17 @@ case 在 cycle cap 处被截断（两侧 `done=false`）时，`tohost`（两侧�
   ★ 成本分布（实测）：Simulator 侧 ≈ 9~10 拍/s ⇒ ELF ≈ 30~60 s/例 · branchbench 20k 拍 ≈ **33 min/例**（4 档 ≈ 2.2 h，串行主导项）。
   ★ 要真正省掉 Verilator 侧编译，必须把 ELF 从 **elaboration 期**移出（imem 初始化改为运行期加载）
   ⇒ 属 DUT/上游级改动 ⇒ 登记为开放项 **O-5**（不在本期）。
-- ★ 分层（v1.4 落实）：清单 `layer` 列 + `--layer pr|night|all` 驱动；PR 层的 case 集合 MUST ⊆ 清单。
+- ★ 分层（v1.4 落实；★ **v1.5 分层语义修正**）：清单 `layer` 列 + `--layer pr|night|all` 驱动。
+
+  | `--layer` | 语义 | 选集 |
+  |---|---|---|
+  | `pr` | PR 级**快子集** | 只跑 `layer=pr` 的 case（8 条） |
+  | ★ `night` | 夜间**全量** | ★ **跑全部 case**（52 条）—— 契约要求「夜间层全部覆盖」 |
+  | `all` | 同 `night`（显式别名） | 全部 case |
+
+  ★ **实测修正（v1.5）**：原实现 `--layer night` 只选 `layer=night` ⇒ **漏掉 PR 层的 8 条**
+  ⇒ 夜间层选集（44）**比 PR 层（8）还小** ⇒ **语义反了** ⇒ 首跑报告只有 44 case。
+  ⇒ 已修正为 `night` = 全部；`pr` = 快子集。
 - ★★ **per-case cycle cap（v1.5 新增）**：ELF 与 branchbench 的完成需求差 ~30 倍（ELF 最长 959 拍 vs branchbench ~86k 拍）
   ⇒ ★ **MUST NOT** 用单一全局 cap：cap 过大 ⇒ ELF 白跑；cap 过小 ⇒ branchbench 恒 partial。
   ⇒ 门禁 MUST 按 `kind` 取默认 cap（`elf`=3000 · `branchbench`=20000，契约 S-15）· 清单第 5 列可覆写。
