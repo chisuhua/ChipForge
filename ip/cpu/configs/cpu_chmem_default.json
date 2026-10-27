@@ -1,0 +1,14 @@
+{
+  "name": "RiscvCpuChmem_default",
+  "type": "cpu",
+  "description": "CH_MEM 后端的 CPU 配置示例 (P2, 2026-10-27)。★ 本文件只含 CH_MEM 实际支持的字段 —— TLM-only 字段 (pipeline_stages / n_lanes / mul_latency / branch_predictor / icache_latency 等) 一律会被 cpu_config_chmem_json.h 拒绝并给出原因。可用字段全集见 ip/cpu/configs/cpu_params_schema.json 中 x-chmem-supported=true 的项。",
+  "params": {
+    "initial_pc": 2147483648,
+    "enable_bp": true,
+    "btb_entries": 256,
+    "bp_uncond": true,
+    "enable_mmu": false,
+    "mmu_mode": "bare",
+    "enable_cache": false
+  }
+}
