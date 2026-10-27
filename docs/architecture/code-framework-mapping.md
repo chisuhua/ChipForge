@@ -345,7 +345,8 @@
    └── 双文件分离: <name>.h (TLM) + <name>_chmem.h (CH_MEM)
    └── 不继承 ChStreamModuleBase / Component
    └── 不调 REGISTER_MODULE("TypeName", ClassName)
-   └── 不写 ch_stream<T>
+   └── 不写 CppTLM 组件范式 (ChStreamModuleBase / StreamAdapter)
+   └── ★ 核内跨阶段用 Payload<T>；IP 间用 CppHDL 的 ch_stream<T> (ADR-092 §D4)
 
 3. （可选）实现纯算法层（ip/<area>/lib/）
    └── 0 引用 cf::plugin::PluginBase/PipeBuilder/Payload
@@ -365,11 +366,12 @@
 
 ## 5. 关键接口对照
 
-> **修订（ADR-083, 2026-10-08）**：业务 IP 不使用 `ch_stream<T>` / `Port<T>` / `ModuleFactory`。以下对照表保留作为 legacy CppTLM 知识（bridge 适配层仍在用），并补充 Plugin-style 替代。
+> **修订（ADR-083, 2026-10-08；★ v1.2 2026-10-28 收窄）**：业务 IP 不使用 **CppTLM 组件范式**（`ChStreamModuleBase` / `StreamAdapter` / `Port<T>` / `ModuleFactory`）⇒ ★ **CppHDL 的 `ch_stream<T>` 可用**（IP 间 / 核↔从设备）。以下对照表保留作为 legacy CppTLM 知识（bridge 适配层仍在用），并补充 Plugin-style 替代。
+> ★ **同名不同物**：`cpptlm::ch_stream<T>`（本表右列）**在 CppTLM 中不存在** —— CppTLM 实际提供的是 `ChStreamModuleBase` / `ChStreamInitiatorPort` / `ChStreamTargetPort` / `StreamAdapter`；★ `ch_stream<T>` 是 **CppHDL** `bundle/stream_bundle.h` 的 bundle 类型。
 
 ### 5.1 Plugin-style PayloadStore 替代 ch_stream（业务 IP 用）
 
-| 特征 | `cf::plugin::Payload<T>` + `PipeNode` (业务 IP) | `cpptlm::ch_stream<T>` (legacy, bridge 用) |
+| 特征 | `cf::plugin::Payload<T>` + `PipeNode` (业务 IP · ★ 核内跨阶段) | CppTLM stream 组件范式 (`ChStreamModuleBase` + `StreamAdapter`, legacy bridge 用) |
 |------|----------------------------------------------|------------------------------------------|
 | 使用者 | 业务 IP 开发者 | bridge 适配层 / 外部 CppTLM-based 系统 |
 | 定义位置 | `cf::plugin::Payload<T>` 全局静态单例 + `PipeNode` 阶段节点 | 模块类内部 `ch_stream<MyBundle>` 成员 |
@@ -377,7 +379,7 @@
 | 跨阶段通信 | `node(key)` 取值 / `node[key] = val` 赋值；编译期类型检查 | `stream.valid` / `stream.payload` 握手 |
 | 连接方式 | PipeBuilder 自动按 at_stage 注册顺序连线 | StreamAdapter 自动映射到 Port |
 | 多周期控制 | `CtrlLink::halt_when/throw_when/flush_when/bypass` | ch_stream 本身无（需自建） |
-| 编译期模式 | `uint_t<N>` 类型抽象双模式统一 | ch_stream 仅 TLM 模式可用 |
+| 编译期模式 | `uint_t<N>` 类型抽象双模式统一 | ★ CppTLM 组件范式仅 TLM 模式可用（★ **CppHDL 的 `ch_stream<T>` 两模式皆可**） |
 
 ### 5.2 Plugin-style TLM 类型 vs Plugin-style CH_MEM 类型
 
@@ -454,8 +456,8 @@
 
 | 文档声称 | 实际代码状态 | 修正方向 |
 |---------|------------|---------|
-| `interface-design.md` L8-22: `bundles/mem_bundles.h` 定义 `MemReqBundle` | `bundles/` 目录为空；`MemReqBundle` 在 CppTLM/CppHDL 中 0 匹配 | 要么实现 Bundle 定义，要么从文档中删除 |
-| `interface-design.md` L39-65: `bundles/cache_bundles.h` 定义 `CacheReqBundle` | 不存在 | 同上 |
+| `interface-design.md` L8-22: `bundles/mem_bundles.h` 定义 `MemReqBundle` | ★ **已修复（2026-10-28，ADR-092 §D7）**：`bundles/mem_bundles.h` 现已存在并定义 **`cf::bundles::MemReq` / `MemResp` / `CacheReq` / `CacheResp`**（★ **不含 `MemReqBundle` 等带 `Bundle` 后缀的名字**） | ✅ 已闭环（文档侧统一改用实际名；★ 新核接口 bundle 真名 = `CpuBusReq`/`CpuBusResp`，见 ADR-091 §D3a.3） |
+| `interface-design.md` L39-65: `bundles/cache_bundles.h` 定义 `CacheReqBundle` | ★ 该文件不存在；★ `CacheReq` 定义在 **`bundles/mem_bundles.h`**（非独立文件） | ✅ 已闭环（文档改用实际名 `cf::bundles::CacheReq`） |
 | `interface-design.md` L68-75: `bundles/impl_mode.h` 定义 `enum class ImplMode {TLM_ONLY, RTL_ONLY, COMPARE, SHADOW}` | `impl_mode.h` 不存在；`ImplMode` 在 CppTLM/CppHDL/ChipForge 全部 0 匹配 | 同上 |
 
 > **说明**：8 项文档/代码背离（幽灵 JSON + 幽灵类名 + Bundle 状态混淆）已通过 `openspec/changes/doc-code-realignment` (2026-06-17) 全部修复，详见 [§7.6](#76-已修复-2026-06-17)。
