@@ -26,11 +26,15 @@ depends_on:
 
 ## 1. Phase 1 — S1：框架层 G-1（端口声明）+ G-5a（后端注入）
 
-- [ ] 1.1 [RED] 扩 `tests/framework/test_pipe_builder_ports.cpp`：case C（端口进网表顶层）/ case D（ctx null ⇒ fail-closed）/ case E（内部驱动的 `ch_in` 不进顶层）/ case F（后端注入 ⇒ `active_backend_name()`）[ADR-091 §D5, §D5.1]
-- [ ] 1.2 [GREEN] `include/cf/plugin/pipe_builder.h` 增 `declare_in<T>` / `declare_out<T>`：★ `#ifdef CF_PLUGIN_USE_CH_MEM` 内 · ★ **只 include 具体头**（MUST NOT `<ch.hpp>`）· ★ ctx null ⇒ throw · ★ `ctx_swap(ctx_)` 保护 [ADR-091 §D5.1 G-1a/b/c]
-- [ ] 1.3 [GREEN] `include/cf/plugin/pipe_builder.h` 增 `create_simulator(std::unique_ptr<ch::IEvalBackend>)` 重载（★ `nullptr` ⇒ 现行为不变 ⇒ 向后兼容）[ADR-091 §D5 G-5a]
-- [ ] 1.4 [GREEN] ★ 头文件纪律门禁：框架头 + `ip/cpu/core/**` **零** `<ch.hpp>` include（★ `module.h:13` 缺 `inline` ⇒ 2+ TU 链接失败）[ADR-091 §D5.1 G-1b]
-- [ ] 1.5 ★ **零回归**：TLM binary **507 case / 506 passed / 1 baseline-known FAIL**（计数不变）+ 八门禁全绿
+- [x] 1.1 [RED] 扩 `tests/framework/test_pipe_builder_ports.cpp`：case C（端口进网表顶层）/ case D（ctx null ⇒ fail-closed）/ case E（内部驱动的 `ch_in` 不进顶层）/ case F（后端注入 ⇒ `active_backend_name()`）[ADR-091 §D5, §D5.1]
+- [x] 1.2 [GREEN] `include/cf/plugin/pipe_builder.h` 增 `declare_in<T>` / `declare_out<T>`：★ `#ifdef CF_PLUGIN_USE_CH_MEM` 内 · ★ **只 include 具体头**（MUST NOT `<ch.hpp>`）· ★ ctx null ⇒ throw · ★ `ctx_swap(ctx_)` 保护 [ADR-091 §D5.1 G-1a/b/c]
+- [x] 1.3 [GREEN] `include/cf/plugin/pipe_builder.h` 增 `create_simulator(std::unique_ptr<ch::IEvalBackend>)` 重载（★ `nullptr` ⇒ 现行为不变 ⇒ 向后兼容）[ADR-091 §D5 G-5a]
+- [x] 1.4 [GREEN] ★ 头文件纪律：框架头 **零** `<ch.hpp>` include（★ `module.h:13` 缺 `inline` ⇒ 2+ TU 链接失败）
+  ⇒ 验证：`simulator.h` 不引入 `module.h`/`ch.hpp` ⇒ `pipe_builder.h` 的现有 include 链**本就安全**
+  ⇒ ★ 新增的 `declare_in`/`declare_out` 复用 `simulator.h` 间接引入的 `core/io.h` ⇒ **零新 include**
+  [ADR-091 §D5.1 G-1b]
+- [ ] ~~1.6 runner `--backend` flag~~ ⇒ ★ **推迟到 Phase 5**（★ 本 Phase 不需要：G-5a 的价值是单进程双后端对照，而对照在 Phase 5 才出现 ⇒ ★ 提前加是无用户的 flag）
+- [x] 1.5 ★ **零回归**：TLM binary **507 case / 506 passed / 1 baseline-known FAIL**（计数不变）+ 八门禁全绿
 
 ## 2. Phase 2 — S2：`bus_iface_chmem.h`（G-4）+ 装配骨架
 
