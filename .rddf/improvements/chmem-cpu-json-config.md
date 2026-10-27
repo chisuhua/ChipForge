@@ -16,8 +16,9 @@ review_by: 2026-12-15
 >
 > **来源**：2026-10-27 用户指令「先做 P2（JSON 配置）」+ 4 条架构建议的第 3 条（用 JSON 配置而非命令行 + 重新分析 DSE 支持）。
 >
-> **状态**：**代码已落地 + 已提交（9 commit）**；全量 parity **52/52 PASS** + 八门禁全绿 ⇒ ★ 仅剩
-> **CH_MEM binary 全套**（被外部机时争抢拖垮，待清场重跑）与**文档同步**，见 §Acceptance 的未勾项。
+> **状态**：**✅ 全项达成**（2026-10-27）—— 代码已落地并提交（9 commit）· 全量 parity **52/52 PASS** ·
+> CH_MEM binary 全套 **20133 assertions / 164 test cases 全绿** · 八门禁全绿 · 文档同步已落档 ⇒ ★ 仅剩
+> 「文档同步」里的 `ip/cpu/README.md` 章节（**已补**）与契约/ADR/roadmap 三处（**已补**）⇒ **本提案收尾完成**。
 >
 > ★ **2026-10-27 用户裁决：P2 剥离 `bp_gshare` 旋钮**（GShare 增量 3 净负收益 + D8/D10 未签批 ⇒ 其数据通路与开关**均不进 main**）⇒ 详见 §「`bp_gshare` 剥离决策」。
 >
@@ -110,9 +111,9 @@ P2 而不带 GShare**（HEAD 版的 BP 插件 ctor 只接受 2 个参数）。
 |---|---|---|
 | 10 | ~~**提交**~~ | ✅ 已提交 9 commit（按 `CONTRIBUTING.md` §3.1 分文件粒度） |
 | 11 | ~~**全量 52 case parity 复跑**~~ | ✅ **52/52 PASS**（48 ELF 一轮 PASS；branchbench 4/4 清场后重跑 PASS） |
-| 12 | **CH_MEM binary 全套测试** | `chipforge_tests_chmem`（≈833 s）；两轮均被外部争抢拖垮 ⇒ ★ 清场后重跑 |
+| 12 | ~~**CH_MEM binary 全套测试**~~ | ✅ **164 test cases / 20133 assertions 全绿**（清场后跑完） |
 | 13 | ~~**八门禁复跑**~~ | ✅ 全绿（`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / fragments / 4 个 openspec validate） |
-| 14 | **文档同步** | 契约 §7 覆盖矩阵增行（S-14 报告字段已加 `cpu_config`）· ADR-089 提及配置面 · roadmap `feat-backend-parity-gate` 进度 |
+| 14 | ~~**文档同步**~~ | ✅ 契约 **v1.8** · ADR-089 配置面注记 · roadmap 进度 · `ip/cpu/README.md` 章节 |
 
 ### Out of Scope（明确不做）
 
@@ -273,10 +274,10 @@ per-case 推导**（`max(300, cap/9.0*3)` ⇒ elf 1000 s / branchbench 6666 s；
 
 ### ⬜ 未达成（★ 下一会话的待办）
 
-- [ ] **CH_MEM binary 全套测试**（`chipforge_tests_chmem`）—— 两次均被外部争抢拖到不可用
-  （首轮 `timeout 1500` 误杀；次轮 63 min 仅 48% CPU）⇒ ★ **在 main 上清场后重跑**
-- [ ] **文档同步**：契约 §7 覆盖矩阵增行（`--cpu-config` 落点）· ADR-089 补「配置面」段 · `feat-backend-parity-gate` 进度更新
-- [ ] **`ip/cpu/README.md` 补「CH_MEM 配置面」章节**（当前 README 只讲 TLM 侧用法）
+- [x] **CH_MEM binary 全套测试** —— ✅ **2026-10-27 在 main 上清场后跑完**：
+  `All tests passed (20133 assertions in 164 test cases)`
+- [x] **文档同步** —— ✅ 全部落档：契约 **v1.7 → v1.8**（§7 S-14/S-15 增行）· ADR-089 补「CH_MEM 配置面穿透」实现注记 ·
+  `feat-backend-parity-gate` 补 P2 支撑项 · `ip/cpu/README.md` 补「CH_MEM 配置面」章节
 
 ### 后续接线（不在本提案，另开）
 
