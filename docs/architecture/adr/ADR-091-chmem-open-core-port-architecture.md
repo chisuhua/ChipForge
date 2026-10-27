@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.1，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；★ **v1.1 = 增补 §D3a（D-J `ch_stream` 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名 `CpuBusReq`/`CpuBusResp` + §D4 指向 ADR-092 Phase-2**）**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过）**）**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -190,12 +190,39 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 
 | # | 缺口 | 落点 | 规模 |
 |---|---|---|---|
-| **G-1** | **端口声明能力**：`PipeBuilder` 无 `ch_in`/`ch_out` API | `include/cf/plugin/pipe_builder.h` 新增（★ 须在 `ctx_swap` 保护下创建端口节点，否则落到错误的 current context —— 上游 `device.h:13-19` 记录过该坑导致 node-id aliasing） | 1~2 人日 |
+| **G-1** | **端口声明能力**：`PipeBuilder` 无 `ch_in`/`ch_out` API | `include/cf/plugin/pipe_builder.h` 新增（★ 4 条实测约束见 **D5.1**） | 1~2 人日 |
 | **G-5a** | **后端注入**：`create_simulator()` 无后端参数 | 新增 `create_simulator(std::unique_ptr<ch::IEvalBackend>)`（★ `nullptr` = 保持现有默认行为 ⇒ 向后兼容） | 0.5 人日 |
 | **G-4** | CH_MEM 版 bundle 定义 | `ip/cpu/core/bus_iface_chmem.h`（新）⇒ ★ 真名 `CpuBusReq`/`CpuBusResp`（D3a.3） | 1~2 人日 |
 
 ⇒ ★ **框架层仍不引入「配置面」**（G-2）：配置归 `ip/cpu` 层（复用已落地的 `CpuConfigChmem`，见 `.rddf/improvements/chmem-cpu-json-config.md`）。
 ⇒ ★ **框架层仍不引入「DSE 维度抽象」**（G-3）：归 `ip/cpu/core/`（D7）。
+
+### D5.1 ★ G-1 的 4 条**实测**约束（★ 2026-10-28 PoC 得出，非推断）
+
+> **PoC 证据**：`tests/framework/test_pipe_builder_ports.cpp`（2 case / 6 assertions，**实测全过**）
+> ⇒ 验证「裸 ctx + `ch_in`/`ch_out` ⇒ 网表顶层端口」可行 ⇒ ★ **不需要 CppHDL 的 Component / `ch_device` 体系**。
+
+| # | 约束 | 依据（实测） | 违反后果 |
+|---|---|---|---|
+| **G-1a** | ★ 端口 API MUST 置于 **`#ifdef CF_PLUGIN_USE_CH_MEM`** 内 | 框架头现有 CppHDL 依赖**全部**条件化（`uint_t.h:25` · `payload.h:34` · `ctrl_link.h:39`）⇒ TLM 模式不得引入 | TLM 模式编译失败 |
+| **G-1b** | ★ 框架头 **MUST NOT include `<ch.hpp>`** ⇒ 只 include 具体头（`core/io.h` · `core/uint.h` · `core/context.h`） | ★ `ch.hpp:10` include `module.h`，而 ★ `module.h:13` 的 `build_hierarchical_name` **缺 `inline`** ⇒ **任何 2+ TU include `<ch.hpp>` 即链接失败**（multiple definition）★ 实测触发 | ★ **新核多文件必然踩雷**（每个头都含 `ch.hpp` ⇒ 链接失败） |
+| **G-1c** | ★ 端口创建 MUST **fail-closed 断言 ctx 非空** | ★ `ch_logic_in` 构造是 `if (ctx) { ctx->create_input(...); }` ⇒ ★ **无 current context 时静默不建节点**（`impl() == nullptr`）★ 实测确认 | ★ **假绿通道**：端口「消失」而不报错 ⇒ 网表少端口 ⇒ 门禁照绿 |
+| **G-1d** | ★ 端口**方向必须严格**：请求用 `ch_out`，响应用 `ch_in`；且 ★ `ch_in` **MUST NOT** 被内部逻辑赋值 | ★ 有内部 driver 的 `ch_in` **不是**顶层端口（上游 `verilator_backend.cpp:617` 的 skip：`inputimpl::driver() != nullptr` ⇒ 不进 `port_access_`；codegen 侧同理） | 端口**不进** `port_access_` ⇒ Verilator 后端**读不到** ⇒ 观测量采集失败 |
+
+⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+
+#### D5.1.1 ★ PoC 实测的网表形态（★ 开放核的接口目标形态）
+
+```verilog
+module top (
+    input default_clock,
+    input default_reset,
+    input [31:0] poc_in,      ← ★ 新增顶层 input (响应侧)
+    output [31:0] poc_out     ← ★ 新增顶层 output (请求侧)
+);
+```
+
+⇒ ★ 从「2 端口封闭核」变为「**N 端口开放核**」⇒ ★ 这是 ADR-091 §B-1/B-2/B-3 三个阻塞的**共同解锁点**。
 
 ### D6 ★ 硬约束（★ MUST，全部为 fail-closed）
 
