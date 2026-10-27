@@ -2,9 +2,9 @@
 
 | 字段 | 值 |
 |------|-----|
-| 状态 | ✅ Accepted (2026-10-08) · **v1.1 (2026-10-24)** —— 补 §2.5 冻结条款 + §5.4 退役时间线（详见 [ADR-088](ADR-088-tlm-backend-retirement.md)） |
-| 来源 | overview.md / AGENTS.md 文档漂移修正 + Plugin-style 范式固化（v1.1: TLM 后端退役 B0 阶段） |
-| 关联 ADR | **ADR-037**（Plugin 作为设计范式，v2.0 Phase 6c M5 落地）/ **ADR-040 v2.0**（TLM→HDL 移植性约束，CH_MEM 是新正道）/ ADR-025（Plugin 基类无 tick）/ ADR-046（多周期 FSM 豁免）/ **ADR-088**（TLM 后端退役：冻结契约与语义裁决锚） |
+| 状态 | ✅ Accepted (2026-06-08) · **v1.1 (2026-10-24)** —— 补 §2.5 冻结条款 + §5.4 退役时间线（详见 [ADR-088](ADR-088-tlm-backend-retirement.md)）· ★ **v1.2 (2026-10-28)** —— ★ **表述纠偏**（§1.2 架构图 `ch_stream` 归类 + §4.2 拒绝范围收窄；★ **决策本身未变**，纠的是**转述失准**；配套 [ADR-092](ADR-092-tlm-reference-freeze.md)） |
+| 来源 | overview.md / AGENTS.md 文档漂移修正 + Plugin-style 范式固化（v1.1: TLM 后端退役 B0 阶段）· ★ **v1.2: `ch_stream` 归属纠偏**（实测：`ch_stream<T>` 在 **CppHDL** `bundle/stream_bundle.h`；★ CppTLM 只有**无下划线**的 `chstream_*` / `stream_adapter*` ⇒ 原 §1.2 图**自相矛盾**） |
+| 关联 ADR | **ADR-037**（Plugin 作为设计范式，v2.0 Phase 6c M5 落地）/ **ADR-040 v2.0**（TLM→HDL 移植性约束，CH_MEM 是新正道）/ ADR-025（Plugin 基类无 tick）/ ADR-046（多周期 FSM 豁免）/ **ADR-088**（TLM 后端退役：冻结契约与语义裁决锚）/ ★ **ADR-092**（TLM 参考实现的冻结与演进停止）· ★ **ADR-091**（CH_MEM 开放核形态） |
 | 关联文档 | `docs/architecture/overview.md` §1 架构总览 / `AGENTS.md` 顶部简介 / `docs/methodology/plugin-style-design-methodology-v1.md` v2 双模方法学 |
 
 ---
@@ -48,15 +48,25 @@ ADR-001（2026-06-07）定义了"三层框架分工"（ChipForge 应用 + CppHDL
 │   - TLM 模式: cf::plugin POD 直接走 C++ 直仿               │
 │   - CH_MEM 模式: lnode DAG → Verilog → Verilator 仿真    │
 │   - Bundle 类型系统 + chlib + toVerilog + Verilator backend│
+│   ★ v1.2 追加: ch_stream<T> 亦在本层 (bundle/stream_bundle.h)│
 └────────────────────────────────────────────────────────────┘
                               │
                               │ (外部依赖, 不被 Plugin 使用)
                               ▼
 ┌────────────────────────────────────────────────────────────┐
 │ CppTLM 仿真内核 (legacy, 仅 bridge 适配层用)               │
-│   - ch_stream / Module / Port / ModuleFactory             │
+│   ★ v1.2 更正: ch_stream 移出本框 (它属 CppHDL, 见上)      │
+│   - Module / Port / ModuleFactory                        │
+│   - chstream_module / chstream_port / stream_adapter      │
 │   - Bridge 适配层 (src/cf_plugin/bridge/) 仅用于外部集成   │
 └────────────────────────────────────────────────────────────┘
+
+> ★★ **v1.2 表述纠偏（2026-10-28，architect）**：本图此前把 `ch_stream` 列在 **CppTLM 框**内，而**同图的 CppHDL 框已含「Bundle 类型系统 + chlib」**（`ch_stream<T>` 正是其一部分）⇒ ★ **图自身自相矛盾**。
+>
+> - 事实：`ch_stream<T>` 定义在 **CppHDL** `include/bundle/stream_bundle.h`（`bundle_base` 派生 + `CH_BUNDLE_FIELDS_T` + `as_master/slave_direction()`）
+> - ★ **CppTLM 里没有 `ch_stream`（下划线）** —— 只有 `chstream_module.hh` / `chstream_port.hh` / `stream_adapter.hh` 等**无下划线**的 `chstream_*` / `stream_adapter*`（**同名不同物**）
+>   - ★ **交叉印证**：CppTLM 自己的注释里提到的 `ch_stream` 正是 CppHDL 的那个 —— `include/bundles/cache_bundles_rtl.hh:3` 明写「**CppHDL** ch_stream<BundleT> 使用的 Bundle 类型」⇒ ★ **CppTLM 是 CppHDL `ch_stream` 的消费者，不是提供者**
+> - ⇒ 详见 **ADR-092** §D4（层次区分：`ch_stream` = IP 间 / 核↔从设备；`Payload<T>` = 核内 stage 间，★ **两者不互斥**）与本 ADR §4.2（拒绝范围收窄）
 ```
 
 ### 1.3 D4 决策已有但文档未显式记录
@@ -201,10 +211,17 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 - **理由**：违反 DRY；版本同步成本高；接口漂移已发生（L1Cache `MMUPlugin.cpp` 在 TLM 路径有 MMU bug 但 CH_MEM 路径无法复现）
 - **替代**：Plugin-style 单一 source + 双模式编译
 
-### 4.2 拒绝"CppTLM ch_stream 作为 IP 间通信"
+### 4.2 拒绝"CppTLM ch_stream 作为 IP 间通信"（★ **v1.2 收窄适用范围**）
 
 - **理由**：D4 决策已否（2026-06-08）；ch_stream 强握手语义对单周期同步场景过度；`PipeBuilder::build()` + `Payload<T>` 已验证可替代
 - **替代**：`cf::plugin::Payload<T>` + `PipeNode`
+
+> ★★ **v1.2 收窄（2026-10-28，architect 主持）**：本条**拒绝的是 CppTLM 的 `chstream_module` / `stream_adapter` 组件范式**（原标题已含「CppTLM」限定，此处显式化）。
+>
+> - ★ **CppHDL 的 `ch_stream<T>`（`bundle/stream_bundle.h`）不在本条拒绝范围** ⇒ ★ **采用**为 **IP 之间 / 核 ↔ 从设备**的接口连接方式（ADR-092 §D4 / ADR-091 增补 §D-J）
+> - ★ **但核内 stage 之间仍用 `Payload<T>` + `PipeNode`** ⇒ 「强握手对单周期同步过度」的原始判断**对核内数据通路依然成立** ⇒ ★ **MUST NOT** 以「采用 `ch_stream`」为理由删除 `Payload<T>`
+> - ★ **原文「ch_stream 强握手语义」表述已失准** —— 该判断针对的是 **CppTLM 的组件范式**；CppHDL 的 `ch_stream` 同样带 `valid`/`ready` 握手 ⇒ ★ 跨 IP 接口采用它时，**握手成本由接口契约显式承担**（`ready` 可恒真 ⇒ 退化为无阻塞流），MUST NOT 默认假设「握手免费」
+> - ⇒ 与 ADR-092 §D4 一致；★ **`MemReqBundle` 悬空引用**（代码里实际是 `cf::bundles::MemReq`）的修正见「相关」文档同步
 
 ### 4.3 拒绝"TLM 模式作为长期模式"
 
@@ -223,6 +240,7 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 | `docs/architecture/tech-selection.md` | §2 CppTLM 选型 + §3 CppHDL 选型 合并为 "CppHDL 设施选型"（CppTLM 段降到"外部依赖，bridge 适配层用"） |
 | `docs/architecture/code-framework-mapping.md` | §1 总图 + §4 项目层映射 修订为"Plugin-style 是项目层；CppHDL 是设施层；CppTLM 是 legacy" |
 | `docs/architecture/adr.md` | 注册 ADR-083 |
+| ★ **v1.2（2026-10-28）表述纠偏** | `AGENTS.md` §1 顶部简介（「业务 IP 不使用 ch_stream / Module / Port / ModuleFactory」⇒ ★ **收窄为「不使用 CppTLM 的 `Module`/`Port`/`ModuleFactory`/`chstream_module`/`stream_adapter` 组件范式」**，并显式声明 **CppHDL 的 `ch_stream<T>` 可用**）· `docs/architecture/overview.md` §架构总览 · `docs/architecture/code-framework-mapping.md`（19 处）· `docs/architecture/interface-design.md`（13 处）· `docs/architecture/declarative-hybrid-framework.md`（25 处）· `docs/GLOSSARY.md`（6 处）· ★ **`MemReqBundle` 悬空引用修正**（代码里实际是 `cf::bundles::MemReq`；出现在 10 文档 + 4 份 `ip/cpu/configs/*.json`）⇒ **落点 = ADR-092 §D7 + ADR-091 增补 §D-J** |
 
 ### 5.2 代码无需修改
 
