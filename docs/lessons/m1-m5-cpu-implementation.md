@@ -78,10 +78,12 @@
 
 ## 4. D4 决策 (Plugin-style 范式) 验证
 
-D4 要求: CPU Plugin 全部用 cf_plugin 框架 (PluginBase/PipeBuilder/at_stage), 不直接调 ch_stream/sim_object。
+D4 要求: CPU Plugin 全部用 cf_plugin 框架 (PluginBase/PipeBuilder/at_stage), 不直接调 **CppTLM** 的 ch_stream 组件范式 / sim_object。
+★ 更正 (2026-10-28, ADR-083 v1.2 §4.2): ★ `ch_stream` 本身是 **CppHDL** 的 bundle 类型 (`bundle/stream_bundle.h`) ⇒ CppTLM 里**没有** `ch_stream` 类型 (只有 `ChStreamModuleBase` / `StreamAdapter` 等 `ChStream*` 系列) ⇒ 本条的准确表述 = 「不使用 CppTLM 的组件范式」; ★ **CppHDL 的 `ch_stream<T>` 可用** (IP 之间 / 核 ↔ 从设备)。
 
 **M1-M5 验证**: 11 个 Plugin 全部 `class XxxPlugin : public cf::plugin::PluginBase` + `void build(PipeBuilder&)` 注册
-- ✅ 0 个 Plugin 直接用 ch_stream
+- ✅ 0 个 Plugin 直接用 **CppTLM 的 stream 组件范式** (`ChStreamModuleBase` / `StreamAdapter`)
+  ★ 更正 (2026-10-28): 原表述「0 个 Plugin 直接用 ch_stream」在字面上会误判为「连 CppHDL 的 `ch_stream` 都没用」⇒ 实际语义是「不用 CppTLM 组件范式」
 - ✅ 0 个 Plugin 绕开 PipeBuilder
 - ✅ 0 个业务 tick() (Plugin 内部)
 

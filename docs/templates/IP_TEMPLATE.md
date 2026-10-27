@@ -41,7 +41,11 @@ ctest -L unit
 ### 4.1 端口定义
 | 端口名 | 方向 | 类型 | Bundle | 说明 |
 |--------|------|------|--------|------|
-| - | in/out | ch_stream | - | - |
+| - | in/out | ★ `ch_stream` | ★ `ch_stream<T>` 的 `T` = **CppHDL bundle**（`bundle_base` 派生）| - |
+
+> ★ **`ch_stream` 归属澄清（2026-10-28，ADR-083 v1.2 §4.2 / ADR-092 §D4）**：本模板的 `ch_stream` 指 ★ **CppHDL** 的 `ch_stream<T>`（`bundle/stream_bundle.h`）⇒ **可用**，用于 **IP 之间 / 核 ↔ 从设备**的接口连接。
+> ★ **MUST NOT** 写成 CppTLM 的 `ChStreamModuleBase` / `StreamAdapter` 组件范式（★ CppTLM **没有** `ch_stream` 类型 —— 二者是**同名不同物**）。
+> ★ **核内 stage 间**用 `Payload<T>` + `PipeNode`（无握手）⇒ 与 `ch_stream` **层次不同，不互斥**。
 
 ### 4.2 握手协议
 - valid/ready 握手
