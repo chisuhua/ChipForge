@@ -15,12 +15,12 @@
   },
   "ports": {
     "ibus": {
-      "type": "ch_stream",
-      "bundle": "MemReqBundle"
+      "type": "chstream",
+      "bundle": "MemReq"
     },
     "dbus": {
-      "type": "ch_stream",
-      "bundle": "MemReqBundle"
+      "type": "chstream",
+      "bundle": "MemReq"
     },
     "irq": {
       "type": "signal",

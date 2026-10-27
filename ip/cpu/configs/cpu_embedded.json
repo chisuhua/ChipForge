@@ -13,8 +13,8 @@
     "dcache_latency": 1
   },
   "ports": {
-    "ibus": {"type": "ch_stream", "bundle": "MemReqBundle"},
-    "dbus": {"type": "ch_stream", "bundle": "MemReqBundle"},
+    "ibus": {"type": "chstream", "bundle": "MemReq"},
+    "dbus": {"type": "chstream", "bundle": "MemReq"},
     "irq": {"type": "signal", "width": 8}
   },
   "stats": ["ipc", "cycles"]
