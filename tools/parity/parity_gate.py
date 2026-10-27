@@ -61,6 +61,15 @@ EXCEPTION_COUNT_SOFT_LIMIT = 10  # S-12：> N ⇒ 提示 architect 复审（**�
 #                  ⇒ cap 20k（**跑不到 done** ⇒ 该 case 为 partial，见 S-9 partial 语义）
 DEFAULT_CAPS = {"elf": 3000, "branchbench": 20000}
 
+# ★ 子进程超时 MUST 按 case **推导**，不能用一个全局常量：
+#   实测 Simulator 吞吐 ≈ 9.1 拍/s（`rv32ui-p-add` 478 拍 / 52.8 s）⇒ branchbench 20k 拍
+#   **满核**就需 ~2222 s ⇒ 旧的全局 3600 s 余量仅 1.6× ⇒ 任何机时争抢都会误报 TIMEOUT。
+#   ★ 2026-10-27 实测踩到：4 路 sim + 外部 perf 套件把单进程压到 ~52% CPU
+#   ⇒ branchbench 实际需 ~4273 s > 3600 s ⇒ 4 档全部 `runner_error=TIMEOUT`（**假红**）。
+ASSUMED_TICKS_PER_S = 9.0   # ★ 实测下界（保守取值）
+TIMEOUT_MARGIN = 3.0        # ★ 覆盖机时争抢（实测 52% CPU ⇒ 需 ~2× 余量）
+TIMEOUT_FLOOR_S = 300       # ★ 与拍数无关的固定开销（Verilog 生成 + Verilator 编译）
+
 
 # ────────────────────────────────────────────────────────────── 语料清单
 
@@ -359,6 +368,20 @@ def case_cap(case, opts):
     return int(case.get("max_cycles") or DEFAULT_CAPS.get(case["kind"], opts.max_cycles))
 
 
+def case_timeout(case, opts):
+    """★ per-case 子进程超时（契约 S-15）。
+
+    `--timeout-s` 给正值 ⇒ **显式覆盖**（调试用）；0（默认）⇒ 按 cap 推导：
+    `max(FLOOR, cap / ASSUMED_TICKS_PER_S * MARGIN)`。
+    ★ 为什么推导而不是拍一个常量：cap 与超时是同一件事的两面（都随 `kind` 差 ~7 倍），
+      分开写死必然漂（2026-10-27 实测：cap 已按 kind 分档，超时却仍是全局 3600 ⇒ 假红）。
+    """
+    if opts.timeout_s:
+        return opts.timeout_s
+    cycles = case_cap(case, opts)
+    return max(TIMEOUT_FLOOR_S, int(cycles / ASSUMED_TICKS_PER_S * TIMEOUT_MARGIN))
+
+
 def run_simulator(case, opts):
     out = os.path.join(opts.work_dir, f"{case['name']}.sim.json")
     cmd = [opts.sim_bin, "--elf", case["relpath"], "--cycles", str(case_cap(case, opts)),
@@ -367,7 +390,7 @@ def run_simulator(case, opts):
     #   ★ 只在显式给出时传：不给 ⇒ 走各 runner 的默认（与 P2 之前逐位一致）。
     if getattr(opts, "cpu_config", ""):
         cmd += ["--config", opts.cpu_config]
-    proc, err = _run(cmd, opts.timeout_s)
+    proc, err = _run(cmd, case_timeout(case, opts))
     if err:
         return None, err
     if not os.path.isfile(out):
@@ -391,7 +414,7 @@ def run_verilator(case, opts):
     # P2: 同 simulator 侧 —— 同一份 config 必须喂给两侧, 否则比的是两种配置。
     if getattr(opts, "cpu_config", ""):
         cmd += ["--config", getattr(opts, "cpu_config")]
-    proc, err = _run(cmd, opts.timeout_s)
+    proc, err = _run(cmd, case_timeout(case, opts))
     if err:
         return None, err
     if not os.path.isfile(out):
@@ -494,6 +517,20 @@ def self_test():
     checks.append(("completion 缺失 ⇒ ERROR", r["verdict"] == "ERROR"
                     and r["error_kind"] == "completion_missing", r["error_kind"]))
 
+    # ── S-15 per-case 超时推导（2026-10-27 修「全局单一超时 ⇒ branchbench 假红」）──
+    class _O:  # 最小 opts 桩
+        timeout_s = 0
+        max_cycles = 3000
+    t_elf = case_timeout({"name": "e", "kind": "elf"}, _O)
+    t_bb = case_timeout({"name": "b", "kind": "branchbench"}, _O)
+    checks.append(("超时按 kind 推导（branchbench 远大于 elf）",
+                    t_bb > t_elf > TIMEOUT_FLOOR_S, f"elf={t_elf}s bb={t_bb}s"))
+    checks.append(("branchbench 超时 > 满核所需（20000/9.1≈2222s）",
+                    t_bb > 2222, f"{t_bb}s"))
+    _O.timeout_s = 77
+    checks.append(("--timeout-s 显式覆盖生效",
+                    case_timeout({"name": "b", "kind": "branchbench"}, _O) == 77, "77s"))
+
     width = max(len(c[0]) for c in checks)
     failed = 0
     for name, passed, detail in checks:
@@ -524,7 +561,9 @@ def main(argv=None):
     ap.add_argument("--cpu-config", default="",
                     help="path to a CH_MEM CPU config JSON "
                          "(see ip/cpu/configs/cpu_chmem_default.json)")
-    ap.add_argument("--timeout-s", type=int, default=3600)
+    ap.add_argument("--timeout-s", type=int, default=0,
+                    help="子进程超时（秒）。0（默认）= 按 case 的 cap 推导 "
+                         "(S-15)；给正值 = 显式覆盖全部 case（调试用）")
     ap.add_argument("--jobs", type=int, default=4,
                     help="并行度（两侧 runner 是独立子进程 ⇒ 线程池安全；默认 4）")
     ap.add_argument("--self-test", action="store_true")
@@ -616,6 +655,7 @@ def main(argv=None):
             "differences": j["differences"],
             "exceptions_applied": j["applied"],
             "cap": case_cap(case, opts),
+            "timeout_s": case_timeout(case, opts),
         }
 
     # ★ 并行：两侧 runner 是**独立子进程**（各自独立 context / 独立 work-dir）
