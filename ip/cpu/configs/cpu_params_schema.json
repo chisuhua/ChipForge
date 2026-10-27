@@ -4,11 +4,22 @@
   "description": "v2.0 字段 + M4-DSE/M5-DSE 新增字段 (2026-06-17) + M5-DSE superscalar 9 新字段 + 3 字段重命名 (2026-06-22, M5.19). 见 ip/cpu/docs/dse_architecture.md §4",
   "type": "object",
   "properties": {
-    "name": {"type": "string", "description": "实例名称"},
-    "type": {"type": "string", "const": "cpu"},
+    "name": {
+      "type": "string",
+      "description": "实例名称"
+    },
+    "type": {
+      "type": "string",
+      "const": "cpu"
+    },
     "impl_mode": {
       "type": "string",
-      "enum": ["TLM_ONLY", "RTL_ONLY", "COMPARE", "SHADOW"],
+      "enum": [
+        "TLM_ONLY",
+        "RTL_ONLY",
+        "COMPARE",
+        "SHADOW"
+      ],
       "default": "TLM_ONLY",
       "description": "实现模式"
     },
@@ -17,216 +28,443 @@
       "properties": {
         "isa": {
           "type": "string",
-          "enum": ["rv32i", "rv32im", "rv32imac"],
+          "enum": [
+            "rv32i",
+            "rv32im",
+            "rv32imac"
+          ],
           "default": "rv32im",
-          "description": "指令集架构。implemented: rv32i/rv32im；declared-reserved: rv32imac, 以及规划值 rv64i/rv64gc（后者 schema 不收录, 运行时可接受并 emit warn, 不参与 dispatch, 见 ADR-087 §D1）；其余取值运行时 fail-fast。"
+          "description": "指令集架构。implemented: rv32i/rv32im；declared-reserved: rv32imac, 以及规划值 rv64i/rv64gc（后者 schema 不收录, 运行时可接受并 emit warn, 不参与 dispatch, 见 ADR-087 §D1）；其余取值运行时 fail-fast。",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM 固定 rv32im (编译期编入)"
         },
         "xlen": {
           "type": "integer",
-          "enum": [32, 64],
+          "enum": [
+            32,
+            64
+          ],
           "default": 32,
-          "description": "XLEN 位宽 (ADR-087 §D2)。与 isa 的关联校验在 cf::cpu::detail::validate_isa_xlen（build_cpu 入口）。"
+          "description": "XLEN 位宽 (ADR-087 §D2)。与 isa 的关联校验在 cf::cpu::detail::validate_isa_xlen（build_cpu 入口）。",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM 固定 32 (ADR-087 D2)"
         },
         "pipeline_stages": {
           "type": "integer",
-          "enum": [3, 5, 7, 10],
+          "enum": [
+            3,
+            5,
+            7,
+            10
+          ],
           "default": 5,
-          "description": "流水线级数 (3=embedded, 5=default, 7=superscalar, 10=deep pipeline)"
+          "description": "流水线级数 (3=embedded, 5=default, 7=superscalar, 10=deep pipeline)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM 是组合数据通路, 级数固定 5"
         },
         "clock_freq_mhz": {
           "type": "integer",
           "minimum": 1,
           "maximum": 2000,
           "default": 100,
-          "description": "时钟频率 (MHz)"
+          "description": "时钟频率 (MHz)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "无时钟域概念 (elaboration 定形)"
         },
         "enable_pmp": {
           "type": "boolean",
           "default": true,
-          "description": "启用物理内存保护"
+          "description": "启用物理内存保护",
+          "x-chmem-supported": false,
+          "x-chmem-note": "PMP 未实装"
         },
         "enable_mmu": {
           "type": "boolean",
           "default": true,
-          "description": "启用 MMU (cf::cpu::plugins::RiscvMMUPlugin, 见 ip/cpu/plugins/mmu.h)"
+          "description": "启用 MMU (cf::cpu::plugins::RiscvMMUPlugin, 见 ip/cpu/plugins/mmu.h)",
+          "x-chmem-supported": true,
+          "x-chmem-note": "plumbing-only no-op log (CH_MEM MMU 未实装翻译)"
         },
         "mmu_mode": {
           "type": "string",
-          "enum": ["sv32", "sv39", "sv48"],
+          "enum": [
+            "sv32",
+            "sv39",
+            "sv48"
+          ],
           "default": "sv32",
-          "description": "虚拟内存模式"
+          "description": "虚拟内存模式",
+          "x-chmem-supported": true,
+          "x-chmem-note": "仅 log 记录, 无 functional effect"
         },
         "branch_predictor": {
           "type": "string",
-          "enum": ["static", "bimodal", "gshare", "tournament"],
+          "enum": [
+            "static",
+            "bimodal",
+            "gshare",
+            "tournament"
+          ],
           "default": "gshare",
-          "description": "分支预测器类型"
+          "description": "分支预测器类型",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM BP 开关面是 enable_bp + bp_uncond + btb_entries; ★ GShare 未签批 ⇒ 不暴露对应开关"
         },
         "btb_entries": {
           "type": "integer",
-          "enum": [16, 32, 64, 128, 256],
+          "enum": [
+            16,
+            32,
+            64,
+            128,
+            256
+          ],
           "default": 64,
-          "description": "BTB 条目数"
+          "description": "BTB 条目数",
+          "x-chmem-supported": true,
+          "x-chmem-note": "BP 逻辑条目数, 全支持"
         },
         "icache_latency": {
           "type": "integer",
           "minimum": 0,
           "maximum": 32,
           "default": 1,
-          "description": "ICache 命中延迟 (cycle)"
+          "description": "ICache 命中延迟 (cycle)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "Cache CH_MEM 未实装"
         },
         "dcache_latency": {
           "type": "integer",
           "minimum": 0,
           "maximum": 32,
           "default": 1,
-          "description": "DCache 命中延迟 (cycle)"
+          "description": "DCache 命中延迟 (cycle)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "Cache CH_MEM 未实装"
         },
         "enable_branch_predictor": {
           "type": "boolean",
           "default": true,
-          "description": "[M4-DSE 新增] 是否启用分支预测器 (3 级嵌入式可关)"
+          "description": "[M4-DSE 新增] 是否启用分支预测器 (3 级嵌入式可关)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM 改用 enable_bp"
         },
         "split_if_id": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] 7 级模式把 fetch 拆 IF1/IF2"
+          "description": "[M4-DSE 新增] 7 级模式把 fetch 拆 IF1/IF2",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM 固定 5 级拓扑"
         },
         "merge_ex_mem": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] 3 级模式合并 EX+MEM"
+          "description": "[M4-DSE 新增] 3 级模式合并 EX+MEM",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM 固定 5 级拓扑"
         },
         "ghr_bits": {
           "type": "integer",
-          "enum": [8, 16],
+          "enum": [
+            8,
+            16
+          ],
           "default": 8,
-          "description": "[M4-DSE 新增] GShare 全局历史寄存器位数"
+          "description": "[M4-DSE 新增] GShare 全局历史寄存器位数",
+          "x-chmem-supported": false,
+          "x-chmem-note": "GHR 宽度由 btb_entries 推导 (硬编码)"
         },
         "ext_m": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] RISC-V M 扩展 (MUL/DIV)"
+          "description": "[M4-DSE 新增] RISC-V M 扩展 (MUL/DIV)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "M 扩展编译期编入"
         },
         "ext_a": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] RISC-V A 扩展 (atomic)"
+          "description": "[M4-DSE 新增] RISC-V A 扩展 (atomic)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "未实装"
         },
         "ext_f": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] RISC-V F 扩展 (单精度 FPU, stub)"
+          "description": "[M4-DSE 新增] RISC-V F 扩展 (单精度 FPU, stub)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "未实装"
         },
         "ext_d": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] RISC-V D 扩展 (双精度 FPU, stub)"
+          "description": "[M4-DSE 新增] RISC-V D 扩展 (双精度 FPU, stub)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "未实装"
         },
         "ext_zicsr": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] RISC-V Zicsr 扩展 (CSR)"
+          "description": "[M4-DSE 新增] RISC-V Zicsr 扩展 (CSR)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "Zicsr 编译期编入"
         },
         "ext_zifencei": {
           "type": "boolean",
           "default": false,
-          "description": "[M4-DSE 新增] RISC-V Zifencei 扩展"
+          "description": "[M4-DSE 新增] RISC-V Zifencei 扩展",
+          "x-chmem-supported": false,
+          "x-chmem-note": "未实装"
         },
         "mul_latency": {
           "type": "integer",
-          "enum": [1, 3, 5],
+          "enum": [
+            1,
+            3,
+            5
+          ],
           "default": 1,
-          "description": "[M5-DSE 新增] MUL 指令延迟 (cycle 数)"
+          "description": "[M5-DSE 新增] MUL 指令延迟 (cycle 数)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "CH_MEM M 扩展是组合式 (1 拍), 无多周期参数"
         },
         "use_strict_scoreboard": {
           "type": "boolean",
           "default": true,
-          "description": "[M4-DSE 新增] HazardPlugin 严格 scoreboard 模式"
+          "description": "[M4-DSE 新增] HazardPlugin 严格 scoreboard 模式",
+          "x-chmem-supported": false,
+          "x-chmem-note": "scoreboard 未实装"
         },
         "collect_stats": {
           "type": "boolean",
           "default": false,
-          "description": "[M5-DSE 新增] 是否收集运行统计 (IPC/branch_miss/cache_hit)"
+          "description": "[M5-DSE 新增] 是否收集运行统计 (IPC/branch_miss/cache_hit)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "统计信号由 elaboration 期发射, 非配置项"
         },
         "n_lanes": {
           "type": "integer",
-          "enum": [1, 2, 4, 8],
+          "enum": [
+            1,
+            2,
+            4,
+            8
+          ],
           "default": 1,
-          "description": "[M5-DSE 新增] 执行 lane 数 (与 dispatch_width 等价, 1=byte-identical baseline)"
+          "description": "[M5-DSE 新增] 执行 lane 数 (与 dispatch_width 等价, 1=byte-identical baseline)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "superscalar 未实装"
         },
         "dispatch_width": {
           "type": "integer",
-          "enum": [1, 2, 4],
+          "enum": [
+            1,
+            2,
+            4
+          ],
           "default": 1,
-          "description": "[M5-DSE 新增] 单 cycle dispatch lane 数 (2-wide superscalar 场景设为 2)"
+          "description": "[M5-DSE 新增] 单 cycle dispatch lane 数 (2-wide superscalar 场景设为 2)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "superscalar 未实装"
         },
         "issue_queue_size": {
           "type": "integer",
           "minimum": 0,
           "default": 0,
-          "description": "[M5-DSE 新增] Issue Queue entries 数 (0=关闭 OoO issue, 1=byte-identical baseline)"
+          "description": "[M5-DSE 新增] Issue Queue entries 数 (0=关闭 OoO issue, 1=byte-identical baseline)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "乱序发射未实装"
         },
         "rob_size": {
           "type": "integer",
           "minimum": 0,
           "default": 0,
-          "description": "[M5-DSE 新增] Reorder Buffer entries 数 (0=关闭 OoO commit)"
+          "description": "[M5-DSE 新增] Reorder Buffer entries 数 (0=关闭 OoO commit)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "乱序提交未实装"
         },
         "lsq_size": {
           "type": "integer",
           "minimum": 0,
           "default": 0,
-          "description": "[M5-DSE 新增] Load/Store Queue entries 数 (0=顺序访存)"
+          "description": "[M5-DSE 新增] Load/Store Queue entries 数 (0=顺序访存)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "乱序访存未实装"
         },
         "rename_table_size": {
           "type": "integer",
           "minimum": 0,
           "default": 0,
-          "description": "[M5-DSE 新增] 重命名表项数 (0=不启用寄存器重命名)"
+          "description": "[M5-DSE 新增] 重命名表项数 (0=不启用寄存器重命名)",
+          "x-chmem-supported": false,
+          "x-chmem-note": "寄存器重命名未实装"
         },
         "retire_width": {
           "type": "integer",
-          "enum": [1, 2, 4],
+          "enum": [
+            1,
+            2,
+            4
+          ],
           "default": 1,
-          "description": "[M5-DSE 新增] 单 cycle retire lane 数"
+          "description": "[M5-DSE 新增] 单 cycle retire lane 数",
+          "x-chmem-supported": false,
+          "x-chmem-note": "superscalar 未实装"
         },
         "fetch_width": {
           "type": "integer",
-          "enum": [1, 2, 4],
+          "enum": [
+            1,
+            2,
+            4
+          ],
           "default": 1,
-          "description": "[M5-DSE 新增] 单 cycle fetch 指令数"
+          "description": "[M5-DSE 新增] 单 cycle fetch 指令数",
+          "x-chmem-supported": false,
+          "x-chmem-note": "superscalar 未实装"
         },
         "commit_width": {
           "type": "integer",
-          "enum": [1, 2, 4],
+          "enum": [
+            1,
+            2,
+            4
+          ],
           "default": 1,
-          "description": "[M5-DSE 新增] 单 cycle commit 指令数"
+          "description": "[M5-DSE 新增] 单 cycle commit 指令数",
+          "x-chmem-supported": false,
+          "x-chmem-note": "superscalar 未实装"
         }
       },
-      "required": ["isa"],
+      "required": [
+        "isa"
+      ],
       "allOf": [
-        {"if": {"properties": {"enable_mmu": {"const": true}}}, "then": {"required": ["mmu_mode"]}},
-        {"if": {"properties": {"isa": {"enum": ["rv32i", "rv32im", "rv32imac"]}}}, "then": {"properties": {"mmu_mode": {"const": "sv32"}}}},
-        {"if": {"properties": {"pipeline_stages": {"const": 3}}}, "then": {"properties": {"branch_predictor": {"enum": ["static", "bimodal"]}}, "btb_entries": {"enum": [16, 32]}}},
-        {"if": {"properties": {"pipeline_stages": {"const": 7}}}, "then": {"properties": {"branch_predictor": {"enum": ["gshare", "tournament"]}}}}
+        {
+          "if": {
+            "properties": {
+              "enable_mmu": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "mmu_mode"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isa": {
+                "enum": [
+                  "rv32i",
+                  "rv32im",
+                  "rv32imac"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "mmu_mode": {
+                "const": "sv32"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "pipeline_stages": {
+                "const": 3
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "branch_predictor": {
+                "enum": [
+                  "static",
+                  "bimodal"
+                ]
+              }
+            },
+            "btb_entries": {
+              "enum": [
+                16,
+                32
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "pipeline_stages": {
+                "const": 7
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "branch_predictor": {
+                "enum": [
+                  "gshare",
+                  "tournament"
+                ]
+              }
+            }
+          }
+        }
       ]
     },
     "ports": {
       "type": "object",
       "description": "外部端口定义",
       "properties": {
-        "ibus": {"type": "object"},
-        "dbus": {"type": "object"},
-        "irq": {"type": "object"}
+        "ibus": {
+          "type": "object"
+        },
+        "dbus": {
+          "type": "object"
+        },
+        "irq": {
+          "type": "object"
+        }
       }
     },
     "stats": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": {
+        "type": "string"
+      },
       "description": "统计指标列表"
     }
   },
-  "required": ["name", "type", "params"],
-  "additionalProperties": false
+  "required": [
+    "name",
+    "type",
+    "params"
+  ],
+  "additionalProperties": false,
+  "x-chmem-extra-fields": {
+    "_comment": "CH_MEM 后端独有字段（不在 TLM 的 params 面）。权威解析器 = ip/cpu/configs/cpu_config_chmem_json.h；示例 = cpu_chmem_default.json",
+    "initial_pc": {
+      "type": "integer",
+      "default": 2147483648,
+      "description": "取指起始地址 (默认 0x80000000); MUST 4 字节对齐"
+    },
+    "enable_bp": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否注册 BranchPredictorPlugin"
+    },
+    "bp_uncond": {
+      "type": "boolean",
+      "default": true,
+      "description": "jal/j 建 BTB 项且恒 taken 预测"
+    }
+  }
 }
