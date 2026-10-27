@@ -16,7 +16,8 @@ review_by: 2026-12-15
 >
 > **来源**：2026-10-27 用户指令「先做 P2（JSON 配置）」+ 4 条架构建议的第 3 条（用 JSON 配置而非命令行 + 重新分析 DSE 支持）。
 >
-> **状态**：**代码已落地并通过 PR 层验收**（8 case 逐位等价）；**收尾（跑批 / 门禁 / 文档同步）未完成** ⇒ 见 §Acceptance 的未勾项。
+> **状态**：**代码已落地 + 已提交（9 commit）**；全量 parity **52/52 PASS** + 八门禁全绿 ⇒ ★ 仅剩
+> **CH_MEM binary 全套**（被外部机时争抢拖垮，待清场重跑）与**文档同步**，见 §Acceptance 的未勾项。
 >
 > ★ **2026-10-27 用户裁决：P2 剥离 `bp_gshare` 旋钮**（GShare 增量 3 净负收益 + D8/D10 未签批 ⇒ 其数据通路与开关**均不进 main**）⇒ 详见 §「`bp_gshare` 剥离决策」。
 >
@@ -107,10 +108,10 @@ P2 而不带 GShare**（HEAD 版的 BP 插件 ctor 只接受 2 个参数）。
 
 | # | 待办 | 说明 |
 |---|---|---|
-| 10 | **提交** | 全部改动仍在工作树；建议按 `CONTRIBUTING.md` §3.1 分文件粒度 commit |
-| 11 | **全量 52 case parity 复跑** | 本轮只跑 PR 层 8 case（等价性已证）；全量 52 case ≈ 50 min |
-| 12 | **CH_MEM binary 全套测试** | `chipforge_tests_chmem`（≈833 s）；本轮**被中断未跑完** |
-| 13 | **八门禁复跑** | `verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / fragments / 4 个 openspec validate |
+| 10 | ~~**提交**~~ | ✅ 已提交 9 commit（按 `CONTRIBUTING.md` §3.1 分文件粒度） |
+| 11 | ~~**全量 52 case parity 复跑**~~ | ✅ **52/52 PASS**（48 ELF 一轮 PASS；branchbench 4/4 清场后重跑 PASS） |
+| 12 | **CH_MEM binary 全套测试** | `chipforge_tests_chmem`（≈833 s）；两轮均被外部争抢拖垮 ⇒ ★ 清场后重跑 |
+| 13 | ~~**八门禁复跑**~~ | ✅ 全绿（`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / fragments / 4 个 openspec validate） |
 | 14 | **文档同步** | 契约 §7 覆盖矩阵增行（S-14 报告字段已加 `cpu_config`）· ADR-089 提及配置面 · roadmap `feat-backend-parity-gate` 进度 |
 
 ### Out of Scope（明确不做）
@@ -158,7 +159,7 @@ P2 而不带 GShare**（HEAD 版的 BP 插件 ctor 只接受 2 个参数）。
 
 - **P2 是 P5 的硬前置**：sweep 引擎要换 CH_MEM 后端 ⇒ 必须先有 JSON 配置面 + `--config` 入口
 - **P2 是 P4（VerilatorBackend 接入）的输入准备**：`set_backend` 路线需要参数经配置面传递
-- **P2 零语义风险**：纯重构，验收标准 = 52 case 逐位不变（已用 PR 层 8 case 证明）
+- **P2 零语义风险**：纯重构，验收标准 = 52 case 逐位不变（★ 已全量验证：**52/52 PASS**，determinism 指纹与 A3 基线逐位相同）
 
 ### 预期收益
 
@@ -248,13 +249,30 @@ struct CpuConfigChmem {
 - [x] **既有 schema 测试零影响**（14 case / 171 assertions 全绿）
 - [x] **TLM binary `[cpu]` + `[cpu-configs]` 全绿**（164 case / 913 assertions）
 - [x] **门禁自检 13/13**（`--self-test` 未受影响）
+- [x] **提交**（9 个 commit，按 `CONTRIBUTING.md` §3.1 分文件粒度）
+- [x] **全量 52 case parity 复跑 = 52/52 PASS**（`--layer night --jobs 4`）—— 48 ELF 一轮跑完全 PASS；
+  4 个 branchbench 因**外部进程争抢机时**首轮 `runner_error=TIMEOUT`（见下「TIMEOUT 排查」），
+  清场后单独重跑 **4/4 PASS**（`partial` 语义正确标 `vacuous=['tohost','cycles']`）
+- [x] **八门禁全绿**（`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / `rddf roadmap validate-fragments` / 4 个 `openspec change validate`）
+
+#### ★ TIMEOUT 排查（2026-10-27，结论：机时争抢，非回归）
+
+| 证据 | 值 |
+|---|---|
+| determinism 指纹 | `node_count = 2437` / `names_hash = 0ceb2fb11ea8016f`（= A3 基线，**逐位相同**） |
+| 网表行数 | 5531（= A3 基线） |
+| `branchbench_m0` 观测 | 与 A3 首跑 `m0_20k.sim.json` **7 个观测量全部逐位相同** |
+| sim vs vl（4 档） | **IDENTICAL**（`tohost`/`regs`/`cycles`/`pchash`/`memsig`/`memsig_updates` 全等） |
+| 首轮超时原因 | `--timeout-s 3600` 被 4 路 sim + `chipforge_tests_chmem` + **外部 CppHDL perf 套件**（load average 8.96→15.87）争抢；sim 单档满核需 ~2222 s，实际只拿到 ~52% CPU ⇒ >3600 s |
+| 复跑参数 | `--timeout-s 5400`、清场后 4 路独占 ⇒ 全 PASS |
+
+★ **遗留改进项（另开）**：门禁的 `--timeout-s` 是**全局单一超时**，而 `branchbench` 单档满核就需 ~2222 s
+（余量仅 1.6×）⇒ 任何机时争抢都会误报 TIMEOUT。应改为「按 `max_cycles` 与实测吞吐推导」的 per-kind 超时。
 
 ### ⬜ 未达成（★ 下一会话的待办）
 
-- [ ] **提交**（按 `CONTRIBUTING.md` §3.1 分文件粒度；★ `cpu_factory_chmem.h` 用 `git add -p` 挑块，避开 GShare WIP）
-- [ ] **全量 52 case parity 复跑**（`--layer night --jobs 4` ≈ 50 min）⇒ 报告应 **52/52 PASS**，与 A3 首跑（`openspec/changes/backend-parity-corpus/first-run-evidence.md`）的「既存分歧清单 = 空」结论一致
-- [ ] **CH_MEM binary 全套测试**（`chipforge_tests_chmem` ≈ 833 s；★ 本轮被中断）
-- [ ] **八门禁全绿**（`verify_adr` / `verify_plugin_decision` / `check_plugin_portability` / `doc_link_check` / `roadmap-r9-check` / `rddf roadmap validate-fragments` / 4 个 `openspec change validate`）
+- [ ] **CH_MEM binary 全套测试**（`chipforge_tests_chmem`）—— 两次均被外部争抢拖到不可用
+  （首轮 `timeout 1500` 误杀；次轮 63 min 仅 48% CPU）⇒ ★ **在 main 上清场后重跑**
 - [ ] **文档同步**：契约 §7 覆盖矩阵增行（`--cpu-config` 落点）· ADR-089 补「配置面」段 · `feat-backend-parity-gate` 进度更新
 - [ ] **`ip/cpu/README.md` 补「CH_MEM 配置面」章节**（当前 README 只讲 TLM 侧用法）
 
@@ -318,7 +336,7 @@ struct CpuConfigChmem {
 | # | 风险 | 触发 | 缓解 |
 |---|---|---|---|
 | R1 | **误提交 GShare WIP** | 提交时 `git add` 整个 `cpu_factory_chmem.h` | `git add -p` 逐块；提交前 `git diff --cached` 复核 |
-| R2 | **全量 parity 复跑发现配置路径的隐性差异** | 52 case 中某个 case 的配置敏感 | 本轮 PR 层 8 case 已覆盖 ALU/branch/load/store/M 四类；branchbench 4 档待复跑覆盖 |
+| R2 | **全量 parity 复跑发现配置路径的隐性差异** | 52 case 中某个 case 的配置敏感 | ★ **已闭合**：全量 52/52 PASS（含 branchbench 4 档），determinism 指纹 = A3 基线 |
 | R3 | **schema 的 `x-chmem-supported` 与拒绝表漂移** | 后续新增字段 | 测试「schema false ⊆ 拒绝表 且 拒绝表 ∩ 支持字段 = ∅」双向钉住 |
 | R4 | **两套配置面长期漂移** | TLM 侧新增字段时忘同步 | 已登记为 Impact 负面项 1；后续可考虑让 TLM 侧也走 `x-chmem-supported` 标注 |
 
