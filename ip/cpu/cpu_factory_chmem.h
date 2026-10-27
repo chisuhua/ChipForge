@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -55,6 +56,13 @@ using namespace cf::cpu::arch::riscv;
 #ifndef CF_PLUGIN_USE_CH_MEM
 #include "ip/cpu/plugins/mmu_exception_handler.h"
 #endif
+
+// P2 (2026-10-27): CH_MEM 配置结构。★ 只含 struct + 值域校验, **零外部依赖**
+//   (不含 nlohmann)。JSON 解析在 ip/cpu/configs/cpu_config_chmem_json.h,
+//   仅由需要读配置文件的调用方 include ⇒ 本头文件不被 nlohmann 污染。
+//   ★ MUST 在 `#ifndef CF_PLUGIN_USE_CH_MEM` 之外 —— CH_MEM 构建下那段
+//     根本不编译, 放进去会导致 CpuConfigChmem 不可见。
+#include "ip/cpu/configs/cpu_config_chmem.h"
 
 namespace cf {
 namespace cpu {
@@ -476,6 +484,51 @@ class CpuFactoryChmem {
 
     pb->build();
     return pb;
+  }
+
+  // ==========================================================================
+  // build_cpu (config 重载) — P2 (2026-10-27)
+  //
+  // 把 12 个位置参数收敛成一个 CpuConfigChmem。语义与位置参数版本**逐位等价**:
+  //   cfg.initial_pc   → initial_pc
+  //   cfg.enable_mmu   → enable_mmu       (true ⇒ plumbing-only no-op log)
+  //   cfg.mmu_mode     → mmu_mode
+  //   cfg.enable_cache → enable_cache     (true ⇒ throw)
+  //   cfg.enable_bp    → enable_bp
+  //   cfg.btb_entries  → btb_entries      (★ 显式传值, 不再是 nullopt)
+  //   cfg.bp_uncond    → bp_uncond
+  //
+  // ★ **不含 bp_gshare** —— GShare 增量 3 未签批 (净负收益, ADR-088 §5.3.3 C-3
+  //   不满足) ⇒ 其开关不进配置面 (见 cpu_config_chmem.h 文件头)。
+  //
+  // ★ `preload_elf` 不单独设开关: 由 `elf_image.empty()` 推导。
+  //   原 12 参版是 `preload_elf && !elf_image.empty()`, 二者等价
+  //   (elf_image 为空时 preload_elf 无意义) ⇒ 消除 "preload_elf=true 但
+  //   elf_image 空" 的歧义态。
+  //
+  // ★ 本重载**额外做值域校验** (validate_cpu_config_chmem) ⇒ 非法 btb_entries /
+  //   mmu_mode / initial_pc 对齐 在这里 fail-fast。旧 12 参版**不做**(保持
+  //   既有调用方的行为逐位不变, 校验责任仍在调用方)。
+  // ==========================================================================
+  static std::unique_ptr<PipeBuilder> build_cpu(
+      ch::core::context* elaboration_ctx,
+      const CpuConfigChmem& cfg,
+      const std::vector<uint8_t>& elf_image = {}) {
+    const std::string verr = validate_cpu_config_chmem(cfg);
+    if (!verr.empty()) {
+      throw std::invalid_argument("CpuFactoryChmem::build_cpu(config): " + verr);
+    }
+    return build_cpu(elaboration_ctx,
+                     /*memory=*/nullptr,
+                     T{cfg.initial_pc},
+                     /*preload_elf=*/!elf_image.empty(),
+                     elf_image,
+                     cfg.enable_mmu,
+                     cfg.mmu_mode,
+                     cfg.enable_cache,
+                     cfg.enable_bp,
+                     cfg.btb_entries,
+                     cfg.bp_uncond);
   }
 
   // ==========================================================================
