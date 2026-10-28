@@ -30,6 +30,11 @@
 //
 //   ⑤ **握手成本**：从设备 MUST 可将 `ready` 恒真（退化为无阻塞流）
 //      ⇒ ★ MUST 暴露 `fire()` 语义（D3a.2 的「两档分别测时序」判据依赖它）
+//
+//   ⑥ ★ **写语义完备**（ADR-091 v1.7）：★ `size`（3 bit）MUST 存在
+//      ⇒ 表达访问字节宽度（1/2/4/8）⇒ 从设备做 byte-strobe RMW
+//      ⇒ ★ CPU 侧不做 RMW ⇒ 写不依赖读响应 ⇒ 写无延迟
+//      ⇒ ⇒ **无需 stall / forwarding**（★ 推导见 plan §K16）
 // ---------------------------------------------------------------------------
 
 #include "catch_amalgamated.hpp"
@@ -65,12 +70,16 @@ TEST_CASE("bus_iface: CpuBusReq field widths all <= 64 bit (ADR-091 H-1)",
   REQUIRE(CpuBusReq::kDataWidth <= 64);
   REQUIRE(CpuBusReq::kIdWidth <= 64);
   REQUIRE(CpuBusReq::kBurstLenWidth <= 64);
+  // ★ v1.7：`size`（访问字节宽度）—— 3 bit ⇒ 远低于 64 bit 上限
+  REQUIRE(CpuBusReq::kSizeWidth <= 64);
 
   // ★ 编译期钉住「不得再加宽」
   static_assert(CpuBusReq::kAddressWidth <= 64,
                 "address MUST stay <= 64 bit (VerilatorBackend PortBitwidthOverflow)");
   static_assert(CpuBusReq::kDataWidth <= 64,
                 "data MUST stay <= 64 bit (VerilatorBackend PortBitwidthOverflow)");
+  static_assert(CpuBusReq::kSizeWidth <= 64,
+                "size MUST stay <= 64 bit (VerilatorBackend PortBitwidthOverflow)");
   SUCCEED("H-1 宽度纪律生效");
 }
 
@@ -126,6 +135,39 @@ TEST_CASE("bus_iface: direction semantics — master out / slave in", "[bus-ifac
   }
 
   SUCCEED("④ 方向语义契约生效");
+}
+
+TEST_CASE("bus_iface: write semantics are complete — size expresses byte width "
+          "(ADR-091 v1.7)",
+          "[bus-iface][chmem]") {
+  // ★★ **v1.7 的契约缺口修复**：★ 原字段清单（address/data/burst_len/id/
+  //   is_write）**无法表达 sub-word store**（`sb`/`sh`）—— 从设备不知道
+  //   该写几个字节 ⇒ ★ 加 `size`（3 bit）⇒ 从设备按 `address` 低 2 位
+  //   + `size` 推 byte-strobe ⇒ ★ **CPU 侧不做 RMW** ⇒ 写**不依赖读响应**
+  //   ⇒ ⇒ **写无延迟**（★ 与预载核同拍生效）⇒ ⇒ **无需 stall / forwarding**。
+  //
+  // ★ 本 case 钉住三件事：
+  //   ① `size` 存在且是 `ch::core::ch_uint`（CH_MEM-only）
+  //   ② `size` 的**位宽足够表达 1/2/4/8**（3 bit ⇒ 0..7 ⇒ 覆盖 1/2/4/8）
+  //   ③ `size` MUST 出现在 `CH_BUNDLE_FIELDS_T` 的展开里（⇒ 逐字段端口
+  //      展开时会带上它 ⇒ Verilator 侧可读）
+  static_assert(std::is_same_v<decltype(CpuBusReq::size),
+                               ch::core::ch_uint<CpuBusReq::kSizeWidth>>,
+                "size MUST be ch::core::ch_uint (CH_MEM-only)");
+  // ★ 3 bit ⇒ 可表达 0..7 ⇒ MUST 覆盖 1/2/4/8 四种字节宽度
+  static_assert(CpuBusReq::kSizeWidth >= 3,
+                "size MUST be wide enough to express 1/2/4/8 byte widths");
+  REQUIRE(CpuBusReq::kSizeWidth >= 3);
+
+  // ★ ③ 字段必须进入 bundle 的字段元信息（⇒ 逐字段端口展开会带上它）
+  ch::core::context ctx("write_semantics");
+  {
+    ch::core::ctx_swap guard(&ctx);
+    CpuBusReq req;
+    req.as_master_direction();  // ★ MUST NOT 抛（G-1g：MUST 在 ctx 保护内）
+  }
+
+  SUCCEED("⑥ 写语义完备：`size` 存在 + 位宽足够 + 进入 bundle 字段元信息");
 }
 
 TEST_CASE("bus_iface: ready-constant-high degrades to a non-blocking stream",

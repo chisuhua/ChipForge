@@ -71,6 +71,19 @@ bool port_declared_in_verilog(const std::string& verilog_path,
 
 }  // namespace
 
+
+/// ★ 解包 `Result<Port>`（★ ADR-047：静态配置头禁 throw ⇒ 端口声明走
+///   `Result`）⇒ ★ 失败即 fail-closed（★ 不产生「半成品端口对象」）
+///
+/// ★★★ **MUST 按值返回**（★ 不可返回引用）：★ `Result<P>` 是**临时对象**
+///   ⇒ ★ 若返回 `*r`（引用）⇒ ★ 引用悬垂（★ full-expression 结束后临时对象
+///   ★ 析构 ⇒ ★ 端口节点的 `impl_` 随之失效 ⇒ ★ 端口「消失」⇒ 假绿）
+///   ⇒ ★ 按值返回 + C++17 copy elision ⇒ ★ 不触发 `port` 的 deleted 拷贝赋值
+template <typename P>
+P must(cf::plugin::Result<P> r) {
+  REQUIRE(r.has_value());
+  return *r;
+}
 TEST_CASE("ports: bare ctx can declare top-level ch_in/ch_out (ADR-091 G-1 A)",
           "[ports][chmem]") {
   ch::core::context ctx("port_probe");
@@ -129,8 +142,8 @@ TEST_CASE("ports: PipeBuilder declare_in/out land in netlist top-level ports",
   ch::core::context ctx("pb_ports");
   cf::plugin::PipeBuilder pb(&ctx);
 
-  auto cpu_req = pb.declare_out<ch::core::ch_uint<32>>("cpu_req");
-  auto cpu_rsp = pb.declare_in<ch::core::ch_uint<32>>("cpu_rsp");
+  auto cpu_req = must(pb.declare_out<ch::core::ch_uint<32>>("cpu_req"));
+  auto cpu_rsp = must(pb.declare_in<ch::core::ch_uint<32>>("cpu_rsp"));
   REQUIRE(cpu_req.impl() != nullptr);
   REQUIRE(cpu_rsp.impl() != nullptr);
 
@@ -152,11 +165,17 @@ TEST_CASE("ports: PipeBuilder declare_in/out land in netlist top-level ports",
 TEST_CASE("ports: PipeBuilder with null ctx fails closed on declare", "[ports][chmem]") {
   // ★ G-1c：ctx 为 null MUST 抛异常 —— MUST NOT 静默不建节点
   //   （ch_logic_in 构造是 `if (ctx) {...}` ⇒ 无 ctx 时静默跳过 ⇒ 假绿通道）
+  // ★★★ **v1.8 修正**：★ 原实现是 `throw PluginException` ⇒ ★ 违反 ADR-047
+  //   Check 10（静态配置头文件禁 throw）⇒ ★ 改为返回
+  //   `std::unexpected(PluginError::NullContextPtr)` ⇒ ★ **fail-closed 语义
+  //   不变**（★ 调用方拿不到端口 ⇒ 不会静默不建节点 ⇒ 假绿通道仍堵死）。
   cf::plugin::PipeBuilder pb(nullptr);
-  REQUIRE_THROWS_AS(pb.declare_in<ch::core::ch_uint<32>>("null_in"),
-                    cf::plugin::PluginException);
-  REQUIRE_THROWS_AS(pb.declare_out<ch::core::ch_uint<32>>("null_out"),
-                    cf::plugin::PluginException);
+  const auto r_in = pb.declare_in<ch::core::ch_uint<32>>("null_in");
+  REQUIRE_FALSE(r_in.has_value());
+  REQUIRE(r_in.error() == cf::plugin::PluginError::NullContextPtr);
+  const auto r_out = pb.declare_out<ch::core::ch_uint<32>>("null_out");
+  REQUIRE_FALSE(r_out.has_value());
+  REQUIRE(r_out.error() == cf::plugin::PluginError::NullContextPtr);
 }
 
 TEST_CASE("ports: G-1d — driven ch_in is not a top-level port", "[ports][chmem]") {

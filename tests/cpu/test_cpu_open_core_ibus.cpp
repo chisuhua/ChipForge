@@ -69,18 +69,31 @@ std::uint32_t read_out(const ch::Simulator& sim,
 
 }  // namespace
 
+
+/// ★ 解包 `Result<Port>`（★ ADR-047：静态配置头禁 throw ⇒ 端口声明走
+///   `Result`）⇒ ★ 失败即 fail-closed（★ 不产生「半成品端口对象」）
+///
+/// ★★★ **MUST 按值返回**（★ 不可返回引用）：★ `Result<P>` 是**临时对象**
+///   ⇒ ★ 若返回 `*r`（引用）⇒ ★ 引用悬垂（★ full-expression 结束后临时对象
+///   ★ 析构 ⇒ ★ 端口节点的 `impl_` 随之失效 ⇒ ★ 端口「消失」⇒ 假绿）
+///   ⇒ ★ 按值返回 + C++17 copy elision ⇒ ★ 不触发 `port` 的 deleted 拷贝赋值
+template <typename P>
+P must(cf::plugin::Result<P> r) {
+  REQUIRE(r.has_value());
+  return *r;
+}
 TEST_CASE("open_core: ibus ports reach netlist top level (ADR-091 S3-1)",
           "[open-core][chmem]") {
   ch::core::context ctx("open_core_ports");
   cf::plugin::PipeBuilder pb(&ctx);
 
   // ★ 端口由装配层统一声明（顶层接口，MUST NOT 由 plugin 各自散着声明）
-  auto req_addr  = pb.declare_out<ch::core::ch_uint<32>>("imem_req_addr");
-  auto req_valid = pb.declare_out<ch::core::ch_uint<1>>("imem_req_valid");
-  auto req_ready = pb.declare_in<ch::core::ch_uint<1>>("imem_req_ready");
-  auto rsp_data  = pb.declare_in<ch::core::ch_uint<32>>("imem_rsp_data");
-  auto rsp_valid = pb.declare_in<ch::core::ch_uint<1>>("imem_rsp_valid");
-  auto pc_port   = pb.declare_out<ch::core::ch_uint<32>>("open_pc");
+  auto req_addr  = must(pb.declare_out<ch::core::ch_uint<32>>("imem_req_addr"));
+  auto req_valid = must(pb.declare_out<ch::core::ch_uint<1>>("imem_req_valid"));
+  auto req_ready = must(pb.declare_in<ch::core::ch_uint<1>>("imem_req_ready"));
+  auto rsp_data  = must(pb.declare_in<ch::core::ch_uint<32>>("imem_rsp_data"));
+  auto rsp_valid = must(pb.declare_in<ch::core::ch_uint<1>>("imem_rsp_valid"));
+  auto pc_port   = must(pb.declare_out<ch::core::ch_uint<32>>("open_pc"));
 
   // ★ PluginBase 的拷贝/移动构造均被 delete ⇒ plugin MUST 用
   //   「make_unique + 构造后注入」的标准用法（与 cpu_factory_chmem.h 同款）
@@ -113,12 +126,12 @@ TEST_CASE("open_core: ibus fetches over ports without any ELF preload "
   ch::core::context ctx("open_core_fetch");
   cf::plugin::PipeBuilder pb(&ctx);
 
-  auto req_addr  = pb.declare_out<ch::core::ch_uint<32>>("imem_req_addr");
-  auto req_valid = pb.declare_out<ch::core::ch_uint<1>>("imem_req_valid");
-  auto req_ready = pb.declare_in<ch::core::ch_uint<1>>("imem_req_ready");
-  auto rsp_data  = pb.declare_in<ch::core::ch_uint<32>>("imem_rsp_data");
-  auto rsp_valid = pb.declare_in<ch::core::ch_uint<1>>("imem_rsp_valid");
-  auto pc_port   = pb.declare_out<ch::core::ch_uint<32>>("open_pc");
+  auto req_addr  = must(pb.declare_out<ch::core::ch_uint<32>>("imem_req_addr"));
+  auto req_valid = must(pb.declare_out<ch::core::ch_uint<1>>("imem_req_valid"));
+  auto req_ready = must(pb.declare_in<ch::core::ch_uint<1>>("imem_req_ready"));
+  auto rsp_data  = must(pb.declare_in<ch::core::ch_uint<32>>("imem_rsp_data"));
+  auto rsp_valid = must(pb.declare_in<ch::core::ch_uint<1>>("imem_rsp_valid"));
+  auto pc_port   = must(pb.declare_out<ch::core::ch_uint<32>>("open_pc"));
 
   // ★ PluginBase 的拷贝/移动构造均被 delete ⇒ plugin MUST 用
   //   「make_unique + 构造后注入」的标准用法（与 cpu_factory_chmem.h 同款）
