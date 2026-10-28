@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）**；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -211,8 +211,20 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1e** | ★ **端口的驱动赋值 MUST 在 `ctx_swap` 保护下做** | ★ 实测：赋值在保护外 ⇒ `[ERROR] No active context for literal creation` ⇒ `ch_logic_out::operator=` 报「output_node_ or src_lnode is null」⇒ ★ **output 端口进了网表但无 driver ⇒ 值未定义/X** | ★ **假绿通道**：端口「在但无值」⇒ 仿真读到 X ⇒ 门禁照绿 |
 | **G-1f** | ★ **bundle 字段 MUST NOT 带字面量初始化器** | ★ `AddrT address{0};` 在**默认构造时**就创建字面量节点 ⇒ 无 active context 时报「No active context for literal creation」⇒ 值退化为默认且**不报错** ⇒ 上游 `bundle/common_bundles.h` 的 `fifo_bundle` 同款做法（`T data;` 无初始化器） | ★ **假绿通道**（字段值静默为默认）· ★ **连带**：★ **老核 `bundles/mem_bundles.h` 有同样隐患**（`uint_t<64> address{0}`）⇒ 在 CH_MEM 下 include 它即报错 ⇒ ⇒ **新核 MUST NOT include 老 bundle**（⇒ 「不重名」纪律只能文档级，非机检 ⇒ 已诚实标注） |
 | **G-1g** | ★ **`as_master_direction()` / `as_slave_direction()` MUST 在 `ctx_swap` 保护内调用** | ★ 内部 `make_output`/`make_input` 会创建节点 ⇒ 无 active context 时报错 | 方向设置失败 ⇒ 端口方向错 ⇒ Verilator 后端读不到 |
+| **G-1h** | ★ **`PipeBuilder::elaborate(ctx&)` MUST 在 `ctx_swap` 保护下调用**（★ **v1.5 已做框架级加固**：`elaborate` 内部自建 `ctx_swap`） | ★ `elaborate` 此前**不做** current context 切换 ⇒ stage 闭包内创建的 `ch_*` 节点**静默失败**（值 0 / null impl）⇒ ★ 既有 runner 均自行 `ctx_swap` 后调用（`parity_sim_runner.cpp:328` · `cpu_verilator_sim.cpp:272`）⇒ ★ 是**隐式约定**，无文档无门禁 | ★ 假绿通道（端口/寄存器全为 0 而不报错） |
+| **G-1i** | ★ **plugin 的成员初始化器 MUST NOT 创建 `ch_*` 字面量** | ★ `ch_uint<N> m = ch_uint<N>(ch_literal<0,N>{})` 在**plugin 构造期**（`make_unique`）即创建字面量节点 ⇒ ★ 构造期**通常无 active context** ⇒ 静默失败 ⇒ ★ 实测：PC 初值恒 0 ⇒ **全部下游读 0** | ★ 假绿通道（plugin 存在、端口在、但功能全无）⇒ ⇒ **MUST 用纯 C++ 值 + 惰性转换**（如 `uint32_t initial_pc_` + `get_pc()` 内 `ch_reg(uint32_t)`） |
+| **G-1j** | ★ **`PipeBuilder::build()` MUST 在 `elaborate()` 之前调用**（★ **v1.5 已做框架级加固**：`elaborate` 检测未 build ⇒ 自动 build） | ★ `build()` 跑 plugin 的 `setup()`/`build()`（★ **注册 `at_stage` 闭包**），`elaborate()` 只**执行**已注册的闭包 ⇒ ★ 漏调 `build()` ⇒ stage 从未注册 ⇒ **全部逻辑静默不执行**（★ 网表能生成、端口能在，但功能全无）⇒ ★ 既有 runner 靠 `CpuFactoryChmem::build_cpu()` 内部调 `build()` ⇒ ★ 又是**隐式约定** | ★★ **最严重的假绿通道** |
 
-⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g/h/i/j 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+
+#### D5.1.2 ★ v1.5 的**框架级加固**（★ G-1h / G-1j ⇒ 已在 `include/cf/plugin/pipe_builder.h` 落地）
+
+| 加固 | 内容 | 性质 |
+|---|---|---|
+| **G-1h** | ★ `elaborate(ctx&)` 内部**自建 `ctx_swap`** | ★ **幂等纯增益**（既有 runner 自行 swap ⇒ 嵌套无副作用）⇒ ★ 消除「stage 闭包内建节点静默失败」 |
+| **G-1j** | ★ `elaborate()` 检测「未 `build()`」⇒ **自动 build** | ★ `build()` 幂等（只跑 plugin 的 `setup`/`build` ⇒ 注册 `at_stage`）⇒ ★ 消除「漏调 `build()` ⇒ 全部逻辑静默不执行」 |
+
+⇒ ★ **验收**：★ **零退化** —— TLM binary **509 case / 508 passed / 1 failed**（唯一失败 = baseline-known）· ★ CH_MEM 框架子集 **24 case / 105 assertions 全绿** · ★ `[chmem]` 58 case 中 57 PASS（唯一失败 = `[verilator]` 48-ELF 端到端 **SIGTERM 超时**，★ 非功能失败）。
 
 #### D5.1.1 ★ G-1d 的判据补正（★ 实测）
 

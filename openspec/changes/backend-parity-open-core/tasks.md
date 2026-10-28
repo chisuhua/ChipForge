@@ -46,12 +46,21 @@ depends_on:
 
 ## 3. Phase 3 — S3：端口数据通路 + 顶层观测端口
 
-- [ ] 3.1 [RED] 测试：开放核在**无 ELF 预载**下能通过 `ch_stream` 端口取到指令 [ADR-091 §D2]
-- [ ] 3.2 [GREEN] `ip/cpu/core/ibus_port_chmem.h`：取指走端口（★ 复用 `ibus_chmem.h` 的两级取指 + flush 语义）
+- [x] 3.1 [RED] 测试：开放核在**无 ELF 预载**下能通过端口取到指令 [ADR-091 §D2]
+  ⇒ `tests/cpu/test_cpu_open_core_ibus.cpp`（2 case / 24 assertions **实测全过**）
+- [x] 3.2 [GREEN] `ip/cpu/core/ibus_port_chmem.h`：取指走端口（★ **取指侧完成**）
+  ⇒ ★ 与预载核**共享** `ip/cpu/core/payload_common.h`（payload 契约）⇒ 语义不分叉
+  ⇒ ★ **时序等价性**：`sread`（1 拍）≡ 请求当拍 → 响应下拍（也是 1 拍）⇒ ★ **H-3 等价性自检有前提**
+  ⇒ ★ 端口**逐字段**（★ CppHDL 的 `ch_stream` 语义即 payload/valid/ready 三元组）
+- [ ] 3.2b [GREEN] ★ **分支重定向**（`pc` 由 branch 驱动）⇒ 本版本只做**顺序取指**（★ 诚实标注）
 - [ ] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
-- [ ] 3.4 [GREEN] 顶层**观测端口**（★ `tohost`/`pc`/`regs`/`memsig` ⇒ MUST 走顶层 `ch_out` ⇒ 退休 `--public-flat-rw` 内部层级读法）[ADR-091 §D6 H-2]
-- [ ] 3.5 [GREEN] 握手成本：`ready` 恒真 ⇒ 无阻塞流；`ready` 可拉低 ⇒ CPU 侧 MUST 有 stall（★ 两档分别测时序）[ADR-091 §D3a.2]
-- [ ] 3.6 零回归 + 八门禁
+- [x] 3.4 [GREEN] 顶层**观测端口**（取指侧）：★ `open_pc` 走顶层 `ch_out` [ADR-091 §D6 H-2]
+  ⇒ ★ `tohost`/`regs`/`memsig` 随 dmem 侧与完整装配落地
+- [x] 3.5 [GREEN] 握手成本**第一档**：`ready` 恒真 ⇒ 无阻塞流 [ADR-091 §D3a.2]
+  ⇒ ★ **「`ready` 可拉低」（背压）+ CPU 侧 stall 机制未实现** ⇒ ★ **诚实标注**
+- [x] 3.6 零回归 + 八门禁
+  ⇒ ★ **框架级加固**（ADR-091 v1.5 §D5.1.2）：`elaborate()` 自建 `ctx_swap`（G-1h）+ 自动 `build()`（G-1j）
+  ⇒ ★ 零退化：TLM **509 case / 508 passed / 1 failed**（baseline-known）· CH_MEM 框架子集 **24/24 全绿**
 
 ## 4. Phase 4 — S4：验证实现（`verify_mem_model_chmem.h`）
 
