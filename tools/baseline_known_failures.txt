@@ -1,0 +1,50 @@
+# tools/baseline_known_failures.txt
+#
+# ★★★ **baseline-known 失败清单**（★ C1「旧产物顶替」假绿通道排查的产物）
+#
+# ---------------------------------------------------------------------------
+# ★ 语义（★ 由 `tools/run_catch2_with_baseline.sh` 强制）
+# ---------------------------------------------------------------------------
+# ★ 失败集合 **⊆ 本清单** ⇒ ★ 退出码 **0**（★ 「无新回归」）
+# ★ 失败集合 **⊋ 本清单** ⇒ ★ 退出码 **非 0**（★ 有**新回归** ⇒ fail-closed）
+# ★ ★ **纪律**：★ 清单条目**不是**「允许失败」的空白支票 ⇒ ★ 每条 MUST 附
+# ★   「根因 + owner + 收敛期限」⇒ ★ 清单本身也要被 review（★ 同 ADR-089
+# ★   例外白名单的纪律：★ 不得靠扩张清单来消红）。
+#
+# ★★★ **为何需要它**（★ C1 的实测结论）
+# ---------------------------------------------------------------------------
+# ★ `ctest` 的 `chipforge_tests` entry 跑的是**全量** Catch2 binary
+# ⇒ ★ 它包含下面的 baseline-known 失败 ⇒ ★ **该 entry 恒红**
+# ⇒ ⇒ ★ 「全量回归通过」这个信号**从来就不存在**
+# ⇒ ⇒ ★ 任何依赖 ctest 退出码的判断（CI / 脚本 / 人工）都在**误判**。
+# ⇒ ⇒ ★ 修法：★ 引入本清单 + `run_catch2_with_baseline.sh`（★ 判定「是否有
+# ★   **新**失败」而非「是否有任何失败」）⇒ ★ 让退出码**重新有意义**。
+#
+# ---------------------------------------------------------------------------
+# ★ 格式：★ 按 **binary** 分节（★ `[tlm]` / `[chmem]`）⇒ ★ 每节内每行一个
+#   Catch2 **test case 名**（不含 tag）⇒ ★ `#` 开头为注释
+#   ⇒ ★ 分节的意义：★ 「清单里有、本次未失败」的检查**只在对应 binary 内**做
+#   ⇒ ★ 否则跑 TLM 子集时会把 CH_MEM 的条目误报为「可能已修复」
+# ---------------------------------------------------------------------------
+
+[tlm]
+# ===== TLM binary（build/bin/chipforge_tests）=====
+#
+# 7stage_topology_from_config
+#   · 根因：★ **infra drift** —— `soc/cpu/.../cpu_superscalar.json` 的
+#     `enable_mmu=false` ⇒ ★ MMU 的 10 个 substage **不注册** ⇒ ★ 期望的
+#     `node_count == 17` 本身是**旧的**（实测 9）⇒ ★ **期望值过时**，非实现 bug
+#   · owner：ip/cpu（配置与期望值对齐）
+#   · 收敛：★ 待 superscalar 配置面与该期望值重新对齐后**删除本条**
+7stage_topology_from_config
+
+[chmem]
+# ===== CH_MEM binary（build/bin/chipforge_tests_chmem）=====
+#
+# cpphdl_poc_chbool_contextual_conversion
+#   · 根因：★ **上游 CppHDL** 的 `ch_bool` contextual conversion 的
+#     **context-pollution flake** ⇒ ★ **单跑 PASS / 全跑偶发 FAIL**
+#     （★ 与「旧产物顶替」无关 ⇒ ★ 是真实的顺序敏感 flake）
+#   · owner：★ upstream CppHDL（★ 归属 `poc-follow-up-fixes` change）
+#   · 收敛：★ 待上游修复或本地改用不依赖 context 的写法后**删除本条**
+cpphdl_poc_chbool_contextual_conversion
