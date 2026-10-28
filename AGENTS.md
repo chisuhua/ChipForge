@@ -212,7 +212,7 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 ```
 
 **CH_MEM 模式状态** (2026-10-27 HEAD 实测):
-- ✅ ★ **CH_MEM binary 全套 = ★ 198 case / 20674 assertions 全绿**（★ **2026-10-28 重建后实测**；★ 覆盖 `[chmem]` / `[framework]` / `[cpu]` / `[cpphdl]` / `[elaborate]` / `[verilator]` / `[mmu-verilator]` / `[keys]` / `[alu]` / `[mmu]` / `[cache]` / `[open-core]` / `[bus-iface]` 全部 family）
+- ✅ ★ **CH_MEM binary 全套 = ★ 202 case / 20686 assertions 全绿**（★ **2026-10-28 重建后实测**；★ 覆盖 `[chmem]` / `[framework]` / `[cpu]` / `[cpphdl]` / `[elaborate]` / `[verilator]` / `[mmu-verilator]` / `[keys]` / `[alu]` / `[mmu]` / `[cache]` / `[open-core]` / `[bus-iface]` 全部 family）
   ⇒ ★ **旧数字 164 case / 20133 assertions（2026-10-27）** ⇒ ★ 与 TLM 侧同因（★ **旧产物**）⇒ ★ 本轮重建后更新
   ⇒ ★ ★ **判定已改为 baseline-aware**（★ C1，2026-10-28）⇒ ★ 清单 = `tools/baseline_known_failures.txt` ⇒ ★ 只在出现**新**失败时退出码非 0
 - ✅ `[cpphdl]` 6/6 PASS (W0 PoC 完整链路)
