@@ -69,9 +69,9 @@
 //   ✗ **背压（`ready` 可拉低）**：★ 本版本只实现「`ready` 恒真」的无阻塞流
 //     ⇒ ★ `req_ready` 被读入但**不参与**任何决策（★ 恒真假设）
 //     ⇒ ★ ADR-091 §D3a.2 第 ③ 档 ⇒ ★ **显式登记为已知边界**
-//   ✗ **flush 抑制**：★ 预载核的 `is_store_active` 含 `!flush`
-//     ⇒ ★ 本版本**无 flush 源**（★ 分支重定向尚未实现 ⇒ 错路 store 不存在）
-//     ⇒ ★ **无 flush 语义**（★ 归 S3.2b）
+//   ✓ **flush 抑制**（★ S3.2b 已落地）：★ `we = is_store & !flush`
+//     ⇒ ★ `flush` 由 `ibus_port_chmem.h` 在 `fetch` stage 写（★ 打 1 拍）
+//     ⇒ ★ 错路 store 不写内存（★ 与预载核 `is_store_active` 的 `!flush` 同款）
 //   ✗ **MMU 翻译**：★ 地址取 `KT::RESULT`（vaddr）**直接**作字节地址
 //     ⇒ ★ Bare 模式（★ 与预载核的 `PADDR_VALID=false` 路径同款）
 //     ⇒ ★ Sv32 翻译归 `mmu-chmem-phase-b-c-launch`
@@ -109,6 +109,7 @@
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
 // ★ payload 契约（★ 与预载核**共享** ⇒ 新旧核语义不分叉 —— ADR-091 §D1）
+#include "ip/cpu/core/branch_iface_chmem.h"
 #include "ip/cpu/core/payload_common.h"
 
 namespace cf {
@@ -325,9 +326,36 @@ class DMemPortPlugin : public cf::plugin::PluginBase {
     //   ★   ⇒ 2 处 FAILED：★ **写使能恒 0**（写请求发不出去 ⇒ 最坏假绿：
     //   ★   端口在、值全 0）+ ★ **符号扩展失效**（零扩展冒充符号扩展））
     //   ★ ⇒ ★ MUST 用**节点级 `select()`**（mux）替代 `?:`。
+    // ★★★ **错路 store MUST 被抑制**（★ ADR-091 §D3a.5 ③ —— S3.2b）
+    //   ★ 语义：`we = is_store & !flush`
+    //   ★ `flush` 由 **ibus** 在 `fetch` stage 写（★ 打 1 拍 ⇒ 与发布的
+    //     `(PC, INSTRUCTION)` 对齐）⇒ ★ 本 stage（`memory`）读 ⇒ ★ 可见
+    //     （★ `fetch` 的 stage 首现序早于 `memory` —— ADR-040 v3.0 §10.6）
+    //   ★ ★ **fail-open + 显式登记**（ADR-091 §D3a.5 ④）：★ 读不到 `FLUSH`
+    //     （★ 只装 dmem 不装 ibus 的合法形态，如本文件的单测）⇒ ★ 视为 0
+    //     ⇒ ★ 该风险由 **A6 的 H-3 等价性自检**兜底（终值 `memsig` 会不等）
+    namespace BK = cf::cpu::core::branch_keys;
+    ch::core::ch_bool flush_now = ch::core::ch_bool(ch::core::operator==(
+        ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}),
+        ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{})));
+    if (auto* fch = pb.node_of_logic_stage("fetch").get()) {
+      if (fch->payloads().has(BK::FLUSH)) {
+        flush_now = fch->operator()(BK::FLUSH);
+      }
+    }
+    // ★★★ **`we = is_store ? (flush ? 0 : 1) : 0`**（★ 纯嵌套 `select`）
+    //   ★ 纪律（★ 本轮实测踩坑 —— G-1m 同族）：
+    //     · **MUST NOT** 用 `ch_uint<1>(ch_bool)` 做布尔取反
+    //       ⇒ ★ 该构造会读 C++ 侧值 ⇒ ★ 节点**折成常量** ⇒ ★ 抑制静默失效
+    //     · **MUST NOT** 用混宽 `operator&(ch_bool, ch_uint<1>)`
+    //       ⇒ ★ 结果宽度/语义依赖模板推导 ⇒ ★ 可读性差
+    //   ★ ⇒ ★ 两层 `select`，cond 用 `ch_bool`，分支用 `ch_uint<1>` ⇒ 无歧义。
+    const auto not_flushed = ch::core::ch_uint<1>(ch::core::select(
+        flush_now, ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}),
+                   ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{})));
     get_we_reg() <<= ch::core::ch_uint<1>(ch::core::select(
-        is_store, ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{}),
-                 ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{})));
+        is_store, not_flushed,
+        ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{})));
     get_off_reg() <<= byte_off;
     // ★★★ **MUST 显式转 `ch_uint<1>`**（★ 实测约束 G-1p）：★
     //   `ch_reg<ch_uint<1>> <<= ch_bool` 的类型路径与 `ch_uint<1>` **不同**

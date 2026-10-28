@@ -68,6 +68,7 @@
 
 #include "cf/plugin/payload.h"
 // ★ payload key 契约（★ 与预载核**共享** ⇒ 新旧核语义不分叉 —— ADR-091 §D1）
+#include "ip/cpu/core/branch_iface_chmem.h"
 #include "ip/cpu/core/payload_common.h"
 #include "cf/plugin/pipe_builder.h"
 #include "cf/plugin/plugin_base.h"
@@ -94,6 +95,8 @@ struct IBusPortPorts {
   ch::core::ch_in<ch::core::ch_uint<1>>*   rsp_valid = nullptr;  // 响应有效
   // ── 观测（顶层端口 ⇒ ADR-091 §D6 H-2）──
   ch::core::ch_out<ch::core::ch_uint<32>>* pc = nullptr;         // 当前 PC（逐拍）
+  /// ★ 「本拍发布的指令是错路」⇒ 供 dmem 抑制 store（ADR-091 §D3a.5 ③）
+  ch::core::ch_out<ch::core::ch_uint<1>>* flush = nullptr;
 };
 
 // ============================================================================
@@ -124,6 +127,14 @@ class IBusPortPlugin : public cf::plugin::PluginBase {
     // ★ fetch NORMAL：发请求 + 收响应（★ 与预载核同 stage 同 phase ⇒ 时序对齐）
     pb.at_stage("fetch", cf::plugin::Phase::NORMAL,
                 [this, &pb] { this->fetch(pb); });
+    // ★★★ branch LATE：**pc 重定向**（★ ADR-091 §D3a.5 —— S3.2b）
+    //   ★ MUST 用 `branch` stage 的 **LATE** phase（★ 与预载核同款）：
+    //     · `canonical_stage_order()` 只看 stage 名字**首现序**
+    //       ⇒ ★ 若放 `fetch LATE`，它会排在 `branch NORMAL` **之前**
+    //       ⇒ ★ 读不到本拍 branch 的结果（★ 滞后一拍 ⇒ 多 1 拍错路）
+    //     · `branch LATE` 保证晚于 branch 生产者的 NORMAL/EARLY
+    pb.at_stage("branch", cf::plugin::Phase::LATE,
+                [this, &pb] { this->update_pc(pb); });
   }
 
   void build(cf::plugin::PipeBuilder&) override {}
@@ -134,6 +145,11 @@ class IBusPortPlugin : public cf::plugin::PluginBase {
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> pc_lag_reg_;
   /// ★ 响应打拍（对齐 `sread` 的 1 拍语义 —— 见文件头「时序等价性」）
   std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<32>>> instr_reg_;
+  /// ★★ `FLUSH` 打拍（★ ADR-091 §D3a.5 ③ 的 1 拍对齐）
+  ///   ★ 拍 N 的 `taken=1` ⇒ 拍 N 取到的是**顺序地址 A+4**（错路，已在飞）
+  ///   ⇒ ★ 拍 N+1 才发布它的 `(PC, INSTRUCTION)` ⇒ ★ `FLUSH` MUST 在拍 N+1 有效
+  ///   ⇒ ★ 因此 MUST `flush_reg <<= branch_taken`
+  std::unique_ptr<ch::core::ch_reg<ch::core::ch_uint<1>>> flush_reg_;
 
   Ports ports_{};
   /// ★ 纯 C++ 值（★ 禁 `ch_uint` 成员初始化器 —— 见 `set_initial_pc` 注释）
@@ -154,6 +170,14 @@ class IBusPortPlugin : public cf::plugin::PluginBase {
           ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "open_pc_lag");
     }
     return *pc_lag_reg_;
+  }
+
+  ch::core::ch_reg<ch::core::ch_uint<1>>& get_flush_reg() {
+    if (!flush_reg_) {
+      flush_reg_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<1>>>(
+          ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}), "open_flush");
+    }
+    return *flush_reg_;
   }
 
   ch::core::ch_reg<ch::core::ch_uint<32>>& get_instr_reg() {
@@ -194,9 +218,64 @@ class IBusPortPlugin : public cf::plugin::PluginBase {
     // ★ 顶层观测端口（H-2）
     if (ports_.pc) *ports_.pc = pc_val;
 
-    // ── PC 递增（★ 本版本只做顺序取指；分支重定向待后续增量）──
+    // ── `FLUSH` 发布（★ ADR-091 §D3a.5 ③）──
+    // ★ 消费者 = dmem（`is_store & !flush`）⇒ ★ `fetch` 的 stage 首现序
+    //   早于 `memory` ⇒ ★ 可见性天然成立（ADR-040 v3.0 §10.6）
+    {
+      namespace BK = cf::cpu::core::branch_keys;
+      const auto flush_val = ch::core::ch_uint<1>(get_flush_reg());
+      n->operator()(BK::FLUSH) = ch::core::ch_bool(
+          ch::core::operator==(flush_val, ch::core::ch_uint<1>(
+              ch::core::ch_literal<1, 1>{})));
+      if (ports_.flush) *ports_.flush = flush_val;
+    }
+
+    // ── PC 锁存（★ `pc` 的 next 由 `update_pc` 在 `branch LATE` 决定）──
     pc_lag <<= pc_val;
-    pc <<= pc_val + ch::core::ch_uint<32>(ch::core::ch_literal<4, 32>{});
+  }
+
+  /// ★★ `branch LATE`：pc 重定向（★ ADR-091 §D3a.5 —— S3.2b）
+  ///
+  /// ★ 形态与预载核 `ibus_chmem.h::update_pc` 的**无 BP 路径同构**：
+  ///   `pc <<= select(branch_taken, branch_target, pc + 4)`
+  /// ★ 差异：★ 开放核**不读 BP 预测臂**（★ BP 归 `feat-bp-btb-gshare`）
+  ///   ⇒ ★ 两臂（taken / 顺序）足够 ⇒ ★ 语义更简单、无预测器耦合
+  void update_pc(cf::plugin::PipeBuilder& pb) {
+    namespace BK = cf::cpu::core::branch_keys;
+    auto& pc = get_pc();
+    auto& flush_reg = get_flush_reg();
+    const ch::core::ch_uint<32> pc_val(pc);
+
+    auto* brn = pb.node_of_logic_stage("branch").get();
+
+    // ★★ **fail-open + 显式登记**（★ ADR-091 §D3a.5 ④）：
+    //   ★ branch 节点不存在（★ A2/A4 分阶段装配 ⇒ 只装 ibus 不装 branch）⇒
+    //   ★ 退化为**顺序取指**（`taken=0`）⇒ ★ 与预载核
+    //   `brn == nullptr ⇒ br_taken = false` **同口径**
+    ch::core::ch_bool br_taken = ch::core::ch_bool(
+        ch::core::operator==(ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}),
+                             ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{})));
+    ch::core::ch_uint<32> br_target(
+        ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}));
+    if (brn && brn->payloads().has(BK::BRANCH_TAKEN)) {
+      br_taken = brn->operator()(BK::BRANCH_TAKEN);
+    }
+    if (brn && brn->payloads().has(BK::BRANCH_TARGET)) {
+      br_target = brn->operator()(BK::BRANCH_TARGET);
+    }
+
+    // ★ pc mux：★ taken ⇒ target；否则 ⇒ pc + 4
+    //   ★ MUST 用 `select()`（★ G-1m：`ch_bool` 禁用于 `?:`）
+    const auto pc_next = ch::core::ch_uint<32>(ch::core::select(
+        br_taken, br_target,
+        ch::core::ch_uint<32>(pc_val + ch::core::ch_uint<32>(
+            ch::core::ch_literal<4, 32>{}))));
+    pc <<= pc_next;
+
+    // ★★ `FLUSH` 打 1 拍（★ 见 `flush_reg_` 注释的 1 拍对齐推导）
+    flush_reg <<= ch::core::ch_uint<1>(ch::core::select(
+        br_taken, ch::core::ch_uint<1>(ch::core::ch_literal<1, 1>{}),
+        ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{})));
   }
 };
 
