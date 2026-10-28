@@ -53,11 +53,33 @@ depends_on:
   ⇒ ★ **时序等价性**：`sread`（1 拍）≡ 请求当拍 → 响应下拍（也是 1 拍）⇒ ★ **H-3 等价性自检有前提**
   ⇒ ★ 端口**逐字段**（★ CppHDL 的 `ch_stream` 语义即 payload/valid/ready 三元组）
 - [ ] 3.2b [GREEN] ★ **分支重定向**（`pc` 由 branch 驱动）⇒ 本版本只做**顺序取指**（★ 诚实标注）
-- [ ] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
+- [x] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
+  ⇒ ★ **实现**：`ip/cpu/core/dmem_port_chmem.h` + `tests/cpu/test_cpu_open_core_dmem.cpp`
+    （★ **4 case / 92 assertions 实测全过**）⇒ ★ **8 个访存端口 + 1 个观测端口进网表顶层**
+  ⇒ ★ **时序形态**（★ ADR-091 v1.6 §D3a.4）：★ 请求侧**打 1 拍** ⇒ ★ 数据侧**组合消费**
+    ⇒ ⇒ ★ 消费拍 N+1 的数据对应地址拍 N（★ 「外部提前 1 拍供数」的机制依据，见 plan §K17.3）
+  ⇒ ★ **写语义完备**（★ ADR-091 v1.7）：★ 端口带 `size`（3 bit）⇒ ★ **从设备**做 byte-strobe RMW
+    ⇒ ★ CPU 侧**不做** RMW ⇒ ★ 写**无延迟** ⇒ ★ 无 load-after-store ⇒ ★ **无需 stall / forwarding**
+  ⇒ ★ **读语义与预载核逐位同构**（★ byte select 树同款：lb/lbu/lh/lhu/lw 的符号扩展与零扩展）
+  ⇒ ★★ **诚实标注（本版本**未**实现）**：
+    · ✗ **背压（`ready` 可拉低）+ CPU 侧 stall** ⇒ 只实现「`ready` 恒真」的无阻塞流（★ ADR-091 §D3a.2 第 ③ 档未实现）
+    · ✗ **flush 抑制**（★ 分支重定向未实现 ⇒ 错路 store 不存在 ⇒ 无 flush 语义）
+    · ✗ **MMU 翻译**（★ 地址取 `KT::RESULT`（vaddr）直接作字节地址 ⇒ **Bare 模式**）
+    · ✗ **`memsig` 观测**（★ ★ 开放核**不持有内存** ⇒ 核侧算不出「最终字」⇒ 观测来源 MUST 由**从设备 / host**承担 ⇒ 归 **S5 决策**）
 - [x] 3.4 [GREEN] 顶层**观测端口**（取指侧）：★ `open_pc` 走顶层 `ch_out` [ADR-091 §D6 H-2]
   ⇒ ★ `tohost`/`regs`/`memsig` 随 dmem 侧与完整装配落地
 - [x] 3.5 [GREEN] 握手成本**第一档**：`ready` 恒真 ⇒ 无阻塞流 [ADR-091 §D3a.2]
   ⇒ ★ **「`ready` 可拉低」（背压）+ CPU 侧 stall 机制未实现** ⇒ ★ **诚实标注**
+- [x] 3.7 [GREEN] ★ **ADR-047 合规修正**（★ S1 遗留缺陷，本轮发现）：★ `declare_in/out` 的
+  `throw PluginException` ⇒ 违反 ADR-047 Check 10 ⇒ **门禁红** ⇒ ★ 改 `Result<Port>` +
+  `std::unexpected(PluginError::NullContextPtr)` ⇒ ★ **fail-closed 语义不变**（★ ADR-091 §D5.1 **G-1c 修正**）
+  ⇒ ★ 调用面 = **3 个测试文件**（★ 生产代码零调用）
+- [x] 3.8 ★ **变异对照纪律**（★ ADR-091 v1.8 §D6 **V-9**）：★ 本轮 8 条候选「实测约束」
+  ⇒ ★ **变异对照裁决** ⇒ ★ **只有 2 条（G-1l / G-1m）** 配登记为硬约束 ⇒ ★ **4 条被证伪**
+  （★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ 全部不成立）
+  ⇒ ★ 证据见 `.rddf/plans/backend-parity-open-core.md` §K17
+  ⇒ ★ ★ **真实假失败根因 = 测试指令编码错误**（★ `funct3` 未落在 bits[14:12] ⇒ `lbu` 被解码成 `lb`）
+  ⇒ ★ ⇒ ★ **教训**：★ 假失败排查 FIRST 检查项 = **输入编码 / 期望值本身**（★ 不是实现）
 - [x] 3.6 零回归 + 八门禁
   ⇒ ★ **框架级加固**（ADR-091 v1.5 §D5.1.2）：`elaborate()` 自建 `ctx_swap`（G-1h）+ 自动 `build()`（G-1j）
   ⇒ ★ 零退化：TLM **509 case / 508 passed / 1 failed**（baseline-known）· CH_MEM 框架子集 **24/24 全绿**
