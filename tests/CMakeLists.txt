@@ -12,6 +12,21 @@ file(GLOB_RECURSE TEST_SOURCES
 # 修法: 后续 csr-chmem 完成后回头删除本 exclude block.
 list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_csr_chmem.cpp")
 
+# ★★★ ADR-091 v1.8（★ 修复「TLM binary 自 S1 起不可重建」的假绿）：
+#   ★ CH_MEM-only 测试文件（★ 用 `PipeBuilder::declare_in/out` / `elaborate()`
+#   ★ / `create_simulator()` ⇒ ★ 这些 API **只在 `#ifdef CF_PLUGIN_USE_CH_MEM`
+#   ★ 内存在**）⇒ ★ MUST NOT 进 TLM binary ⇒ ★ 否则 **TLM 编译失败**
+#   ★ ⇒ ★ TLM binary **无法重建** ⇒ ★ 「TLM 回归通过」变成**旧 binary 的假绿**。
+#   ★ ⇒ ★ 实测命中：★ `test_cpu_open_core_ibus.cpp` + `test_cpu_open_core_dmem.cpp`
+#   ★   （★ S3a / A1 引入）⇒ ★ TLM 目标 **111 个编译错误**。
+#   ★ ⇒ ★ 机制：★ 显式列出 ⇒ ★ 一次性排除 ⇒ ★ 且下方的 CMake 断言保证
+#   ★   「**排除集合 ⊆ CH_MEM binary 的源集合**」（★ 否则 CH_MEM 侧漏测试）。
+set(CHMEM_ONLY_TEST_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_ibus.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_dmem.cpp"
+)
+list(REMOVE_ITEM TEST_SOURCES ${CHMEM_ONLY_TEST_SOURCES})
+
 # 关键: cache + mmu 测试需要的实现 .cpp 源文件
 # 这些 .cpp 之前在 src/cf_plugin/CMakeLists.txt 中被显式编译进独立 test target
 # 单二进制模式下, 必须显式列出以确保链接找到符号
@@ -168,6 +183,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/schema/test_cpu_bus_iface.cpp
     # ADR-091 S3 (backend-parity-open-core): 开放核取指端口化契约
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_ibus.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_dmem.cpp
     # ADR-092 v1.2 §D3.1 Z-1：P2 的 CH_MEM 配置面契约测试（★ 实测确认 CH_MEM binary
     #   此前 0 个「chmem config」case ⇒ binary 归属盲区）
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/schema/test_cpu_config_chmem.cpp
@@ -179,6 +195,15 @@ set(CHMEM_TEST_SOURCES
 list(APPEND CHMEM_TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/catch2/catch_amalgamated.cpp"
 )
+
+# ★ ADR-091 v1.8：断言「CH_MEM-only 排除集合 ⊆ CH_MEM binary 的源集合」
+#   ⇒ ★ 防「TLM 排除了、CH_MEM 忘了加」⇒ ★ CH_MEM 侧漏测试（★ 假绿通道）
+foreach(_cf_chmem_only IN LISTS CHMEM_ONLY_TEST_SOURCES)
+  if(NOT "${_cf_chmem_only}" IN_LIST CHMEM_TEST_SOURCES)
+    message(FATAL_ERROR
+        "CH_MEM-only 测试文件必须同时加入 CHMEM_TEST_SOURCES: ${_cf_chmem_only}")
+  endif()
+endforeach()
 
 add_executable(chipforge_tests_chmem ${CHMEM_TEST_SOURCES})
 target_compile_features(chipforge_tests_chmem PRIVATE cxx_std_23)
