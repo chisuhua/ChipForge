@@ -1,11 +1,11 @@
 {
   "schema_version": "scope-v1",
   "current_scope": {
-    "category": "tools",
-    "target": "ci",
-    "sub_target": "regression"
+    "category": "ip",
+    "target": "cpu",
+    "sub_target": "core"
   },
-  "updated_at": "2026-10-28T06:16:17Z",
+  "updated_at": "2026-10-28T10:36:50Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
@@ -57,6 +57,13 @@
       "at": "2026-10-28T06:16:17Z",
       "by": "user",
       "trigger": "用户指令「执行 C1」⇒ 改动落 tools/run_chipforge_tests.sh + tests/CMakeLists.txt ⇒ scope 切 tools/ci"
+    },
+    {
+      "from": "tools/ci",
+      "to": "ip/cpu",
+      "at": "2026-10-28T10:36:50Z",
+      "by": "user",
+      "trigger": "用户指令「做 C2」⇒ 复核 ADR-091 §D5.1 的 G-1a~G-1k ⇒ scope 回 ip/cpu"
     }
   ]
 }
