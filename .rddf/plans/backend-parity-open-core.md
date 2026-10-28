@@ -411,6 +411,57 @@ auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
 | ★ **L3** | ★ CI（`architecture-gates.yml`）**不构建项目、不跑测试** ⇒ ★ C1 的 build fixture **只在本地 ctest 生效** | ★ 归 **A4 `backend-parity-ci`**（B2） |
 | ★ **L4** | ★ **`[mmu-verilator]` 的 `mmu_bare_plumbing_tohost1_baseline_5_elf` 是顺序敏感 flake**（★ 单跑 3/3 PASS ⇒ ★ 全量跑 FAIL，`tohost == 0`）⇒ ★ 根因**未最终定位** | ★ 独立 change（★ owner: ip/mmu）⇒ ★ 已登记进 baseline 清单（★ 附「根因未定位」标注） |
 
+### K19 — ★ C2：★ 存量 G-1a~G-1k 的**逐条变异对照复核**（★ 11 条）
+
+> ★ **ADR-091 v1.9 正文只留覆盖度矩阵**（★ 决策层）⇒ ★ **本节承载变异细节与输出**。
+
+#### K19.1 ★ **复核方法**
+
+★ 对每条约束施加「**撤掉该写法**」的变异 ⇒ ★ 跑对应判据 ⇒ ★ **判据必须 RED**
+⇒ ★ 才算该约束「**被机检覆盖**」（★ ADR-091 §D6 **V-9** 纪律）。
+★ ★ **注意**：★ 变异必须**干净**（★ 只改被测的那一处）⇒ ★ 本轮有 2 次
+★ 首版变异**无效**（★ ① 误删 `#ifdef` 的配对 `#endif` ⇒ 报「unterminated #ifndef」
+★ ② 正则用 `[^/]*` 吞掉前导空格 ⇒ ★ 缩进判据失效）⇒ ★ **已重做并复测**。
+
+#### K19.2 ★ 逐条结果（★ 11 条）
+
+| # | 变异手法 | 判据 | 结果 |
+|---|---|---|---|
+| ★ **G-1a** | 删掉 `pipe_builder.h` 中含 `declare_in/out` 的 `#ifdef CF_PLUGIN_USE_CH_MEM`（★ 行 331/557） | 编 **TLM target** | ★ **rc=2 / 268 errors** ⇒ 首个 = `'ch' was not declared in this scope`（★ `core/io.h` 的 include 本身也在条件化块内）⇒ ★ CH_MEM target 不受影响（rc=0） |
+| ★ **G-1b** | 在 `pipe_builder.h` 加 `#include <ch.hpp>` | 编 **TLM target**（★ CH_MEM target 带 `-Wl,--allow-multiple-definition` ⇒ **会掩盖**链接错误 ⇒ 必须用 TLM） | ★ **rc=2 / 29 errors** ⇒ 全部是 `reference to 'detail' is ambiguous` ⇒ ★ ★ **不是** ADR 原写的 multiple definition ⇒ ★ **后果描述须更正**（★ `module.h:13` 缺 `inline` 仍然成立，★ 但首个失败是**命名冲突**） |
+| ★ **G-1c** | 删掉 `declare_in/out` 的 `if (!ctx_) return unexpected(...)` | `[ports]` 的 null-ctx case | ★ **RED**（9 case ⇒ 1 failed） |
+| ★ **G-1d** | —— | —— | ★ **编译期类型系统**保证（★ `ch_in`/`ch_out` 不可互换）⇒ ★ 运行期另有行为判据（case E：★ 被内部驱动的 `ch_in` 不进顶层） |
+| ★ **G-1f** | ① `AddrT address{0};` ② `AddrT address{ch::core::ch_literal<0,64>{}};` | ★ **C2 新增**的 `[bus-iface]` 机检 case | ★ **两次都 RED**（★ 判据 = 「**有 ctx** 下默认构造 bundle ⇒ 字段 impl 应为 null」） |
+| ★ **G-1h** | 删掉 `elaborate()` 内部的 `ch::core::ctx_swap ctx_guard(&ctx);` | ★ **C2 新增**的 G-1h case | ★ **RED**（9 case ⇒ 1 failed） |
+| ★ **G-1i** | 在 `dmem_port_chmem.h` 的**成员初始化器**里创建 `ch_uint` 字面量 | ★ **C2 新增**的 G-1i case | ★ **全绿** ⇒ ★ ⇒ ★ 该 case 只钉住**机制**（★ 无 ctx ⇒ null impl），★ **抓不到「谁违反」** ⇒ ★ 覆盖度 = **中** |
+| ★ **G-1j** | 删掉 `elaborate()` 里的「未 build ⇒ 自动 build」 | ★ **C2 新增**的 G-1j case | ★ **RED**（9 case ⇒ **2 failed**） |
+| ★ **G-1e / G-1g** | —— | —— | ★ **无机检** ⇒ ★ 变异只能观察到**上游错误日志**（★ 非抛异常）⇒ ★ 难以断言 ⇒ ★ 覆盖度 = **弱** |
+| ★ **G-1k** | 去掉地址 `ch_reg`（地址直接组合输出） | —— | ★ **不可观测** ⇒ ★ host 供数时序不变 ⇒ ★ **当前测试无法区分** ⇒ ★ 判据需 **A6** 的「开放核 vs 预载核」时序对比 |
+
+#### K19.3 ★ **G-1i 的静态机检尝试与放弃**（★ ★ 避免引入假红）
+
+★ 想法：★ 在 `tools/check_plugin_portability.sh` 加一条静态检查，扫「类成员声明行含
+`ch_literal<`」⇒ ★ 形态：`grep -rnE "^ {0,4}[^ /].*ch_literal<" ip/ --include="*.h"`。
+
+★ ★ **实测结果：★ 该判据误报严重** ⇒ ★ 命中 11 个文件 / 上百行 ⇒ ★ 因为
+★ **namespace 内的自由函数体**语句缩进也可能 ≤ 4（★ 例
+`ip/cache/plugins/l1_cache_refill_fsm_chmem.h:167`）⇒ ★ ⇒ ★ **放弃该方案**
+⇒ ★ ★ **理由**：★ **门禁的假红比漏检更坏**（★ 会让人养成「忽略门禁」的习惯）
+⇒ ★ ⇒ ★ G-1i 保留「**机制锚**」单测（★ 钉住「无 ctx ⇒ null impl」）⇒ ★
+★ ★ **覆盖度诚实标注为「中」**（★ 覆盖机制，不覆盖「谁违反」）。
+
+#### K19.4 ★ ★ **C2 的副产物：★ C1 的 CMake 断言只做了单向**（★ 已修）
+
+★ C2 新增的 G-1h/i/j 三个 case 用了 CH_MEM-only API（★ `elaborate()` / `ch_literal`）
+⇒ ★ 而它们被追加在 `test_pipe_builder_ports.cpp` 的 **`#ifdef` 之外**
+⇒ ★ ⇒ ★ **TLM target 编译失败**（★ 11 errors）⇒ ★ ★ **正是 C1-② 的同一通道**
+⇒ ★ ⇒ ★ C1 的断言只检查了「CH_MEM-only ⊆ CH_MEM 源集合」（★ **单向**）
+⇒ ★ ⇒ ★ **补双向断言**（★ CH_MEM-only **MUST NOT** 留在 TLM 源集合）
+⇒ ★ ⇒ ★ 并把 `test_pipe_builder_ports.cpp` **整体**移出 TLM 源集合
+（★ ★ 它本质是 CH_MEM-only：★ 在 TLM 下只贡献 1 个 case，★ 却是用 CH_MEM API 的）。
+
+★ ★ **TLM 基线随之变化**：★ 515 → **514 case**（★ 67466 → 67463 assertions）。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
