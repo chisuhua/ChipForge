@@ -409,6 +409,7 @@ auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
 | ★ **L1** | ★ `cmake --build <dir>`（**all**）会触发 **ExternalProject re-configure** ⇒ ★ 该独立 cmake 步骤**找不到编译器** ⇒ ★ 失败（★ 既存环境脆性，★ 与本轮改动无关）⇒ ★ 故 fixture 与回归脚本**只 build 测试 target** | ★ 独立 change（★ 给 ExternalProject 传 `CMAKE_CXX_COMPILER` / `CXX`） |
 | ★ **L2** | ★ `test_cpu_factory_isa_xlen.cpp` 的 3 个 case **依赖 reporter 实现**（★ XML 下失败）⇒ ★ 脆弱测试 | ★ 独立 change（★ 让 CpuFactory 的 warn 可注入 ⇒ 不依赖全局 `std::cerr`） |
 | ★ **L3** | ★ CI（`architecture-gates.yml`）**不构建项目、不跑测试** ⇒ ★ C1 的 build fixture **只在本地 ctest 生效** | ★ 归 **A4 `backend-parity-ci`**（B2） |
+| ★ **L4** | ★ **`[mmu-verilator]` 的 `mmu_bare_plumbing_tohost1_baseline_5_elf` 是顺序敏感 flake**（★ 单跑 3/3 PASS ⇒ ★ 全量跑 FAIL，`tohost == 0`）⇒ ★ 根因**未最终定位** | ★ 独立 change（★ owner: ip/mmu）⇒ ★ 已登记进 baseline 清单（★ 附「根因未定位」标注） |
 
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 

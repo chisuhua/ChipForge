@@ -95,6 +95,7 @@ depends_on:
 - [ ] ★ **L1** `cmake --build <dir>`（all）触发 ExternalProject re-configure ⇒ 找不到编译器 ⇒ 失败（★ 既存环境脆性）⇒ 独立 change
 - [ ] ★ **L2** `test_cpu_factory_isa_xlen.cpp` 的 3 个 case **依赖 reporter 实现**（★ XML 下失败）⇒ 脆弱测试 ⇒ 独立 change
 - [ ] ★ **L3** CI 不构建项目、不跑测试 ⇒ ★ C1 的 build fixture 只在本地 ctest 生效 ⇒ 归 **A4 `backend-parity-ci`**
+- [ ] ★ **L4** `[mmu-verilator]` 的 `mmu_bare_plumbing_tohost1_baseline_5_elf` 是**顺序敏感 flake**（★ 单跑 3/3 PASS ⇒ ★ 全量跑 FAIL，`tohost == 0`）⇒ ★ 根因**未最终定位** ⇒ ★ 已登记进 baseline 清单（★ 附「根因未定位」标注）⇒ 独立 change（owner: ip/mmu）
 
 ## 4. Phase 4 — S4：验证实现（`verify_mem_model_chmem.h`）
 
