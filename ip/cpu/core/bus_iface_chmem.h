@@ -42,8 +42,13 @@
 //         `as_slave_direction()` 一一对应
 //
 //   ⑤ 握手成本（ADR-091 §D3a.2）：从设备 MUST 可将 `ready` 恒真
-//      ⇒ 退化为**无阻塞流** ⇒ 单周期同步场景不被握手拖慢
+//      ⇒ 退化为**无阻塞流**⇒ 单周期同步场景不被握手拖慢
 //      ⇒ ★ MUST NOT 默认假设「握手免费」⇒ 时序判据分两档测
+//
+//   ⑥ ★ **写语义完备**（ADR-091 v1.7）：★ `size`（3 bit）表达访问字节宽度
+//      （1/2/4/8）⇒ ★ 从设备按 `address` 低 2 位 + `size` 推 byte-strobe
+//      ⇒ ★ **CPU 侧不做 RMW** ⇒ ★ **写不依赖读响应** ⇒ ★ **写无延迟**
+//      ⇒ ⇒ **无需 stall / forwarding**（★ 推导见 plan §K16）
 //
 // ============================================================================
 // CH_MEM 纪律 (ADR-040 v3.0)
@@ -83,15 +88,18 @@ using ch::core::bundle_base;
 template <typename AddrT = ch::core::ch_uint<64>,
           typename DataT = ch::core::ch_uint<64>,
           typename IdT = ch::core::ch_uint<8>,
-          typename BurstLenT = ch::core::ch_uint<8>>
-struct CpuBusReq : public ch::core::bundle_base<CpuBusReq<AddrT, DataT, IdT, BurstLenT>> {
-  using Self = CpuBusReq<AddrT, DataT, IdT, BurstLenT>;
+          typename BurstLenT = ch::core::ch_uint<8>,
+          typename SizeT = ch::core::ch_uint<3>>
+struct CpuBusReq
+    : public ch::core::bundle_base<CpuBusReq<AddrT, DataT, IdT, BurstLenT, SizeT>> {
+  using Self = CpuBusReq<AddrT, DataT, IdT, BurstLenT, SizeT>;
 
   // ── 宽度常量（H-1：逐字段 ≤ 64 bit）──
   static constexpr unsigned kAddressWidth = AddrT::width;
   static constexpr unsigned kDataWidth = DataT::width;
   static constexpr unsigned kIdWidth = IdT::width;
   static constexpr unsigned kBurstLenWidth = BurstLenT::width;
+  static constexpr unsigned kSizeWidth = SizeT::width;
 
   // ── 载荷字段 ──
   // ★★ **MUST NOT 带字面量初始化器**（★ 实测约束 G-1f）：
@@ -105,19 +113,34 @@ struct CpuBusReq : public ch::core::bundle_base<CpuBusReq<AddrT, DataT, IdT, Bur
   BurstLenT burst_len;     // 突发长度
   IdT id;                  // 请求标识
   ch::core::ch_bool is_write;  // true = 写 / false = 读
+  /// ★★ **访问字节宽度**（★ ADR-091 v1.7 新增）—— 1 / 2 / 4 / 8
+  ///
+  /// ★ **为什么必须有它**：★ sub-word store（`sb` / `sh`）的语义**无法用
+  ///   「address + data + is_write」表达** —— 从设备不知道该写几个字节。
+  ///   ⇒ ★ 有了 `size`，**从设备**就能按 `address` 低 2 位（byte offset）
+  ///     + `size` 推出 **byte-strobe mask** 并做 RMW。
+  ///
+  /// ★★ **写语义因此由「从设备」承担**（★ CPU 侧不做 RMW）⇒
+  ///   ⇒ **写不依赖读响应** ⇒ ⇒ **写无延迟**（★ 与预载核同拍生效）
+  ///   ⇒ ⇒ **无需 stall，也无需 forwarding**（★ 推导见 plan §K16）
+  ///
+  /// ★ **读侧不需要它**：★ 从设备总是返回**整个对齐字**（低 32 位有效）
+  ///   ⇒ ★ CPU 侧按 `address` 低 2 位做 byte/half 提取
+  ///   ⇒ ⇒ 读语义与预载核 `dmem_chmem.h` 的 byte select 树**逐位同构**。
+  SizeT size;
 
-  CH_BUNDLE_FIELDS_T(address, data, burst_len, id, is_write)
+  CH_BUNDLE_FIELDS_T(address, data, burst_len, id, is_write, size)
 
   // ── 方向语义（契约 ④）──
   /// master 方向：输出请求（payload/valid），输入 ready
   void as_master_direction() {
-    this->make_output(address, data, burst_len, id, is_write);
+    this->make_output(address, data, burst_len, id, is_write, size);
     this->make_input(/* ready 由 ch_stream 自身提供 */);
   }
 
   /// slave 方向：输入请求，输出 ready
   void as_slave_direction() {
-    this->make_input(address, data, burst_len, id, is_write);
+    this->make_input(address, data, burst_len, id, is_write, size);
     this->make_output(/* ready 由 ch_stream 自身提供 */);
   }
 
