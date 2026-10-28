@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.6 = A0 访存时序裁决（★ 2026-10-28 用户裁决 + architect 主持）：★ 访存端口 = 「地址提前 1 拍发出 + 数据侧组合消费 + 写请求同拍发出」⇒ 读/写数据时点与预载核同拍等价 ⇒ ★ 不需要 stall / forwarding；★ ★ 连带修正 H-3（5 观测量逐位相等 ⇒ **3 终值逐位相等 + 2 轨迹观测量走 ADR-089 例外白名单**）+ 新增硬约束 G-1k（访存地址 MUST 提前 1 拍）**；★ **推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K13~K15（★ 正文只留决策）**；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -145,8 +145,8 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 |---|---|
 | `ready` 语义 | ★ **从设备可恒真**（`ready` 恒 1 ⇒ 退化为无阻塞流）⇒ ★ 单周期同步场景**不被握手拖慢** |
 | `valid` 语义 | ★ 请求方**必须**在 `valid=1` 时保持 `payload` 稳定（⇒ 契约测试 MUST 覆盖） |
-| 背压 | ★ 若从设备无法在本拍响应 ⇒ MUST 拉低 `ready` ⇒ ★ **CPU 侧 MUST 有 stall 机制**（★ 与 ADR-091 D8 S3 的外部驱动数据通路耦合） |
-| 判据 | ★ 握手成本 MUST 以「`ready` 恒真 vs 可拉低」两档**分别**测时序（★ 不得只测一档） |
+| 背压 | ★ **v1.6 降级**（★ A0 裁决连带）：★ 访存正确性**不依赖** stall（★ 写**无延迟** ⇒ 无 load-after-store 问题 ⇒ 见 §D3a.4）⇒ ★ stall 仅在「外部从设备**非组合响应**（降频）」时才需要 ⇒ ★ 该场景 MUST 显式登记为**已知边界** |
+| 判据 | ★ **v1.6 改三档**：① **组合响应**（★ A0 裁决的**基线档**）② `ready` 恒真 + 1 拍响应 ③ `ready` 可拉低（背压）⇒ ★ **① MUST 过**；★ ②③ MUST 显式标注为**未实现/已知边界**（★ 不得只测一档） |
 
 #### D3a.3 ★ 接口契约（`CpuBusReq` / `CpuBusResp`）
 
@@ -157,6 +157,21 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | 方向 | 请求 = 核为 **master**（`as_master_direction()`）· 响应 = 核为 **slave**（`as_slave_direction()`）⇒ ★ 逐字段展开 ⇒ 144-bit 总宽**不触发** `PortBitwidthOverflow` |
 | 与老核 bundle | ★ **无耦合**（老核的 `cf::bundles::MemReq` 保持 POD 不动 ⇒ ADR-092 §D-E 推迟到 Phase-2） |
 | 命名一致性 | ★ **MUST NOT** 复用 `MemReqBundle`（悬空引用）；★ 老核 JSON 里的 `"bundle": "MemReqBundle"` 修正归 ADR-092 §D7 / 本节配套文档同步 |
+
+#### D3a.4 ★ 访存端口化的时序方案（★ **A0 裁决**，2026-10-28，用户裁决 + architect 主持）
+
+> ★ **推导与证据**（预载核三侧时序的实测事实表 · 三条推导 · 代价分析）⇒ **`.rddf/plans/backend-parity-open-core.md` §K13~K15** ⇒ ★ 本节只留**决策与后果**。
+
+| 项 | 决策 |
+|---|---|
+| ★ **读语义** | ★ **组合消费** `dmem_rsp_data`（★ **MUST NOT** 引入额外 1 拍 reg）⇒ ★ 与预载核 `aread`（0 拍）**同拍消费** |
+| ★ **写语义** | ★ **写请求同拍发出** ⇒ 外部在同拍执行 ⇒ ★ **写生效的绝对拍 = 与预载核一致**（★ 写**无延迟**） |
+| ★ **地址可见性** | ★ **访存地址 MUST 提前 1 拍发出**（相对数据消费点）⇒ 需 1 个地址 `ch_reg` ⇒ ⇒ **新增硬约束 G-1k** |
+| ★ **从设备义务** | ★ 从设备 MUST 是**组合 slave**（组合地响应读 + 组合地执行写）⇒ ★ Verilator 侧生成组合 `assign`（★ 上游 `c27543d` 已把 `aread` 对齐成 0 拍组合 assign ⇒ 可行） |
+| ★ **stall / forwarding** | ★ **不需要**（★ 写无延迟 ⇒ 无 load-after-store 问题）⇒ ★ §D3a.2 的 stall 要求**降级**为「仅当从设备非组合响应时」 |
+| ★ ★ **代价** | ★ **流水结构不同构** ⇒ 预载核是**全组合 5 级**（`cpu_factory_chmem.h:431-435` 无 stage 寄存器）而新核**带访存级寄存器** ⇒ ⇒ ★★ **`cycles`（拍数）与 `pchash`（per-cycle ordered FNV-1a over PC）在「开放核 vs 预载核」之间结构性不可比** ⇒ ⇒ ★ **H-3 判据 MUST 修正**（见 §D6）⇒ ★ 与 ADR-088 §5.3.3 记录的 M-op「cycle 不同构不可比」**同族、有先例** |
+
+⇒ ★★ **对 H-3 的直接影响**：★ **5 观测量逐位相等** ⇒ 修正为 **3 个终值观测量（`tohost`/`regs`/`memsig`）逐位相等 + 2 个轨迹观测量（`cycles`/`pchash`）走 ADR-089 例外白名单** ⇒ ★ 详见 §D6。
 
 ### D4 ★ 两套 bundle 并存（新核用新 bundle，老核代码不动）
 
@@ -214,8 +229,9 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1h** | ★ **`PipeBuilder::elaborate(ctx&)` MUST 在 `ctx_swap` 保护下调用**（★ **v1.5 已做框架级加固**：`elaborate` 内部自建 `ctx_swap`） | ★ `elaborate` 此前**不做** current context 切换 ⇒ stage 闭包内创建的 `ch_*` 节点**静默失败**（值 0 / null impl）⇒ ★ 既有 runner 均自行 `ctx_swap` 后调用（`parity_sim_runner.cpp:328` · `cpu_verilator_sim.cpp:272`）⇒ ★ 是**隐式约定**，无文档无门禁 | ★ 假绿通道（端口/寄存器全为 0 而不报错） |
 | **G-1i** | ★ **plugin 的成员初始化器 MUST NOT 创建 `ch_*` 字面量** | ★ `ch_uint<N> m = ch_uint<N>(ch_literal<0,N>{})` 在**plugin 构造期**（`make_unique`）即创建字面量节点 ⇒ ★ 构造期**通常无 active context** ⇒ 静默失败 ⇒ ★ 实测：PC 初值恒 0 ⇒ **全部下游读 0** | ★ 假绿通道（plugin 存在、端口在、但功能全无）⇒ ⇒ **MUST 用纯 C++ 值 + 惰性转换**（如 `uint32_t initial_pc_` + `get_pc()` 内 `ch_reg(uint32_t)`） |
 | **G-1j** | ★ **`PipeBuilder::build()` MUST 在 `elaborate()` 之前调用**（★ **v1.5 已做框架级加固**：`elaborate` 检测未 build ⇒ 自动 build） | ★ `build()` 跑 plugin 的 `setup()`/`build()`（★ **注册 `at_stage` 闭包**），`elaborate()` 只**执行**已注册的闭包 ⇒ ★ 漏调 `build()` ⇒ stage 从未注册 ⇒ **全部逻辑静默不执行**（★ 网表能生成、端口能在，但功能全无）⇒ ★ 既有 runner 靠 `CpuFactoryChmem::build_cpu()` 内部调 `build()` ⇒ ★ 又是**隐式约定** | ★★ **最严重的假绿通道** |
+| **G-1k** | ★ **访存地址 MUST 提前 1 拍发出**（相对数据消费点）⇒ 需 1 个地址 `ch_reg` | ★ 端口形态下外部从设备是「拍边界驱动」⇒ 拍 N 才知道拍 N 的读地址 ⇒ ★ **无法在拍 N 组合给出数据** ⇒ ⇒ 地址 MUST 提前 1 拍可见（★ §D3a.4 A0 裁决） | ★ 访存读退化为 1 拍 ⇒ **与预载核不等价** ⇒ ⇒ `memsig`/`regs` 的 H-3 判定随之失效 |
 
-⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g/h/i/j 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）⇒ ★ MUST 逐条机检。
+⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g/h/i/j 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）；★ **G-1k 是「等价性前提」**（★ 违反 ⇒ H-3 的终值判定失效）⇒ ★ MUST 逐条机检。
 
 #### D5.1.2 ★ v1.5 的**框架级加固**（★ G-1h / G-1j ⇒ 已在 `include/cf/plugin/pipe_builder.h` 落地）
 
@@ -255,9 +271,13 @@ module top (
 |---|---|---|
 | **H-1** | ★ **每个端口字段 MUST ≤ 64 bit**（`PortBitwidthOverflow`）⇒ `MemReq.address`(64) / `MemReq.data`(64) **恰好卡在上限** ⇒ **禁止再加宽**（如 128-bit 地址）⇒ 需加宽时 MUST 拆字段或走解释器后端 | `verilator_backend.cpp:631-643` |
 | **H-2** | ★ **观测 MUST 走顶层 `ch_out`** ⇒ MUST NOT 依赖 `--public-flat-rw` 读内部层级 | 上游 `rv32i_pipeline_top.h` 注释 |
-| **H-3** | ★ **开放核与预载核 MUST 有机器可判的等价性自检**：同一 ELF 分别跑两核，**5 项观测量逐位相等** ⇒ 否则两核就是 ADR-083 §4.1 拒绝的「双副本漂移」 | ADR-083 §4.1 + ADR-089 观测量集 |
+| **H-3** | ★ **开放核与预载核 MUST 有机器可判的等价性自检**：同一 ELF 分别跑两核 ⇒ ★★ **v1.6 修正：3 个终值观测量（`tohost`/`regs`/`memsig`）逐位相等**（★ 这才是「语义等价」的机器可判形式 ⇒ 满足 ADR-083 §4.1「防双副本漂移」的本意）⇒ ★ **2 个轨迹观测量（`cycles`/`pchash`）MUST 走 ADR-089 例外白名单**（★ 结构性不可比 —— 流水结构不同构，见 §D3a.4）⇒ ★ 例外 scope MUST 限定为「开放核 vs 预载核」对比语料，★ **MUST NOT 扩散到双后端 parity 语料**（★ 双后端线 MUST 保持逐拍相等）⇒ ★ **白名单扩张权归 architect**（★ 本条即 2026-10-28 architect 扩张） | ADR-083 §4.1 + ADR-089 §D3 观测量集与例外白名单 |
 | **H-4** | ★ **新核 MUST NOT 引入 TLM 依赖**（不引 `cf::plugin::uint_t`、不引 `cpptlm`）⇒ `ip/cpu/core/**` 全部文件 MUST 为 CH_MEM-only | ADR-040 v3.0 + ADR-088 §10 |
 | **H-5** | ★ **每个顶层端口字段 MUST 在两个后端上都能读到** ⇒ 门禁 MUST 以「顶层端口」为唯一观测量来源 | ADR-089 D2 |
+
+### ★ 正文长度自检（★ 诚实标注 —— 不在本次顺手重构）
+
+★ 本 ADR 已 **> 250 行**（★ 正文 = 决策本身）⇒ ⇒ ★ **推导与证据已外移**（§D3a.4 的推导 → plan §K13~K15）⇒ ★ **建议后续拆分**：★ 「核形态决策」与「端口契约 + 实测约束（G-1 系列）」可拆为 **ADR-091 + 1 篇主题文档** ⇒ ★ **归后续独立 change**（★ 不在本次顺手改写 —— 存量文档不追溯）。
 
 ### D7 ★ DSE 的定位与可扫维度清单
 
@@ -336,7 +356,7 @@ module top (
 
 - [ ] **V-1** ★ **端口契约生效**：新核生成的网表顶层端口**含** `imem_req`/`imem_rsp`/`dmem_req`/`dmem_rsp` 的逐字段端口 + `tohost`/`pc` 等观测端口 ⇒ **且每个字段 ≤ 64 bit**（H-1）
 - [ ] **V-2** ★ **双后端必过**（D0-c）：★ **同一份测试 body** 在**解释器后端**与 **Verilator 后端**下**都必须 PASS** ⇒ 判据 = 上游 `DUAL_BACKEND_TEST_PAIR` 范式（`tests/dual_backend_fixture.h`）⇒ ★ Verilator 侧 **WARN-skip 不算 PASS**（MUST 显式 SKIP 而非静默跳过）
-- [ ] **V-3** ★ **等价性自检**（H-3）：同一 ELF 跑**开放核**与**预载核** ⇒ **5 项观测量（tohost / regs / memsig / cycles / pchash）逐位相等** ⇒ ★ 变异对照：★ 故意改开放核的 1 处语义 ⇒ 该自检 MUST RED（证明它有鉴别力，不是「两边都没跑就绿」）
+- [ ] **V-3** ★ **等价性自检**（H-3，★ **v1.6 修正**）：同一 ELF 跑**开放核**与**预载核** ⇒ ★ **3 个终值观测量（`tohost`/`regs`/`memsig`）逐位相等** ⇒ ★ **2 个轨迹观测量（`cycles`/`pchash`）MUST 已登记为 ADR-089 例外**（★ scope 限定「开放核 vs 预载核」⇒ 双后端线不受影响）⇒ ★ 变异对照：★ 故意改开放核的 1 处语义 ⇒ 该自检 MUST RED（证明它有鉴别力，不是「两边都没跑就绿」）
 - [ ] **V-4** ★ **H-2 生效**：门禁的 5 个观测量**全部**从**顶层端口**读取 ⇒ ★ `--public-flat-rw` 读内部层级的路径**退休**（新核路径上）
 - [ ] **V-5** ★ **H-4 生效**：`ip/cpu/core/**` 全部文件**零** `cf::plugin::uint_t` / `cpptlm` 引用（★ 建议加 CI grep 检查）
 - [ ] **V-6** ★ **零回归**：★ 现有 52 case parity **基线不变**（预载核不动 ⇒ 报告应与 `openspec/changes/backend-parity-corpus/first-run-evidence.md` 的 A3 首跑**逐位一致**）⇒ ★ D4 架构门禁（`check_plugin_portability.sh` / `verify_plugin_decision.sh`）全绿
