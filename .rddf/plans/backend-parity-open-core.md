@@ -462,6 +462,65 @@ auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
 
 ★ ★ **TLM 基线随之变化**：★ 515 → **514 case**（★ 67466 → 67463 assertions）。
 
+### K20 — ★ A2（分支重定向 + flush）的逐拍推导与变异对照
+
+> ★ **ADR-091 v1.10 正文只留契约**（§D3a.5 + G-1n + V-10）⇒ ★ 本节承载推导与证据。
+
+#### K20.1 ★ 三个 1 拍延迟的逐拍推导（★ 抑制链）
+
+| 量 | 定义 | 说明 |
+|---|---|---|
+| `pc_reg(N)` | 拍 N 的取指地址 | ★ `req_addr(N) = pc_reg(N)` |
+| `INSTRUCTION(N)` | `instr_reg(N)` = 地址 `pc_reg(N-1)` 的指令 | ★ 与 `PC(N) = pc_lag(N) = pc_reg(N-1)` **对齐** |
+| `BRANCH_TAKEN(N)` | 地址 `pc_reg(N-1)` 的指令的分支结果 | ★ 生产者 = branch（A4） |
+| `pc_reg(N+1)` | `select(taken(N), target, pc_reg(N)+4)` | ★ **taken(N)=1 ⇔ `pc_reg(N)` 是错路** |
+| `FLUSH(N)` | `flush_reg(N)` = `taken(N-1)` | ★ ★ **与 `INSTRUCTION(N)` 对齐**（二者都对应 `pc_reg(N-1)`） |
+| `we_reg(N+1)` | `is_store(N) ? !FLUSH(N) : 0` | ★ dmem 的 `we_reg` **本身打 1 拍** |
+| ⇒ | ★ **`FLUSH(N)=1` ⇒ 该 store 的写请求在拍 N+1 发出且 `we=0`** | ★ 抑制成立 |
+
+★ ★ **读取口径陷阱**（★ 本轮实测踩过 3 次）：
+★ `sim.tick()` **之后**读端口 ⇒ ★ 读到的是**下一拍**的值
+（★ `ch_reg` 的 next 在 tick 的 sequential 阶段已应用）
+⇒ ★ 即 `trace[i]` = 拍 `i+1` 的值 ⇒ ★ 断言 MUST 按此口径写。
+
+#### K20.2 ★ 4 个变异对照（★ 全部 RED ⇒ V-10 满足）
+
+| # | 变异 | 结果 |
+|---|---|---|
+| M1 | `flush_reg <<= 0`（`FLUSH` 恒 0） | ★ **2 case 失败** |
+| M2 | `we = is_store`（去掉 flush 抑制） | ★ **1 case 失败** |
+| M3 | `pc <<= pc + 4`（不重定向） | ★ **1 case 失败** |
+| M4 | ★ 提供者 plugin 注册在 ibus **之前**（G-1n） | ★ **1 case 失败** |
+
+⇒ ★ 恢复后 **339 assertions / 6 cases 全绿**。
+
+#### K20.3 ★ G-1n 的发现过程（★ 最贵的一次误判）
+
+★ 症状：★ `flush` 端口输出**正确**（序列 0,1,0,0），但 `dmem_req_we` **恒 1**（抑制未生效）。
+
+★ 诊断链（★ 3 步才定位）：
+
+| 步 | 假设 | 结果 |
+|---|---|---|
+| 1 | ★ `ch_uint<1>(ch_bool)` 取反折成常量（G-1m 同族） | ❌ 改成 `select` 后仍失败 |
+| 2 | ★ 混宽 `operator&(ch_bool, ch_uint<1>)` 语义不明 | ❌ 改成纯嵌套 `select` 后仍失败 |
+| 3 | ★ 加诊断打印 `has(FLUSH)` | ★ **`hasFLUSH=0`** ⇒ ★ dmem 根本读不到 |
+
+★ 再追：★ `stage_names()` = `branch memory fetch branch memory`
+⇒ ★ 说明注册顺序是「提供者 → ibus → dmem」
+⇒ ★ `canonical_stage_order()` 按**首现序** ⇒ `[branch, memory, fetch]`
+⇒ ★ `memory NORMAL`(dmem) **先于** `fetch NORMAL`(ibus) 执行 ⇒ ★ `FLUSH` 未写。
+
+★ ★ **真正根因**：★ `PipeBuilder::build()` 才按 `plugins_` 顺序调用 `setup()`
+⇒ ★ 测试里**直接**调 `pb.at_stage(...)` 的提供者会**先于所有 plugin** 注册
+⇒ ★ ⇒ ★ **提供者 MUST 做成 plugin，且注册在 ibus/dmem 之后**
+⇒ ★ 首现序 = `fetch, branch, memory` = **流水顺序** ✔
+
+⇒ ★★ **升为硬约束 G-1n**（★ 装配骨架 A4 同样受约束：★ **MUST 按流水顺序注册 plugin**）。
+
+★ ★ **通用教训**：★ 「跨 stage payload 读不到」的**第一诊断动作** = ★
+★ **打印 `has(key)` + `stage_names()`**（★ 而不是怀疑类型/运算语义）。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
