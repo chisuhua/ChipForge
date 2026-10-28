@@ -153,14 +153,17 @@ lines = console.splitlines()
 # ★ 失败块 = 「分隔线 / 名字 / 分隔线」**成对**出现 ⇒ ★ 用成对模式提取
 #   （★ 单看分隔线会把紧随其后的 `<file>:<line>` 行误当成 case 名）
 # ★ SECTION 名是**缩进**的 ⇒ 只取顶格行
-BLOCK = re.compile(r"^-{70,}[ \t]*\n([^\n]+?)\n^-{70,}[ \t]*$", re.M)
+# ★ ★ **块名可能是多行**：★ 失败发生在 SECTION 内时，Catch2 打印
+#   「分隔线 / <test case 名> / <SECTION 名（缩进）> / 分隔线」⇒ ★
+#   ★ 单行正则会漏抓 ⇒ ★ 这里允许 1~N 行 ⇒ ★ 取**第一行**（顶格）作 case 名。
+BLOCK = re.compile(r"^-{70,}[ \t]*\n((?:[^\n]*\n)+?)^-{70,}[ \t]*$", re.M)
 # ★ ★ **必须区分 FAILED 块与 WARN 块**：★ Catch2 v3 对 **warning** 也用
 #   「分隔线 / 名字 / 分隔线」格式打印（★ 实测：`PTW_Has_AdvanceFromRealMemory_Method`
 #   的 warning 块曾被误判为失败）⇒ ★ 判据 = 块体内含 `: FAILED:`。
 blocks = list(BLOCK.finditer(console))
 failed = []
 for i, m in enumerate(blocks):
-    name = m.group(1).strip()
+    name = m.group(1).splitlines()[0].strip()
     if not name or name.startswith(" "):
         continue
     end = blocks[i + 1].start() if i + 1 < len(blocks) else len(console)

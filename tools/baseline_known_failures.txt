@@ -48,3 +48,15 @@
 #   · owner：★ upstream CppHDL（★ 归属 `poc-follow-up-fixes` change）
 #   · 收敛：★ 待上游修复或本地改用不依赖 context 的写法后**删除本条**
 cpphdl_poc_chbool_contextual_conversion
+#
+# mmu_bare_plumbing_tohost1_baseline_5_elf
+#   · 根因：★ **顺序敏感 flake** —— ★ **单跑** `[mmu-verilator]` 3/3 PASS
+#     ⇒ ★ **全量跑**时该 case FAIL（★ `tohost == 0` ⇒ Verilator runner
+#     未跑到 tohost）⇒ ★ 根因**未最终定位**（★ 疑似前序 case 的全局状态
+#     或时序影响）
+#     ⇒ ★ 与本轮改动**无因果关系**：★ 本轮只改了 ① 框架成员的**位置**
+#     （`built_` 移出 `#ifdef` ⇒ CH_MEM 下成员默认值不变）② 3 个测试文件的
+#     端口声明 ③ CMake 的 TLM 排除 ⇒ ★ **均不触及 MMU / Verilator 路径**
+#     ⇒ ★ 且历史记录「`[mmu-verilator]` 3/3 PASS（2026-10-27）」⇒ ★ 属**既存** flake
+#   · owner：ip/mmu · 收敛：★ 独立 change 定位污染源（★ tasks.md §L4）
+mmu_bare_plumbing_tohost1_baseline_5_elf
