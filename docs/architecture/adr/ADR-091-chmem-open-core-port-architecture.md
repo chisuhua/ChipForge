@@ -1,6 +1,7 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.8 = A1（访存端口化）实施期实测收敛：★ 新增 **2 条**硬约束（G-1l「累加式 select 需上游先写」+ G-1m「`ch_bool` 禁用于 `?:`」）+ ★ **G-1c 修正**（fail-closed 由 `throw` 改为 `std::unexpected` ⇒ 合 ADR-047 Check 10）+ ★ **访存时序模型澄清**（★ `ch_reg` 的 next 是组合表达式 ⇒ 端口呈现的是**上一拍末**算出的地址）+ ★ **诚实标注 4 条被变异对照证伪的怀疑**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ **均不成立** ⇒ ★ **不作为硬约束**）⇒ ★ 推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K17；
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.9 = C2 逐条变异对照复核（★ 存量 G-1a~G-1k 共 11 条 ⇒ ★ **无一被证伪** ⇒ ★ 但 ★ **机检覆盖度极不均衡**（★ 强 7 / 中 1 / 弱 3）⇒ ★ 增「G-1 的机检覆盖矩阵」+ ★ **更正 G-1b 的后果描述**（★ 实测 = **命名冲突**，★ 非 ADR 原写的 multiple definition））**；
+★ **v1.8 = A1（访存端口化）实施期实测收敛：★ 新增 **2 条**硬约束（G-1l「累加式 select 需上游先写」+ G-1m「`ch_bool` 禁用于 `?:`」）+ ★ **G-1c 修正**（fail-closed 由 `throw` 改为 `std::unexpected` ⇒ 合 ADR-047 Check 10）+ ★ **访存时序模型澄清**（★ `ch_reg` 的 next 是组合表达式 ⇒ 端口呈现的是**上一拍末**算出的地址）+ ★ **诚实标注 4 条被变异对照证伪的怀疑**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ **均不成立** ⇒ ★ **不作为硬约束**）⇒ ★ 推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K17；
 ★ **v1.7 = A1 实施期发现并裁决「写语义」缺口：★ `CpuBusReq` MUST 增 `size`（3 bit，访问字节宽度）⇒ 写由**从设备**按 byte-strobe RMW ⇒ ⇒ ★ CPU 侧不依赖读响应 ⇒ 写**无延迟**（★ 代价远小于「CPU 侧 RMW ⇒ stall/forwarding」）；★ 同时补齐 `burst_len` 字段登记**；★ **v1.6 = A0 访存时序裁决（★ 2026-10-28 用户裁决 + architect 主持）：★ 访存端口 = 「地址提前 1 拍发出 + 数据侧组合消费 + 写请求同拍发出」⇒ 读/写数据时点与预载核同拍等价 ⇒ ★ 不需要 stall / forwarding；★ ★ 连带修正 H-3（5 观测量逐位相等 ⇒ **3 终值逐位相等 + 2 轨迹观测量走 ADR-089 例外白名单**）+ 新增硬约束 G-1k（访存地址 MUST 提前 1 拍）**；★ **推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K13~K15（★ 正文只留决策）**；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
@@ -223,7 +224,7 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | # | 约束 | 依据（实测） | 违反后果 |
 |---|---|---|---|
 | **G-1a** | ★ 端口 API MUST 置于 **`#ifdef CF_PLUGIN_USE_CH_MEM`** 内 | 框架头现有 CppHDL 依赖**全部**条件化（`uint_t.h:25` · `payload.h:34` · `ctrl_link.h:39`）⇒ TLM 模式不得引入 | TLM 模式编译失败 |
-| **G-1b** | ★ 框架头 **MUST NOT include `<ch.hpp>`** ⇒ 只 include 具体头（`core/io.h` · `core/uint.h` · `core/context.h`） | ★ `ch.hpp:10` include `module.h`，而 ★ `module.h:13` 的 `build_hierarchical_name` **缺 `inline`** ⇒ **任何 2+ TU include `<ch.hpp>` 即链接失败**（multiple definition）★ 实测触发 | ★ **新核多文件必然踩雷**（每个头都含 `ch.hpp` ⇒ 链接失败） |
+| **G-1b** | ★ 框架头 **MUST NOT include `<ch.hpp>`** ⇒ 只 include 具体头（`core/io.h` · `core/uint.h` · `core/context.h`） | ★ `ch.hpp:10` include `module.h`，而 ★ `module.h:13` 的 `build_hierarchical_name` **缺 `inline`**（★ **上游与 install 头均如此**）⇒ ★ **2+ TU include 即 multiple definition**；★ ★ **v1.9 实测更正**：★ 该变异的**首个**失败**不是** multiple definition ⇒ ★ 而是 **29 个 `reference to 'detail' is ambiguous`**（★ `<ch.hpp>` 引入的 `ch::detail` 与其它 `detail` **命名冲突**）⇒ ★ ⇒ ★ **后果以「编译期命名冲突」为准**（★ 约束本身不变） | ★ **新核多文件必然踩雷**（★ 编译失败 ⇒ 旧产物顶替 ⇒ ★ C1 假绿通道） |
 | **G-1c** | ★ 端口创建 MUST **fail-closed 拒绝 ctx 为空**（★ **v1.8 修正**：★ 由 `throw` 改为 **`return std::unexpected(PluginError::NullContextPtr)`** ⇒ ADR-047 Check 10「静态配置头文件禁 throw」） | ★ `ch_logic_in` 构造是 `if (ctx) { ctx->create_input(...); }` ⇒ ★ **无 current context 时静默不建节点**（`impl() == nullptr`）★ 实测确认 | ★ **假绿通道**：端口「消失」而不报错 ⇒ 网表少端口 ⇒ 门禁照绿 |
 | **G-1d** | ★ 端口**方向必须严格**：请求用 `ch_out`，响应用 `ch_in`；且 ★ `ch_in` **MUST NOT** 被内部逻辑赋值 | ★ 有内部 driver 的 `ch_in` **不是**顶层端口（上游 `verilator_backend.cpp:617` 的 skip：`inputimpl::driver() != nullptr` ⇒ 不进 `port_access_`；codegen 侧同理） | 端口**不进** `port_access_` ⇒ Verilator 后端**读不到** ⇒ 观测量采集失败 |
 | **G-1e** | ★ **端口的驱动赋值 MUST 在 `ctx_swap` 保护下做** | ★ 实测：赋值在保护外 ⇒ `[ERROR] No active context for literal creation` ⇒ `ch_logic_out::operator=` 报「output_node_ or src_lnode is null」⇒ ★ **output 端口进了网表但无 driver ⇒ 值未定义/X** | ★ **假绿通道**：端口「在但无值」⇒ 仿真读到 X ⇒ 门禁照绿 |
@@ -236,7 +237,36 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1m** | ★ **`ch_bool` MUST NOT 用于 C++ 条件上下文**（`?:` / `if`）⇒ ★ MUST 用**节点级 `select()`** | ★ `ch_bool::operator bool` 是 **explicit** ⇒ ★ 在 `?:` / `if` 里走 **contextual conversion** ⇒ ★ **静默取 false** ⇒ ★ **变异对照 RED**（`select()` → `?:` ⇒ 2 处 FAILED：★ **写使能恒 0**（写请求发不出去 ⇒ 端口在、值全 0 ⇒ 最坏假绿）+ ★ **符号扩展失效**） | ★ **静默失效**（★ 无编译错误、无运行错误 ⇒ 只表现为「值不对」） |
 | **G-1k** | ★ **访存地址 MUST 提前 1 拍发出**（相对数据消费点）⇒ 需 1 个地址 `ch_reg` | ★ 端口形态下外部从设备是「拍边界驱动」⇒ 拍 N 才知道拍 N 的读地址 ⇒ ★ **无法在拍 N 组合给出数据** ⇒ ⇒ 地址 MUST 提前 1 拍可见（★ §D3a.4 A0 裁决） | ★ 访存读退化为 1 拍 ⇒ **与预载核不等价** ⇒ ⇒ `memsig`/`regs` 的 H-3 判定随之失效 |
 
-⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g/h/i/j 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）；★ **G-1k 是「等价性前提」**（★ 违反 ⇒ H-3 的终值判定失效）⇒ ★ MUST 逐条机检。
+#### ★ v1.9 ★ G-1 的**机检覆盖矩阵**（★ C2 逐条变异对照复核，2026-10-28）
+
+> ★ **复核方法**：★ 对每条约束施加「**撤掉该写法**」的变异 ⇒ ★ 跑对应判据
+> ⇒ ★ **判据必须 RED** 才算该约束「被机检覆盖」（★ ADR-091 §D6 **V-9** 纪律）。
+> ★ **变异细节与输出** ⇒ `.rddf/plans/backend-parity-open-core.md` §K19。
+
+| # | 约束 | 机检形态 | 变异结果 | 覆盖度 |
+|---|---|---|---|---|
+| **G-1a** | 端口 API 条件化 | ★ **编译期**（TLM target） | ★ **268 errors**（`'ch' was not declared`） | ✅ **强** |
+| **G-1b** | 禁 include `<ch.hpp>` | ★ **编译期** | ★ **29 errors**（★ `detail` 命名冲突） | ✅ **强** |
+| **G-1c** | fail-closed 拒绝空 ctx | ★ 单测（`test_pipe_builder_ports.cpp`） | ★ **RED** | ✅ **强** |
+| **G-1d** | 端口方向严格 | ★ **编译期类型系统**（★ `ch_in`/`ch_out` 不可互换）+ 行为判据 case E | ★ 类型层面阻断 | ✅ **强** |
+| **G-1f** | bundle 无字面量初始化器 | ★ 单测（★ **C2 新增**） | ★ **RED**（★ `{0}` 与编译期字面量**两种**形式） | ✅ **强** |
+| **G-1h** | `elaborate()` 自建 `ctx_swap` | ★ 单测（★ **C2 新增**） | ★ **RED** | ✅ **强** |
+| **G-1j** | `build()` 在 `elaborate()` 之前 | ★ 单测（★ **C2 新增**） | ★ **RED**（★ 2 处） | ✅ **强** |
+| **G-1i** | 成员初始化器不建 `ch_*` 字面量 | ★ **机制锚**单测（★ C2 新增：★ 钉住「无 ctx ⇒ null impl」） | ★ 变异「某 plugin 在成员里建字面量」**未被抓住** | ⚠️ **中**（★ 覆盖**机制**，★ 不覆盖「**谁**违反」） |
+| **G-1e** | 驱动赋值在 `ctx_swap` 下 | ✗ 无 | —— | ⚠️ **弱**（★ 仅文档级） |
+| **G-1g** | 方向设置在 `ctx_swap` 下 | ✗ 无 | —— | ⚠️ **弱**（★ 仅文档级） |
+| **G-1k** | 访存地址提前 1 拍 | ✗ 无 | —— | ⚠️ **弱**（★ 需 **A6** 的「开放核 vs 预载核」时序对比才可判定） |
+
+⇒ ★★ **复核结论（★ 诚实标注）**：
+★ **11 条存量约束无一被证伪**（★ 与 v1.8 的 8 条候选中 **4 条被证伪**形成对照
+⇒ ★ 说明 S1/S3a 时期的登记**确实有实测支撑**）⇒ ★
+★ **但机检覆盖度极不均衡**：★ **强 7 / 中 1 / 弱 3** ⇒ ★
+★ ⇒ ★ 「**MUST 逐条机检**」的表述**名不副实**（★ 3 条**没有任何机检**）⇒ ★
+★ ⇒ ★ **降级表述**：★ 本节矩阵 = **各条的真实覆盖度**（★ 不得再宣称「逐条机检」）。
+
+⇒ ★★ **G-1a/b 是「框架头纪律」**（与 ADR-040 的 CH_MEM-only 纪律同族）；★ **G-1c/d/e/f/g/h/i/j 是「假绿通道」**（与 ADR-089 的 fail-closed 纪律同族）；★ **G-1k 是「等价性前提」**（★ 违反 ⇒ H-3 的终值判定失效）⇒ ★ ★ **v1.9 更正**：★ 原表述「MUST 逐条机检」**名不副实** ⇒ ★ 实际覆盖度见上方
+★ **机检覆盖矩阵**（★ 强 7 / 中 1 / **弱 3** ⇒ ★ **G-1e / G-1g / G-1k 无任何机检**）
+⇒ ★ ⇒ ★ **本节各条 MUST 至少有一条机检**（★ 弱覆盖的 3 条 **MUST 补机检**或显式标注）。
 
 #### D5.1.2 ★ v1.5 的**框架级加固**（★ G-1h / G-1j ⇒ 已在 `include/cf/plugin/pipe_builder.h` 落地）
 
