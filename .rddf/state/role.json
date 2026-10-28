@@ -1,28 +1,10 @@
 {
   "schema_version": "role-v1",
   "current_role": "builder",
-  "updated_at": "2026-10-28T00:07:24Z",
+  "updated_at": "2026-10-28T02:56:55Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "builder",
-      "at": "2026-10-24T03:42:23Z",
-      "by": "user",
-      "trigger": "用户选择『切 builder，先补 check 机检缺口』"
-    },
-    {
-      "role": "builder",
-      "at": "2026-10-24T05:05:30Z",
-      "by": "user",
-      "trigger": "用户指令『切builder后迁入.rddf/plans后执行』"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-24T10:39:05Z",
-      "by": "user",
-      "trigger": "用户指令『切换到architect并给出决策分析和决断』"
-    },
     {
       "role": "planner",
       "at": "2026-10-24T10:41:06Z",
@@ -124,6 +106,24 @@
       "at": "2026-10-28T00:07:24Z",
       "by": "user",
       "trigger": "用户指令「先做 ADR-093 的前置（D-I family 分类表），然后继续 S3」⇒ D-I 前置已完成（ADR-092 v1.2 + ADR-093 + Z-1）⇒ 切 builder 实施 S3"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-28T02:52:19Z",
+      "by": "user",
+      "trigger": "A0 裁决完成（ADR-091 v1.6 + plan §K13~K15）⇒ 切 builder 实施 A1（dmem 端口化）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-28T02:54:26Z",
+      "by": "user",
+      "trigger": "A1 实施期发现 CpuBusReq 缺「访问字节宽度」字段 ⇒ 写语义无法表达 sub-word RMW ⇒ 契约变更属架构裁决 ⇒ 切 architect 落 ADR-091 v1.7"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-28T02:56:55Z",
+      "by": "user",
+      "trigger": "A0 深化完成（ADR-091 v1.6 + v1.7 + plan §K13~K16）⇒ 切 builder 实施 A1（dmem 端口化）"
     }
   ]
 }
