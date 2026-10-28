@@ -514,7 +514,10 @@ class PipeBuilder {
   //        ⇒ **任何 2+ TU include `<ch.hpp>` 即链接失败**（multiple definition）
   //        ⇒ 所需 `ch_in`/`ch_out` 类型由 `<simulator.h>` 间接引入的
   //        `core/io.h` 提供（★ 已验证 simulator.h 不引入 module.h / ch.hpp）
-  //   G-1c ctx 为 null MUST **throw**（fail-closed）——
+  //   G-1c ctx 为 null MUST **fail-closed 报错**（★ v1.8 修正：★ 由 throw
+  //        改为 `return std::unexpected(PluginError::NullContextPtr)`
+  //        ⇒ ★ ADR-047 Check 10「静态配置头文件禁 throw」；★ fail-closed
+  //        语义不变：★ 调用方拿不到端口 ⇒ 不会静默不建节点）——
   //        `ch_logic_in` 构造是 `if (ctx) { ctx->create_input(...); }`
   //        ⇒ 无 ctx 时**静默不建节点**（不报错）⇒ 「端口消失而门禁照绿」的假绿通道
   //   G-1d 端口**方向**由调用方负责：`ch_in` **MUST NOT** 被内部赋值
@@ -525,10 +528,16 @@ class PipeBuilder {
 
   /// 声明一个顶层**输入**端口（如从设备的响应）。
   /// ★ 返回的 `ch_in` **不可赋值**（编译期 static_assert 保护，见 G-1d）。
+  ///
+  /// ★★★ **返回 `Result` 而非 throw**（★ ADR-047 Check 10：★ 静态配置头文件
+  ///   **MUST NOT** `throw std::*` / `throw PluginException` ⇒ MUST 用
+  ///   `std::unexpected` 表达 fail-closed 错误）
+  ///   ⇒ ★ **fail-closed 语义不变**（★ ctx 为 null ⇒ 返回错误 ⇒ 调用方**不会**
+  ///   ★ 拿到端口对象 ⇒ ★ 不会静默不建节点 ⇒ ★ G-1c 的假绿通道仍被堵死）。
   template <typename T>
-  ch::core::ch_in<T> declare_in(const std::string& name) {
+  Result<ch::core::ch_in<T>> declare_in(const std::string& name) {
     if (!ctx_) {
-      throw PluginException(PluginError::NullContextPtr, "declare_in");
+      return std::unexpected(PluginError::NullContextPtr);
     }
     ch::core::ctx_swap guard(ctx_);
     return ch::core::ch_in<T>(name, std::source_location::current());
@@ -536,10 +545,11 @@ class PipeBuilder {
 
   /// 声明一个顶层**输出**端口（如核的请求）。
   /// ★ 返回的 `ch_out` **可赋值**（output 端口需要内部 driver 才会被发射）。
+  /// ★★★ **返回 `Result` 而非 throw**（★ ADR-047 Check 10 —— 理由同 `declare_in`）。
   template <typename T>
-  ch::core::ch_out<T> declare_out(const std::string& name) {
+  Result<ch::core::ch_out<T>> declare_out(const std::string& name) {
     if (!ctx_) {
-      throw PluginException(PluginError::NullContextPtr, "declare_out");
+      return std::unexpected(PluginError::NullContextPtr);
     }
     ch::core::ctx_swap guard(ctx_);
     return ch::core::ch_out<T>(name, std::source_location::current());
@@ -586,9 +596,15 @@ class PipeBuilder {
       stage_payload_map_;
   // Prereq-1: ctx pointer (lifecycle managed by caller, not PipeBuilder)
   ch::core::context* ctx_ = nullptr;
-  // ★ ADR-091 v1.5 G-1j：`build()` 是否已执行（★ `elaborate()` 用它决定要不要自动 build）
-  bool built_ = false;
 #endif
+  // ★ ADR-091 v1.5 G-1j：`build()` 是否已执行（★ `elaborate()` 用它决定要不要自动 build）
+  // ★★★ **MUST NOT 置于 `#ifdef CF_PLUGIN_USE_CH_MEM` 内**（★ v1.8 修复）：
+  //   ★ `build()` 里的 `built_ = true;`（★ TLM 与 CH_MEM **都**编译）
+  //   ⇒ ★ 若声明被条件化 ⇒ ★ **TLM 模式编译失败**（`'built_' was not declared`
+  //   ⇒ ★ 实测命中）⇒ ★ ⇒ **TLM binary 无法重建** ⇒ ★ 「TLM 回归通过」变成
+  //   ★ **旧 binary 的假绿**（★ S1 引入 ⇒ 潜伏至 v1.8 才被发现）。
+  //   ⇒ ★ `built_` 是**框架状态**（与后端无关）⇒ ★ 应当在 ifdef **之外**。
+  bool built_ = false;
 };
 
 }  // namespace plugin
