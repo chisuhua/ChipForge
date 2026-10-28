@@ -349,6 +349,67 @@ auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
 ★ 改 `Result<Port>` + `std::unexpected(PluginError::NullContextPtr)` ⇒ ★ fail-closed 语义不变
 ⇒ ★ 调用面 = ★ **3 个测试文件**（★ 生产代码零调用）⇒ ★ 破坏面可控。
 
+### K18 — ★ C1：「旧产物顶替」假绿通道的系统性排查（★ 3 个通道 + 4 条实测）
+
+> ★ **触发**：★ 本轮实测发现 TLM binary **自 ADR-091 S1 起编译失败**
+> ⇒ ★ 此前多轮报告的「TLM 509 case / 508 passed / 1 failed」全部是**旧产物**的数字
+> ⇒ ★ ⇒ ★ **「回归通过」这个信号本身不可信** ⇒ ★ ⇒ ★ C1 立项。
+
+#### K18.1 ★★★ **三个「旧产物顶替」通道**（★ 逐个封堵）
+
+| # | 通道 | 机制 | 封堵 |
+|---|---|---|---|
+| ★ **C1-①** | ★ **框架代码在 `#ifdef` 内声明，两种模式只编一种** | ★ `built_` 声明被置在 `#ifdef CF_PLUGIN_USE_CH_MEM` 内 ⇒ ★ **TLM 模式编译失败** ⇒ ★ 旧 binary 静默顶替 | ★ 成员移出 `#ifdef`（★ `built_` 是**框架状态**，与后端无关）⇒ ★ **真实基线 509 → 515** |
+| ★ **C1-②** | ★ **两个测试 binary 的源文件集合**不对称**（TLM = GLOB / CH_MEM = 显式列表） | ★ CH_MEM-only 测试（用 `declare_in/out` / `elaborate()` / `create_simulator()`）被 TLM 的 `GLOB_RECURSE` 收集 ⇒ ★ **TLM 111 个编译错误** | ★ 新增 `CHMEM_ONLY_TEST_SOURCES` + **CMake 断言**（★ 排除集合 ⊆ CH_MEM 源集合）⇒ ★ 防「只排一边」 |
+| ★ **C1-③** | ★ **ctest 本身不构建项目** | ★ 源码编译失败 ⇒ ★ ctest **照跑旧产物** ⇒ ★ 报告「通过」 | ★ 新增 **build fixture**（★ `cf_build_all`）⇒ ★ 编译失败 ⇒ 依赖测试 **Not Run** ⇒ ctest 整体 FAIL ⇒ **fail-closed** |
+
+#### K18.2 ★★ **「回归通过」信号此前根本不存在**（★ 恒红）
+
+★ `ctest` 的 `chipforge_tests` entry 跑**全量** binary ⇒ ★ 其中含 baseline-known
+失败 ⇒ ★ **entry 恒红** ⇒ ★ 「全量回归通过」**从来就不存在** ⇒ ★ 任何依赖
+退出码的判断都在误判。
+
+⇒ ★ **修法**：★ `tools/run_catch2_with_baseline.sh`（★ baseline-aware）
+⇒ ★ 判定「是否有**新**失败」⇒ ★ 清单 = `tools/baseline_known_failures.txt`
+⇒ ★ **按 binary 分节**（★ `[tlm]` / `[chmem]`）⇒ ★ 每条附「根因 + owner + 收敛期限」
+⇒ ★ ★ **纪律**：★ 清单不得靠扩张来消红（★ 同 ADR-089 例外白名单）。
+
+#### K18.3 ★★★ **★ Catch2 的 XML reporter 会破坏「被测代码捕获 std::cerr」的测试**（★ 最有价值的可迁项）
+
+★ **实测对照**（★ 同一 binary、同一 filter、同一时刻）：
+
+| reporter | `tests/cpu/test_cpu_factory_isa_xlen.cpp` 的 3 个 case |
+|---|---|
+| **console** | ★ **全过** |
+| **XML** | ★ **3 个全挂** |
+
+★ **机制**：★ Catch2 的 XML reporter 会为**每个 test case** 捕获 stdout/stderr
+（★ 实现 = 替换 `std::cerr` 的 rdbuf ⇒ 捕获内容进 `<Output>` 节点）
+⇒ ⇒ ★ 被测代码自己的 `CerrCapture`（★ 卸掉 Catch2 的捕获 buffer）
+⇒ ⇒ ★ 被测代码的 warn 写进了 **Catch2 的 buffer** ⇒ ⇒ ★ `cap.str()` 为空
+⇒ ⇒ ★ 断言 `find("[declared-reserved]") != npos` 失败。
+
+★ ★ **⇒ 两条可迁结论**：
+  ① ★ **不要用 XML reporter 做「失败用例名单」的唯一来源**（★ 它会改变被测行为）
+  ② ★ ★ **依赖 `std::cerr` 捕获的测试是脆弱测试** ⇒ ★ 它们的通过**依赖 reporter
+  实现细节** ⇒ ★ **存量 follow-up**（★ 见 §K18.5 L2）
+
+#### K18.4 ★★★ **Catch2 console 输出的三个坑**（★ 解析器必须处理）
+
+| # | 坑 | 现象 | 处理 |
+|---|---|---|---|
+| ★ ① | ★ **两种汇总形态** | ★ 有失败 = `test cases: N \| M passed \| K failed`；★ 全通过 = `All tests passed (A assertions in N test cases)` ⇒ ★ **后者没有 `test cases:` 行** | ★ 两种都匹配（★ 只匹配前者 ⇒ ★ 全绿时误判 fail-closed） |
+| ★ ② | ★ **warning 也用「分隔线 / 名字 / 分隔线」格式** | ★ `PTW_Has_AdvanceFromRealMemory_Method` 的 warning 块被误判为失败 | ★ 按块体内的 **`: FAILED:`** 标记区分 |
+| ★ ③ | ★ 失败块后紧跟 `<file>:<line>` 行 | ★ 单看分隔线会把它误当 case 名 | ★ 用**成对分隔线**模式提取 |
+
+#### K18.5 ★★ **C1 的遗留项（★ 诚实标注，未实现）**
+
+| # | 遗留 | 归属 |
+|---|---|---|
+| ★ **L1** | ★ `cmake --build <dir>`（**all**）会触发 **ExternalProject re-configure** ⇒ ★ 该独立 cmake 步骤**找不到编译器** ⇒ ★ 失败（★ 既存环境脆性，★ 与本轮改动无关）⇒ ★ 故 fixture 与回归脚本**只 build 测试 target** | ★ 独立 change（★ 给 ExternalProject 传 `CMAKE_CXX_COMPILER` / `CXX`） |
+| ★ **L2** | ★ `test_cpu_factory_isa_xlen.cpp` 的 3 个 case **依赖 reporter 实现**（★ XML 下失败）⇒ ★ 脆弱测试 | ★ 独立 change（★ 让 CpuFactory 的 warn 可注入 ⇒ 不依赖全局 `std::cerr`） |
+| ★ **L3** | ★ CI（`architecture-gates.yml`）**不构建项目、不跑测试** ⇒ ★ C1 的 build fixture **只在本地 ctest 生效** | ★ 归 **A4 `backend-parity-ci`**（B2） |
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
