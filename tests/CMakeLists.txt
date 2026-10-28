@@ -24,6 +24,11 @@ list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_csr_chmem.cp
 set(CHMEM_ONLY_TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_ibus.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_dmem.cpp"
+    # ★ C2（2026-10-28）：★ 本文件原本的 CH_MEM 部分被 `#ifdef` 包住 ⇒ TLM 可编译
+    # ⇒ ★ 但 **C2 新增的 G-1h/G-1i/G-1j 机检 case 在 `#ifdef` 之外**
+    #   （★ 它们要直接调 `elaborate()` / `ch_literal` ⇒ CH_MEM-only API）
+    # ⇒ ★ ⇒ ★ TLM 编译失败（★ 实测 11 errors）⇒ ★ 故**整体**移出 TLM 源集合。
+    "${CMAKE_CURRENT_SOURCE_DIR}/framework/test_pipe_builder_ports.cpp"
 )
 list(REMOVE_ITEM TEST_SOURCES ${CHMEM_ONLY_TEST_SOURCES})
 
@@ -234,6 +239,13 @@ foreach(_cf_chmem_only IN LISTS CHMEM_ONLY_TEST_SOURCES)
   if(NOT "${_cf_chmem_only}" IN_LIST CHMEM_TEST_SOURCES)
     message(FATAL_ERROR
         "CH_MEM-only 测试文件必须同时加入 CHMEM_TEST_SOURCES: ${_cf_chmem_only}")
+  endif()
+  # ★ ★ **反向断言**（★ C2 新增 —— ★ C1 只做了单向 ⇒ ★ 漏了「TLM 侧」）：
+  #   ★ CH_MEM-only 文件 **MUST NOT** 留在 TLM 的源集合里
+  #   ★ ⇒ ★ 否则 TLM 编译失败 ⇒ ★ ⇒ ★ **旧 TLM binary 静默顶替**（★ C1-①/②）
+  if("${_cf_chmem_only}" IN_LIST TEST_SOURCES)
+    message(FATAL_ERROR
+        "CH_MEM-only 测试文件不得留在 TLM 源集合（会导致 TLM 编译失败）: ${_cf_chmem_only}")
   endif()
 endforeach()
 
