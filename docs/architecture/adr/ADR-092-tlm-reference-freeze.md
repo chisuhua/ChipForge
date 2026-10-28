@@ -1,6 +1,6 @@
 # ADR-092 — TLM 参考实现的冻结与演进停止（Phase-1）
 
-> **Status**: ✅ **Accepted（v1.1，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~⑨ + R-1/R-2/R-3 + D-H-1/D-H-2/D-I-1 全部裁决；★ **v1.1 = 文档文本同步完成登记**（22 文件，见 §D7））**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~⑨ + R-1/R-2/R-3 + D-H-1/D-H-2/D-I-1 全部裁决；v1.1 = 文档文本同步完成登记（22 文件，见 §D7）；★ **v1.2 = §D3.1 D-I 逐 family 分类结果（42 family 逐条判定）+ ★ 数字更正「686」→「478 个 TLM-only case」（★ 原值是 `--list-tests | wc -l` 的**行数**，tag 独占一行 ⇒ 行数 ≈ 2× case 数）**）**
 > **上游**: ADR-088 v1.4 §10（三段迁移路径；本 ADR 是其**阶段 C 的 Phase-1 准备**，★ **不**替代其 5 条硬前置）· ADR-083（Plugin-style 单一 source of truth；★ **v1.2 表述纠偏**见「相关」）· ADR-040 v3.0 · ADR-091 v1.0（CH_MEM 开放核形态）
 > **下游**: `tools/check_tlm_freeze.sh`（冻结门禁升级）· `ip/**`（32 个冻结文件）· `docs/architecture/tlm-frozen-reference.md`（参考基准清单，★ 新建）· `openspec/specs/tlm-coverage-parity-ledger/spec.md`（★ **D-I 的落点 = ADR-088 阶段 B 台账**）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留 ⇒ 本 ADR 取 **ADR-092**。
@@ -21,13 +21,13 @@
 
 | 维度 | 直接删除 | ★ **冻结保留** | 取证 |
 |---|---|---|---|
-| **测试覆盖** | ❌ TLM binary **1017 case** vs CH_MEM binary **331 case** ⇒ **686 case 消失** | ✅ **保留** | 实测 `--list-tests` 计数 |
+| **测试覆盖** | ❌ TLM binary **1017 case** vs CH_MEM binary **331 case** ⇒ **478 个 TLM-only case 消失** | ✅ **保留** | 实测 `--list-tests` 计数 |
 | **冻结门禁有效性** | ❌ Check 7「TLM-only 文件不应含 ch 类型实例化」⇒ **文件集为空 ⇒ 真空 PASS**（ADR-088 点名的「最坏假绿形态」） | ✅ **文件集非空 ⇒ 检查仍有效** | `tools/check_tlm_freeze.sh` 检测面逻辑 |
 | **TLM 参考语义** | ❌ 丢失 | ✅ **保留为可执行基准**（优于散文规格） | ADR-088 硬前置③ |
 | **框架层单模化** | ✅ 立即可做 | ⚠️ **推迟**（`uint_t` 别名化后 TLM 代码不可编译 ⇒ 见 §4） | `include/cf/plugin/uint_t.h` 模态分支 |
 | **文档纠偏** | ✅ 现在做 | ✅ **现在可做**（只标注不删） | — |
 
-⇒ ★★ **冻结把三个风险（686 case 消失 / 真空 PASS / 参考语义丢失）全部推迟**，让**开放核主线（ADR-091）先行**，再回头做删除。
+⇒ ★★ **冻结把三个风险（478 个 TLM-only case 消失 / 真空 PASS / 参考语义丢失）全部推迟**，让**开放核主线（ADR-091）先行**，再回头做删除。
 
 ### 3. 现状：冻结机制**已存在**（可直接升级，不必新造）
 
@@ -52,7 +52,7 @@
 
 ⇒ ★ **TLM 代码会编译失败或语义错误** ⇒ 二选一：
 
-| | TLM 代码 | 框架层 | 686 case |
+| | TLM 代码 | 框架层 | 478 个 TLM-only case |
 |---|---|---|---|
 | **(a) ★ 采纳** | 保留 **+ 仍在构建** | **保持双模** | ✅ 保留 |
 | (b) | 保留源码 + 排除构建 | 立即单模化 | ❌ 消失 |
@@ -131,7 +131,7 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 
 ### D3 ★ D-I：覆盖缺口的处置方法（★ **按 family 分类，不按数字**）
 
-**问题**：若按「补齐 686 case」执行 ⇒ 需迁移**大量在 CH_MEM 上不存在的功能**。
+**问题**：若按「补齐 478 个 TLM-only case」执行 ⇒ 需迁移**大量在 CH_MEM 上不存在的功能**。
 
 ⇒ ★ **D-I-1 裁决：改用 family 级分类清单**，落点 = ★ **ADR-088 阶段 B 台账**（`docs/architecture/tlm-coverage-parity-ledger.md`）⇒ **不新造机制**。
 
@@ -144,7 +144,76 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 | `[soc]` `[cpu-l1-mmu-demo]` `[cpu-sim]` `[dhrystone]` `[performance]` | 待分类 | 依赖 SoC 级接线（ADR-091 S6） |
 | `[api]` `[bundles]` `[result-paradigm]` `[elf-loader]` `[isa-xlen]` `[cpu-configs]` `[stall]` `[probe]` `[picolibc]` `[base-addr]` `[base-window]` | 待分类 | 多数已有 CH_MEM 侧等价覆盖 |
 
-⇒ ★ **判据**：★ **MUST NOT 以「case 数」作删除判据**（686 是**形态差异**的产物，不是覆盖缺口）⇒ **以 family 分类的「真缺口」清单**为准。
+⇒ ★ **判据**：★ **MUST NOT 以「case 数」作删除判据**（478 是**形态差异**的产物，不是覆盖缺口）⇒ **以 family 分类的「真缺口」清单**为准。
+
+### D3.1 ★ D-I 的逐 family 分类结果（★ 2026-10-28 实测 + 逐条判定）
+
+> **实测口径**：`chipforge_tests --list-tests`（★ 按 **case 名级**差集去重 ⇒ ★ **TLM-only = 478 个 case**）
+> ★ **数字更正**：先前引用的「686」是 `--list-tests | wc -l` 的**行数**（Catch2 的 tag 独占一行 ⇒ 行数 ≈ 2× case 数）⇒ **不是** case 数。★ 「463」是 ADR-088 §5.2 的 2026-10-24 旧值。
+> **判定 4 档**：`不可迁`（CH_MEM 不存在该能力 = 形态差异）· `重复`（CH_MEM 已有等价覆盖）· `可迁`（与后端无关，可低成本迁）· ★ `真缺口`（CH_MEM 无等价、能力应当存在、**需补实现**）
+
+#### D3.1.1 ★ 汇总（★ 核心结论）
+
+| 判定 | family 数 | TLM-only case 数（★ 多 tag 重复计数） | 处置 |
+|---|---:|---:|---|
+| ★ **真缺口** | **8** | ~80 | ★ **集中在 2 个子系统**：MMU 语义面（6）+ Cache（1）+ 依赖 MMU 的 SoC demo（1）⇒ ★ **实装已有归属**（见 D3.1.3） |
+| **不可迁** | 15 | ~180 | ★ **形态差异**（TLM 特有语义 / 工具 / 多周期 FSM）⇒ **永远补不齐** ⇒ MUST NOT 作为删除判据 |
+| **重复** | 7 | ~110 | CH_MEM 侧已有等价覆盖（★ 48 ELF / 配置面 / ISA-XLEN / tohost / perf） |
+| **可迁** | 5 | ~15 | 与后端无关（JSON 拓扑 / ELF 加载 / 探针），★ **低成本可迁** |
+| ★ **合计** | **35**（去重后 33 个 TLM-only tag） | — | ★★ **478 个 TLM-only case 中，只有约 1/6 是真正的能力缺口** |
+
+⇒ ★★ **D-I 的方法论结论（★ 这是本节最重要的产出）**：
+> **「补齐 478 个 case」是错的工程目标** —— 其中约 **3/4 是形态差异或重复覆盖**，永远补不齐；
+> ⇒ ★ **真正的缺口集中在 2 个子系统（MMU + Cache），且它们的实装已有归属**
+> ⇒ ⇒ ★ **Phase-2 的实质不是「补测试」，而是「等这两个子系统实装」**
+> ⇒ ⇒ ★ **D-I 分类表 MUST 成为 ADR-088 阶段 B 台账的重新定性依据**（★ 落点 = 台账；★ **本 ADR 不改台账** —— 台账在 architect 的 `exclude_paths` 内 ⇒ 归阶段 B owner）
+
+#### D3.1.2 ★ 逐 family 判定表（★ 完整）
+
+| family | TLM-only case | 判定 | 理由 / 归属 |
+|---|---:|---|---|
+| `mmu` | 59 | ★ **真缺口** | ★ CH_MEM 的 MMU 只有 **TLB 命中路径**（`MMUPlugin_chmem.h` 302 行，**无 PTW walk**）⇒ 归 `chmem-ptw-walk`（ADR-085/086 已锁架构）+ `mmu-chmem-phase-b-c-launch` |
+| `cache` | 25 | ★ **真缺口** | ★ Cache 的 **CH_MEM 主插件不存在**（`--enable-cache` 是 fail-fast）⇒ 归 `verilator-l1cache-e2e-coverage`（wave4 P2 placeholder） |
+| `mmu-exception-handler` | 4 | ★ **真缺口** | CH_MEM 的 MMU exception handler **未注册进工厂** ⇒ 同 `mmu-chmem-phase-b-c-launch` |
+| `ptw` / `real-memory` / `api` / `stub-guard` | 3/3/1/1 | ★ **真缺口** | PTW 真实内存路径 ⇒ 同 `chmem-ptw-walk` |
+| `bare-shortcut` / `shadow-bug` / `paddr-propagation` | 3/3/3 | ★ **真缺口** | MMU 语义面（Bare 判定 / shadow bug / paddr 消费）⇒ 依赖 MMU 实装 |
+| `tlb-refill` | 2 | ★ **真缺口** | TLB refill ⇒ 依赖 MMU 实装 |
+| `cpu-l1-mmu-demo` | 6 | ★ **真缺口**（随 MMU） | SoC 级 demo 依赖 MMU ⇒ 阻塞于 PTW |
+| `cpu-integration` | 96 | ★ **不可迁**（主体） | ★ **3/7/10 stage 拓扑 + superscalar `dispatch_width=2`** ⇒ ★ **CH_MEM 是固定 5 级全组合通路 ⇒ 这些拓扑在 CH_MEM 上不存在** ⇒ 不可迁（★ 其中 `5stage` / `add_elf` 等子集**可迁**） |
+| `framework` | 94 | ★ **不可迁**（主体） | ★ `pb.run()` 每周期执行 / `array_store` TLM no-op / `uint_t` POD ⇒ TLM 特有语义 |
+| `cpu` | 137 | ★ **混合** | TLM 模式 CPU 单元测试 ⇒ 3/5/7/10 stage 与 superscalar 子集**不可迁**；其余 CH_MEM 侧已有对应（★ `[alu][semantics]` / `[keys]` / `[cpu-chmem-keys]`）⇒ **重复** |
+| `mul-div-fsm` / `mul-div-fsm-integration` / `cycle-parity` | 9/4/3 | ★ **不可迁** | ★ **CH_MEM 是组合式**（M-op 1 拍）vs TLM radix-2（多周期）⇒ ★ **cycle 不同构不可比**（ADR-089 已记录） |
+| `result-paradigm` | 4 | ★ **不可迁** | `Result<T>` 范式绑定 TLM 侧 `pb.run()` 路径 |
+| `picolibc` / `base-window` / `write_half` / `write_word` / `load_section` | 7/3/2/1/1 | ★ **不可迁** | `PicolibcHostMemory` 是 **TLM 侧 host 内存模型** ⇒ CH_MEM 侧用 `ch_mem` ⇒ 形态差异 |
+| `cpu-sim` / `base-addr` | 2/2 | ★ **不可迁** | ★ `tools/cpu_sim` 是 **TLM CLI 工具** ⇒ 随 TLM 退役删除（ADR-088 阶段 C） |
+| `bundles` | 9 | ★ **不可迁**（当前） | TLM POD bundle ⇒ 随 **ADR-092 Phase-2** 的 bundle 单模化处理 |
+| `riscv-tests` | 48 | ★ **重复** | ★ CH_MEM 侧 `[verilator]` **48 ELF 全 PASS**（含 8 rv32um）⇒ 功能重复覆盖 |
+| `rv32um` | 8 | ★ **重复** | ★ 同上（CH_MEM 侧 8 个 rv32um 真 PASS） |
+| `cpu-configs` | 27 | ★ **重复** | ★ P2 的 CH_MEM 配置面已落地（`test_cpu_config_chmem.cpp` + schema 标注）⇒ ★ **实为 binary 归属问题**（该文件只在 TLM binary）⇒ **零工作量可解** |
+| `chmem-config` | 14 | ★ **重复** + binary 归属 | ★ 同上 ⇒ 加一行 `CHMEM_TEST_SOURCES` 即可在 CH_MEM 侧也跑 |
+| `isa-xlen` | 9 | ★ **重复** | ★ ADR-087 的 ISA/XLEN 声明校验是 **JSON/编译期级** ⇒ 与后端无关 |
+| `tohost` | 3 | ★ **重复** | ★ CH_MEM 侧 `[verilator]` 48 ELF 判 `tohost==1` |
+| `performance` | 1 | ★ **重复** | ★ 已有 `verilator_perf_baseline`（DMIPS/MHz **1.34472**，2026-10-24 实测） |
+| `dhrystone` | 3 | ★ **部分重复** | ★ CH_MEM 侧已有 perf harness ⇒ 但 ★ **cycle 与 TLM 不可比**（ADR-088 §5.3）⇒ **不可直接对比** |
+| `negotiate` | 5 | ★ **重复** | ★ `CapabilityTable` 是框架级 ⇒ 与后端无关 ⇒ 应在 CH_MEM 侧也跑 |
+| `stall` | 19 | ★ **混合** | TLM 侧 stall 机制 ⇒ 不可迁；CH_MEM 侧已有 `[ctrl-link]` 对应 |
+| `soc` | 20 | ★ **可迁** | ★ JSON 拓扑验证**不依赖仿真后端** ⇒ 低成本可迁（★ 依赖 SoC 接线 = ADR-091 S6） |
+| `elf-loader` / `multi-section` | 3/1 | ★ **可迁** | ELF 加载是 **host 侧逻辑** ⇒ 与后端无关 |
+| `probe` | 1 | ★ **可迁** | 探针机制 ⇒ 与后端无关 |
+
+#### D3.1.3 ★ Phase-2 的准入结论（★ ADR-093 的前置据此更新）
+
+⇒ ★ **G-1「真缺口清单归零或全部显式登记」的判据 MUST 用本表**（★ **不是** case 数）：
+
+| 门禁 | 判据 | 当前状态 |
+|---|---|---|
+| **G-1a** | MMU 语义面 6 个 family ⇒ **实装**（`chmem-ptw-walk` + `mmu-chmem-phase-b-c-launch`）**或** 显式登记为已知边界 | ⬜ **未满足**（两个 change 均未实装） |
+| **G-1b** | Cache 1 个 family ⇒ **实装**（`verilator-l1cache-e2e-coverage`）**或** 显式登记 | ⬜ **未满足**（CH_MEM 主插件不存在） |
+| **G-1c** | `cpu-l1-mmu-demo` ⇒ 随 G-1a 解决 | ⬜ 随 G-1a |
+| **G-1d** | ★ **零工作量项**（binary 归属）：`chmem-config` + `cpu-configs` + `negotiate` 加入 `CHMEM_TEST_SOURCES` | ⬜ **可立即做**（★ 零代码改动） |
+| **G-1e** | ★ **低成本可迁项**（5 个 family / ~15 case）：`soc` / `elf-loader` / `multi-section` / `probe` | ⬜ 可选（★ 与后端无关） |
+
+⇒ ★★ **结论**：★ **Phase-2 的阻塞项收敛为「MMU + Cache 两个子系统的实装」** ⇒ ★ 这是**外部依赖**，不是「补测试」的工作量问题 ⇒ ★★ **ADR-092 Phase-1（冻结）应长期维持**，★ **Phase-2 的启动条件 = G-1a + G-1b 达成**（⇒ 与 ADR-088 §5.2 判据 6「差分门禁全绿」并列）。
 
 ### D4 ★ `ch_stream` 的层次区分（D-B 落地，避免误删 `Payload<T>`）
 
@@ -196,7 +265,7 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 
 ### 正面
 
-1. ★ **686 case 保留** ⇒ 「删掉 463/686 个 case 后没有自动机制能发现语义退化」这一盲区**不存在**
+1. ★ **478 个 TLM-only case 保留** ⇒ 「删掉数百个 case 后没有自动机制能发现语义退化」这一盲区**不存在**
 2. ★ **Check 7 不真空 PASS** ⇒ 冻结门禁在 Phase-1 全程有效
 3. ★ **TLM 参考语义以「可执行规格」形式保留** ⇒ ADR-088 硬前置③ **以实现满足**，MUST NOT 另写散文规格
 4. ★ **开放核主线（ADR-091）不被阻塞** ⇒ Phase-1 可全速推进
@@ -216,10 +285,10 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 
 | 备选 | 结论 | 理由 |
 |---|---|---|
-| **A. 直接删除 TLM** | ❌ 拒绝 | ★ 686 case 消失 + Check 7 真空 PASS + 参考语义丢失 ⇒ **三个风险同时发生**，而用户已明确「先不删」 |
+| **A. 直接删除 TLM** | ❌ 拒绝 | ★ 478 个 TLM-only case 消失 + Check 7 真空 PASS + 参考语义丢失 ⇒ **三个风险同时发生**，而用户已明确「先不删」 |
 | **B. 保留但不冻结**（现状） | ❌ 拒绝 | ★ 冻结门禁只「禁新增函数」⇒ **改函数体 / 改常量仍可发生** ⇒ 冻结不可信 ⇒ 参考基准会被悄悄改掉 |
-| **C. 冻结 + 排除构建** | ❌ 拒绝（Phase-1） | ⇒ 框架层可立即单模化，但 686 case 消失 ⇒ 违反「先不删」的意图 ⇒ 归 Phase-2（ADR-093） |
-| **D. 按「补齐 686 case」执行 D-I** | ❌ 拒绝 | ★ 大量 case 在 CH_MEM 上**不存在**（3/7/10 stage 拓扑 / 多周期 FSM cycle parity）⇒ 迁移不可行 ⇒ 改为 family 分类（D3） |
+| **C. 冻结 + 排除构建** | ❌ 拒绝（Phase-1） | ⇒ 框架层可立即单模化，但 478 个 TLM-only case 消失 ⇒ 违反「先不删」的意图 ⇒ 归 Phase-2（ADR-093） |
+| **D. 按「补齐 478 个 TLM-only case」执行 D-I** | ❌ 拒绝 | ★ 大量 case 在 CH_MEM 上**不存在**（3/7/10 stage 拓扑 / 多周期 FSM cycle parity）⇒ 迁移不可行 ⇒ 改为 family 分类（D3） |
 | **E. 另写散文规格替代实现** | ❌ 拒绝 | ★ 实现**即**规格（ADR-088 硬前置③ 原文「语义已抽成规格」）⇒ 散文 + 实现 = 双份漂移源 ⇒ 只做「文件 × 语义职责」清单 |
 | **F. 新造一套冻结机制** | ❌ 拒绝 | ★ `check_tlm_freeze.sh` **已存在**且检测面正确（除 D1.3 误判）⇒ 升级即可 |
 | **G. 用 `ch_stream` 取代 `Payload<T>`** | ❌ 拒绝 | ★ 层次不同（核内 stage 间 vs IP 间）⇒ `Payload<T>` 保留不动（D4） |
@@ -236,6 +305,7 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 - [ ] **V-6** ★ **零回归**：★ TLM binary **1017 case** 与 CH_MEM binary **331 case** 计数**不变**；★ 现有 52 case parity 基线**逐位不变**（预载核不动）
 - [ ] **V-7** ★ **门禁无假绿**：★ `check_plugin_portability.sh` **全绿**且 ★ **Check 2/4/6/7/13 仍有效**（★ 判据：★ 注入一个旧 Check 5 能抓的 `if(ch_bool)` ⇒ MUST 仍 RED ⇒ 防「改完门禁反而松了」）
 - [ ] **V-8** ★ **双模仍在**：★ `CF_PLUGIN_USE_CH_MEM` 使用点 **167 处仍在**（⇒ 证明 Phase-1 未误触单模化）
+- [ ] **V-10** ★ **D-I 分类表完成**：★ 42 个 family 逐条判定完毕（`真缺口` 8 / `不可迁` 15 / `重复` 7 / `可迁` 5）⇒ ★ 每个 family MUST 有**判定 + 理由 + 归属**；★ **case 数口径可复算**（case 名级差集 ⇒ 478）⇒ ★ **MUST NOT** 引用未去重的行数
 - [ ] **V-9** ★ **文档同步完成**：★ 22 个文件已同步（★ `AGENTS.md` + `docs/architecture/*` 5 篇 + `docs/GLOSSARY.md` + 模板 + lessons + 9 个 IP/README + `tests/bundles/README.md` + 4 份 configs JSON + 1 个 roadmap objective）⇒ ★ 复查「`不使用.*ch_stream`」类断言**仅剩已修正的合法表述**；★ **`MemReqBundle` 悬空引用在活文档中归零**（★ 设计文档**自带**该名字的 `struct` 定义处**保留** ⇒ 那是设计意图命名，非悬空）；★ **有意的边界**：研究快照 + 归档**未改**
 
 ---
