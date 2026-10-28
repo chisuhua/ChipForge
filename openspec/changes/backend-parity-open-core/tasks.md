@@ -97,6 +97,17 @@ depends_on:
 - [ ] ★ **L3** CI 不构建项目、不跑测试 ⇒ ★ C1 的 build fixture 只在本地 ctest 生效 ⇒ 归 **A4 `backend-parity-ci`**
 - [ ] ★ **L4** `[mmu-verilator]` 的 `mmu_bare_plumbing_tohost1_baseline_5_elf` 是**顺序敏感 flake**（★ 单跑 3/3 PASS ⇒ ★ 全量跑 FAIL，`tohost == 0`）⇒ ★ 根因**未最终定位** ⇒ ★ 已登记进 baseline 清单（★ 附「根因未定位」标注）⇒ 独立 change（owner: ip/mmu）
 
+## 3.6 ★ C2 — 存量 G-1a~G-1k 的**逐条变异对照复核**（★ 2026-10-28）
+
+- [x] C2.1 ★ **11 条存量约束逐条施加变异**（★ 撤掉该写法 ⇒ 判据 MUST RED）⇒ ★ **无一被证伪**（★ 与 v1.8 的 8 条候选中 **4 条被证伪**形成对照 ⇒ ★ 说明 S1/S3a 时期的登记确有实测支撑）
+- [x] C2.2 ★ **补 4 个机检 case**（★ G-1f / G-1h / G-1i / G-1j）⇒ ★ 覆盖度 = ★ **强 7 / 中 1 / 弱 3**
+- [x] C2.3 ★ **G-1b 后果描述更正**：★ 实测首个失败 = **29 个 `reference to 'detail' is ambiguous`**（★ 命名冲突）★ **非** ADR 原写的 multiple definition（★ `module.h:13` 缺 `inline` 仍成立）
+- [x] C2.4 ★ **「MUST 逐条机检」表述更正**（★ 名不副实 ⇒ ★ 改为**机检覆盖度矩阵**，★ 不得再宣称「逐条机检」）
+- [x] C2.5 ★ **副产物**：★ C1 的 CMake 断言改**双向**（★ CH_MEM-only **MUST NOT** 留在 TLM 源集合）+ `test_pipe_builder_ports.cpp` **整体**移出 TLM ⇒ ★ TLM 基线 **515 → 514 case**
+- [ ] ★ **W1** **G-1e / G-1g** 无机检（★ 弱）⇒ ★ 补机检或显式标注为「仅文档级」
+- [ ] ★ **W2** **G-1k** 的机检**依赖 A6** 的「开放核 vs 预载核」时序对比
+- [ ] ★ **W3** **G-1i** 的静态机检（★ 已评估并**放弃** ⇒ ★ grep 缩进启发式**误报严重** ⇒ ★ 避免门禁假红 ⇒ ★ 保留「机制锚」单测）
+
 ## 4. Phase 4 — S4：验证实现（`verify_mem_model_chmem.h`）
 
 - [ ] 4.1 [RED] 测试：验证实现加载 ELF 并正确响应 imem/dmem 请求 [ADR-091 §D2]
