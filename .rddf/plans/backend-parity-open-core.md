@@ -264,6 +264,91 @@
 ⇒ ★ **连带改动**：★ `CpuBusReq` 增 `size`（3 bit）⇒ ★ `ip/cpu/core/bus_iface_chmem.h`
 + ★ `tests/cpu/schema/test_cpu_bus_iface.cpp` MUST 同步 ⇒ ★ **H-1 仍满足**（3 ≤ 64）。
 
+### K17 — ★ A1（访存端口化）实施期的实测约束裁决（★ **5 条变异对照**）
+
+> ★ **ADR-091 v1.8 正文只留决策**（G-1l / G-1m 两条硬约束 + G-1c 修正 + 时序澄清）
+> ⇒ ★ **本节承载全部推导、证据与「被证伪的怀疑」**。
+
+#### K17.1 ★ 候选约束清单与**裁决表**（★ 8 条候选 ⇒ **只有 2 条**配登记为硬约束）
+
+| # | 候选「实测约束」 | 判据 | 裁决 |
+|---|---|---|---|
+| ★ **G-1l** | payload「累加式 select」（`X = select(cond, v, X)`）**需上游 stage 先写 `X`** | ★ **gdb 栈**：`muximpl::create_instruction` → `lnodeimpl::id(nullptr)` ⇒ `Simulator::initialize` 段错误 | ✅ **登记为硬约束** |
+| ★ **G-1m** | **`ch_bool` 禁用于 `?:` / `if`**（⇒ MUST 用节点级 `select()`） | ★ **变异对照 RED**：把 `select()` 换回 `?:` ⇒ 62 assertions ⇒ 2 处 FAILED（★ **写使能恒 0** + ★ **符号扩展失效**） | ✅ **登记为硬约束** |
+| G-1n（候选） | `ch_bool` 的 `&&` / `\|\|` 失效 | ★ **变异对照**：改回 `&&` / `\|\|` ⇒ **92 assertions 全绿** | ❌ **证伪 ⇒ 撤回** |
+| G-1o（候选） | `ch_uint` 的 `==` 走 `logic_buffer::operator==`（**节点指针比较**）⇒ 须显式限定调用 | ★ **变异对照**：改回 `a == b` ⇒ **92 assertions 全绿** | ❌ **证伪 ⇒ 撤回**（★ 显式限定调用仍保留，但降级为**防御性写法**） |
+| G-1p（候选） | 跨宽构造 `ch_uint<64>(ch_uint<32>)` 只支持截断 ⇒ 须用 `zext<64>` | ★ **变异对照**：改用跨宽构造 ⇒ **92 assertions 全绿** | ⚠️ **降级**（★ 原始 null impl 日志真实，但**已被后续修复覆盖** ⇒ 当前形态等效） |
+| G-1q（候选） | ctx 名必须唯一（否则节点 id aliasing） | ★ **变异对照**：全部场景用**同名 ctx** ⇒ **92 assertions 全绿** | ⚠️ **降级**为防御性写法（★ 该现象来自 **S3a** 的历史观测，本轮**未复现**） |
+| G-1r（候选） | `ch_reg<ch_uint<1>> <<= ch_bool` 与 `<<= ch_uint<1>` 路径不同 | ★ 未做对照实验 | ⚠️ **降级**（★ 实现本就显式转换 ⇒ 无需约束） |
+| G-1s（候选） | `bits<>` / `select()` 结果须显式转 `ch_uint` | ★ 未做对照实验 | ⚠️ **降级**为防御性写法（★ 显式化只提升可读性） |
+
+⇒ ★★ **裁决纪律**（★ 已升为 ADR-091 §D6 **V-9**）：
+★ 每条「实测约束」MUST 有**变异对照**（撤掉该写法 ⇒ 测试 MUST RED）⇒
+★ 否则它只是**猜测**，会被后人当铁律继承 ⇒ ★ 本轮 **8 条候选里 4 条被证伪**。
+
+#### K17.2 ★ ★ **真实的假失败根因 = 测试指令编码错误**（★ 最贵的误诊）
+
+★ 症状：`lbu` 场景期望 `0x000000FF`（零扩展）实得 `0xFFFFFFFF`（符号扩展）。
+★ 期间先后**误判**为 3 个不同根因（★ 每次都「修」了实现）：
+
+| 轮次 | 当时的假设 | 实际 |
+|---|---|---|
+| 1 | ★ `ch_bool` 的 `\|\|` 失效 ⇒ 符号扩展标志恒 0 | ❌ |
+| 2 | ★ `ch_uint` 的 `==` 走指针比较 ⇒ `funct3` 判定恒真 | ❌ |
+| 3 | ★ `?:` 的 contextual conversion | ✅ **成立**（但**只**解释「符号扩展失效」，**不**解释「`lbu` 被当 `lb`」） |
+
+⇒ ★★ **真正的根因**：★ 我写的 `lbu` 指令编码 `0x00030183` 把 `0x3` 放到了 **rs1** 字段（bits[19:15]），
+⇒ ★ **funct3（bits[14:12]）实际为 0** ⇒ ★ `lbu` 被解码成 `lb` ⇒ ★ 符号扩展**正确**施加 ⇒ ★ 假失败。
+
+★ **RISC-V I 型编码纪律**：`funct3[14:12] | rd[11:7] | rs1[19:15] | imm | opcode[6:0]`
+⇒ ★ `lbu` 正确编码 = `4<<12 | 3<<7 | 0x03` = **`0x00004183`**（★ 原值 `0x00030183` 差一个字段位置）。
+
+⇒ ★★★ **教训（可迁项）**：★ **假失败排查的 FIRST 检查项 = 输入编码 / 期望值本身**
+⇒ ★ **不是**实现。⇒ ★ ★ 本轮**为此浪费了 4 轮**（★ 每轮都改实现 + 加诊断端口）
+⇒ ★ ⇒ ★ **流程改进**：★ 每次断言失败 ⇒ ★ **先手算期望值**（★ 不看代码）⇒ ★ 再看实现。
+
+#### K17.3 ★ `ch_reg` 的时序模型（★ ADR-091 §D3a.4 的「时序澄清」依据）
+
+★ `ch_reg` 的 next 是**组合表达式** ⇒ ★ 每次 tick 的 sequential 阶段用
+★ 「**tick N-1 末的 DAG 状态**」重新求值 ⇒ ⇒
+
+```
+tick N 的 sequential :  addr_reg_ ← expr(tick N-1 末的状态)
+tick N 的组合        :  端口呈现 addr_reg_（= 拍 N-1 末算出的地址）
+host 读端口         :  在 tick N 之后读到 ⇒ 在 tick N+1 之前供数
+⇒ 消费拍 N+1 的数据  对应  地址拍 N        ⇒ 延迟 1 拍 ✔
+```
+
+⇒ ★★ 这正是 **G-1k**（访存地址 MUST 提前 1 拍可见）的成立机制
+⇒ ★ 也是 S5「验证实现 MUST 提前 1 拍供数」的**机制依据**。
+
+#### K17.4 ★ `Result<P>` 的**悬垂引用**陷阱（★ 本轮自引入 ⇒ 已修）
+
+★ `declare_in/out` 改成 `Result<Port>`（ADR-047）后，★ 惯用解包写法会引入悬垂：
+
+```cpp
+template <typename P> P& must(Result<P> r) { REQUIRE(r.has_value()); return *r; }
+auto& req_addr = must(pb.declare_out<U64>("x"));   // ❌ r 是临时 ⇒ *r 悬垂
+```
+
+⇒ ★ full-expression 结束后 `Result<P>` 临时对象析构 ⇒ ★ `port` 的 `impl_` 失效
+⇒ ★ **端口「消失」**（★ 最坏假绿：网表少端口 ⇒ 门禁照绿）。
+
+⇒ ★ **正确写法**：★ `must` **按值返回** + 调用方用**值语义**（★ C++17 copy elision
+⇒ ★ 不触发 `port` 的 deleted 拷贝赋值）：
+
+```cpp
+template <typename P> P must(Result<P> r) { REQUIRE(r.has_value()); return *r; }
+auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
+```
+
+#### K17.5 ★ ADR-047 Check 10 与 `declare_in/out` 的 `throw`（★ S1 遗留缺陷）
+
+★ S1 引入的 `declare_in/out` 用了 `throw PluginException(...)` ⇒ ★ **违反 ADR-047 Check 10**
+⇒ ★ **门禁红**（★ `check_plugin_portability.sh` [10/12] FAIL）⇒ ★ **本轮修复**：
+★ 改 `Result<Port>` + `std::unexpected(PluginError::NullContextPtr)` ⇒ ★ fail-closed 语义不变
+⇒ ★ 调用面 = ★ **3 个测试文件**（★ 生产代码零调用）⇒ ★ 破坏面可控。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
