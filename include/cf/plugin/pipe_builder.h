@@ -138,6 +138,10 @@ class PipeBuilder {
   }
 
   Result<void> build() {
+    // ★ ADR-091 v1.5 G-1j：`build()` 是**幂等**的（只跑 plugin 的
+    //   setup/build ⇒ 注册 at_stage）⇒ 重复调用安全 ⇒ 可作为 `elaborate()`
+    //   的自动前置（见 elaborate() 注释）。
+    built_ = true;
     // Phase C (ADR-082): 在 setup/build 之前跑 negotiate + 检查 unresolved
     CapabilityTable cap;
     try {
@@ -411,6 +415,21 @@ class PipeBuilder {
   //   每个 stage 的 flush = OR-merge of all registered CtrlLink flush_conds
   //   缺省 stall/flush 由各 stage 的 CtrlLink 决定; 无 CtrlLink → ch_bool(false)
   Result<void> elaborate(ch::core::context& ctx) {
+    // ★★ 框架级加固（ADR-091 v1.5 §D5.1 G-1h/G-1j，2026-10-28）：
+    //   ① `ctx_swap` —— ★ `elaborate` 此前**不做** current context 切换 ⇒
+    //      stage 闭包内创建的 `ch_*` 节点会**静默失败**（无 active context
+    //      ⇒ 值 0 / null impl）⇒ ★ 假绿通道。
+    //      ★ 既有 runner 均自行 `ctx_swap` 后调用 ⇒ 本处补齐是**幂等纯增益**。
+    //   ② 自动 `build()` —— ★ `build()` 跑 plugin 的 `setup()`/`build()`
+    //      （★ 注册 `at_stage` 闭包），`elaborate()` 只**执行**已注册的闭包
+    //      ⇒ ★ 漏调 `build()` ⇒ stage 从未注册 ⇒ **全部逻辑静默不执行**
+    //      （★ 最严重的假绿通道：网表能生成、端口能在，但功能全无）。
+    //      ⇒ 首次 `elaborate()` 前若尚未 build ⇒ 自动 build（幂等）。
+    ch::core::ctx_swap ctx_guard(&ctx);
+    if (!built_) {
+      auto b = build();
+      if (!b.has_value()) return b;
+    }
     const auto order = canonical_stage_order();
     for (const auto& stage_name : order) {
       for (int p_idx = 0; p_idx < 3; ++p_idx) {
@@ -567,6 +586,8 @@ class PipeBuilder {
       stage_payload_map_;
   // Prereq-1: ctx pointer (lifecycle managed by caller, not PipeBuilder)
   ch::core::context* ctx_ = nullptr;
+  // ★ ADR-091 v1.5 G-1j：`build()` 是否已执行（★ `elaborate()` 用它决定要不要自动 build）
+  bool built_ = false;
 #endif
 };
 
