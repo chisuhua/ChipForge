@@ -1,22 +1,10 @@
 {
   "schema_version": "role-v1",
   "current_role": "builder",
-  "updated_at": "2026-10-27T17:14:59Z",
+  "updated_at": "2026-10-28T00:07:24Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "builder",
-      "at": "2026-10-23T05:39:23Z",
-      "by": "user",
-      "trigger": "审查分批提交完成后，按用户既定指示切换 builder 实施建议"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-23T17:51:51Z",
-      "by": "user",
-      "trigger": "用户指令『切 architect 角色进行 B1 决策和 B2 定案』"
-    },
     {
       "role": "builder",
       "at": "2026-10-24T03:42:23Z",
@@ -124,6 +112,18 @@
       "at": "2026-10-27T17:14:59Z",
       "by": "user",
       "trigger": "用户指令「继续下一步」⇒ 实施 ADR-091 开放核（S1~S5）—— architect 不能 edit src/** / 立项 / 起草 plan ⇒ 切 builder"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-28T00:01:19Z",
+      "by": "user",
+      "trigger": "用户指令「先做 ADR-093 的前置（D-I family 分类表），然后继续 S3」⇒ D-I 分类表是架构裁决 ⇒ 切 architect"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-28T00:07:24Z",
+      "by": "user",
+      "trigger": "用户指令「先做 ADR-093 的前置（D-I family 分类表），然后继续 S3」⇒ D-I 前置已完成（ADR-092 v1.2 + ADR-093 + Z-1）⇒ 切 builder 实施 S3"
     }
   ]
 }
