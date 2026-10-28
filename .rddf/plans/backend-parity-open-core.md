@@ -200,6 +200,50 @@
 ⇒ Catch2 的 `static_cast<bool>` **不适用**（编译错误）⇒ 用 `bool(x.operator bool())`
 或 `x == ch_bool(ch_literal<1,1>{})` 做比较。
 
+### K13 — ★ 预载核的三侧访存时序**不对称**（★ A0 裁决的实测依据）
+
+| 侧 | 预载核实现 | 时延 | 实测依据 |
+|---|---|---|---|
+| **取指读** | `imem.sread(word_addr)` | **1 拍** | `ip/cpu/plugins/ibus_chmem.h:100-103` |
+| **访存读** | `mem.aread(word_addr)` | **0 拍**（组合） | `ip/cpu/plugins/dmem_chmem.h:185` |
+| **访存写** | `mem.write(word_addr, data, en)` | **同拍生效** | `ip/cpu/plugins/dmem_chmem.h:237`（★ 无 `swrite`/`awrite` 之分 ⇒ 组合写） |
+
+⇒ ★ 上游 `c27543d` 把 `aread` 对齐成 **0 拍组合 assign**（Simulator 与生成 Verilog 同为 0-cycle）⇒
+⇒ ★ **`imem` 必须用 `sread`**（否则 `INSTRUCTION` 与 `pc_lag` 的 1 拍对齐被破坏）⇒
+⇒ ★ **`dmem` 用 `aread`**（0 拍组合）⇒ ★ **写是同拍生效**。
+
+### K14 — ★ 端口形态下「0 拍读」为何**不可直接达成** ⇒ 三条推导
+
+1. ★ **端口形态 = 拍边界驱动**：外部从设备通过顶层 `ch_in` 端口供数 ⇒ 值在**拍边界**确定 ⇒
+   ⇒ 外部在拍 N 才拿到拍 N 的读地址 ⇒ ★ **无法在拍 N 组合给出该地址的数据**。
+2. ★ **唯一出路 = 地址提前 1 拍可见**：CPU 侧用 1 个 `ch_reg` 把访存地址打一拍 ⇒
+   ⇒ 端口在拍 N-1 就呈现地址 A ⇒ 外部在拍 N 组合算数据 ⇒ CPU 在拍 N **组合消费**
+   ⇒ ★★ **与预载核同拍消费 ✔**（⇒ 硬约束 **G-1k**）。
+3. ★ **写侧同拍生效**：地址拍 N-1 发出 ⇒ 外部拍 N 收到写请求 ⇒ 拍 N 执行写
+   ⇒ ★★ **写生效的绝对拍 = 拍 N = 与预载核一致 ✔**
+   ⇒ ⇒ **无 load-after-store 问题 ⇒ 不需要 stall，也不需要 forwarding**。
+
+⇒ ★★ **A0 裁决落地**（ADR-091 §D3a.4）：访存端口 = ★「**地址提前 1 拍发出 + 数据侧组合消费 + 写请求同拍发出**」。
+
+⇒ ★ **从设备的强约束**：★ MUST 是**组合 slave**（组合地响应读 + 组合地执行写）⇒
+★ Verilator 侧生成组合 `assign`（★ 上游 `c27543d` 已把 `aread` 对齐成 0 拍组合 assign ⇒ 可行）⇒
+⇒ ★ 若从设备是「拍边界 slave」⇒ 退化为 §D3a.2 的**第 ② 档**（`ready` 恒真 + 1 拍响应）。
+
+### K15 — ★ 「流水结构不同构」⇒ `cycles` / `pchash` **结构性不可比**
+
+| 维度 | 预载核 | 开放核 | 后果 |
+|---|---|---|---|
+| 流水结构 | ★ **全组合 5 级**（`ip/cpu/cpu_factory_chmem.h:431-435` 无 stage 寄存器）⇒ 访存地址同拍产生同拍消费 | ★ **带访存级寄存器**（地址打 1 拍）⇒ 消费点晚 1 拍 ⇒ 后续 stage 全部延后 | ★★ **不同构** |
+| `cycles`（tick count to done） | — | — | ★★ **必然不等** |
+| `pchash`（per-cycle ordered FNV-1a over PC） | — | — | ★★ **必然不等**（PC 序列长度与内容都变） |
+| `memsig`（折叠签名） | — | — | ★ **仍相等**（★ 只观测「写了哪一字 + 写了什么」的**集合/内容** ⇒ 与时序无关） |
+| `regs` / `tohost`（终值） | — | — | ★ **仍相等** |
+
+⇒ ★★ **H-3 判据修正**（ADR-091 §D6）：★ **3 终值逐位相等 + 2 轨迹走 ADR-089 例外白名单**。
+⇒ ★ **例外 scope MUST 限定**：「开放核 vs 预载核」对比语料（★ **需新 corpus**）⇒
+★ **双后端 parity 语料的 `cycles`/`pchash` MUST 保持逐拍相等**（★ 那是 A 阶段 52 case 基线，★ 不得被污染）。
+⇒ ★ **先例**：ADR-088 §5.3.3 的 M-op「组合式 1 拍 vs TLM radix-2 多周期 ⇒ cycle 不同构不可比」= **同族问题**。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
