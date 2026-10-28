@@ -114,7 +114,7 @@ fi
 FULL_RUN=0
 [[ $# -eq 0 ]] && FULL_RUN=1
 
-python3 - "$CONSOLE_OUT" "$KNOWN_LIST" "$CATCH2_EXIT" "$KNOWN_SECTION" "$FULL_RUN" <<'PY'
+python3 -u - "$CONSOLE_OUT" "$KNOWN_LIST" "$CATCH2_EXIT" "$KNOWN_SECTION" "$FULL_RUN" <<'PY'
 import re
 import sys
 
@@ -236,4 +236,7 @@ if [[ $PY_STATUS -eq 0 ]]; then
 else
     echo "[baseline] RESULT: 有新回归 ✘（详见上方 NEW failures）"
 fi
+# ★ 输出到**文件**时 bash 是块缓冲 ⇒ ★ 若进程被强杀 ⇒ 判定行会丢
+#   ⇒ ★ 显式 flush（★ 实测踩坑：★ 后台任务被进程组清理 ⇒ 判定输出丢失）
+sync
 exit $PY_STATUS
