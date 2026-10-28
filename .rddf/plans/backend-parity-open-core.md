@@ -244,6 +244,26 @@
 ★ **双后端 parity 语料的 `cycles`/`pchash` MUST 保持逐拍相等**（★ 那是 A 阶段 52 case 基线，★ 不得被污染）。
 ⇒ ★ **先例**：ADR-088 §5.3.3 的 M-op「组合式 1 拍 vs TLM radix-2 多周期 ⇒ cycle 不同构不可比」= **同族问题**。
 
+### K16 — ★ 为何「写语义」必须由**从设备**承担（★ A1 实施期发现的契约缺口）
+
+★ **缺口**：`CpuBusReq` 原字段清单 = `address`(64) / `data`(64) / `burst_len`(8) / `id`(8) / `is_write`(1)
+⇒ ★★ **没有「访问字节宽度」字段** ⇒ ⇒ sub-word store（`sb` / `sh`）的语义**无法表达**。
+
+| 方案 | 写语义 | 依赖 | 代价 | 等价性 |
+|---|---|---|---|---|
+| ★ **A. 从设备做 byte-strobe RMW**（★ **采纳**） | 请求带 `address`(字节地址) + `data` + `size`(1/2/4/8) ⇒ 从设备按 `address` 低 2 位 + `size` 推 mask，合并后写回 | ★ **不依赖读响应** | ★ **契约增 1 个 3-bit 字段** | ★ **写与预载核同拍生效** ✔ ⇒ 无 load-after-store ⇒ ★ **无需 stall / forwarding** ✔ |
+| B. CPU 侧做 RMW | CPU 必须先拿到「当前字」才能算合并值（★ 预载核靠 `aread` 拿到） | ★ **依赖读响应** | ★ 写晚 1 拍 ⇒ 需 **stall 或 forwarding** 整套机制 | ★ 写延迟 ⇒ cycles 再 +1 ⇒ 与预载核不等价 |
+
+⇒ ⇒ ★★ **裁决 A**：★ 代价对比 = **1 个 3-bit 字段** vs **一整套 stall/forwarding 机制 + 额外 1 拍延迟** ⇒ ★ 明显更小
+⇒ ★ 且 AXI 的 byte-strobe 语义是**行业惯例** ⇒ ★ 与「未来接 AXI4 适配」的方向一致。
+
+⇒ ★ **读侧不需要 `size`**：★ 从设备**总是返回整个对齐字**（低 32 位有效）⇒
+⇒ ★ CPU 侧按 `address` 低 2 位做 byte/half 提取（★ 与预载核 `dmem_chmem.h` 的 byte select 树**同款**）
+⇒ ⇒ ★ 读语义与预载核**逐位同构**。
+
+⇒ ★ **连带改动**：★ `CpuBusReq` 增 `size`（3 bit）⇒ ★ `ip/cpu/core/bus_iface_chmem.h`
++ ★ `tests/cpu/schema/test_cpu_bus_iface.cpp` MUST 同步 ⇒ ★ **H-1 仍满足**（3 ≤ 64）。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
