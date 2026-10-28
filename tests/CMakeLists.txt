@@ -116,13 +116,45 @@ set_target_properties(chipforge_tests PROPERTIES
 )
 
 # 注册到 ctest（单测试）
-add_test(NAME chipforge_tests COMMAND chipforge_tests)
+# ★ C1（2026-10-28）「旧产物顶替」假绿通道修复 —— ★ 三层防护：
+#   ① **baseline-aware 判定**（★ wrapper）⇒ ★ 判定「是否有**新**失败」
+#      ⇒ ★ 清单 = `tools/baseline_known_failures.txt`
+#      ⇒ ★ 修掉「entry 恒红 ⇒ 退出码失去意义」的老问题
+#   ② **build fixture**（★ `cf_build_all`）⇒ ★ ctest **先 build**
+#      ⇒ ★ 编译失败 ⇒ fixture FAIL ⇒ 依赖它的测试被标为 **Not Run**
+#      ⇒ ⇒ ★ ctest 整体 FAIL ⇒ ★ **fail-closed**（★ 不再跑旧产物）
+#   ③ **wrapper 拒绝缺失 binary**（★ exit 2）⇒ ★ 绝无「找不到就跳过」
+add_test(NAME chipforge_tests
+         COMMAND ${CMAKE_SOURCE_DIR}/tools/run_catch2_with_baseline.sh
+                 $<TARGET_FILE:chipforge_tests>)
 set_tests_properties(chipforge_tests PROPERTIES LABELS "unit;integration;catch2")
+set_tests_properties(chipforge_tests PROPERTIES FIXTURES_REQUIRED cf_build)
 
 # 让 ctest 可执行文件找到项目根
 set_tests_properties(chipforge_tests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+# ════════════════════════════════════════════════════════════════════
+# ★ C1：build fixture（★ fail-closed 的关键）
+# ════════════════════════════════════════════════════════════════════
+# ★ ctest **本身不构建项目** ⇒ ★ 若源码有编译错误，★ ctest 会**照跑旧产物**
+#   ⇒ ★ 报告「通过」而源码根本没编过 ⇒ ★ **假绿通道**（★ 本轮实测命中：
+#   ★ TLM binary 自 ADR-091 S1 起编译失败 ⇒ 回归跑的是旧产物）。
+# ★ ⇒ ★ 用 fixture 把「build」变成 ctest 的**前置**：
+#   · `cf_build_all` 跑 `cmake --build`（★ 增量）
+#   · 测试用 `FIXTURES_REQUIRED cf_build` 声明依赖
+#   ⇒ ★ build 失败 ⇒ fixture FAIL ⇒ 依赖测试标为 **Not Run**
+#   ⇒ ⇒ ★ ctest 整体 FAIL ⇒ ★ **fail-closed**（★ 不再静默跑旧产物）
+# ★ ★ **只 build 测试 target**（★ 不 build `all`）：★ `cmake --build <dir>`（all）
+#   会连带触发 **ExternalProject re-configure**（★ `cpptlm_external`）⇒ ★ 该
+#   独立 cmake 步骤**找不到编译器** ⇒ ★ 失败（★ 既存环境脆性，★ 与本 fixture
+#   无关 ⇒ ★ 已单独立项跟踪）⇒ ★ 而 `--target <测试>` **不**触发它（★ 实测
+#   EXIT=0）⇒ ★ 故此处**必须**限定 target。
+add_test(NAME cf_build_all
+         COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
+                 --target chipforge_tests chipforge_tests_chmem)
+set_tests_properties(cf_build_all PROPERTIES FIXTURES_SETUP cf_build)
 
 # ----------------------------------------------------------------------------
 # chipforge_tests_chmem: 第二测试 target, 编译选项 -DCF_PLUGIN_USE_CH_MEM=ON
@@ -232,8 +264,12 @@ set_target_properties(chipforge_tests_chmem PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     LINK_FLAGS "-Wl,--allow-multiple-definition"
 )
-add_test(NAME chipforge_tests_chmem COMMAND chipforge_tests_chmem)
+# ★ C1：★ 同 TLM entry（★ baseline-aware + build fixture 依赖）
+add_test(NAME chipforge_tests_chmem
+         COMMAND ${CMAKE_SOURCE_DIR}/tools/run_catch2_with_baseline.sh
+                 $<TARGET_FILE:chipforge_tests_chmem>)
 set_tests_properties(chipforge_tests_chmem PROPERTIES LABELS "unit;chmem")
+set_tests_properties(chipforge_tests_chmem PROPERTIES FIXTURES_REQUIRED cf_build)
 set_tests_properties(chipforge_tests_chmem PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
