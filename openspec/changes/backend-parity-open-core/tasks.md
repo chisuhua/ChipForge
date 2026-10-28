@@ -52,7 +52,21 @@ depends_on:
   ⇒ ★ 与预载核**共享** `ip/cpu/core/payload_common.h`（payload 契约）⇒ 语义不分叉
   ⇒ ★ **时序等价性**：`sread`（1 拍）≡ 请求当拍 → 响应下拍（也是 1 拍）⇒ ★ **H-3 等价性自检有前提**
   ⇒ ★ 端口**逐字段**（★ CppHDL 的 `ch_stream` 语义即 payload/valid/ready 三元组）
-- [ ] 3.2b [GREEN] ★ **分支重定向**（`pc` 由 branch 驱动）⇒ 本版本只做**顺序取指**（★ 诚实标注）
+- [x] 3.2b [GREEN] ★ **分支重定向 + flush**（★ ADR-091 v1.10 §D3a.5）
+  ⇒ ★ **实现**：`ip/cpu/core/branch_iface_chmem.h`（3 个核内 payload key）+
+    `ibus_port_chmem.h` 的 `branch LATE`（pc mux + `FLUSH` 打拍）+
+    `dmem_port_chmem.h` 的 store 抑制（`we = is_store ? !flush : 0`）
+  ⇒ ★ **测试**：`tests/cpu/test_cpu_open_core_branch.cpp`（★ **6 case / 339 assertions 全过**）
+  ⇒ ★ **pc mux**：★ `pc <<= select(BRANCH_TAKEN, BRANCH_TARGET, pc+4)`（★ 无 BP 预测臂）
+  ⇒ ★ **`FLUSH` 1 拍对齐**：★ `FLUSH(N) = BRANCH_TAKEN(N-1)` ⇒ ★ 与 `INSTRUCTION(N)` 对齐
+  ⇒ ★ **变异对照 4/4 RED**（★ `FLUSH` 恒 0 / 去掉抑制 / 不重定向 / 注册顺序倒置）
+  ⇒ ★★ **新增硬约束 G-1n**：★ **stage 首现序 MUST 等于流水顺序**
+    ⇒ ★ 装配方（含测试）MUST 按流水顺序注册 plugin（★ `setup()` 在 `build()` 时才跑）
+    ⇒ ★ 否则跨 stage payload **读不到** ⇒ 静默走 fail-open（★ 本轮踩坑）
+  ⇒ ★★ **诚实标注（仍未实现）**：
+    · ✗ **分支预测**（★ BP / BTB / GShare ⇒ 归 `feat-bp-btb-gshare`）
+    · ✗ **多拍错路**（★ 当前只 flush **1 拍**错路 ⇒ ★ 与预载核的两级取指同深度）
+    · ✗ **异常 / 中断重定向**（★ 归 `mmu-chmem-phase-b-c-launch` 的异常通路）
 - [x] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
   ⇒ ★ **实现**：`ip/cpu/core/dmem_port_chmem.h` + `tests/cpu/test_cpu_open_core_dmem.cpp`
     （★ **4 case / 92 assertions 实测全过**）⇒ ★ **8 个访存端口 + 1 个观测端口进网表顶层**
