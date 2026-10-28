@@ -193,7 +193,7 @@ bash tools/run_chipforge_tests.sh --all
 > - `[framework]`/`[cache]`/`[cpu]`/`[cpu-integration]`/`[soc]`/`[bundles]`/`[mmu]`/`[riscv-tests]`/`[cpu-l1-mmu-demo]`/`[tlb-refill]` — 全部在 `chipforge_tests` (TLM binary)
 > - `[chmem]`/`[cpphdl]`/`[elaborate]`/`[verilator]`/`[mmu-verilator]` — **全部在 `chipforge_tests_chmem`** (CH_MEM binary, `-DCF_PLUGIN_USE_CH_MEM`)
 > - **推荐运行**:
->   - TLM 快速回归：`./build/bin/chipforge_tests` (509 catch2 instances / 67453 assertions, ~0.6s；★ **1 个 baseline-known FAIL**：`7stage_topology_from_config` —— `node_count == 9` vs 期望 17（`cpu_superscalar.json` 的 `enable_mmu=false` ⇒ MMU 的 10 个 substage 不注册 ⇒ **期望值本身是旧的**，AGENTS.md §已知测试状态 早已登记为 infra drift）
+>   - TLM 快速回归：`./build/bin/chipforge_tests` (★ **515 catch2 instances / 67466 assertions / ~2m35s**，★ 2026-10-28 **重建后**实测；★ ★ **旧数字 509/67453/~0.6s 是「旧 binary」的假绿** —— TLM binary 自 ADR-091 S1 起**编译失败**（`built_` 声明被误置在 `#ifdef CF_PLUGIN_USE_CH_MEM` 内 ⇒ TLM 模式不可重建 ⇒ 回归跑的是旧产物）⇒ ★ 本轮修复后**重建** ⇒ 真实基线 = **515 case / 514 passed / 1 failed**；★ **1 个 baseline-known FAIL**：`7stage_topology_from_config` —— `node_count == 9` vs 期望 17（`cpu_superscalar.json` 的 `enable_mmu=false` ⇒ MMU 的 10 个 substage 不注册 ⇒ **期望值本身是旧的**，AGENTS.md §已知测试状态 早已登记为 infra drift）
 >   - 全量 (TLM + CH_MEM + verilator + gate)：`bash tools/run_chipforge_tests.sh --all`
 >   - Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2)：
 >     ```bash
@@ -435,7 +435,7 @@ bash tools/verify_adr.sh                           # ADR 漂移检查
 bash tools/verify_plugin_decision.sh                # D4 业务代码检查（~7 项）
 bash tools/check_plugin_portability.sh              # ADR-040 移植性检查（~4 项）
 bash tools/doc_link_check.sh                        # 文档死链检查
-bash tools/run_chipforge_tests.sh                   # 默认: TLM only (509 catch2 instances / 67453 assertions, ~0.6s, fast loop)
+bash tools/run_chipforge_tests.sh                   # 默认: TLM only (★ 515 catch2 instances / 67466 assertions / ~2m35s, ★ 2026-10-28 重建后实测)
 bash tools/run_chipforge_tests.sh --all             # 全量: ctest 4 entries (TLM + CH_MEM + Verilator smoke + gate, ~167s)
 python tools/doc_checker.py --format text --verbose  # 文档健康检查
 pre-commit run --all-files                          # 格式化/空白/JSON 检查
