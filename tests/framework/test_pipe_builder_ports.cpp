@@ -40,10 +40,12 @@
 #include <codegen_verilog.h>
 #include <core/context.h>
 #include <core/interpreter_backend.h>
+#include <core/literal.h>
 #include <core/io.h>
 #include <core/uint.h>
 
 #include "cf/plugin/pipe_builder.h"
+#include "cf/plugin/uint_t.h"
 #include "cf/plugin/plugin_exception.h"
 
 #include <type_traits>
@@ -228,3 +230,92 @@ TEST_CASE("ports: create_simulator accepts an injected backend", "[ports][chmem]
 }
 
 #endif  // CF_PLUGIN_USE_CH_MEM
+
+
+// ============================================================================
+// ★ C2（2026-10-28）：G-1h / G-1i / G-1j 的**机检**（★ 此前**无任何测试**）
+// ============================================================================
+// ★ 背景：★ ADR-091 §D5.1 声明「MUST 逐条机检」⇒ ★ 但 G-1e/f/g/h/i/j/k
+//   **无任何对应测试** ⇒ ★ 只是文档级纪律 ⇒ ★ 本节补上机检。
+// ★ ★ 三个 case 的断言对象都是「**纪律被违反时的可观测行为**」
+//   （★ 而非「实现正确时的行为」）⇒ ★ ⇒ ★ 它们**恒绿**
+//   ⇒ ★ ⇒ ★ **它们的作用是：★ 撤掉对应纪律 ⇒ ★ 本 case MUST RED**
+//   ⇒ ★ ★ 这就是 ADR-091 §D6 V-9「变异对照」纪律的**可执行形式**。
+namespace {
+
+/// ★ 测试用 plugin：★ `setup()` 注册一个 stage 闭包，★ 闭包内**创建 ch 节点**
+///   （写 payload）⇒ ★ 两条假绿通道的**共同触发点**：
+///   · 若 `elaborate()` 不自建 `ctx_swap` ⇒ ★ 闭包内建节点**静默为 null**（G-1h）
+///   · 若 `build()` 未被调用 ⇒ ★ 闭包**从未注册** ⇒ ★ 逻辑静默不执行（G-1j）
+class StageWritingPlugin : public cf::plugin::PluginBase {
+ public:
+  void setup(cf::plugin::PipeBuilder& pb) override {
+    pb.at_stage("g1_stage", cf::plugin::Phase::NORMAL, [this, &pb] {
+      auto* n = pb.node_of_logic_stage("g1_stage").get();
+      if (!n) return;
+      n->operator()(payload_) =
+          cf::plugin::uint_t<32>(ch::core::ch_literal<7, 32>{});
+    });
+  }
+
+  void build(cf::plugin::PipeBuilder&) override {}
+
+  cf::plugin::Payload<cf::plugin::uint_t<32>> payload_{"g1.test.value"};
+};
+
+}  // namespace
+
+TEST_CASE("ports: G-1h — elaborate() creates stage nodes without an explicit ctx_swap",
+          "[ports][chmem]") {
+  // ★ G-1h：★ `elaborate()` **MUST 自建 `ctx_swap`** ⇒ ★ 否则 stage 闭包内
+  //   创建的 ch 节点**静默失败**（值 0 / null impl）⇒ ★ 假绿通道。
+  // ★ 本 case **故意不**手工 `ctx_swap` ⇒ ★ 只依赖框架的自动 swap。
+  ch::core::context ctx("g1h_ctx");
+  cf::plugin::PipeBuilder pb(&ctx);
+  auto plugin = std::make_unique<StageWritingPlugin>();
+  auto* plugin_ptr = plugin.get();
+  pb.register_plugin(std::move(plugin));
+
+  REQUIRE(pb.elaborate().has_value());
+
+  // ★ 断言：闭包内的 payload 节点**确实被创建**（非 null impl）
+  auto* n = pb.node_of_logic_stage("g1_stage").get();
+  REQUIRE(n != nullptr);
+  REQUIRE(n->payloads().has(plugin_ptr->payload_));
+  REQUIRE(n->operator()(plugin_ptr->payload_).impl() != nullptr);
+}
+
+TEST_CASE("ports: G-1i — a ch literal created without an active context yields a null impl",
+          "[ports][chmem]") {
+  // ★ G-1i：★ plugin 的**成员初始化器**里创建 `ch_*` 字面量 ⇒ ★ 构造期
+  //   **通常无 active context** ⇒ ★ 静默失败（impl == nullptr）
+  //   ⇒ ★ ⇒ ★ 这就是「MUST 惰性创建」的原因。
+  // ★ 本 case 钉住该**机制**：★ 无 ctx ⇒ null impl；有 ctx ⇒ 非 null。
+  ch::core::ch_uint<32> v_no_ctx(ch::core::ch_literal<0, 32>{});
+  REQUIRE(v_no_ctx.impl() == nullptr);   // ★ 静默失败（★ 无报错）
+
+  ch::core::context ctx("g1i_ctx");
+  {
+    ch::core::ctx_swap guard(&ctx);
+    ch::core::ch_uint<32> v_with_ctx(ch::core::ch_literal<0, 32>{});
+    REQUIRE(v_with_ctx.impl() != nullptr);
+  }
+}
+
+TEST_CASE("ports: G-1j — elaborate() auto-builds so stage closures are registered",
+          "[ports][chmem]") {
+  // ★ G-1j：★ `build()` MUST 在 `elaborate()` 之前 ⇒ ★ 否则 `setup()` 从未
+  //   运行 ⇒ ★ `at_stage` 闭包**从未注册** ⇒ ★ **全部逻辑静默不执行**
+  //   （★ ADR-091 自称「最严重的假绿通道」）。
+  // ★ 框架已做**自动 build**加固 ⇒ ★ 本 case **故意不**调 `pb.build()`。
+  ch::core::context ctx("g1j_ctx");
+  cf::plugin::PipeBuilder pb(&ctx);
+  pb.register_plugin(std::make_unique<StageWritingPlugin>());
+
+  REQUIRE(pb.elaborate().has_value());
+
+  // ★ 断言：stage 闭包**已被注册**（⇒ 逻辑会执行）
+  const auto names = pb.stage_names();
+  REQUIRE(names.size() == 1u);
+  REQUIRE(names[0] == "g1_stage");
+}

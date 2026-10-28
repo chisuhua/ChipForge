@@ -170,6 +170,29 @@ TEST_CASE("bus_iface: write semantics are complete — size expresses byte width
   SUCCEED("⑥ 写语义完备：`size` 存在 + 位宽足够 + 进入 bundle 字段元信息");
 }
 
+TEST_CASE("bus_iface: G-1f — bundle fields carry no literal initializers "
+          "(ADR-091 G-1f)",
+          "[bus-iface][chmem]") {
+  // ★★ **G-1f 的机检**（★ C2 2026-10-28 新增 —— ★ 此前**无任何测试**）：
+  //   ★ G-1f：★ bundle 字段 **MUST NOT** 带**编译期字面量初始化器**
+  //     （★ `ch_literal<V,W>{}` 或等价的 `{0}`）⇒ ★ 否则**默认构造时**就创建
+  //     字面量节点 ⇒ ★ 无 active context 时**静默失败**（★ 值退化且不报错）。
+  //   ★ ★ **判据设计**：★ 在**有 active context** 的情况下默认构造 bundle
+  //     ⇒ ★ 若字段**无**初始化器 ⇒ ★ 字段保持**空节点**（`impl() == nullptr`）
+  //     ⇒ ★ 若字段带初始化器 ⇒ ★ 会**创建节点**（`impl() != nullptr`）
+  //   ⇒ ⇒ ★ 该判据**不依赖无 ctx 路径的可观测性**（★ 无 ctx 时上游只打日志
+  //   ⇒ 难以断言）⇒ ★ ★ 且对「加初始化器」这个变异**敏感** ✔
+  ch::core::context ctx("g1f_ctx");
+  {
+    ch::core::ctx_swap guard(&ctx);
+    CpuBusReq req;
+    // ★ 无初始化器 ⇒ 默认构造**不创建**节点
+    REQUIRE(req.address.impl() == nullptr);
+    REQUIRE(req.data.impl() == nullptr);
+    REQUIRE(req.size.impl() == nullptr);
+  }
+}
+
 TEST_CASE("bus_iface: ready-constant-high degrades to a non-blocking stream",
           "[bus-iface][chmem]") {
   // ★ ⑤ 握手成本：从设备 MUST 可将 `ready` 恒真 ⇒ 退化为无阻塞流
