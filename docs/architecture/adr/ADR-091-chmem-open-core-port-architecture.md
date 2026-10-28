@@ -1,6 +1,6 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
-> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.6 = A0 访存时序裁决（★ 2026-10-28 用户裁决 + architect 主持）：★ 访存端口 = 「地址提前 1 拍发出 + 数据侧组合消费 + 写请求同拍发出」⇒ 读/写数据时点与预载核同拍等价 ⇒ ★ 不需要 stall / forwarding；★ ★ 连带修正 H-3（5 观测量逐位相等 ⇒ **3 终值逐位相等 + 2 轨迹观测量走 ADR-089 例外白名单**）+ 新增硬约束 G-1k（访存地址 MUST 提前 1 拍）**；★ **推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K13~K15（★ 正文只留决策）**；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
+> **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.7 = A1 实施期发现并裁决「写语义」缺口：★ `CpuBusReq` MUST 增 `size`（3 bit，访问字节宽度）⇒ 写由**从设备**按 byte-strobe RMW ⇒ ⇒ ★ CPU 侧不依赖读响应 ⇒ 写**无延迟**（★ 代价远小于「CPU 侧 RMW ⇒ stall/forwarding」）；★ 同时补齐 `burst_len` 字段登记**；★ **v1.6 = A0 访存时序裁决（★ 2026-10-28 用户裁决 + architect 主持）：★ 访存端口 = 「地址提前 1 拍发出 + 数据侧组合消费 + 写请求同拍发出」⇒ 读/写数据时点与预载核同拍等价 ⇒ ★ 不需要 stall / forwarding；★ ★ 连带修正 H-3（5 观测量逐位相等 ⇒ **3 终值逐位相等 + 2 轨迹观测量走 ADR-089 例外白名单**）+ 新增硬约束 G-1k（访存地址 MUST 提前 1 拍）**；★ **推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K13~K15（★ 正文只留决策）**；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
 > **上游**: ADR-088 v1.4 §10（目标态：一个模型 CH_MEM + 两个后端 + 一道差分门禁）· ADR-089 v1.4（双后端差分 parity 门禁）· ADR-083（Plugin-style 单一 source of truth）· ADR-040 v3.0（TLM→HDL 移植性约束）
 > **下游**: `ip/cpu/core/`（新开放核实现）· `include/cf/plugin/pipe_builder.h`（端口声明 + 后端注入）· `ip/cpu/configs/cpu_config_chmem.h`（配置面复用）· `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A 载体）
 > **编号说明**: `ADR-090` 已被 `openspec/changes/vexii-riscv-parity-poc` 预留（VexiiRiscv 数值 SSOT），故本 ADR 取 **ADR-091**。
@@ -154,6 +154,7 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 |---|---|
 | 载荷类型 | ★ `CpuBusReq` / `CpuBusResp`（**新文件** `ip/cpu/core/bus_iface_chmem.h`，纯 `ch::core::ch_uint` + `bundle_base` 派生 + `CH_BUNDLE_FIELDS_T`） |
 | 字段宽度 | ★ **每字段 ≤ 64 bit**（ADR-091 H-1；★ `address`(64) / `data`(64) 恰好卡在上限 ⇒ **禁止再加宽**） |
+| ★ **字段清单（v1.7 补齐）** | ★ `address`(64) · `data`(64) · `burst_len`(8) · `id`(8) · `is_write`(1) · ★★ **`size`(3，v1.7 新增)** ⇒ ★ `size` = 访问字节数（1/2/4/8）⇒ ★ **写语义的载体**（见 §D3a.4） |
 | 方向 | 请求 = 核为 **master**（`as_master_direction()`）· 响应 = 核为 **slave**（`as_slave_direction()`）⇒ ★ 逐字段展开 ⇒ 144-bit 总宽**不触发** `PortBitwidthOverflow` |
 | 与老核 bundle | ★ **无耦合**（老核的 `cf::bundles::MemReq` 保持 POD 不动 ⇒ ADR-092 §D-E 推迟到 Phase-2） |
 | 命名一致性 | ★ **MUST NOT** 复用 `MemReqBundle`（悬空引用）；★ 老核 JSON 里的 `"bundle": "MemReqBundle"` 修正归 ADR-092 §D7 / 本节配套文档同步 |
@@ -165,7 +166,7 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | 项 | 决策 |
 |---|---|
 | ★ **读语义** | ★ **组合消费** `dmem_rsp_data`（★ **MUST NOT** 引入额外 1 拍 reg）⇒ ★ 与预载核 `aread`（0 拍）**同拍消费** |
-| ★ **写语义** | ★ **写请求同拍发出** ⇒ 外部在同拍执行 ⇒ ★ **写生效的绝对拍 = 与预载核一致**（★ 写**无延迟**） |
+| ★ **写语义** | ★★ **写由「从设备」按 byte-strobe RMW 完成**（★ **CPU 侧不做 RMW**）⇒ ★ **从设备**按 `address` 低 2 位（byte offset）+ `size` 推出 mask，合并后写回 ⇒ ★⇒ **写不依赖读响应** ⇒ ★ **写生效的绝对拍 = 与预载核一致**（★ 写**无延迟**）⇒ ⇒ ★ **无需 stall，也无需 forwarding**（★ 理由见 plan §K16） |
 | ★ **地址可见性** | ★ **访存地址 MUST 提前 1 拍发出**（相对数据消费点）⇒ 需 1 个地址 `ch_reg` ⇒ ⇒ **新增硬约束 G-1k** |
 | ★ **从设备义务** | ★ 从设备 MUST 是**组合 slave**（组合地响应读 + 组合地执行写）⇒ ★ Verilator 侧生成组合 `assign`（★ 上游 `c27543d` 已把 `aread` 对齐成 0 拍组合 assign ⇒ 可行） |
 | ★ **stall / forwarding** | ★ **不需要**（★ 写无延迟 ⇒ 无 load-after-store 问题）⇒ ★ §D3a.2 的 stall 要求**降级**为「仅当从设备非组合响应时」 |
@@ -360,6 +361,7 @@ module top (
 - [ ] **V-4** ★ **H-2 生效**：门禁的 5 个观测量**全部**从**顶层端口**读取 ⇒ ★ `--public-flat-rw` 读内部层级的路径**退休**（新核路径上）
 - [ ] **V-5** ★ **H-4 生效**：`ip/cpu/core/**` 全部文件**零** `cf::plugin::uint_t` / `cpptlm` 引用（★ 建议加 CI grep 检查）
 - [ ] **V-6** ★ **零回归**：★ 现有 52 case parity **基线不变**（预载核不动 ⇒ 报告应与 `openspec/changes/backend-parity-corpus/first-run-evidence.md` 的 A3 首跑**逐位一致**）⇒ ★ D4 架构门禁（`check_plugin_portability.sh` / `verify_plugin_decision.sh`）全绿
+- [ ] **V-8** ★ **写语义完备**（v1.7）：★ `CpuBusReq` MUST 含 `size`（3 bit）⇒ ★ `size` MUST 表达 1/2/4/8 四种字节宽度 ⇒ ★ **sub-word store 的 byte-strobe 语义 MUST 可表达** ⇒ ★ 契约测试 MUST 覆盖 `size` 的 4 种取值 ⇒ ★ **MUST NOT** 让 CPU 侧承担 RMW（★ 那会引入读响应依赖 ⇒ 写延迟 ⇒ stall/forwarding）
 - [ ] **V-7** ★ **DSE 正名生效**：`ip/cpu/docs/dse_architecture.md` 与 `tools/dse/README.md` 的表述与 D7 一致（★ 「表容量/存储深度的参数敏感度分析」；★ 明确列出**不可配**维度）⇒ ⚠️ **不得**仍以「7 维 576-config」描述 CH_MEM 路径
 
 ---
