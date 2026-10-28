@@ -84,6 +84,18 @@ depends_on:
   ⇒ ★ **框架级加固**（ADR-091 v1.5 §D5.1.2）：`elaborate()` 自建 `ctx_swap`（G-1h）+ 自动 `build()`（G-1j）
   ⇒ ★ 零退化：TLM **509 case / 508 passed / 1 failed**（baseline-known）· CH_MEM 框架子集 **24/24 全绿**
 
+## 3.5 ★ C1 — 「旧产物顶替」假绿通道排查（★ 2026-10-28，★ 独立于 S1~S5 主线）
+
+- [x] C1.1 ★ **排查三个通道**：① 框架成员误置 `#ifdef`（TLM 编译失败）② CH_MEM-only 测试进 TLM 的 `GLOB_RECURSE`（TLM 111 错误）③ **ctest 不构建项目**（编译失败 ⇒ 照跑旧产物）⇒ ★ 逐个封堵
+- [x] C1.2 ★ **真实基线修正**：★ TLM **509 → 515 case**（★ 旧数字是**旧产物**）⇒ ★ 唯一失败仍是 baseline-known `7stage_topology_from_config`
+- [x] C1.3 ★ **回归脚本三约束**：`tools/run_chipforge_tests.sh` ⇒ ★ ① **默认先 build**（编译失败即退出）② **产物新鲜度 fail-closed**（跳过 build 时校验 mtime）③ **baseline-aware 判定**
+- [x] C1.4 ★ **baseline-aware 运行器**：`tools/run_catch2_with_baseline.sh` + `tools/baseline_known_failures.txt`（★ 按 binary 分节 + 每条附根因/owner/收敛期限）⇒ ★ **「全量回归通过」信号恢复**（★ 原先 ctest entry **恒红** ⇒ 信号从来不存在）
+- [x] C1.5 ★ **ctest build fixture**：`cf_build_all` ⇒ ★ 编译失败 ⇒ 依赖测试 **Not Run** ⇒ ctest 整体 FAIL ⇒ ★ **fail-closed**（★ 实测：注入编译错误 ⇒ `0% tests passed, 2 tests failed`）
+- [x] C1.6 ★ **实测知识沉淀**：plan §K18（★ 含「Catch2 XML reporter 会破坏依赖 `std::cerr` 捕获的测试」等 4 条可迁结论）
+- [ ] ★ **L1** `cmake --build <dir>`（all）触发 ExternalProject re-configure ⇒ 找不到编译器 ⇒ 失败（★ 既存环境脆性）⇒ 独立 change
+- [ ] ★ **L2** `test_cpu_factory_isa_xlen.cpp` 的 3 个 case **依赖 reporter 实现**（★ XML 下失败）⇒ 脆弱测试 ⇒ 独立 change
+- [ ] ★ **L3** CI 不构建项目、不跑测试 ⇒ ★ C1 的 build fixture 只在本地 ctest 生效 ⇒ 归 **A4 `backend-parity-ci`**
+
 ## 4. Phase 4 — S4：验证实现（`verify_mem_model_chmem.h`）
 
 - [ ] 4.1 [RED] 测试：验证实现加载 ELF 并正确响应 imem/dmem 请求 [ADR-091 §D2]
