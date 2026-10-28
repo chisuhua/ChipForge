@@ -4,8 +4,17 @@
 # 功能描述: 运行 ChipForge 自身测试
 #
 # 默认路径 (Oracle 2026-10-06 修订): delegate 到 build/bin/chipforge_tests (TLM Catch2 binary)
-#   — TLM 全部 ~411 cases, 无 whitelist, 无 silent-failure
+#   — TLM 全部 ~515 cases, 无 whitelist, 无 silent-failure
 #   — **不**覆盖 chipforge_tests_chmem (CH_MEM/Verilator), 见 --all
+#
+# ★★★ C1（2026-10-28）「旧产物顶替」假绿通道修复 —— ★ 三条硬约束：
+#   ① **默认先 build**（★ 增量）⇒ ★ 产物必是「本轮源码」的 ⇒ ★ 编译失败
+#      ⇒ ★ **构建失败即退出**（★ 不跑旧产物）⇒ ★ `--no-build` 是逃生门
+#   ② **产物新鲜度 fail-closed**：★ 跳过 build 时校验 binary 的 mtime
+#      是否晚于全部编译输入 ⇒ ★ 否则**拒绝运行**（★ 并列出陈旧的源文件）
+#   ③ **baseline-aware 判定**：★ 委托 `tools/run_catch2_with_baseline.sh`
+#      ⇒ ★ 判定「是否有**新**失败」而非「是否有任何失败」
+#      ⇒ ★ 清单 = `tools/baseline_known_failures.txt`
 # --all:    调 ctest, 包含 TLM + CH_MEM (含 [verilator]/[mmu-verilator] 4 cases)
 #           + cpu_verilator_sim_add (Phase 6d.5 E8 standalone runner smoke)
 #           + verify_plugin_decision (PA-4b 缓解: 139 CppHDL internal 预期 'Not Run')
@@ -60,12 +69,18 @@ VERBOSE=""
 INCLUDE_ALL=""
 TAG_REGEX=""
 TAG_EXCLUDE=""
+# ★ C1①：★ 默认**先 build**（增量）⇒ ★ --no-build 是逃生门
+SKIP_BUILD=""
 
 # ---- 参数解析 ----
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --build)
             DO_BUILD=1
+            shift
+            ;;
+        --no-build)
+            SKIP_BUILD=1
             shift
             ;;
         --rebuild-deps|-r)
@@ -119,14 +134,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ---- 1. 必要时先 build ----
-if [[ -n "$DO_BUILD" ]]; then
-    echo "[run_chipforge_tests] --build: invoking tools/build.sh"
+# ---- 1. build（★ C1①：★ **默认执行**；★ 编译失败即退出 ⇒ 不跑旧产物）----
+if [[ -n "$SKIP_BUILD" ]]; then
+    echo "[run_chipforge_tests] --no-build: ★ 跳过 build ⇒ 将执行**产物新鲜度校验**"
+else
+    echo "[run_chipforge_tests] building (★ C1：保证产物 = 本轮源码) ..."
     BUILD_FLAGS=()
     [[ -n "$REBUILD_DEPS" ]] && BUILD_FLAGS+=("$REBUILD_DEPS")
     [[ -n "$SOURCE_DEPS" ]]  && BUILD_FLAGS+=("$SOURCE_DEPS")
     [[ -n "$ASAN" ]]         && BUILD_FLAGS+=("$ASAN")
-    "$BUILD_SCRIPT" "${BUILD_FLAGS[@]}"
+    if [[ ${#BUILD_FLAGS[@]} -gt 0 ]]; then
+        # ★ 显式要求「全量重建 deps / 切编译模式 / ASan」⇒ ★ 走 tools/build.sh
+        #   （★ 该路径会 build `all` ⇒ ★ 可能触发 ExternalProject re-configure
+        #   ⇒ ★ 既存环境脆性 ⇒ ★ 失败是**响亮的**（set -e ⇒ 退出）⇒ ★ fail-closed ✔）
+        "$BUILD_SCRIPT" "${BUILD_FLAGS[@]}"
+    else
+        # ★ 默认路径：★ configure（幂等）+ **只 build 测试 target**
+        #   ⇒ ★ 避开 `all` 的 ExternalProject re-configure 脆性（★ 实测 EXIT=0）
+        #   ⇒ ★ 编译失败 ⇒ set -e ⇒ 本脚本退出（★ 不跑旧产物）★ fail-closed ✔
+        JOBS_FLAG="-j$(command -v nproc >/dev/null 2>&1 && nproc || echo 2)"
+        cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug
+        cmake --build "$BUILD_DIR" --target chipforge_tests chipforge_tests_chmem $JOBS_FLAG
+    fi
 fi
 
 # ---- 2. 检查 build/ ----
@@ -157,6 +186,25 @@ if [ ! -x "$TEST_BINARY" ]; then
     exit 1
 fi
 
+# ---- 3b-0. ★ C1②：产物新鲜度 fail-closed ----
+# ★ 目的：★ 即使跳过了 build（如 --no-build），★ 也**拒绝**运行陈旧产物
+#   ⇒ ★ 因为「旧 binary 静默顶替」= 报告失真的**假绿通道**（★ 本轮实测命中：
+#   ★ TLM binary 自 ADR-091 S1 起编译失败 ⇒ 回归跑的是旧产物）。
+# ★ 判据：★ binary 的 mtime 必须**晚于全部编译输入**。
+if [[ -n "$SKIP_BUILD" ]]; then
+    STALE_INPUTS=$(find "$PROJECT_ROOT/include" "$PROJECT_ROOT/ip" "$PROJECT_ROOT/src" \
+                        "$PROJECT_ROOT/tests" "$PROJECT_ROOT/bundles" \
+                        "$PROJECT_ROOT/CMakeLists.txt" \
+                        -newer "$TEST_BINARY" -type f 2>/dev/null | head -20)
+    if [[ -n "$STALE_INPUTS" ]]; then
+        echo "ERROR: ★ 产物陈旧（★ C1 fail-closed）：★ 以下编译输入比 binary 更新："
+        echo "$STALE_INPUTS" | sed 's/^/    /'
+        echo "  ⇒ ★ 拒绝运行旧产物（★ 旧产物顶替 = 假绿通道）"
+        echo "  ⇒ ★ 请先执行: $0 --build   （或直接 cmake --build build）"
+        exit 1
+    fi
+fi
+
 # 构造 Catch2 tag filter
 #   --tag "[cache]"            → [cache]
 #   --exclude "[mmu]"          → ~[mmu]
@@ -179,8 +227,10 @@ fi
 CATCH2_FLAGS=()
 [[ -n "$VERBOSE" ]] && CATCH2_FLAGS+=("--success")
 
+# ★ C1③：★ 委托 baseline-aware 运行器（★ 判定「是否有新失败」）
+BASELINE_RUNNER="${SCRIPT_DIR}/run_catch2_with_baseline.sh"
 if [[ ${#CATCH2_FILTERS[@]} -gt 0 ]]; then
-    ./build/bin/chipforge_tests "$CATCH2_FILTER_STR" "${CATCH2_FLAGS[@]}"
+    "$BASELINE_RUNNER" "$TEST_BINARY" "$CATCH2_FILTER_STR" "${CATCH2_FLAGS[@]}"
 else
-    ./build/bin/chipforge_tests "${CATCH2_FLAGS[@]}"
+    "$BASELINE_RUNNER" "$TEST_BINARY" "${CATCH2_FLAGS[@]}"
 fi
