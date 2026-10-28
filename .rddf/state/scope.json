@@ -1,13 +1,13 @@
 {
   "schema_version": "scope-v1",
   "current_scope": {
-    "category": "ip",
-    "target": "cpu",
-    "sub_target": "docs"
+    "category": "tools",
+    "target": "ci",
+    "sub_target": "regression"
   },
-  "updated_at": "2026-10-26T08:11:53Z",
+  "updated_at": "2026-10-28T06:16:17Z",
   "updated_by": "user",
-  "session_id": "ses_ebd10896effeIBebOAJUcXVV3E",
+  "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
     {
       "from": "ip/mmu",
@@ -50,6 +50,13 @@
       "at": "2026-10-26T08:11:53Z",
       "by": "user",
       "trigger": "用户指令『把 bp-btb-gshare-design-brief.md 移入 ip/cpu/docs，遵循 scope 工作目录（ip-cpu 相关放 ip/cpu scope）』⇒ sub_target = docs"
+    },
+    {
+      "from": "ip/cpu",
+      "to": "tools/ci",
+      "at": "2026-10-28T06:16:17Z",
+      "by": "user",
+      "trigger": "用户指令「执行 C1」⇒ 改动落 tools/run_chipforge_tests.sh + tests/CMakeLists.txt ⇒ scope 切 tools/ci"
     }
   ]
 }
