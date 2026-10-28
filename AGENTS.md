@@ -436,7 +436,14 @@ bash tools/verify_plugin_decision.sh                # D4 业务代码检查（~7
 bash tools/check_plugin_portability.sh              # ADR-040 移植性检查（~4 项）
 bash tools/doc_link_check.sh                        # 文档死链检查
 bash tools/run_chipforge_tests.sh                   # 默认: TLM only (★ 515 catch2 instances / 67466 assertions / ~2m35s, ★ 2026-10-28 重建后实测)
-bash tools/run_chipforge_tests.sh --all             # 全量: ctest 4 entries (TLM + CH_MEM + Verilator smoke + gate, ~167s)
+bash tools/run_chipforge_tests.sh --all             # 全量: ctest 8 entries (TLM + CH_MEM + Verilator smoke + gate + build fixture)
+bash tools/run_chipforge_tests.sh --no-build        # ★ 跳过 build ⇒ 改为**产物新鲜度 fail-closed 校验**（陈旧即拒跑）
+
+# ★ C1（2026-10-28）：「回归是否通过」的判定已改为 **baseline-aware**
+#   ⇒ 清单 = tools/baseline_known_failures.txt（★ 按 binary 分节）
+#   ⇒ 只在出现**新**失败时退出码非 0（★ 原先 ctest entry 恒红 ⇒ 信号不存在）
+#   ⇒ baseline-aware 运行器：tools/run_catch2_with_baseline.sh
+# ★ ctest 的 cf_build_all fixture ⇒ 编译失败 ⇒ 依赖测试 Not Run ⇒ 整体 FAIL（fail-closed）
 python tools/doc_checker.py --format text --verbose  # 文档健康检查
 pre-commit run --all-files                          # 格式化/空白/JSON 检查
 ```
