@@ -166,6 +166,8 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/framework/test_pipe_builder_ports.cpp
     # ADR-091 S2 (backend-parity-open-core): 总线接口契约 (CpuBusReq/CpuBusResp)
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/schema/test_cpu_bus_iface.cpp
+    # ADR-091 S3 (backend-parity-open-core): 开放核取指端口化契约
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_ibus.cpp
     # ADR-092 v1.2 §D3.1 Z-1：P2 的 CH_MEM 配置面契约测试（★ 实测确认 CH_MEM binary
     #   此前 0 个「chmem config」case ⇒ binary 归属盲区）
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/schema/test_cpu_config_chmem.cpp
