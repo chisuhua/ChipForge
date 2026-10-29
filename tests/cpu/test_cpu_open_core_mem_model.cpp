@@ -90,6 +90,8 @@ struct MemRig {
   // ★★ **观测端口**（★ 契约名 `mem_sig` / `mem_sig_updates`）
   std::unique_ptr<ch::core::ch_out<U32>> mem_sig;
   std::unique_ptr<ch::core::ch_out<U32>> mem_sig_updates;
+  // ★★ **`tohost` 探针**（★ 契约名 `tohost_probe_data_proxy`）
+  std::unique_ptr<ch::core::ch_out<U32>> tohost_probe;
 
   std::unique_ptr<cf::cpu::core::VerifyMemModelPlugin> mem;
 
@@ -126,6 +128,11 @@ struct MemRig {
         must(pb.declare_out<U32>("mem_sig")));
     mem_sig_updates = std::make_unique<ch::core::ch_out<U32>>(
         must(pb.declare_out<U32>("mem_sig_updates")));
+    // ★★★ **契约名 = `tohost_probe_data_proxy`**（★ 与预载核
+    //   `dmem_chmem.h:278` 的**内部** proxy 节点名**完全一致**）
+    //   ⇒ ★ parity runner 的 `resolve_node_id` **两侧都命中** ⇒ ★ 零改动 ✔
+    tohost_probe = std::make_unique<ch::core::ch_out<U32>>(
+        must(pb.declare_out<U32>("tohost_probe_data_proxy")));
 
     mem = std::make_unique<cf::cpu::core::VerifyMemModelPlugin>();
     mem->bind_ports({imem_req_addr.get(), imem_req_valid.get(),
@@ -135,7 +142,9 @@ struct MemRig {
                      dmem_req_we.get(), dmem_req_valid.get(),
                      dmem_req_ready.get(), dmem_rsp_data.get(),
                      dmem_rsp_valid.get(), mem_sig.get(),
-                     mem_sig_updates.get()});
+                     mem_sig_updates.get(), tohost_probe.get()});
+    // ★ 与预载核同款（★ `cpu_factory_chmem.h:333` ⇒ `0x400` ⇒ 字节 0x1000）
+    mem->set_tohost_probe_word(0x400);
     pb.register_plugin(std::move(mem));
   }
 
@@ -360,6 +369,63 @@ TEST_CASE("open_core: memsig is exposed as top-level ports with contract names "
   std::string line;
   while (std::getline(f, line)) all += line + "\n";
   REQUIRE(all.find("open_mem_sig") != std::string::npos);
+}
+
+TEST_CASE("open_core: tohost probe reads the tohost word (ADR-091 v1.12 D3a.9)",
+          "[open-core][chmem]") {
+  // ★★★ **`tohost` 探针**（★ §D3a.9）：★ 归**从设备**（★ 开放核**不持有内存**
+  //   ⇒ 核侧无法 `aread` ⇒ ★ 预载核的 `tohost_probe_data_proxy` 在开放核
+  //   侧**无对应物** ⇒ ★ MUST 由从设备提供）
+  MemRig rig;
+  rig.build_and_run();
+
+  // ★ ① 探针位置（★ 字索引 0x400 ⇒ ★ 字节地址 0x1000）
+  constexpr std::uint64_t kTohostByteAddr = 0x1000u;
+
+  // ★ 未写时 ⇒ ★ 探针读到 0
+  REQUIRE(pv(*rig.sim, *rig.tohost_probe) == 0u);
+
+  // ★ ② 写入 tohost（★ riscv-tests 写 1 = PASS）⇒ ★ 探针 MUST 读到 1
+  rig.write(kTohostByteAddr, 1u, 4u);
+  REQUIRE(pv(*rig.sim, *rig.tohost_probe) == 1u);
+
+  // ★ ③ 写别的位置 ⇒ ★ 探针 MUST **不受影响**
+  rig.write(kTohostByteAddr + 4u, 0xDEADu, 4u);
+  REQUIRE(pv(*rig.sim, *rig.tohost_probe) == 1u);
+
+  // ★ ④ 改写 tohost ⇒ ★ 探针 MUST 跟随
+  rig.write(kTohostByteAddr, 0x42u, 4u);
+  REQUIRE(pv(*rig.sim, *rig.tohost_probe) == 0x42u);
+}
+
+TEST_CASE("open_core: tohost probe port uses the preloaded-core contract name "
+          "(ADR-091 v1.12 D3a.9)",
+          "[open-core][chmem]") {
+  // ★★ 契约名 MUST 与**预载核**一致（★ `dmem_chmem.h:278` 的
+  //   `mem.aread(probe_addr, "tohost_probe")` ⇒ 内部 proxy 节点名
+  //   = `tohost_probe_data_proxy`）
+  //   ⇒ ★ ⇒ ★ **parity runner 的 `resolve_node_id` 两侧都命中** ⇒ ★ 零改动 ✔
+  MemRig rig;
+  rig.build_and_run();
+
+  const std::string vpath = "/tmp/opencode/open_core_tohost_top.v";
+  {
+    ch::core::ctx_swap guard(&rig.ctx);
+    ch::toVerilog(vpath, &rig.ctx);
+  }
+  using cf_test::open_core::top_port_declared;
+
+  // ★ ① 契约名 MUST 精确存在（★ 顶层 `ch_out`）
+  REQUIRE(top_port_declared(vpath, "tohost_probe_data_proxy"));
+  // ★ ② ★★ **反向断言（G-1o）**：★ 端口名 MUST **NOT** 被改名
+  REQUIRE_FALSE(top_port_declared(vpath, "tohost_probe_data_proxy_1"));
+  // ★ ③ 内部 proxy MUST 用**别的**名字（★ 否则与顶层端口同名 ⇒ 撞名）
+  std::ifstream f(vpath);
+  REQUIRE(f.good());
+  std::string all;
+  std::string line;
+  while (std::getline(f, line)) all += line + "\n";
+  REQUIRE(all.find("tohost_probe_internal") != std::string::npos);
 }
 
 TEST_CASE("open_core: mem model write enable gates the write (ADR-091 S4)",
