@@ -1016,6 +1016,65 @@ struct SigRef {                       // ★ 复刻预载核折叠
 ★ 「必须显式取值」⇒ ⇒ ★ 反而写出**冗余代码**（★ 本实现**保留**显式取值
 ★ 只是为了与预载核**逐位同款**可读，★ 而非因为「不取就错」）。
 
+### K28 — ★ A5-4（`tohost` 探针）的证据 + ★★ 一个**契约名**的修正
+
+> ★ **ADR-091 v1.12 §D3a.9 正文只留契约** ⇒ ★ 本节承载证据与修正。
+
+#### K28.1 ★★★ 契约名修正：`tohost` ⇒ **`tohost_probe_data_proxy`**
+
+★ §D3a.9 原文（★ v1.12 落盘时）：★ 「`tohost` … 顶层 `ch_out`（★ 名 `tohost`）」
+
+★★ **本轮实测：该名 MUST 改** ⇒ ★ 理由（★ 全部有代码证据）：
+
+| 事实 | 依据 |
+|---|---|
+| ★ 预载核的观测节点名 = **`tohost_probe_data_proxy`** | ★ `dmem_chmem.h:278`：`mem.aread(probe_addr, "tohost_probe")` |
+| ★ `aread` 的 proxy 节点名 = **`name + "_data_proxy"`**（★ **完全可控**） | ★ `CppHDL/include/core/mem.h:141-142` ⇒ ★ `create_node<proxyimpl>(data_width, name + "_data_proxy", sloc)` |
+| ★ parity runner 按**节点名**采集 | ★ `parity_sim_runner.cpp:384`：`resolve_node_id(ctx, "tohost_probe_data_proxy")` |
+
+⇒ ★★ ⇒ ★ **顶层端口名 MUST = `tohost_probe_data_proxy`** ⇒ ★
+★ ⇒ ★ **parity runner 的 `resolve_node_id` 两侧都命中** ⇒ ★ **零改动** ✔✔
+★ ⇒ ★ 若用 `tohost` ⇒ ★ 预载核侧命中、开放核侧**落空** ⇒ ★ **runner 须特判** ✘
+
+⇒ ★ ★ **同理**：`memsig` / `mem_sig_updates` / `reg_1..reg_31` 的契约名
+★ ⇒ ★ **全部与预载核同名** ⇒ ★ ⇒ ★ **runner 对 5 个观测量全部零改动** ✔
+
+★ ★★ **修正需 architect 落 ADR**（★ 已签批 ADR 的措辞变更 ⇒ 归 architect 职权）
+⇒ ★ 本轮**不改** ADR ⇒ ★ 记录在此 ⇒ ★ **提请 architect 修正 §D3a.9 的 `tohost` 名**。
+
+#### K28.2 ★ G-1o 的第三次命中（★ 内部 proxy 名 MUST 与顶层端口名不同）
+
+★ 内部 `aread` 的 proxy 节点名 = `name + "_data_proxy"` ⇒ ★ 若内部用
+`"tohost_probe"` ⇒ ★ 内部节点名 = `tohost_probe_data_proxy`
+⇒ ★ **与顶层端口名完全相同** ⇒ ★ CppHDL 唯一化把**顶层端口改名**
+⇒ ★ **破契约**（★ 正是 G-1o）
+
+⇒ ★ ⇒ ★ 内部 MUST 用**别的**名字（★ 本实现：`"tohost_probe_internal"`
+⇒ ★ 内部节点名 `tohost_probe_internal_data_proxy`）⇒ ★ 不撞名 ✔
+⇒ ★ ★ **变异对照 M2 直接捕获**（★ 改回 `"tohost_probe"` ⇒ RED）。
+
+#### K28.3 ★ 探针位置与语义
+
+| 项 | 值 | 依据 |
+|---|---|---|
+| ★ 字索引 | ★ **0x400**（★ 字节地址 0x1000） | ★ 预载核 `cpu_factory_chmem.h:333`：`set_tohost_probe_word(0x400)` |
+| ★ API | ★ `set_tohost_probe_word(std::size_t)`（★ **同款**） | ★ 预载核 `dmem_chmem.h:57` |
+| ★ 读延迟 | ★ **0 拍**（★ `aread` 组合读） | ★ ADR-091 §D3a.4（★ 从设备 = 组合 slave） |
+| ★ 归属 | ★ **从设备** | ★ 开放核**不持有内存** ⇒ 核侧无法 `aread` |
+
+#### K28.4 ★ 变异对照（★ 3 个全 RED）
+
+| # | 变异 | 结果 |
+|---|---|---|
+| **M1** | ★ 探针地址错（★ 读字 0 而非 0x400） | ★ **1 case 失败** |
+| **M2** | ★ 内部 proxy 用契约名（★ ⇒ 与顶层端口同名 ⇒ 端口被改名） | ★ **1 case 失败**（★ 伴随编译错） |
+| **M3** | ★ 探针不驱动（★ 恒 0） | ★ **1 case 失败** |
+
+★ ★ 附：★ 本轮**又一次命中 C1 假绿通道**（★ 变异脚本的锚点空白不匹配
+⇒ ★ 改动未生效 ⇒ ★ **编译错 12 个** ⇒ ★ 但旧 binary 仍输出
+「All tests passed (761 assertions)」⇒ ★ ⇒ ★ **必须先确认编译 0 错再读测试结果**
+（★ 已在 A4-0 的 commit message 记过一次 ⇒ ★ **本轮再犯** ⇒ ★ **强化**）。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
