@@ -1,6 +1,7 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
 > **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.9 = C2 逐条变异对照复核（★ 存量 G-1a~G-1k 共 11 条 ⇒ ★ **无一被证伪** ⇒ ★ 但 ★ **机检覆盖度极不均衡**（★ 强 7 / 中 1 / 弱 3）⇒ ★ 增「G-1 的机检覆盖矩阵」+ ★ **更正 G-1b 的后果描述**（★ 实测 = **命名冲突**，★ 非 ADR 原写的 multiple definition））**；
+★ **v1.12 = A4 架构裁决（2026-10-29，用户裁决 + architect 主持）：★ 新增 §D3a.7「可复用单元的两层范式」（★ **Component 做可复用单元 + Payload 桥接** —— 用户裁决 A；★ 接口 = **纯 `Payload<T>`** —— 用户裁决 B；★ **MUST NOT** 用 `ch_stream`（★ 越层：ADR-092 §D4 定 `ch_stream` = IP 间）+ ★ **新增框架缺口 #4**（`PipeBuilder` 暴露 ctx））+ ★ 新增 §D3a.8「微架构边界」（★ **register re-naming = 需要**（★ 有实证）+ ★ **乱序 = 明确排除** + ★ 层次化 = 采纳）+ ★ 新增 §D3a.9「观测量的载体与归属」（★ **4 项裁决** ⇒ ★ `memsig`/`tohost` 载体 MUST 是**顶层 `ch_out`** + ★ `tohost` 归**从设备** + ★ `regs[32]` 走顶层端口 + ★ `pchash` 不改 `open_pc`）+ ★ **新增硬约束 G-1p**（★ Component MUST 共用 ctx ⇒ ★ 子 ctx ⇒ node-id aliasing）+ ★ Verification **V-16~V-19**（4 条）；
 ★ **v1.11 = A2 收尾审查 + `memsig` 观测来源裁决（2026-10-29，用户裁决 Q1/Q4 + architect 主持）：★ 新增 §D3a.6「`memsig` 观测来源 = **从设备自算**」（★ 节点名沿用 `mem_sig`/`mem_sig_updates` ⇒ ★ **parity runner 零改动**；★ 折叠算法 MUST 与预载核 `dmem_chmem.h:244-270` **逐位同款**；★ **从设备 MUST 提供**（强契约）⇒ ★ ADR-089 例外白名单**零新增**）+ ★ **新增硬约束 G-1o**（★ **顶层端口名 MUST NOT 与内部 `ch_reg`/`ch_node` 名同名** ⇒ ★ 否则 CppHDL 唯一化把端口改名（`open_pc` → `open_pc_1`）⇒ ★ **两后端端口名不一致** ⇒ ★ 破 H-5）+ ★ Verification **V-11~V-15**（5 条）；
 ★ **v1.10 = A2（分支重定向 + flush，S3.2b）实施期收敛：★ 新增 §D3a.5「分支反馈契约」（3 个核内 payload key + **1 拍对齐** + fail-open）+ ★ **新增硬约束 G-1n**（★ **stage 首现序 MUST 等于流水顺序** —— `canonical_stage_order()` 按首现序 ⇒ ★ 装配/测试注册顺序错 ⇒ **跨 stage payload 可见性反转** ⇒ 静默失效）+ ★ Verification **V-10**（4 个变异对照）；
 ★ **v1.8 = A1（访存端口化）实施期实测收敛：★ 新增 **2 条**硬约束（G-1l「累加式 select 需上游先写」+ G-1m「`ch_bool` 禁用于 `?:`」）+ ★ **G-1c 修正**（fail-closed 由 `throw` 改为 `std::unexpected` ⇒ 合 ADR-047 Check 10）+ ★ **访存时序模型澄清**（★ `ch_reg` 的 next 是组合表达式 ⇒ 端口呈现的是**上一拍末**算出的地址）+ ★ **诚实标注 4 条被变异对照证伪的怀疑**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ **均不成立** ⇒ ★ **不作为硬约束**）⇒ ★ 推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K17；
@@ -209,6 +210,45 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | ★ **H-3 中的地位** | ★ 保留在 H-3 的「**3 个终值观测量**（`tohost`/`regs`/`memsig`）逐位相等」内 ⇒ ★ 它验证的正是「**从设备 RMW 与预载核 RMW 逐位相同**」⇒ ★ 逻辑自洽 ⇒ ★ **不改 H-3** |
 | ★ **与 `tohost`/`regs` 的差别** | ★ `tohost`/`regs` 由**核**产生（★ 核持有寄存器堆）⇒ 走**顶层 `ch_out`**（H-2）⇒ ★ `memsig` 由**从设备**产生 ⇒ 走**内部节点名**（★ 预载核同款）⇒ ★ **两条观测通路并存**，MUST NOT 混淆 |
 
+#### D3a.7 ★ 可复用单元的**两层范式**（★ **A4 裁决**，2026-10-29，用户裁决 A/B + architect 主持）
+
+> ★ **推导与证据**（上游 `ch::Component` / `ch_module` / `ch_stream` / `rv32i_regfile` / `rv32i_pipeline_top` 的实测调研 · 6 项对比表 · 可行性验证）⇒ **`.rddf/plans/backend-parity-open-core.md` §K24** ⇒ ★ 本节只留**契约**。
+
+| 项 | 决策 |
+|---|---|
+| ★ **范式分层** | ★ **两层**：★ **层 1 = 核内 stage 间**（`PluginBase` + `at_stage` + `Payload<T>`）★ **层 2 = 可复用 IP 单元**（`ch::Component` + `io()` struct）⇒ ★ **层 2 的输出 MUST 由「桥接 plugin」发布成层 1 的 `Payload<T>`** |
+| ★ **单元载体** | ★ **`ch::Component` 子类**（★ 上游先例：`include/cpu/pipeline/rv32i_regfile.h` 的 `Rv32iRegFile : public ch::Component`）⇒ ★ **独立可测 + 可被 SoC 复用** |
+| ★ **接口载体** | ★ **纯 `Payload<T>`**（★ 用户裁决 B ⇒ ★ 复用 `ip/cpu/core/payload_common.h` 现有 key）⇒ ★ **MUST NOT** 为单元另造一套 IO 类型 |
+| ★ ★ **MUST NOT 用 `ch_stream`** | ★ `ch_stream<T>` 按 ADR-083 v1.2 + ADR-092 §D4 = **IP 间 / 核↔从设备**接口 ⇒ ★ 单元是**核内**部件 ⇒ ★ **越层**；★ 且 `ch_stream` 带 FIFO（`stream_fifo<T,DEPTH>`）⇒ ★ 引入延迟 ⇒ ★ H-3「逐位相等」更不可比 ⇒ ★ `ch_stream` 保留给 §D3a.3 的 `CpuBusReq`/`CpuBusResp` |
+| ★ **桥接 plugin** | ★ 每个 `Component` 单元 MUST 有**配套桥接 plugin**（★ `PluginBase`）⇒ ★ 在其 `at_stage` 闭包内把 `Component` 的 `io()` 输出**写成 `Payload<T>`** ⇒ ★ **层 2 → 层 1 的唯一通道** |
+| ★ ★ **ctx 共用（硬约束 G-1p）** | ★ `Component::build(external_ctx)` MUST **传 ChipForge 的 ctx** ⇒ ★ **MUST NOT** 自建 ctx（★ `Component::build(nullptr)` 会 `new context(name_, parent_ctx)` ⇒ ★ **子 ctx** ⇒ ★ node-id aliasing ⇒ ★ **上游已踩过此坑**：`include/device.h:12-19` 明载「child context for ops ⇒ 节点 id aliasing ⇒ 数据丢失」）⇒ ★ **框架缺口 #4**（§D5 **G-6**：`PipeBuilder` 暴露只读 ctx accessor） |
+| ★ ★ **MUST NOT 用 `ch_module<T>`** | ★ `ch_module<T>` 构造时要求**active parent Component**（★ `module.h:44` 报「No active parent Component found」⇒ ★ `Component::current()` 是 thread_local ⇒ ★ ChipForge 无此机制）⇒ ★ ⇒ ★ 用 **`Component` 子类 + 成员 + `build(ctx)`**（★ `build_internal` 内部自动 `set_current` ⇒ ★ **不需要**外部维护 `Component::current()`） |
+| ★ **build 时机** | ★ Component MUST 在**所有 `at_stage` 闭包之前**完成 `build()` ⇒ ★ ⇒ ★ 桥接 plugin 在其 **`setup(pb)`** 内建 Component（★ `setup()` 由 `PipeBuilder::build()` 按 `plugins_` 顺序调用 ⇒ ★ 早于 `elaborate()` 的 stage 闭包）⇒ ★ ★ **与 G-1n 同源**：★ 注册顺序即首现序 ⇒ ★ MUST 按流水顺序注册 |
+| ★ **顶层端口不污染** | ★ Component 的 `io()` 端口**不是网表顶层端口**（★ 只有 `ch_device` 的 top component 的 `io()` 才是）⇒ ★ ⇒ ★ 层 2 不引入新的顶层端口 ⇒ ★ **H-2 与 G-1o 不受影响**（★ 但 Component 的 io 名 MUST 仍与顶层端口名**不同名**，★ 理由同 G-1o） |
+
+#### D3a.8 ★ 微架构边界（★ **A4 裁决**，2026-10-29）
+
+| 项 | 决策 |
+|---|---|
+| ★ **register re-naming** | ★ **需要**（★ **有实证**：★ 预载核 `ip/cpu/plugins/reg_file_chmem.h:160-172` 注释明载 —— ★ `std::array` 默认构造会**泄漏 32 对孤儿 `regimpl`/`proxy` 节点**进 ctx ⇒ ★ 与显式命名的 `reg_0..reg_31` **撞名** ⇒ ★ Verilator 报 `Duplicate declaration of signal '_reg_N'`）⇒ ★ ⇒ ★ 开放核的 regfile MUST 用 **`std::vector` + 显式命名**；★ **契约名 `reg_N` MUST 保持**（★ `parity_sim_runner` 按 `reg_<i>` 采集）⇒ ★ **MUST NOT** 改名（★ 改名 ⇒ runner 失效） |
+| ★ **乱序（OoO）** | ★ **不支持**，且**明确排除**（★ 现状 = in-order 5 级全组合：★ 预载核 `cpu_factory_chmem.h:431-435` 无 stage 寄存器 ⇒ ★ 全组合通路）⇒ ★ 理由：★ 乱序是**比「流水结构不同构」更大的结构差异**（§D3a.4）⇒ ★ 会使 H-3 的「3 终值逐位相等」判据失效 ⇒ ★ ⇒ ★ 归 **§D9「明确不在本 ADR 范围内」** ⇒ ★ 未来若要 OoO ⇒ ★ **另立 ADR**（★ 不得在本 ADR 内顺手扩范围） |
+| ★ **层次化** | ★ **采纳**（★ 两层范式，见 §D3a.7）⇒ ★ 收益：★ 单元**独立可测** + **可被 SoC 复用** + 接口**自带边界** ⇒ ★ 代价：★ 多一层桥接 + 两套生命周期（`Component` vs `PluginBase`）共存 ⇒ ★ **MUST** 以「桥接 plugin」为唯一跨层通道（★ 否则跨 stage 可见性失效 ⇒ 破 G-1n） |
+| ★ **TLM 灵活性 / CH_MEM 可生成 Verilog 的兼顾** | ★ 单元**同时**具备两点：★ **TLM 侧**：★ `Payload<T>` 在 TLM 模式是 POD ⇒ ★ 单元算法可**纯 C++ 复用**（★ `lib/` 层）⇒ ★ **CH_MEM 侧**：★ `Component` 的 `describe()` 发射 DAG ⇒ ★ 可生成 Verilog ⇒ ★ ⇒ ★ **分层即兼顾**：★ **算法在 `lib/`（双模共用）· 行为在 `Component`（CH_MEM 发射）· 边界在 `Payload`（双模）** |
+
+#### D3a.9 ★ 观测量的**载体与归属**（★ **A4 裁决**，2026-10-29）
+
+> ★ **背景**：★ A2.6 台账同步时实测发现（★ plan §K23）★ Verilator 后端当前**全部 5 个观测量**都靠 `--public-flat-rw` 穿透内部层级（★ `mem_sig` → `top__DOT__mem_sig` · ★ `regs` → `top__DOT___reg_N` · ★ `tohost` → `top__DOT__dmem[word]`）⇒ ★ 这正是 **H-2** 要退休的「非契约路径」。
+
+| 项 | 决策 |
+|---|---|
+| ★ ★ **载体通则** | ★ **每个顶层观测量 MUST 是顶层 `ch_out` 端口**（★ H-2）⇒ ★ **MUST NOT** 是内部 `ch_reg`（★ 内部节点不在 Verilator 的 `port_access_` ⇒ ★ 只能穿透 ⇒ ★ 违背 H-2）⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 读内部层级 |
+| ★ ★ **`resolve_node_id` 的兼容** | ★ `parity_sim_runner` 的 `resolve_node_id` 遍历 `ctx.get_nodes()` ⇒ ★ **顶层端口节点也在其中** ⇒ ★ ⇒ ★ 载体改为顶层 `ch_out` 后 ★ **解释器侧 runner 零改动**（★ 这正是「顶层 `ch_out` 是唯一自洽解」的原因） |
+| ★ **`memsig` / `mem_sig_updates`** | ★ 归属**从设备**（§D3a.6）★ 载体 MUST 是**顶层 `ch_out`**（★ 名 `mem_sig` / `mem_sig_updates`）⇒ ★ **补齐 §D3a.6 未写的「载体」这一半**（★ §D3a.6 只写了「节点名」）⇒ ★ 节点名不变 ⇒ ★ runner 零改动 |
+| ★ **`tohost`** | ★ 归属**从设备**（★ 开放核**不持有内存** ⇒ ★ 核侧无法 `aread` ⇒ ★ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`（`dmem_chmem.h:278`）⇒ ★ **开放核无对应物**）★ 载体 MUST 是**顶层 `ch_out`**（★ 名 `tohost`） |
+| ★ **`regs[32]`** | ★ 归属**核**（★ 核持有寄存器堆）★ 载体 MUST 是**顶层 `ch_out`**（★ 名 `reg_1`..`reg_31` ⇒ ★ `reg_0` 为 x0 恒 0 ⇒ ★ 沿用 parity runner 的 1..31 口径）⇒ ★ **契约名 MUST NOT 改**（★ runner 按 `reg_<i>` 采集）⇒ ★ ★ **两侧载体不同**（★ 预载核 = 内部 `ch_reg` ⇒ 冻结集不动；★ 开放核 = 顶层端口）⇒ ★ **但 runner 零改动**（★ `resolve_node_id` 两侧都能命中）⇒ ★ **Verilator 侧**须分别处理（★ 归 A6） |
+| ★ **`pchash` / `pc`** | ★ 归属**核** ★ 载体 MUST 是**顶层 `ch_out`** ⇒ ★ **但契约名 `open_pc` MUST NOT 改**（★ 已进 ADR/tasks/测试 ⇒ 改名面大）⇒ ★ ⇒ ★ **parity runner 加 1 处 fallback**（★ 先试 `pc` ⇒ 未命中则试 `open_pc`）⇒ ★ 归 A6（★ **runner 改动，非契约**） |
+| ★ **`cycles`** | ★ 轨迹观测量 ⇒ ★ **MUST 走 ADR-089 例外白名单**（★ H-3；★ scope 限定「开放核 vs 预载核」）⇒ ★ **不改** |
+
 ### D4 ★ 两套 bundle 并存（新核用新 bundle，老核代码不动）
 
 > 用户裁决 D0-⑨ + D0-③。
@@ -237,13 +277,14 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 
 ⇒ **代价（诚实登记）**：两套 bundle 并存 ⇒ 长期漂移风险 ⇒ 缓解见 D6 的等价性自检。
 
-### D5 ★ 插件框架层的 3 项缺口（★ 全部是**新增**，不改现有语义）
+### D5 ★ 插件框架层的 4 项缺口（★ 全部是**新增**，不改现有语义）
 
 | # | 缺口 | 落点 | 规模 |
 |---|---|---|---|
 | **G-1** | **端口声明能力**：`PipeBuilder` 无 `ch_in`/`ch_out` API | `include/cf/plugin/pipe_builder.h` 新增（★ 4 条实测约束见 **D5.1**） | 1~2 人日 |
 | **G-5a** | **后端注入**：`create_simulator()` 无后端参数 | 新增 `create_simulator(std::unique_ptr<ch::IEvalBackend>)`（★ `nullptr` = 保持现有默认行为 ⇒ 向后兼容） | 0.5 人日 |
 | **G-4** | CH_MEM 版 bundle 定义 | `ip/cpu/core/bus_iface_chmem.h`（新）⇒ ★ 真名 `CpuBusReq`/`CpuBusResp`（D3a.3） | 1~2 人日 |
+| ★ **G-6** | ★ **ctx 可见性**：★ `PipeBuilder` 的 `ctx_` **private 无 accessor** ⇒ ★ 无法把 ChipForge 的 ctx 传给 `ch::Component::build(external_ctx)` ⇒ ★ §D3a.7 的 Component 单元**无法共用 ctx** | `include/cf/plugin/pipe_builder.h` 增 `context* ctx() const`（★ **只读 accessor**，★ 不改现有语义）⇒ ★ 或等价的新增工厂 API | ★ 0.5 人日 |
 
 ⇒ ★ **框架层仍不引入「配置面」**（G-2）：配置归 `ip/cpu` 层（复用已落地的 `CpuConfigChmem`，见 `.rddf/improvements/chmem-cpu-json-config.md`）。
 ⇒ ★ **框架层仍不引入「DSE 维度抽象」**（G-3）：归 `ip/cpu/core/`（D7）。
@@ -267,6 +308,7 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1j** | ★ **`PipeBuilder::build()` MUST 在 `elaborate()` 之前调用**（★ **v1.5 已做框架级加固**：`elaborate` 检测未 build ⇒ 自动 build） | ★ `build()` 跑 plugin 的 `setup()`/`build()`（★ **注册 `at_stage` 闭包**），`elaborate()` 只**执行**已注册的闭包 ⇒ ★ 漏调 `build()` ⇒ stage 从未注册 ⇒ **全部逻辑静默不执行**（★ 网表能生成、端口能在，但功能全无）⇒ ★ 既有 runner 靠 `CpuFactoryChmem::build_cpu()` 内部调 `build()` ⇒ ★ 又是**隐式约定** | ★★ **最严重的假绿通道** |
 | **G-1n** | ★ **stage 的「首现序」MUST 等于流水顺序** ⇒ ★ 装配方（含测试）MUST 按流水顺序**注册 plugin**（★ `setup()` 在 `build()` 时按 `plugins_` 顺序调用）⇒ ★ **MUST NOT** 在 plugin 注册**之前**直接 `at_stage` | ★ `canonical_stage_order()` 只看 stage 名的**首现序** ⇒ ★ 若提供者先注册 `branch`/`memory` ⇒ ★ `fetch` 被排到**最后** ⇒ ★ `memory NORMAL` 先于 `fetch NORMAL` 执行 ⇒ ★ 跨 stage payload **读不到**（`has()` = false）★ **实测命中** | ★ **跨 stage payload 可见性反转** ⇒ ★ 静默走 fail-open（端口在、语义为零 ⇒ 最坏假绿） |
 | **G-1o** | ★ **顶层端口名 MUST NOT 与内部 `ch_reg` / `ch_node` 名同名** ⇒ ★ 且 ★ 端口名 MUST 与内部节点名**可区分**（★ 建议内部 reg 用 `_reg` 后缀，如 `open_pc_reg`） | ★ CppHDL codegen 按 `eval_list` 顺序建 `name_counts`（`codegen_verilog.cpp:64-76`）⇒ ★ **内部 node 先占名** ⇒ ★ 重名者加 `_N` 后缀 ⇒ ★ **实测**：顶层端口 `open_pc` 被改名 `open_pc_1`（`open_core_ports_top.v:11`）⇒ ★ 同时 `ctx` 里**两个节点同名** ⇒ ★ `resolve_node_id(ctx, "pc")` 取**首个**匹配 ⇒ ★ 观测可能读到 `ch_reg` 而非端口 | ★ **两后端端口名不一致**（Simulator 侧 `open_pc` / Verilator 侧 `open_pc_1`）⇒ ★ 破 H-5（★ Verilator 侧按**生成成员名**读 ⇒ 读到 `open_pc_1` ⇒ ★ 按名匹配失败 ⇒ **静默读不到** ⇒ 最坏假绿） |
+| **G-1p** | ★ **`ch::Component` MUST 共用 ChipForge 的 ctx** ⇒ ★ `Component::build(external_ctx)` MUST 传外部 ctx ⇒ ★ **MUST NOT** 自建 ctx（★ `build(nullptr)` ⇒ 子 ctx ⇒ ★ node-id aliasing ⇒ ★ 数据丢失） | ★ `Component::build`（`component.cpp:107-118`）：★ `external_ctx` 非空 ⇒ `ctx_ = external_ctx`；★ 否则 `new context(name_, parent_ctx)` + `ctx_owner_ = true` ⇒ ★ **子 ctx** ⇒ ★ **上游已踩坑**（`include/device.h:12-19` 明载「child context for ops ⇒ 节点 id aliasing ⇒ 丢失 component 的 output ports」）⇒ ★ **框架缺口 #4**（§D5 **G-6**：`PipeBuilder` 暴露只读 ctx accessor） | ★ **node-id aliasing** ⇒ ★ 组件的输出端口**从 simulator 的 `data_map` 消失** ⇒ ★ 观测**静默读不到** ⇒ ★ 最坏假绿 |
 | **G-1l** | ★ **payload 的「累加式 select」（`X = select(cond, v, X)`）MUST 由上游 stage 先写 `X`** ⇒ 否则 false 分支在首次赋值前被读 ⇒ `PayloadStore::get`（可变版）缺失时 emplace **null impl** ⇒ `Simulator::initialize` **段错误** | ★ gdb 栈坐实：`muximpl::create_instruction` → `lnodeimpl::id(nullptr)` ⇒ `Simulator::initialize` 段错误 | ★ **段错误**（★ 预载核不崩是因为 EX 阶段总是先写 `RD_DATA`） |
 | **G-1m** | ★ **`ch_bool` MUST NOT 用于 C++ 条件上下文**（`?:` / `if`）⇒ ★ MUST 用**节点级 `select()`** | ★ `ch_bool::operator bool` 是 **explicit** ⇒ ★ 在 `?:` / `if` 里走 **contextual conversion** ⇒ ★ **静默取 false** ⇒ ★ **变异对照 RED**（`select()` → `?:` ⇒ 2 处 FAILED：★ **写使能恒 0**（写请求发不出去 ⇒ 端口在、值全 0 ⇒ 最坏假绿）+ ★ **符号扩展失效**） | ★ **静默失效**（★ 无编译错误、无运行错误 ⇒ 只表现为「值不对」） |
 | **G-1k** | ★ **访存地址 MUST 提前 1 拍发出**（相对数据消费点）⇒ 需 1 个地址 `ch_reg` | ★ 端口形态下外部从设备是「拍边界驱动」⇒ 拍 N 才知道拍 N 的读地址 ⇒ ★ **无法在拍 N 组合给出数据** ⇒ ⇒ 地址 MUST 提前 1 拍可见（★ §D3a.4 A0 裁决） | ★ 访存读退化为 1 拍 ⇒ **与预载核不等价** ⇒ ⇒ `memsig`/`regs` 的 H-3 判定随之失效 |
@@ -346,7 +388,7 @@ module top (
 
 ### ★ 正文长度自检（★ 诚实标注 —— 不在本次顺手重构）
 
-★ 本 ADR 已 **> 250 行**（★ 正文 = 决策本身）⇒ ⇒ ★ **推导与证据已外移**（§D3a.4 的推导 → plan §K13~K15）⇒ ★ **建议后续拆分**：★ 「核形态决策」与「端口契约 + 实测约束（G-1 系列）」可拆为 **ADR-091 + 1 篇主题文档** ⇒ ★ **归后续独立 change**（★ 不在本次顺手改写 —— 存量文档不追溯）。
+★ 本 ADR 已 **> 250 行**（★ 正文 = 决策本身；★ v1.12 后约 520 行）⇒ ⇒ ★ **推导与证据已外移**（★ §D3a.4 → plan §K13~K15 · ★ §D3a.5 → §K20 · ★ §D3a.6 → §K21 · ★ §D3a.7 → §K24）（§D3a.4 的推导 → plan §K13~K15）⇒ ★ **建议后续拆分**：★ 「核形态决策」与「端口契约 + 实测约束（G-1 系列）」可拆为 **ADR-091 + 1 篇主题文档** ⇒ ★ **归后续独立 change**（★ 不在本次顺手改写 —— 存量文档不追溯）。
 
 ### D7 ★ DSE 的定位与可扫维度清单
 
@@ -437,6 +479,10 @@ module top (
 - [ ] **V-13** ★ **从设备强契约**（v1.11）：★ 任一作为 DUT 一部分的从设备 MUST 暴露 `mem_sig`/`mem_sig_updates` ⇒ ★ **MUST NOT** 新增 ADR-089 例外白名单条目来绕过 ⇒ ★ 白名单条目数 MUST 保持 1（★ 那 1 条是**合成**自检条目，★ 不计真实例外）
 - [ ] **V-14** ★ **端口名解耦**（v1.11，★ G-1o）：★ 生成网表的顶层端口名 MUST **等于**契约名（★ 如 `open_pc` / `open_flush`）⇒ ★ **MUST NOT** 出现 `_N` 后缀改名 ⇒ ★ 变异对照：★ 把内部 `ch_reg` 改回与端口同名 ⇒ MUST RED（★ 由「端口存在」断言 + 「端口名精确匹配」断言共同捕获）
 - [ ] **V-15** ★ **端口断言精确化**（v1.11）：★ 顶层端口断言 MUST 用**精确名匹配** ⇒ ★ **MUST NOT** 用子串匹配（★ 子串匹配会让改名后的端口「通过」⇒ ★ 假绿）⇒ ★ 变异对照：★ 断言一个**不完整**的名字（★ 如 `open_pc` 对 `open_pc_1`）⇒ MUST RED
+- [ ] **V-16** ★ **两层范式可落地**（v1.12）：★ `ch::Component` 单元 MUST 能在 ChipForge 的 ctx 里 `build()` ⇒ ★ 其 `io()` 输出 MUST 能被桥接 plugin 读出并写成 `Payload<T>` ⇒ ★ **变异对照**：★ 传 `nullptr` 让 Component 自建 ctx（★ 破 G-1p）⇒ MUST RED（★ 组件输出端口从 `data_map` 消失）
+- [ ] **V-17** ★ **单元契约名稳定**（v1.12）：★ regfile 的 reg 名 MUST 是 `reg_0`..`reg_31` ⇒ ★ **MUST NOT** 因默认构造泄漏孤儿节点（★ 实证：`reg_file_chmem.h:160-172` ⇒ Verilator `Duplicate declaration of signal '_reg_N'`）⇒ ★ 变异对照：★ 改用 `std::array` 默认构造 ⇒ MUST RED（★ Verilator 侧编译失败或节点撞名）
+- [ ] **V-18** ★ **观测载体是顶层端口**（v1.12）：★ 生成网表的顶层 MUST 含 `mem_sig` / `mem_sig_updates` / `tohost` / `reg_1..reg_31` / `open_pc` ⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 穿透读内部层级（★ H-2）⇒ ★ 变异对照：★ 把 `mem_sig` 改成内部 `ch_reg` ⇒ MUST RED（★ Verilator 侧 `port_access_` 读不到）
+- [ ] **V-19** ★ **`resolve_node_id` 兼容**（v1.12）：★ 载体改为顶层 `ch_out` 后 ★ `parity_sim_runner` 的 `resolve_node_id(ctx, "<name>")` MUST 仍能命中（★ 因顶层端口节点在 `ctx.get_nodes()` 里）⇒ ★ runner **零改动** ⇒ ★ 变异对照：★ 换一个**未声明**的名字 ⇒ MUST RED（★ 观测缺失 ⇒ fail-closed）
 - [ ] **V-9** ★ **变异对照纪律**（v1.8）：★ 每条「实测约束」MUST 有**变异对照**（★ 撤掉该写法 ⇒ 测试 MUST RED）⇒ ★ 否则「约束」只是**猜测**，会被后人当铁律继承 ⇒ ★ ★ **本轮实测**：★ 8 条候选里 **4 条被证伪**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ 全部**不成立**）⇒ ⇒ ★ **只有 2 条（G-1l / G-1m）配登记为硬约束** ⇒ ★ 证据见 plan §K17
 - [ ] **V-8** ★ **写语义完备**（v1.7）：★ `CpuBusReq` MUST 含 `size`（3 bit）⇒ ★ `size` MUST 表达 1/2/4/8 四种字节宽度 ⇒ ★ **sub-word store 的 byte-strobe 语义 MUST 可表达** ⇒ ★ 契约测试 MUST 覆盖 `size` 的 4 种取值 ⇒ ★ **MUST NOT** 让 CPU 侧承担 RMW（★ 那会引入读响应依赖 ⇒ 写延迟 ⇒ stall/forwarding）
 - [ ] **V-7** ★ **DSE 正名生效**：`ip/cpu/docs/dse_architecture.md` 与 `tools/dse/README.md` 的表述与 D7 一致（★ 「表容量/存储深度的参数敏感度分析」；★ 明确列出**不可配**维度）⇒ ⚠️ **不得**仍以「7 维 576-config」描述 CH_MEM 路径
