@@ -1,6 +1,7 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
 > **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.9 = C2 逐条变异对照复核（★ 存量 G-1a~G-1k 共 11 条 ⇒ ★ **无一被证伪** ⇒ ★ 但 ★ **机检覆盖度极不均衡**（★ 强 7 / 中 1 / 弱 3）⇒ ★ 增「G-1 的机检覆盖矩阵」+ ★ **更正 G-1b 的后果描述**（★ 实测 = **命名冲突**，★ 非 ADR 原写的 multiple definition））**；
+★ **v1.11 = A2 收尾审查 + `memsig` 观测来源裁决（2026-10-29，用户裁决 Q1/Q4 + architect 主持）：★ 新增 §D3a.6「`memsig` 观测来源 = **从设备自算**」（★ 节点名沿用 `mem_sig`/`mem_sig_updates` ⇒ ★ **parity runner 零改动**；★ 折叠算法 MUST 与预载核 `dmem_chmem.h:244-270` **逐位同款**；★ **从设备 MUST 提供**（强契约）⇒ ★ ADR-089 例外白名单**零新增**）+ ★ **新增硬约束 G-1o**（★ **顶层端口名 MUST NOT 与内部 `ch_reg`/`ch_node` 名同名** ⇒ ★ 否则 CppHDL 唯一化把端口改名（`open_pc` → `open_pc_1`）⇒ ★ **两后端端口名不一致** ⇒ ★ 破 H-5）+ ★ Verification **V-11~V-15**（5 条）；
 ★ **v1.10 = A2（分支重定向 + flush，S3.2b）实施期收敛：★ 新增 §D3a.5「分支反馈契约」（3 个核内 payload key + **1 拍对齐** + fail-open）+ ★ **新增硬约束 G-1n**（★ **stage 首现序 MUST 等于流水顺序** —— `canonical_stage_order()` 按首现序 ⇒ ★ 装配/测试注册顺序错 ⇒ **跨 stage payload 可见性反转** ⇒ 静默失效）+ ★ Verification **V-10**（4 个变异对照）；
 ★ **v1.8 = A1（访存端口化）实施期实测收敛：★ 新增 **2 条**硬约束（G-1l「累加式 select 需上游先写」+ G-1m「`ch_bool` 禁用于 `?:`」）+ ★ **G-1c 修正**（fail-closed 由 `throw` 改为 `std::unexpected` ⇒ 合 ADR-047 Check 10）+ ★ **访存时序模型澄清**（★ `ch_reg` 的 next 是组合表达式 ⇒ 端口呈现的是**上一拍末**算出的地址）+ ★ **诚实标注 4 条被变异对照证伪的怀疑**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ **均不成立** ⇒ ★ **不作为硬约束**）⇒ ★ 推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K17；
 ★ **v1.7 = A1 实施期发现并裁决「写语义」缺口：★ `CpuBusReq` MUST 增 `size`（3 bit，访问字节宽度）⇒ 写由**从设备**按 byte-strobe RMW ⇒ ⇒ ★ CPU 侧不依赖读响应 ⇒ 写**无延迟**（★ 代价远小于「CPU 侧 RMW ⇒ stall/forwarding」）；★ 同时补齐 `burst_len` 字段登记**；★ **v1.6 = A0 访存时序裁决（★ 2026-10-28 用户裁决 + architect 主持）：★ 访存端口 = 「地址提前 1 拍发出 + 数据侧组合消费 + 写请求同拍发出」⇒ 读/写数据时点与预载核同拍等价 ⇒ ★ 不需要 stall / forwarding；★ ★ 连带修正 H-3（5 观测量逐位相等 ⇒ **3 终值逐位相等 + 2 轨迹观测量走 ADR-089 例外白名单**）+ 新增硬约束 G-1k（访存地址 MUST 提前 1 拍）**；★ **推导与证据见 `.rddf/plans/backend-parity-open-core.md` §K13~K15（★ 正文只留决策）**；★ **v1.5 = G-1h/G-1i/G-1j（S3 实现期实测发现的第 8/9/10 条假绿通道：★ `elaborate` 不做 ctx_swap · ★ plugin 成员初始化器创建字面量 · ★ 漏调 `build()` ⇒ 全部逻辑静默不执行）+ ★ 框架级加固（`elaborate` 自建 ctx_swap + 自动 build）**；v1.4 = G-1f/G-1g（S2 实现期实测发现的第 6/7 条假绿通道：bundle 字段禁带字面量初始化器 + 方向设置须在 ctx 保护内；★ 连带发现老核 `bundles/mem_bundles.h` 有同样隐患）；v1.3 = G-1e（驱动赋值 MUST 在 ctx_swap 保护下 —— S1 实测发现的第 5 条假绿通道）+ §D5.1.1 G-1d 判据补正（`is_assignable` 检不出 ⇒ 改三项判据）；v1.2 = §D5.1 G-1 的 4 条实测约束（G-1a/b/c/d）+ PoC 证据（裸 ctx 端口机制已验证可行，2 case / 6 assertions 实测全过））**
@@ -194,6 +195,20 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | ★ **fail-open** | ★ 读不到 `FLUSH` / `BRANCH_TAKEN` ⇒ ★ 视为 0（★ 退化顺序取指 / 不抑制）⇒ ★ 理由：★ A2/A4 分阶段装配 ⇒ ★ 只装单侧是合法形态 ⇒ ★ 抛异常会让合法装配失败 ⇒ ★ 风险由 **A6 的 H-3 等价性自检**兜底（终值 `memsig` 会不等） |
 | ★ ★ **布尔取反纪律** | ★ **MUST NOT** 用 `ch_uint<1>(ch_bool)` 做取反 ⇒ ★ 该构造读 C++ 侧值 ⇒ 节点**折成常量** ⇒ ★ 抑制静默失效 ⇒ ★ MUST 用 `select(cond, 0, 1)`（★ G-1m 同族） |
 
+#### D3a.6 ★ `memsig` 的观测来源（★ **memsig 裁决**，2026-10-29，用户裁决 Q1/Q4 + architect 主持）
+
+> ★ **推导与证据**（预载核折叠算法逐位拆解 · `resolve_node_id` 采集机制核验 · 5 个备选方案的代价对比 · 端口名二义的发现过程）⇒ **`.rddf/plans/backend-parity-open-core.md` §K21** ⇒ ★ 本节只留**契约**。
+
+| 项 | 决策 |
+|---|---|
+| ★ **归属** | ★ **`memsig` 由「从设备」自算**（★ 用户裁决 Q1=A）⇒ ★ 节点名 MUST 沿用 **`mem_sig`** / **`mem_sig_updates`**（★ 与预载核 `dmem_chmem.h:85-86` **同名**）⇒ ★ **parity runner 零改动**（★ `resolve_node_id` 按**节点名**查 `ctx.get_nodes()` ⇒ ★ **不限归属** ⇒ ★ 从设备的节点同样可读） |
+| ★ **为何不能由核侧算** | ★ 核**不持有内存** ⇒ ★ 核算不出「RMW 后的最终字」⇒ ★ 预载核能算是因为它的 `dmem` **持有**内存 ⇒ ★ 开放核的对应角色 = **从设备**（★ 架构上同构） |
+| ★ **折叠算法** | ★ MUST 与预载核 `dmem_chmem.h:244-270` **逐位同款**：`mix = word_addr*31 + store_wdata + sig_upd*0x9E3779B1`；`sig_next = is_store_active ? (sig*16777619) ^ mix : sig`；`sig_upd += is_store_active` ⇒ ★ `store_wdata` = **RMW 后的最终字**（★ sub-word store 合并后的字面值）⇒ ★ **只有持有内存者能算** ⇒ ★ 从设备 MUST 做 byte-strobe RMW（★ 与 §D3a.4「写由从设备 RMW」一致 ⇒ **无额外成本**） |
+| ★ ★ **从设备义务（强契约）** | ★ **MUST 提供**（★ 用户裁决 Q4=A）⇒ ★ 任何作为 DUT 一部分的从设备 MUST 暴露 `mem_sig`/`mem_sig_updates` ⇒ ★ 后果：**ADR-089 例外白名单零新增**（★ `exceptions.json` 现仅 1 条**合成**自检条目 ⇒ ★ `memsig` **未被豁免** ⇒ ★ **必须实现**，不能靠白名单绕过） |
+| ★ **折叠顺序** | ★ 按**写请求到达顺序**折叠 ⇒ ★ 与预载核「写发生顺序」同序 ⇒ ★ 同一拍多写时 MUST 按请求内顺序（★ 由 **S4 验证实现**保证） |
+| ★ **H-3 中的地位** | ★ 保留在 H-3 的「**3 个终值观测量**（`tohost`/`regs`/`memsig`）逐位相等」内 ⇒ ★ 它验证的正是「**从设备 RMW 与预载核 RMW 逐位相同**」⇒ ★ 逻辑自洽 ⇒ ★ **不改 H-3** |
+| ★ **与 `tohost`/`regs` 的差别** | ★ `tohost`/`regs` 由**核**产生（★ 核持有寄存器堆）⇒ 走**顶层 `ch_out`**（H-2）⇒ ★ `memsig` 由**从设备**产生 ⇒ 走**内部节点名**（★ 预载核同款）⇒ ★ **两条观测通路并存**，MUST NOT 混淆 |
+
 ### D4 ★ 两套 bundle 并存（新核用新 bundle，老核代码不动）
 
 > 用户裁决 D0-⑨ + D0-③。
@@ -251,6 +266,7 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | **G-1i** | ★ **plugin 的成员初始化器 MUST NOT 创建 `ch_*` 字面量** | ★ `ch_uint<N> m = ch_uint<N>(ch_literal<0,N>{})` 在**plugin 构造期**（`make_unique`）即创建字面量节点 ⇒ ★ 构造期**通常无 active context** ⇒ 静默失败 ⇒ ★ 实测：PC 初值恒 0 ⇒ **全部下游读 0** | ★ 假绿通道（plugin 存在、端口在、但功能全无）⇒ ⇒ **MUST 用纯 C++ 值 + 惰性转换**（如 `uint32_t initial_pc_` + `get_pc()` 内 `ch_reg(uint32_t)`） |
 | **G-1j** | ★ **`PipeBuilder::build()` MUST 在 `elaborate()` 之前调用**（★ **v1.5 已做框架级加固**：`elaborate` 检测未 build ⇒ 自动 build） | ★ `build()` 跑 plugin 的 `setup()`/`build()`（★ **注册 `at_stage` 闭包**），`elaborate()` 只**执行**已注册的闭包 ⇒ ★ 漏调 `build()` ⇒ stage 从未注册 ⇒ **全部逻辑静默不执行**（★ 网表能生成、端口能在，但功能全无）⇒ ★ 既有 runner 靠 `CpuFactoryChmem::build_cpu()` 内部调 `build()` ⇒ ★ 又是**隐式约定** | ★★ **最严重的假绿通道** |
 | **G-1n** | ★ **stage 的「首现序」MUST 等于流水顺序** ⇒ ★ 装配方（含测试）MUST 按流水顺序**注册 plugin**（★ `setup()` 在 `build()` 时按 `plugins_` 顺序调用）⇒ ★ **MUST NOT** 在 plugin 注册**之前**直接 `at_stage` | ★ `canonical_stage_order()` 只看 stage 名的**首现序** ⇒ ★ 若提供者先注册 `branch`/`memory` ⇒ ★ `fetch` 被排到**最后** ⇒ ★ `memory NORMAL` 先于 `fetch NORMAL` 执行 ⇒ ★ 跨 stage payload **读不到**（`has()` = false）★ **实测命中** | ★ **跨 stage payload 可见性反转** ⇒ ★ 静默走 fail-open（端口在、语义为零 ⇒ 最坏假绿） |
+| **G-1o** | ★ **顶层端口名 MUST NOT 与内部 `ch_reg` / `ch_node` 名同名** ⇒ ★ 且 ★ 端口名 MUST 与内部节点名**可区分**（★ 建议内部 reg 用 `_reg` 后缀，如 `open_pc_reg`） | ★ CppHDL codegen 按 `eval_list` 顺序建 `name_counts`（`codegen_verilog.cpp:64-76`）⇒ ★ **内部 node 先占名** ⇒ ★ 重名者加 `_N` 后缀 ⇒ ★ **实测**：顶层端口 `open_pc` 被改名 `open_pc_1`（`open_core_ports_top.v:11`）⇒ ★ 同时 `ctx` 里**两个节点同名** ⇒ ★ `resolve_node_id(ctx, "pc")` 取**首个**匹配 ⇒ ★ 观测可能读到 `ch_reg` 而非端口 | ★ **两后端端口名不一致**（Simulator 侧 `open_pc` / Verilator 侧 `open_pc_1`）⇒ ★ 破 H-5（★ Verilator 侧按**生成成员名**读 ⇒ 读到 `open_pc_1` ⇒ ★ 按名匹配失败 ⇒ **静默读不到** ⇒ 最坏假绿） |
 | **G-1l** | ★ **payload 的「累加式 select」（`X = select(cond, v, X)`）MUST 由上游 stage 先写 `X`** ⇒ 否则 false 分支在首次赋值前被读 ⇒ `PayloadStore::get`（可变版）缺失时 emplace **null impl** ⇒ `Simulator::initialize` **段错误** | ★ gdb 栈坐实：`muximpl::create_instruction` → `lnodeimpl::id(nullptr)` ⇒ `Simulator::initialize` 段错误 | ★ **段错误**（★ 预载核不崩是因为 EX 阶段总是先写 `RD_DATA`） |
 | **G-1m** | ★ **`ch_bool` MUST NOT 用于 C++ 条件上下文**（`?:` / `if`）⇒ ★ MUST 用**节点级 `select()`** | ★ `ch_bool::operator bool` 是 **explicit** ⇒ ★ 在 `?:` / `if` 里走 **contextual conversion** ⇒ ★ **静默取 false** ⇒ ★ **变异对照 RED**（`select()` → `?:` ⇒ 2 处 FAILED：★ **写使能恒 0**（写请求发不出去 ⇒ 端口在、值全 0 ⇒ 最坏假绿）+ ★ **符号扩展失效**） | ★ **静默失效**（★ 无编译错误、无运行错误 ⇒ 只表现为「值不对」） |
 | **G-1k** | ★ **访存地址 MUST 提前 1 拍发出**（相对数据消费点）⇒ 需 1 个地址 `ch_reg` | ★ 端口形态下外部从设备是「拍边界驱动」⇒ 拍 N 才知道拍 N 的读地址 ⇒ ★ **无法在拍 N 组合给出数据** ⇒ ⇒ 地址 MUST 提前 1 拍可见（★ §D3a.4 A0 裁决） | ★ 访存读退化为 1 拍 ⇒ **与预载核不等价** ⇒ ⇒ `memsig`/`regs` 的 H-3 判定随之失效 |
@@ -387,6 +403,8 @@ module top (
    ⇒ 缓解：★ **纯新增**（不改现有语义）⇒ `create_simulator(nullptr)` 保持原行为
 4. ⚠️ **S1~S5 估算 6~10 人日**（不含 S6）⇒ 超出当前 v0.11.0 窗口，与 A4 / BP 增量 3 争人力（roadmap R5）
 5. ⚠️ **H-1 的 64-bit 天花板** ⇒ 地址/数据宽度被锁死在 64 bit
+6. ⚠️ **「从设备 MUST 提供 `mem_sig`」是强契约**（★ §D3a.6，用户裁决 Q4=A）⇒ ★ 第三方 SoC 接入开放核时，其 memory model / Cache IP MUST 实现该折叠算法 ⇒ ★ **接入门槛**：MUST 复刻预载核 `dmem_chmem.h:244-270` 的折叠（★ 约 5 行）⇒ 缓解：★ 折叠算法已固化在 §D3a.6 + plan §K21 ⇒ ★ 可直接复制
+7. ⚠️ **端口名与内部节点名解耦是强制约束**（★ G-1o）⇒ ★ 新增顶层端口时 MUST 同步检查内部 `ch_reg` 名不冲突 ⇒ ★ 否则 CppHDL 静默改名 ⇒ ★ 两后端端口名不一致 ⇒ ★ 观测按名匹配静默失败
 
 ---
 
@@ -414,6 +432,11 @@ module top (
 - [ ] **V-5** ★ **H-4 生效**：`ip/cpu/core/**` 全部文件**零** `cf::plugin::uint_t` / `cpptlm` 引用（★ 建议加 CI grep 检查）
 - [ ] **V-6** ★ **零回归**：★ 现有 52 case parity **基线不变**（预载核不动 ⇒ 报告应与 `openspec/changes/backend-parity-corpus/first-run-evidence.md` 的 A3 首跑**逐位一致**）⇒ ★ D4 架构门禁（`check_plugin_portability.sh` / `verify_plugin_decision.sh`）全绿
 - [ ] **V-10** ★ **分支反馈语义有鉴别力**（v1.10）：★ 4 个变异 MUST 各自 RED —— ① `FLUSH` 恒 0 ② 去掉 store 抑制（`we = is_store`）③ pc 不重定向（顺序取指）④ 提供者注册在 ibus **之前**（G-1n）⇒ ★ **实测**：4/4 RED（★ 分别 2/1/1/1 个 case 失败）
+- [ ] **V-11** ★ **`memsig` 观测来源落地**（v1.11）：★ 开放核的 `memsig` MUST 由**从设备**提供 ⇒ ★ `mem_sig` / `mem_sig_updates` 节点 MUST 存在于网表 ⇒ ★ `parity_sim_runner` MUST 在**不传** `--allow-incomplete` 时读到它（★ 证明「按节点名查、不限归属」成立）⇒ ★ 变异对照：★ 从设备**不提供** `mem_sig` ⇒ MUST 报「missing observation 'memsig'」并退出非 0（★ fail-closed）
+- [ ] **V-12** ★ **折叠算法逐位同款**（v1.11）：★ 从设备的折叠算法 MUST 与预载核 `dmem_chmem.h:244-270` **逐位一致**（★ 同一写序列 ⇒ 同一 `mem_sig` / `mem_sig_updates`）⇒ ★ 变异对照：★ 改一处常量（★ 如 `0x9E3779B1` → `0x9E3779B2`）⇒ MUST RED
+- [ ] **V-13** ★ **从设备强契约**（v1.11）：★ 任一作为 DUT 一部分的从设备 MUST 暴露 `mem_sig`/`mem_sig_updates` ⇒ ★ **MUST NOT** 新增 ADR-089 例外白名单条目来绕过 ⇒ ★ 白名单条目数 MUST 保持 1（★ 那 1 条是**合成**自检条目，★ 不计真实例外）
+- [ ] **V-14** ★ **端口名解耦**（v1.11，★ G-1o）：★ 生成网表的顶层端口名 MUST **等于**契约名（★ 如 `open_pc` / `open_flush`）⇒ ★ **MUST NOT** 出现 `_N` 后缀改名 ⇒ ★ 变异对照：★ 把内部 `ch_reg` 改回与端口同名 ⇒ MUST RED（★ 由「端口存在」断言 + 「端口名精确匹配」断言共同捕获）
+- [ ] **V-15** ★ **端口断言精确化**（v1.11）：★ 顶层端口断言 MUST 用**精确名匹配** ⇒ ★ **MUST NOT** 用子串匹配（★ 子串匹配会让改名后的端口「通过」⇒ ★ 假绿）⇒ ★ 变异对照：★ 断言一个**不完整**的名字（★ 如 `open_pc` 对 `open_pc_1`）⇒ MUST RED
 - [ ] **V-9** ★ **变异对照纪律**（v1.8）：★ 每条「实测约束」MUST 有**变异对照**（★ 撤掉该写法 ⇒ 测试 MUST RED）⇒ ★ 否则「约束」只是**猜测**，会被后人当铁律继承 ⇒ ★ ★ **本轮实测**：★ 8 条候选里 **4 条被证伪**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ 全部**不成立**）⇒ ⇒ ★ **只有 2 条（G-1l / G-1m）配登记为硬约束** ⇒ ★ 证据见 plan §K17
 - [ ] **V-8** ★ **写语义完备**（v1.7）：★ `CpuBusReq` MUST 含 `size`（3 bit）⇒ ★ `size` MUST 表达 1/2/4/8 四种字节宽度 ⇒ ★ **sub-word store 的 byte-strobe 语义 MUST 可表达** ⇒ ★ 契约测试 MUST 覆盖 `size` 的 4 种取值 ⇒ ★ **MUST NOT** 让 CPU 侧承担 RMW（★ 那会引入读响应依赖 ⇒ 写延迟 ⇒ stall/forwarding）
 - [ ] **V-7** ★ **DSE 正名生效**：`ip/cpu/docs/dse_architecture.md` 与 `tools/dse/README.md` 的表述与 D7 一致（★ 「表容量/存储深度的参数敏感度分析」；★ 明确列出**不可配**维度）⇒ ⚠️ **不得**仍以「7 维 576-config」描述 CH_MEM 路径
