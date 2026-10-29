@@ -170,7 +170,8 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
       const auto imem_addr = ch::core::ch_uint<32>(*ports_.imem_req_addr);
       // ★ `bits<15,2>` 的宽度 = 15-2+1 = **14 bit** ⇒ ★ 与 `ch_mem` 的
       //   addr 宽度一致（★ N = 2^14）⇒ ★ **MUST NOT** 再包跨宽构造
-      //   （★ G-1r：★ 跨宽构造须 `zext`，★ 且语义未文档化）
+      //   （★ ★ **本地写法选择**，★ **非约束**：★ ADR-091 v1.8 的候选
+      //     **CAND-3** 实测「改用跨宽构造 ⇒ 全绿」⇒ ★ **已证伪**）
       const auto imem_word = ch::core::bits<15, 2>(imem_addr);
       const auto rp = mem.aread(imem_word, "imem_aread");
       *ports_.imem_rsp_data = U32(rp.impl());

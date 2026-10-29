@@ -318,7 +318,7 @@ class DMemPortPlugin : public cf::plugin::PluginBase {
     get_addr_reg() <<= addr64;
     get_data_reg() <<= wdata64;
     get_size_reg() <<= size_val;
-    // ★★★ **MUST 用 `select()`，MUST NOT 用 `?:`**（★ **实测约束 G-1r**
+    // ★★★ **MUST 用 `select()`，MUST NOT 用 `?:`**（★ **实测约束 G-1m**
     //   —— ★ 本轮唯一被变异对照坐实的「布尔语义」约束）：
     //   ★ `ch_bool::operator bool` 是 **explicit** ⇒ ★ 在 C++ 条件上下文
     //   ★ （`?:` / `if`）里走 **contextual conversion** ⇒ ★ **静默取 false**
