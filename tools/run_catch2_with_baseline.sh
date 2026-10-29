@@ -78,6 +78,61 @@ if [[ ! -x "$BINARY" ]]; then
     exit 2
 fi
 
+# ★★ **产物新鲜度 fail-closed**（★ 2026-10-30 补，★ 审查发现）
+#   ★ **缺口**：★ 本脚本原先**只查 `-x`**（★ 存在性）⇒ ★ **不查新鲜度**
+#     ⇒ ★ 「直接执行 binary」的路径**绕过** `run_chipforge_tests.sh` 的
+#       mtime 校验与 ctest 的 `cf_build_all` fixture ⇒ ★ ★ **三层防护链断在底层**
+#     ⇒ ★ ⇒ ★ 本轮**已两次**命中：★ 变异脚本改动未生效 ⇒ 编译失败
+#       ⇒ ★ **旧 binary 仍输出「All tests passed」** ⇒ ★ **假绿**
+#   ★ **判据**：★ binary 的 mtime MUST 晚于全部编译输入
+#     （★ 与 `run_chipforge_tests.sh` 的 `--no-build` 路径**同款**）
+#   ★ **MUST NOT** 在有未提交源码改动时误报 ⇒ ★ 只看**文件 mtime**
+#     （★ git 的 index mtime 不参与）
+#   ★ ★ **按 binary 收窄**（★ 避免误报）：★ TLM binary **不**编译
+#     `*_chmem.h`（★ CH_MEM-only ⇒ 含 `<ch.hpp>` ⇒ 绝不可能被 TLM 引用）
+#     ⇒ ★ 若不排除 ⇒ ★ **改一个 CH_MEM-only 头就会把 TLM binary 判 stale**
+#       ⇒ ★ **误报**（★ 本轮实测命中）
+#     ⇒ ★ ⇒ ★ **CH_MEM binary 查全部；★ TLM binary 排除 `*_chmem.h`
+#       + ★ CH_MEM-only 的测试文件**
+#   ★ ★ **CH_MEM-only 测试的排除清单从 `tests/CMakeLists.txt` 的
+#     `CHMEM_ONLY_TEST_SOURCES` 自动提取**（★ ★★ **自动同步**
+#     ⇒ ★ 不会与 CMakeLists 漂移）
+#   ★ ⚠️ **不使用 bash 数组传 find 的括号表达式**（★ 数组元素不参与 shell
+#     转义 ⇒ ★ `\(` 变成字面量 ⇒ ★ find 的括号分组失效）★ ⇒ ★ 直接两套命令
+_STALE_ROOTS=( "$PROJECT_ROOT/include" "$PROJECT_ROOT/ip" "$PROJECT_ROOT/src"
+               "$PROJECT_ROOT/tests" "$PROJECT_ROOT/bundles" )
+if [[ "$(basename "$BINARY")" == *chmem* ]]; then
+    STALE_COUNT="$(find "${_STALE_ROOTS[@]}" \
+        \( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.cxx' \) \
+        -newer "$BINARY" 2>/dev/null | wc -l)"
+else
+    _CHMEM_ONLY_FILES="$(sed -n '/CHMEM_ONLY_TEST_SOURCES/,/^)/p' \
+        "$PROJECT_ROOT/tests/CMakeLists.txt" 2>/dev/null \
+        | grep -oE '[A-Za-z0-9_.-]+\.(cpp|h|hpp)' | sort -u)"
+    _STALE_LIST="$(mktemp -t cf_stale.XXXXXX)"
+    _KEEP="$(mktemp -t cf_keep.XXXXXX)"
+    trap 'rm -f "${CONSOLE_OUT:-}" "$_STALE_LIST" "$_KEEP"' EXIT
+    find "${_STALE_ROOTS[@]}" \
+        \( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.cxx' \) \
+        ! -name '*_chmem.h' -newer "$BINARY" 2>/dev/null > "$_STALE_LIST"
+    while IFS= read -r _f; do
+        _b="$(basename "$_f")"
+        if ! grep -qxF "$_b" <<< "$_CHMEM_ONLY_FILES"; then
+            echo "$_f" >> "$_KEEP"
+        fi
+    done < "$_STALE_LIST"
+    STALE_COUNT="$(wc -l < "$_KEEP")"
+fi
+
+if [[ "${STALE_COUNT:-0}" -gt 0 ]]; then
+    echo "ERROR: binary is STALE (newer sources exist) — refusing to run."
+    echo "  binary: $BINARY"
+    echo "  ⇒ ★ 编译输入比产物新 ⇒ ★ 产物**未反映**当前源码"
+    echo "  ⇒ ★ **旧产物顶替 = 假绿通道**（★ C1）⇒ ★ 先 build 再跑"
+    echo "  ⇒ ★（★ 与 run_chipforge_tests.sh 的 --no-build 路径同款判据）"
+    exit 2
+fi
+
 if [[ ! -f "$KNOWN_LIST" ]]; then
     echo "ERROR: baseline-known list not found: $KNOWN_LIST"
     exit 2
