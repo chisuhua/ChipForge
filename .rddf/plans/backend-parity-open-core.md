@@ -1,6 +1,6 @@
 # ADR-091 开放核实施路径（S1~S5）
 
-> **change**: `backend-parity-open-core`（待立项）
+> **change**: `backend-parity-open-core`（★ **已立项** ⇒ `openspec/changes/backend-parity-open-core/`）
 > **本文件**: ADR-091 §D8「S1~S5」的可执行路径（repo 内 SSOT）
 > **架构授权**: **ADR-091 v1.2**（CH_MEM 开放核形态与端口架构，✅ Accepted 2026-10-28）
 > **契约**: **ADR-092 v1.1**（TLM 参考实现的冻结与演进停止）· ADR-083 v1.2（`ch_stream` 归类纠偏）· ADR-089 v1.4（parity 门禁）
@@ -119,6 +119,12 @@
 - [ ] **3.2** [GREEN] `ip/cpu/core/ibus_port_chmem.h`：取指走端口（★ 复用 `ibus_chmem.h` 的两级取指 + flush 语义）
 - [ ] **3.3** [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
 - [ ] **3.4** [GREEN] 顶层**观测端口**（H-2）：`tohost` / `pc` / `regs` / `memsig` ⇒ ★ **MUST 走顶层 `ch_out`**（★ 这是「退休 `--public-flat-rw` 内部层级读法」的前提）
+  ⇒ ★ **v1.11 修正**（★ 2026-10-29）：★ `memsig` 由**从设备**产生（ADR-091 v1.11 §D3a.6）
+    ⇒ ★ 但**载体仍是顶层 `ch_out`**（★ 名 `mem_sig` / `mem_sig_updates`）
+    ⇒ ★ 理由（★ 实测，见 §K23）：★ `resolve_node_id` 遍历 `ctx.get_nodes()`
+      ⇒ ★ **顶层端口节点也在其中** ⇒ ★ 解释器侧 runner **零改动**
+      ⇒ ★ 且 Verilator 后端走 `port_access_`（★ **契约路径** ⇒ H-2）
+      ⇒ ★ 而**内部 `ch_reg`** 只能靠 `--public-flat-rw` 穿透（★ **非契约路径**）
 - [ ] **3.5** [GREEN] 握手成本处理（D3a.2）：`ready` 恒真 ⇒ 无阻塞流；`ready` 可拉低 ⇒ CPU 侧 MUST 有 stall 机制
 - [ ] **3.6** 门禁 + 零回归
 
@@ -132,7 +138,8 @@
 
 - [ ] **5.1** [RED] 同一份测试 body 在 **解释器后端**与 **Verilator 后端**下都必过（★ 借鉴上游 `tests/dual_backend_fixture.h` 的 `DUAL_BACKEND_TEST_PAIR` 范式；★ **Verilator 侧 WARN-skip 不算 PASS**）
 - [ ] **5.2** [GREEN] 单进程双后端对照（用 Phase 1 的 `create_simulator(backend)`）
-- [ ] **5.3** [RED+GREEN] ★ **H-3 等价性自检**：同一 ELF 跑**开放核**与**预载核** ⇒ **5 观测量（tohost / regs / memsig / cycles / pchash）逐位相等** ⇒ ★ **变异对照**：故意改开放核 1 处语义 ⇒ 该自检 MUST RED
+- [ ] **5.3** [RED+GREEN] ★ **H-3 等价性自检**：同一 ELF 跑**开放核**与**预载核** ⇒ ★ **3 个终值观测量（`tohost` / `regs` / `memsig`）逐位相等** ⇒ ★ **2 个轨迹观测量（`cycles` / `pchash`）MUST 已登记为 ADR-089 例外**（★ scope 限定「开放核 vs 预载核」⇒ 双后端线不受影响）⇒ ★ **变异对照**：故意改开放核 1 处语义 ⇒ 该自检 MUST RED
+  ⇒ ★ **v1.11 修正**（★ 2026-10-29）：★ 本条原文写「5 观测量逐位相等」⇒ ★ **已被 ADR-091 v1.6 修正**（★ 「流水结构不同构」⇒ `cycles` / `pchash` **结构性不可比**）⇒ ★ 本 plan 未同步 ⇒ ★ 此处补正
 - [ ] **5.4** 门禁 + 零回归 + ★ **52 case parity 基线逐位不变**
 
 ---
@@ -685,6 +692,60 @@ module top (
 ⇒ ★ **教训**：★ 变异对照的收尾**必须用 `cp <gold>` 覆盖**，★ **MUST NOT** 用
 ★ `git checkout`（★ 它按 **HEAD** 恢复 ⇒ ★ 会丢掉**未提交**的改动 ⇒ ★
 ★ 而本轮的改动**本来就还没提交** ⇒ ★ 必丢）。
+
+### K23 — ★ 观测量的「载体」实测（★ A2.6 台账同步时发现 ⇒ 决定 A3 的实现前置）
+
+> ★ **触发**：★ A2.6 台账同步时核对「`tohost`/`regs`/`memsig` 走顶层 `ch_out`」
+>   ⇒ ★ 读 `tools/verilator_runner/sim_main.cpp` ⇒ ★ **发现 5 个观测量的实际读法**。
+
+#### K23.1 ★ Verilator 后端当前**全部**靠 `--public-flat-rw` 穿透（★ H-2 的实证）
+
+| 观测量 | Verilator 侧读法 | 性质 |
+|---|---|---|
+| `mem_sig` | `vtop->rootp->top__DOT__mem_sig` | ★ **穿透内部层级** |
+| `mem_sig_updates` | `vtop->rootp->top__DOT__mem_sig_updates` | ★ **穿透内部层级** |
+| `regs[1..31]` | `r->top__DOT___reg_N` | ★ **穿透内部层级** |
+| `tohost` | `rootp->top__DOT__dmem[tohost_word]` | ★ **穿透 + 硬编码数组路径** |
+| `pc` | `pc_head[8]`（同款穿透） | ★ **穿透内部层级** |
+
+⇒ ★★ **这就是 ADR-091 H-2 的动机**（「MUST NOT 依赖 `--public-flat-rw` 读内部层级」
+⇒ ★ 内部节点名一变即断 ⇒ ADR-091 §Context B-1）。
+
+#### K23.2 ★ 关键实测：`resolve_node_id` **顶层端口节点也在** `ctx.get_nodes()` 里
+
+★ `parity_sim_runner.cpp:249-255`：
+
+```cpp
+for (const auto& node : ctx.get_nodes()) {
+  if (node && node->name() == name) return node->id();
+}
+```
+
+★ ★ **顶层 `ch_out` 节点也是 `ctx.get_nodes()` 的成员** ⇒ ★ ⇒ ★ **载体 = 顶层 `ch_out`**
+★ 同时满足两侧：
+
+| 载体 | 解释器后端 | Verilator 后端 |
+|---|---|---|
+| ★ **顶层 `ch_out`**（★ 名字 = `mem_sig`） | ✔ `resolve_node_id` 直接命中 ⇒ ★ **runner 零改动** | ✔ `port_access_`（★ **契约路径** ⇒ H-2） |
+| ★ 内部 `ch_reg`（名字 = `mem_sig`） | ✔ 命中 | ✘ **不在 `port_access_`** ⇒ ★ 只能 `--public-flat-rw` 穿透 ⇒ ★ **违背 H-2 的目标** |
+
+⇒ ★★ ⇒ ★ **「顶层 `ch_out`」是唯一自洽解** ⇒ ★ §D3a.6 的「节点名沿用 `mem_sig`」
+★ **无需推翻**，★ 但 ★ **必须补齐「载体 MUST 是顶层 `ch_out`」这一半**
+（★ ADR-091 v1.11 §D3a.6 只写了「节点名」，★ 未写「载体」）
+⇒ ★ **澄清属 architect 职权** ⇒ ★ 本轮**不改**已签批 ADR ⇒ ★ 归**待裁决清单**。
+
+#### K23.3 ★ 待 architect 裁决的清单（★ A3 的前置）
+
+| # | 待裁决项 | 为什么阻塞 A3 |
+|---|---|---|
+| **①** | ★ **`memsig` 的载体** MUST 是顶层 `ch_out`（★ 补齐 §D3a.6） | ★ 决定 A5 从设备怎么接签名 ⇒ ★ 决定 A3/A4 的端口清单 |
+| **②** | ★ **`tohost` 的归属** = **从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`）⇒ ★ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`（`dmem_chmem.h:278`）⇒ ★ **开放核无对应物** | ★ 决定 `tohost` 是核侧端口还是从设备端口 |
+| **③** | ★ **`regs[32]` 的载体**：★ 预载核是**内部** `ch_reg`（`reg_file_chmem.h:169` 显式命名 `reg_0..reg_31`）⇒ ★ 开放核若走顶层端口 ⇒ ★ **两侧结构不同构** ⇒ ★ H-3 对比时两侧读法不同 | ★ 决定 A4 的 regfile plugin 要不要额外接 32 个端口 |
+| **④** | ★ **`pchash` 的契约名**：★ 预载核的 pc 节点名 = `pc`（内部）⇒ ★ 开放核现有顶层端口名 = `open_pc` ⇒ ★ **命名不一致** ⇒ ★ 采集侧要么改名要么特判 | ★ 决定 A3 是否要改 `open_pc` 的契约名（★ 已进 ADR/tasks ⇒ 改动面大） |
+
+★ ★ **A3 的实际可做范围（★ 按「不预设未裁决契约」原则）**：
+★ **仅 `pchash` 的载体形态**可先行（★ 但它撞 ④ 的命名问题）⇒ ★
+★ `tohost` / `regs` / `memsig` **全部依赖上述裁决** ⇒ ★ **A3 应在 architect 裁决之后实施**。
 
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
