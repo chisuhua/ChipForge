@@ -56,14 +56,23 @@ depends_on:
     · ★ **MUST NOT** 用 `ch_module<T>`（★ 需 active parent Component ⇒ ChipHDL 无此机制）
     · ★ **MUST NOT** 用 `ch_stream` 做单元接口（★ 越层：★ ADR-092 §D4 定其为 IP 间接口）
   ⇒ ★ **推迟到 Phase 3**（★ 装配骨架需要 Phase 3 的端口数据通路才有意义 ⇒ 单独提交一个空骨架是纯形式）
-- [ ] 2.3b [RED+GREEN] ★ **可复用单元：regfile**（★ ADR-091 v1.12 §D3a.7 两层范式 · §D3a.8 register re-naming）
+- [x] 2.3b [RED+GREEN] ★ **可复用单元：regfile**（★ ADR-091 v1.12 §D3a.7 两层范式 · §D3a.8 register re-naming）
   ⇒ ★ **层 2（`ch::Component` 子类）**：★ `io()` struct（★ `rs1_addr`/`rs1_data`/`rs2_*`/`rd_addr`/`rd_data`/`rd_we`）
     ⇒ ★ 上游先例：`include/cpu/pipeline/rv32i_regfile.h`
   ⇒ ★ ★ **MUST 用 `std::vector` + 显式命名 `reg_0..reg_31`**（★ 实证：`reg_file_chmem.h:160-172`
     ⇒ ★ `std::array` 默认构造泄漏 32 对孤儿节点 ⇒ 撞名 ⇒ Verilator `Duplicate declaration of signal '_reg_N'`）
   ⇒ ★ **契约名 `reg_N` MUST NOT 改**（★ runner 按 `reg_<i>` 采集）
   ⇒ ★ **桥接 plugin**（★ 层 1）：★ 在 `setup()` 里 `build(pb_ctx)` ⇒ ★ 在 `at_stage` 闭包读 `io()` ⇒ 写 `Payload`
-  ⇒ ★ **变异对照**：★ ① 传 `nullptr` 让 Component 自建 ctx（★ 破 G-1p）② 改 `std::array` 默认构造（★ 破 §D3a.8）⇒ MUST RED
+  ⇒ ★ **实测**：★ `ip/cpu/core/regfile_chmem.h`（★ 层 2 Component）
+    + `ip/cpu/core/regfile_bridge_chmem.h`（★ 层 1 桥接 plugin）
+    + `tests/cpu/test_cpu_open_core_regfile.cpp`（★ **3 case / 75 assertions**）
+  ⇒ ★ **变异对照 4/4 RED**（★ plan §K25.1）：★ ① `build(nullptr)`（★ 破 G-1p）→ **2 case**
+    ② reg 名用默认名（★ 破 §D3a.8）→ 1 ③ 桥接不发布 payload → 1 ④ 允许写 x0 → 1
+  ⇒ ★★ **6 个契约陷阱**（★ plan §K25.2）：★ `namespace` alias 不能带模板参数 ·
+    ★ 端口 MUST 用 `unique_ptr` 持有（★ `port::operator=` 被 delete）·
+    ★ `ch_bool` 须走 `port::impl()` · ★ 门禁 Check 1 是**纯文本 grep**
+    （★ 注释里也不能写「条件早返」字面形式）· ★ 索引 MUST 是**编译期常量**
+    （★ 否则常量折叠 ⇒ 假绿 ⇒ 模板递归展开）
 - [x] 2.4 零回归 + 八门禁
 
 ## 3. Phase 3 — S3：端口数据通路 + 顶层观测端口

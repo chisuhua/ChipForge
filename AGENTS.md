@@ -212,7 +212,7 @@ ctest --test-dir build -R chipforge_tests_chmem --output-on-failure
 ```
 
 **CH_MEM 模式状态** (2026-10-27 HEAD 实测):
-- ✅ ★ **CH_MEM binary（排除 `[verilator]` + `[vendored-elf]`）= ★ 203 case / 4277 assertions 全绿**（★ **2026-10-29 A2.5 后实测**；★ 覆盖 `[chmem]` / `[framework]` / `[cpu]` / `[cpphdl]` / `[elaborate]` / `[keys]` / `[alu]` / `[mmu]` / `[cache]` / `[open-core]` / `[bus-iface]` / `[ports]` 全部 family）
+- ✅ ★ **CH_MEM binary（排除 `[verilator]` + `[vendored-elf]`）= ★ 207 case / 4355 assertions 全绿**（★ **2026-10-29 A4-1 后实测**；★ 覆盖 `[chmem]` / `[framework]` / `[cpu]` / `[cpphdl]` / `[elaborate]` / `[keys]` / `[alu]` / `[mmu]` / `[cache]` / `[open-core]` / `[bus-iface]` / `[ports]` 全部 family）
   ⇒ ★★ **⚠️ 全量（含 `[vendored-elf]`）当前无法一次跑完**：★ `chmem_vendored_elf_tohost1` 的 **47 个 DYNAMIC_SECTION 在同一进程内累积 47 个 CPU 网表**（CppHDL 不释放节点）⇒ ★ 单次跑 **> 25 分钟**（★ 每个 ELF 上限 1500 拍 × Simulator ~10 拍/s）⇒ ★ **应拆分 / 子进程化**（记 backlog）
   ⇒ ★ 该 case 的**代表性样本已验证未退化**（`rv32ui-p-add` / `rv32ui-p-lw` / `rv32ui-p-sw` / `rv32um-p-div` 单跑全绿）
   ⇒ ★ **旧数字 164 case / 20133 assertions（2026-10-27）** ⇒ ★ 与 TLM 侧同因（★ **旧产物**）⇒ ★ 本轮重建后更新
