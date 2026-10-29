@@ -82,6 +82,9 @@ struct Rig {
   std::unique_ptr<ch::core::ch_out<U32>> open_rs2_v;
   std::unique_ptr<ch::core::ch_out<U32>> open_rd_data_v;
 
+  // ★★ **顶层观测端口**（★ 契约名 `reg_1..reg_31`）
+  std::unique_ptr<ch::core::ch_out<U32>> open_reg_v[32];
+
   // ★ 视图指针（★ 指向堆上本体 ⇒ ★ 不悬垂）
   ch::core::ch_in<U5>* rs1_addr = nullptr;
   ch::core::ch_in<U5>* rs2_addr = nullptr;
@@ -122,8 +125,17 @@ struct Rig {
     open_rs2 = open_rs2_v.get();
     open_rd_data = open_rd_data_v.get();
 
+    // ★★ 31 个观测端口（★ **契约名** `reg_1..reg_31`；★ [0] 不用 ⇒ x0）
+    cf::cpu::core::RegFileBridgePlugin<U32>::ObsPorts obs;
+    for (std::size_t i = 1; i < 32; ++i) {
+      open_reg_v[i] = std::make_unique<ch::core::ch_out<U32>>(
+          must(pb.declare_out<U32>("reg_" + std::to_string(i))));
+      obs.reg[i] = std::make_unique<ch::core::ch_out<U32>>(*open_reg_v[i]);
+    }
+
     bridge = std::make_unique<cf::cpu::core::RegFileBridgePlugin<U32>>();
     bridge->bind_ports({rs1_addr, rs2_addr, rd_addr, rd_data, rd_we});
+    bridge->bind_obs_ports(std::move(obs));
     pb.register_plugin(std::move(bridge));
   }
 
@@ -221,6 +233,50 @@ TEST_CASE("open_core: regfile bridge publishes layer-2 outputs as payload",
   // ★ 拍 3：★ 值保持
   rig.sim->tick();
   REQUIRE(pv(*rig.sim, *rig.open_rs1) == 0xDEADu);
+
+  // ★★★ **顶层观测端口 `reg_5` MUST 反映寄存器值**（★ 不只是「端口存在」）
+  //   ⇒ ★ 端口存在但**恒 0** 也是**假绿** ⇒ ★ MUST 验**值**
+  //   ⇒ ★ `reg_5` 在 `decode NORMAL` 闭包里被驱动（★ 读 `ch_reg` 当前值）
+  REQUIRE(pv(*rig.sim, *rig.open_reg_v[5]) == 0xDEADu);
+  // ★ 未写过的 x7 ⇒ ★ 仍为初值 0
+  REQUIRE(pv(*rig.sim, *rig.open_reg_v[7]) == 0u);
+}
+
+TEST_CASE("open_core: regs observation is exposed as top-level ports "
+          "(ADR-091 v1.12 D3a.9)",
+          "[open-core][chmem]") {
+  // ★★ **§D3a.9**：`regs[32]` 归**核** ⇒ ★ 载体 MUST 是**顶层 `ch_out`**
+  //   ⇒ ★ 契约名 = `reg_1..reg_31`（★ parity runner 按 `reg_<i>` 采集）
+  //   ⇒ ★ **MUST NOT** 与内部 `ch_reg` 名同名（★ G-1o）
+  Rig rig;
+  rig.build_and_run();
+
+  const std::string vpath = "/tmp/opencode/open_core_regs_top.v";
+  {
+    ch::core::ctx_swap guard(&rig.ctx);
+    ch::toVerilog(vpath, &rig.ctx);
+  }
+  using cf_test::open_core::top_port_declared;
+
+  // ★ ① **契约名 MUST 精确存在**（★ 顶层端口）
+  for (int i = 1; i < 32; ++i) {
+    REQUIRE(top_port_declared(vpath, "reg_" + std::to_string(i)));
+  }
+  // ★ ② ★★ **反向断言（G-1o）**：★ 端口名 MUST **NOT** 被改名
+  //   ⇒ ★ 若内部 `ch_reg` 名与端口同名 ⇒ ★ 端口变 `reg_1_1`
+  //   ⇒ ★ ⇒ ★ 断言 `_1` 后缀形式**不在**顶层
+  for (int i = 1; i < 32; ++i) {
+    REQUIRE_FALSE(top_port_declared(vpath, "reg_" + std::to_string(i) + "_1"));
+  }
+  // ★ ③ `reg_0`（x0）MUST **NOT** 出现在顶层（★ 恒 0 ⇒ 无需观测）
+  REQUIRE_FALSE(top_port_declared(vpath, "reg_0"));
+  // ★ ④ 内部实现名 MUST 带 `open_` 前缀（★ 不与契约名撞名）
+  std::ifstream f(vpath);
+  REQUIRE(f.good());
+  std::string all;
+  std::string line;
+  while (std::getline(f, line)) all += line + "\n";
+  REQUIRE(all.find("open_reg_1") != std::string::npos);
 }
 
 TEST_CASE("open_core: regfile x0 is hardwired zero (RISC-V semantics)",
