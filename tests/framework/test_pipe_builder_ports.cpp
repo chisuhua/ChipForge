@@ -180,6 +180,37 @@ TEST_CASE("ports: PipeBuilder with null ctx fails closed on declare", "[ports][c
   REQUIRE(r_out.error() == cf::plugin::PluginError::NullContextPtr);
 }
 
+TEST_CASE("ports: G-6 — PipeBuilder exposes the ctx for ch::Component sharing",
+          "[ports][chmem]") {
+  // ★★ **G-6**（ADR-091 v1.12 §D5）：★ `PipeBuilder` 暴露**只读 ctx accessor**
+  //   ⇒ ★ 供 `ch::Component::build(external_ctx)` **共用 ctx**
+  //   ⇒ ★ 满足硬约束 **G-1p**（★ 子 ctx ⇒ node-id aliasing ⇒ 数据丢失 ⇒ 假绿）
+  //
+  // ★ 本 case 只验「accessor 契约」；★ 「Component 真能共用 ctx」由
+  //   `tests/cpu/test_cpu_open_core_regfile.cpp`（A4-1）验。
+
+  // ★ ① 正常路径：accessor 返回构造时传入的 ctx（**同一指针**）
+  ch::core::context ctx("g6_ctx");
+  cf::plugin::PipeBuilder pb(&ctx);
+  REQUIRE(pb.ctx() == &ctx);
+
+  // ★ ② 空 ctx 路径：MUST 返回 nullptr（★ **不抛** ⇒ ADR-047 Check 10 合规）
+  //   ⇒ ★ 且 `declare_*` 仍 fail-closed（★ G-1c 语义不变）
+  cf::plugin::PipeBuilder pb_null(nullptr);
+  REQUIRE(pb_null.ctx() == nullptr);
+  REQUIRE_FALSE(pb_null.declare_out<ch::core::ch_uint<32>>("g6_null").has_value());
+
+  // ★ ③ accessor MUST **只读**：★ 返回 `context*` ⇒ ★ 调用方**不能**替换
+  //   PipeBuilder 的 ctx（★ 生命周期仍由 caller 管理）
+  static_assert(std::is_same_v<decltype(pb.ctx()), ch::core::context*>,
+                "ctx() MUST return a raw context pointer (read-only accessor)");
+  // ★ 注：★ 成员函数的 const 限定体现在**成员指针类型**里
+  //   ⇒ ★ `is_const_v<decltype(&C::f)>` **不适用**（★ 它判的是类型自身的 const）
+  static_assert(std::is_same_v<decltype(&cf::plugin::PipeBuilder::ctx),
+                               ch::core::context* (cf::plugin::PipeBuilder::*)() const>,
+                "ctx() MUST be a const member function");
+}
+
 TEST_CASE("ports: G-1d — driven ch_in is not a top-level port", "[ports][chmem]") {
   // ★ G-1d（行为判据）：有内部 driver 的 `ch_in` **不是**顶层端口
   //   （上游 verilator_backend.cpp:617 的 skip 逻辑：inputimpl::driver() != nullptr

@@ -554,6 +554,21 @@ class PipeBuilder {
     ch::core::ctx_swap guard(ctx_);
     return ch::core::ch_out<T>(name, std::source_location::current());
   }
+
+  // ===== G-6: 只读 ctx accessor（ADR-091 v1.12 §D5）=====
+  // ★★ **用途**：★ 让 `ch::Component` 单元与 ChipForge **共用同一个 ctx**
+  //   （★ ADR-091 v1.12 §D3a.7 + 硬约束 **G-1p**）。
+  // ★★ **为什么必须有**（★ 上游已踩此坑，`CppHDL/include/device.h:12-19`）：
+  //   ★ `Component::build(nullptr)` ⇒ ★ 自建**子 ctx**（`component.cpp:115-117`）
+  //     ⇒ ★ **node-id aliasing** ⇒ ★ 组件的 output ports
+  //       **从 simulator 的 `data_map` 消失** ⇒ ★ 观测**静默读不到** ⇒ 最坏假绿。
+  //   ★ ⇒ ★ 必须 `Component::build(pb.ctx())` ⇒ ★ 共用 ctx ⇒ ★ 无 aliasing。
+  // ★★ **形态**：★ **只读**（★ 返回 `context*` 而非引用/智能指针）
+  //   ⇒ ★ **不改变 ctx 生命周期**（★ lifecycle 由 caller 管理，见 `ctx_` 注释）
+  //   ⇒ ★ **不改现有语义**（★ 纯新增）
+  // ★★ **MUST NOT** 在 TLM 模式暴露（★ `ctx_` 本身是 CH_MEM-only 成员）
+  //   ⇒ ★ 本 accessor 同样条件化。
+  ch::core::context* ctx() const { return ctx_; }
 #endif
 
   // plugins() —— 返回 plugin 列表只读引用 (M4.12, 供 CpuFactory 测试断言)
