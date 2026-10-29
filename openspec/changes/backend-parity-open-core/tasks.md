@@ -196,9 +196,20 @@ depends_on:
 
 ## 4. Phase 4 — S4：验证实现（`verify_mem_model_chmem.h`）
 
-- [ ] 4.1 [RED] 测试：验证实现加载 ELF 并正确响应 imem/dmem 请求 [ADR-091 §D2]
-- [ ] 4.2 [GREEN] 新建 `ip/cpu/core/verify_mem_model_chmem.h`：内存模型 + ELF 加载（★ 参考 TLM 侧 `picolibc_host_memory.h` 的**语义**，★ MUST NOT include 它 —— 它在 ADR-092 冻结集里）[ADR-092 §D1.1]
-- [ ] 4.3 零回归 + 八门禁
+- [x] 4.1 [RED] 测试：验证实现加载 ELF 并正确响应 imem/dmem 请求 [ADR-091 §D2]
+  ⇒ ★ **部分完成**：★ **imem/dmem 响应**已验（★ A5-1）⇒ ★ **ELF 加载部分**待 A5-2
+- [x] 4.2 [GREEN] 新建 `ip/cpu/core/verify_mem_model_chmem.h`：内存模型 + ELF 加载（★ 参考 TLM 侧 `picolibc_host_memory.h` 的**语义**，★ MUST NOT include 它 —— 它在 ADR-092 冻结集里）[ADR-092 §D1.1]
+  ⇒ ★ **A5-1 完成**：★ 内存（`ch_mem`）+ **组合 slave**（★ `aread` 0 拍）
+    + 按 `size` 的 **byte-strobe RMW**（★ ADR-091 v1.7：★ CPU 侧不做 RMW）
+  ⇒ ★ **架构定位**：★ 从设备属**核外**（★ DUT 外部边界）⇒ ★ **不套层 1/层 2**
+    ⇒ ★ 直接做 plugin（★ 理由见 plan §K26.1）
+  ⇒ ★ ★ **诚实标注（本版本未实现）**：
+    · ✗ **ELF 加载**（★ 只提供 `set_elf_image()` 钩子 ⇒ ★ **不解析**）⇒ ★ 归 **A5-2**
+    · ✗ **`mem_sig` / `mem_sig_updates`**（★ ADR-091 v1.11 §D3a.6）⇒ ★ 归 **A5-3**
+    · ✗ **`tohost` 探针**（★ ADR-091 v1.12 §D3a.9）⇒ ★ 归 **A5-4**
+  ⇒ ★ 变异对照 **3 个有效 RED**（★ 写使能忽略 → 2 case · RMW 退化 → 1 · byte_off 忽略 → 1）
+    + 1 个**无效变异**（★ `aread`→`sread` ⇒ **编译失败** ⇒ ★ 诚实记录，见 plan §K26.3）
+- [ ] 4.3 零回归 + 八门禁（★ A5-1 已跑：★ 六门禁全 PASS + CH_MEM 无新回归）
 
 ## 5. Phase 5 — S5：双后端必过（D0-c）+ 等价性自检（H-3）
 
