@@ -521,6 +521,108 @@ auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
 ★ ★ **通用教训**：★ 「跨 stage payload 读不到」的**第一诊断动作** = ★
 ★ **打印 `has(key)` + `stage_names()`**（★ 而不是怀疑类型/运算语义）。
 
+### K21 — ★ `memsig` 观测来源的推导与证据（★ A2 收尾审查）
+
+> ★ **ADR-091 v1.11 正文只留契约**（§D3a.6 + G-1o + V-11~V-15）⇒ ★ 本节承载推导与证据。
+
+#### K21.1 ★ 预载核折叠算法逐位拆解（★ `dmem_chmem.h:244-270`）
+
+```
+sig_val    = mem_sig(N)                     // 32-bit，当前签名
+sig_upd    = mem_sig_updates(N)             // 32-bit，已发生写次数
+mix        = word_addr * 31 + store_wdata + sig_upd * 0x9E3779B1
+sig_next   = is_store_active ? ((sig_val * 16777619) ^ mix) : sig_val
+sig_upd'   = is_store_active ? sig_upd + 1  : sig_upd
+```
+
+★ 三个**不可省略**的细节（★ 抄错任一项 ⇒ 与预载核不等 ⇒ H-3 RED）：
+
+| 细节 | 说明 |
+|---|---|
+| ★ `store_wdata` = **RMW 后的最终字** | ★ sub-word store 合并后的**字面值**（★ 不是原始 store 数据）⇒ ★ **只有持有内存者能算** |
+| ★ `mix` 纳入**写次数** | ★ 否则「同一 (addr,data) 但发生在不同时刻」的多笔写 ⇒ 折叠值相同 ⇒ **区分度不足** |
+| ★ 运算顺序 | ★ `sig * 16777619` **先乘后 XOR**（★ 不是 `sig ^ (mix * 16777619)`）⇒ ★ 32-bit 截断语义逐位一致 |
+
+★ ★ **`store_wdata` 的依赖性**是本裁决的**决定性依据**：
+★ `store_wdata` 需要「写之前的当前内存内容」⇒ ★ 核**不持有内存** ⇒ ★ **核算不出** ⇒ ★ 只能由从设备算。
+
+#### K21.2 ★ 采集机制核验（★ 为何「从设备自算」⇒ runner 零改动）
+
+★ `parity_sim_runner.cpp:249-255`：
+
+```cpp
+std::optional<std::uint32_t> resolve_node_id(ch::core::context& ctx,
+                                             const std::string& name) {
+  for (const auto& node : ctx.get_nodes()) {
+    if (node && node->name() == name) return node->id();
+  }
+  return std::nullopt;
+}
+```
+
+★ 三个事实 ⇒ 结论：
+
+| 事实 | 依据 |
+|---|---|
+| ★ 按**节点名**查，**不限归属**（★ 不区分「核内」还是「从设备」）⇒ ★ 从设备的节点**同样可读** | ★ 上面的实现（★ 遍历 `ctx.get_nodes()` 全体） |
+| ★ 名字 `mem_sig` / `mem_sig_updates` 与预载核**一致** ⇒ ★ **同名即可对照** | ★ `dmem_chmem.h:112,120` |
+| ★ Verilator 侧同款（★ 也遍历 `ctx.get_nodes()` 取名）⇒ ★ **两后端采集口径一致** | ★ `cpu_verilator_sim.cpp:288-290` |
+
+⇒ ★★ **结论**：★ 只要从设备把 `mem_sig` / `mem_sig_updates` 放进网表 ⇒ ★ **parity runner 一行不改**。
+
+#### K21.3 ★ 5 个备选方案的代价对比（★ 用户裁决 Q1/Q4）
+
+| 备选 | 结论 | 理由 |
+|---|---|---|
+| **A. 从设备自算 + 沿用 `mem_sig`/`mem_sig_updates`** | ✅ **采纳** | ★ runner 零改动 + 与预载核逐位可对照 + 白名单零新增 |
+| **B. 核侧算（从设备提供「当前字」给核，核再折叠）** | ❌ 拒绝 | ★ 违反 §D3a.4「CPU 侧不做 RMW」⇒ ★ 需新增「读当前字」通路 ⇒ ★ **重新引入写延迟** ⇒ ★ 与「写无延迟」冲突 |
+| **C. host 侧算（全内存 dump）** | ❌ 拒绝 | ★ `Simulator::get_memory()` 是**空 stub**（★ 被未启用的 `ENABLE_MEMORY_API` 包住）⇒ ★ 无读出通道 ⇒ ★ ADR-089 §D3 ③ 已把它列为「待上游」的增强项 |
+| **D. 从设备算但换节点名（如 `open_mem_sig`）** | ❌ 拒绝 | ★ runner 按名查 ⇒ ★ 换名 ⇒ **runner 要改** ⇒ ★ 且失去与预载核的**逐位对照**（★ 同名才有对照价值） |
+| **E. 从设备义务 = 可选（缺失则登记白名单）** | ❌ 拒绝 | ★ 用户裁决 Q4=A ⇒ ★ 强契约 ⇒ ★ 「缺失」与「豁免」混淆 ⇒ ★ **掩盖真缺陷** ⇒ ★ 且需在 ADR-089 新增白名单条目（★ 扩张权归 architect） |
+
+★ ★ **Q4 选 A 的关键收益**：★ `exceptions.json` 现仅 1 条**合成**自检条目
+⇒ ★ `memsig` **未被豁免** ⇒ ★ **必须实现** ⇒ ★ 强契约把「实现」变成**义务**而非「选项」。
+
+#### K21.4 ★ 端口名二义的发现过程（★ A2 收尾审查 —— 第 4 个假绿通道）
+
+★★ **触发**：★ 审查「`memsig` 归从设备后，parity runner 怎么按名读观测」⇒ ★ 顺带查「开放核的顶层观测端口名是否稳定」。
+
+★ **发现 1（假绿源）**：★ `top_port_declared()` 用**子串匹配**：
+
+```cpp
+const bool is_decl = line.find("input") != npos || line.find("output") != npos;
+if (is_decl && line.find(name) != npos) return true;   // ★ 子串！
+```
+
+★ 实测生成物（`open_core_ports_top.v:11`）⇒ ★ 顶层端口**实际叫 `open_pc_1`**（不是 `open_pc`）
+⇒ ★ 但断言 `top_port_declared(vpath, "open_pc")` **通过**（★ `"output [31:0] open_pc_1"` 含子串 `"open_pc"`）
+⇒ ★★ **假绿**：★ 端口被改名这件事被测试**掩盖**。
+
+★ **发现 2（契约级）**：★ 顶层端口**真的**被改名了 ⇒ ★ 为什么？
+
+| 环节 | 事实 |
+|---|---|
+| codegen 建名表 | ★ `codegen_verilog.cpp:64-76` ⇒ 按 `eval_list` 顺序建 `name_counts` ⇒ **内部 node 先占名** ⇒ 重名者加 `_N` 后缀 |
+| 内部 `ch_reg` 名 | ★ `ibus_port_chmem.h:162` = `"open_pc"` · `:178` = `"open_flush"` ⇒ ★ **与顶层端口同名** |
+| ⇒ 结果 | ★ 顶层端口被改名 `open_pc_1` / `open_flush_1` ⇒ ★ **两后端端口名不一致**（★ Simulator 侧 `open_pc` / Verilator 侧 `open_pc_1`） |
+
+★ **发现 3（二义）**：★ `ctx` 里**两个节点同名**（内部 `ch_reg` + 顶层端口）
+⇒ ★ `resolve_node_id(ctx, "pc")` 取**首个**匹配 ⇒ ★ **观测可能读到 `ch_reg` 而非端口**。
+
+★ **发现 4（覆盖缺口）**：★ `test_cpu_open_core_branch.cpp` include 了 `codegen_verilog.h`
+但★ **没调 `toVerilog`** ⇒ ★ A2 新增的 `flush_reg` + `open_flush` 端口**从未经过 codegen**。
+
+★ ★ **裁决（升为硬约束 G-1o）**：★ **顶层端口名 MUST NOT 与内部 `ch_reg`/`ch_node` 名同名**
+⇒ ★ 内部 reg 用 `_reg` 后缀（`open_pc_reg` / `open_flush_reg`）⇒ ★ 端口名保持契约名。
+
+★ ★ **对照 `dmem`**（★ 无此病）：★ 内部 reg 名 `open_dmem_addr` / `open_dmem_data` / …
+⇒ ★ 与端口名 `dmem_req_addr` / `open_rd_data` **不同名** ⇒ ★ 生成的端口名**全干净** ✔
+⇒ ★ 证实「**只有 ibus 侧撞名**」⇒ ★ 修法就是内部 reg 加后缀。
+
+★ ★ **通用教训**（★ 与 §K20.3 同族）：★
+★ 「顶层端口名」类断言 MUST 用**精确名匹配** ⇒ ★ 子串匹配会掩盖改名。
+★ ⇒ ★ **G-1o + V-14 + V-15** 三条配套：★ 约束 + 变异对照 + 断言精确化。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
