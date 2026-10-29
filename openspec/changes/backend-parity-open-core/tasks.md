@@ -81,6 +81,17 @@ depends_on:
     · M-V15b（子串匹配 + 去反向断言 + 撞名）→ ★ **全绿 = 假绿复现** ⇒ 证明精确匹配必需
   ⇒ ★ **诚实标注**：★ ADR v1.11 的 **V-15 措辞有歧义**（★ 实测后的准确表述见 plan §K22.2）
     ⇒ ★ 本轮**不改**已签批的 ADR 决策文字 ⇒ 归 backlog（下一轮 architect 澄清）
+- [ ] 3.4b [RED+GREEN] ★ **顶层观测端口补全**：`tohost` / `regs[32]` / `pchash`
+  ⇒ ★★ **前置：观测「载体 + 命名 + 归属」待 architect 裁决**（★ plan §K23.3 的 4 项）
+    ⇒ ★ **本条暂不实施**（★ 实施方式未定 ⇒ ★ 避免返工）
+  ⇒ ★ **`tohost`**：★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`
+    ⇒ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`
+    ⇒ 开放核**无对应物**）⇒ ★ 依赖 A5
+  ⇒ ★ **`regs[32]`**：★ 归**核**（★ 寄存器堆）⇒ ★ **依赖 A4 的 regfile plugin**
+    ⇒ ★ 且预载核是**内部** `ch_reg`（`reg_0..reg_31`）⇒ ★ 若开放核走顶层端口
+      ⇒ ★ **两侧结构不同构** ⇒ H-3 对比时两侧读法不同 ⇒ ★ 待裁决
+  ⇒ ★ **`pchash`**：★ 归**核**（★ 每拍 PC 值）⇒ ★ 预载核 pc 节点名 = `pc`（内部）
+    ⇒ 开放核现有顶层端口名 = `open_pc` ⇒ ★ **契约名不一致** ⇒ ★ 待裁决
 - [x] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
   ⇒ ★ **实现**：`ip/cpu/core/dmem_port_chmem.h` + `tests/cpu/test_cpu_open_core_dmem.cpp`
     （★ **4 case / 92 assertions 实测全过**）⇒ ★ **8 个访存端口 + 1 个观测端口进网表顶层**
@@ -95,7 +106,11 @@ depends_on:
     · ✗ **MMU 翻译**（★ 地址取 `KT::RESULT`（vaddr）直接作字节地址 ⇒ **Bare 模式**）
     · ✗ **`memsig` 观测**（★ ★ 开放核**不持有内存** ⇒ 核侧算不出「最终字」⇒ 观测来源 MUST 由**从设备 / host**承担 ⇒ 归 **S5 决策**）
 - [x] 3.4 [GREEN] 顶层**观测端口**（取指侧）：★ `open_pc` 走顶层 `ch_out` [ADR-091 §D6 H-2]
-  ⇒ ★ `tohost`/`regs`/`memsig` 随 dmem 侧与完整装配落地
+  ⇒ ★ **v1.11 修正**（★ 2026-10-29）：★ `memsig` 归**从设备**（§D3a.6）⇒ ★ 但**载体仍是
+    顶层 `ch_out`**（★ 名字 `mem_sig` / `mem_sig_updates`）⇒ ★ 理由：★ `resolve_node_id`
+    遍历 `ctx.get_nodes()` ⇒ ★ **顶层端口节点也在其中** ⇒ ★ 解释器侧 runner 零改动
+    + ★ Verilator 后端走 `port_access_`（★ 契约路径 ⇒ H-2）
+  ⇒ ★ **`tohost` / `regs` / `pchash`** 见 **3.4b**
 - [x] 3.5 [GREEN] 握手成本**第一档**：`ready` 恒真 ⇒ 无阻塞流 [ADR-091 §D3a.2]
   ⇒ ★ **「`ready` 可拉低」（背压）+ CPU 侧 stall 机制未实现** ⇒ ★ **诚实标注**
 - [x] 3.7 [GREEN] ★ **ADR-047 合规修正**（★ S1 遗留缺陷，本轮发现）：★ `declare_in/out` 的
