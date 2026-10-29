@@ -40,7 +40,7 @@
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/core/regfile_bridge_chmem.h"
 #include "ip/cpu/core/regfile_chmem.h"
-#include "tests/cpu/open_core_verilog_helper.h"
+#include "tests/cpu/open_core_verilog_helper_chmem.h"
 
 namespace {
 

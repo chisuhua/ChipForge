@@ -51,7 +51,7 @@ namespace {
 // ★ 在生成的网表里查顶层端口声明
 // ★★★ **精确名匹配**（★ ADR-091 v1.11 V-15）⇒ ★ 共享 helper
 //   （★ 原本本文件与 dmem 测试各有一份**子串匹配**实现 ⇒ ★ 掩盖端口改名
-//     ⇒ ★ 假绿；★ 现抽到 `open_core_verilog_helper.h` ⇒ 逻辑只有一份）
+//     ⇒ ★ 假绿；★ 现抽到 `open_core_verilog_helper_chmem.h` ⇒ 逻辑只有一份）
 using cf_test::open_core::top_port_declared;
 
 // 读一个顶层 output 端口的当前值
