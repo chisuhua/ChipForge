@@ -26,6 +26,7 @@ set(CHMEM_ONLY_TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_dmem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_branch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_regfile.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_mem_model.cpp"
     # ★ C2（2026-10-28）：★ 本文件原本的 CH_MEM 部分被 `#ifdef` 包住 ⇒ TLM 可编译
     # ⇒ ★ 但 **C2 新增的 G-1h/G-1i/G-1j 机检 case 在 `#ifdef` 之外**
     #   （★ 它们要直接调 `elaborate()` / `ch_literal` ⇒ CH_MEM-only API）
@@ -225,6 +226,7 @@ set(CHMEM_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_dmem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_branch.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_regfile.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cpu/test_cpu_open_core_mem_model.cpp"
     # ADR-092 v1.2 §D3.1 Z-1：P2 的 CH_MEM 配置面契约测试（★ 实测确认 CH_MEM binary
     #   此前 0 个「chmem config」case ⇒ binary 归属盲区）
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu/schema/test_cpu_config_chmem.cpp
