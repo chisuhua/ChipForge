@@ -845,6 +845,58 @@ for (const auto& node : ctx.get_nodes()) {
 ⇒ ★ ⇒ ★ **「兼顾」不是靠同一份代码两用**，★ 而是靠**分层**：★ 算法双模复用 ·
 行为 CH_MEM 发射 · 边界双模一致。
 
+### K25 — ★ A4-1（regfile 单元 + 桥接 plugin）的实测证据与踩坑
+
+> ★ **ADR-091 v1.12 §D3a.7 / §D3a.8 正文只留契约** ⇒ ★ 本节承载证据与踩坑。
+
+#### K25.1 ★ 4 个变异对照（★ 全部实测 RED）
+
+| # | 变异 | 结果 | 判据 |
+|---|---|---|---|
+| **M1** | ★ `build(pb.ctx())` → `build(nullptr)`（★ **破 G-1p** ⇒ 子 ctx） | ★ **2 case 失败** | ★ 组件 output ports 从 `data_map` 消失 ⇒ 观测读不到 |
+| **M2** | ★ reg 名 `reg_N` → 默认名 `reg`（★ **破 §D3a.8**） | ★ **1 case 失败** | ★ 契约名丢失（★ parity runner 按 `reg_<i>` 采集） |
+| **M3** | ★ 桥接不发布 `RS1` payload | ★ **1 case 失败** | ★ 层 2 → 层 1 的通道断了 |
+| **M4** | ★ `write_regs<1>` → `write_regs<0>`（★ 允许写 x0） | ★ **1 case 失败** | ★ RISC-V x0 恒 0 语义 |
+
+⇒ ★ 恢复后：**10 case / 432 assertions 全绿**（★ `[open-core]` 7 → 10 case）。
+
+#### K25.2 ★★★ 6 个实测踩坑（★ 全部是**契约陷阱**，★ 非笔误）
+
+| # | 坑 | 现象 | 正解 |
+|---|---|---|---|
+| ① | ★★ **`namespace KT = ...::keys<U32,32>`** | ★ 编译错「expected identifier」 | ★ `keys` 是**类模板** ⇒ ★ namespace alias **不接受模板参数** ⇒ ★ 必须 `using KT = ...` |
+| ② | ★★★ **`&must(declare_*(...))`** | ★ 编译错「taking address of rvalue」 | ★ ★ 对**临时对象**取地址 ⇒ ★ 临时对象析构 ⇒ ★ 端口 `impl_` 失效 ⇒ ★ **端口消失** ⇒ ★ **假绿**（★ ADR-091 v1.6 已记录同款） |
+| ③ | ★★★ **`ch::core::port` 的 `operator=` 被 `delete`** | ★ 编译错「use of deleted function」 | ★ ★ 连**拷贝赋值**都不可 ⇒ ★ ⇒ ★ `std::optional<port>` **也不行**（★ optional 赋值要求 T 可赋值）⇒ ★ ⇒ ★ 必须 `unique_ptr`（★ `port` 的**拷贝构造**可用 ⇒ `make_unique` OK） |
+| ④ | ★★ **`ch_bool` 无从 `port` 的隐式转换** | ★ 编译错「no matching function for `ch_bool(ch_in<ch_bool>&)`」 | ★ ★ `port` 只为 `ch_uint` 提供 `operator ch_uint<W>()` ⇒ ★ `ch_bool` 须走 **`port::impl()`** ⇒ `ch_bool(port.impl())` |
+| ⑤ | ★★ **门禁 Check 1 是纯文本 grep** | ★ `check_plugin_portability` FAIL，★ 命中的是**注释行** | ★ ★ 判定用 **awk 的原行 `$0`**（★ `gsub` 只去掉了注释，★ 但 `/return;/` 匹配的是**原行**）⇒ ★ ⇒ ★ **注释里也不能写「条件早返」的字面形式** ⇒ ★ 改措辞 |
+| ⑥ | ★ **`sim.tick()` 后读端口 = 下一拍** | ★ 测试期望错（★ 期望 0，实得 0xDEAD） | ★ ★ ADR-091 已记录的口径（★ 本轮再次踩）⇒ ★ 改用「先不写验初值 / 再写验生效」的序列 |
+
+★ ★★ **⑤ 是门禁脚本的**假阳性风险**（★ 注释里的字面形式被命中）⇒ ★ **不改脚本**（★ scope 外）
+⇒ ★ **教训**：★ 在 `at_stage` 块内写注释时，★ **避开「条件早返」的字面写法**。
+
+#### K25.3 ★★ 一个**必须靠模板递归**才能正确的设计点（★ 否则假绿）
+
+★ **寄存器索引 MUST 是编译期常量** ⇒ ★ 否则 `ch_literal<V, W>` 无法表达 ⇒ ★ 若把运行期
+   索引塞进 `ch_uint<5>` ⇒ ★ 该值被**常量折叠** ⇒ ★ 比较结果成为常量
+   ⇒ ★ **信号退化为常量** ⇒ ★ **假绿**（★ ADR-091 §K19 已记录同族坑：「跨宽构造须 `zext`」）
+
+⇒ ★ ⇒ ★ 正解：★ **模板递归展开**（★ `addr_eq<I>` / `write_regs<I>` / `mux<I>`）
+⇒ ★ 每个索引成为**编译期常量** ⇒ ★ `ch_literal<I,5>` 合法 ⇒ ★ 比较是**节点级**的。
+
+★ ★ **对照上游**：★ 上游 `rv32i_regfile.h` 手写了 32 个 `sel_aN` 比较（★ 316 行）
+⇒ ★ 模板递归是**等价但更短**的写法。
+
+#### K25.4 ★ 桥接的**「直连」语义**（★ 反而绕开 G-1n）
+
+★ 桥接 plugin 在 `at_stage` 闭包里**直读** `regfile_->io().rs1_data`（★ 不经 payload 中转）
+⇒ ★ ⇒ ★ **不依赖 stage 顺序** ⇒ ★ **绕开 G-1n**（★ G-1n 只约束 payload 的
+生产者/消费者顺序）★ ⇒ ★ 但 ★ 桥接 plugin 作为 **payload 生产者**
+⇒ ★ MUST 注册在**消费者之前**（★ G-1n 的「注册顺序 = 首现序」仍适用）。
+
+★ ★ 附：★ Component 的 `io()` 输入端口被 `<<=` 驱动后 ⇒ ★ 它们**有 driver**
+⇒ ★ 按 **G-1d** ⇒ 不进 `port_access_` ⇒ ★ 但 Component 的 io **本来就不是**顶层端口
+⇒ ★ **无影响** ✔。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
