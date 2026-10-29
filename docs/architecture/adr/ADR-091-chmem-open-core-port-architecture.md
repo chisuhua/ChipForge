@@ -1,6 +1,7 @@
 # ADR-091 — CH_MEM 开放核形态与端口架构（ip/cpu/core）
 
 > **Status**: ✅ **Accepted（v1.2，2026-10-28，architect 主持；v1.0 = D0 决策链 D0-①~D0-⑨ 全部裁决；v1.1 = 增补 §D3a（D-J 接口契约 + 层次区分 + 握手成本）+ §D3a.3 真名；★ **v1.9 = C2 逐条变异对照复核（★ 存量 G-1a~G-1k 共 11 条 ⇒ ★ **无一被证伪** ⇒ ★ 但 ★ **机检覆盖度极不均衡**（★ 强 7 / 中 1 / 弱 3）⇒ ★ 增「G-1 的机检覆盖矩阵」+ ★ **更正 G-1b 的后果描述**（★ 实测 = **命名冲突**，★ 非 ADR 原写的 multiple definition））**；
+★ **v1.13 = 双审查（oracle + metis，2026-10-30）后落 5 项裁决**：★ **A-1**「开放核 plugin 来源策略」（★ **全部新建** + ★ **复用 = 复用算法语义与纯算法头**，★ **MUST NOT include 任何 plugin 头** —— ★ 含 `<ch.hpp>` 者违 **G-1b**，★ 不含者绑预载核 stage 语义）⇒ ★ **修正 D1 的「复用 `int_alu_chmem.h`」**+ ★ **A-2**「ELF 加载路线」= **elaboration init vector**（★ 运行期注入路径**不可行** —— ★ 上游 `Simulator::set_memory` 是**空 stub**）⇒ ★ **O-5 未解** ⇒ ★ **D1「O-4/O-5 一并解开」降级为诚实标注**+ ★ **A-3** §D3a.9 的 `tohost` 契约名 ⇒ ★ **`tohost_probe_data_proxy`**（★ 与预载核**同名** ⇒ ★ runner 零改动）+ ★ **A-4** §D6 **V-15** 措辞澄清（★ 正向精确断言 = 主断言 / ★ 反向断言 = 第二道护栏）+ ★ **A-5** **H-3 × S-9a 交集**（★ 截断 case 的承重判据 = `regs` + `memsig`）+ ★ Verification **V-20~V-23**（4 条）；
 ★ **v1.12 = A4 架构裁决（2026-10-29，用户裁决 + architect 主持）：★ 新增 §D3a.7「可复用单元的两层范式」（★ **Component 做可复用单元 + Payload 桥接** —— 用户裁决 A；★ 接口 = **纯 `Payload<T>`** —— 用户裁决 B；★ **MUST NOT** 用 `ch_stream`（★ 越层：ADR-092 §D4 定 `ch_stream` = IP 间）+ ★ **新增框架缺口 #4**（`PipeBuilder` 暴露 ctx））+ ★ 新增 §D3a.8「微架构边界」（★ **register re-naming = 需要**（★ 有实证）+ ★ **乱序 = 明确排除** + ★ 层次化 = 采纳）+ ★ 新增 §D3a.9「观测量的载体与归属」（★ **4 项裁决** ⇒ ★ `memsig`/`tohost` 载体 MUST 是**顶层 `ch_out`** + ★ `tohost` 归**从设备** + ★ `regs[32]` 走顶层端口 + ★ `pchash` 不改 `open_pc`）+ ★ **新增硬约束 G-1p**（★ Component MUST 共用 ctx ⇒ ★ 子 ctx ⇒ node-id aliasing）+ ★ Verification **V-16~V-19**（4 条）；
 ★ **v1.11 = A2 收尾审查 + `memsig` 观测来源裁决（2026-10-29，用户裁决 Q1/Q4 + architect 主持）：★ 新增 §D3a.6「`memsig` 观测来源 = **从设备自算**」（★ 节点名沿用 `mem_sig`/`mem_sig_updates` ⇒ ★ **parity runner 零改动**；★ 折叠算法 MUST 与预载核 `dmem_chmem.h:244-270` **逐位同款**；★ **从设备 MUST 提供**（强契约）⇒ ★ ADR-089 例外白名单**零新增**）+ ★ **新增硬约束 G-1o**（★ **顶层端口名 MUST NOT 与内部 `ch_reg`/`ch_node` 名同名** ⇒ ★ 否则 CppHDL 唯一化把端口改名（`open_pc` → `open_pc_1`）⇒ ★ **两后端端口名不一致** ⇒ ★ 破 H-5）+ ★ Verification **V-11~V-15**（5 条）；
 ★ **v1.10 = A2（分支重定向 + flush，S3.2b）实施期收敛：★ 新增 §D3a.5「分支反馈契约」（3 个核内 payload key + **1 拍对齐** + fail-open）+ ★ **新增硬约束 G-1n**（★ **stage 首现序 MUST 等于流水顺序** —— `canonical_stage_order()` 按首现序 ⇒ ★ 装配/测试注册顺序错 ⇒ **跨 stage payload 可见性反转** ⇒ 静默失效）+ ★ Verification **V-10**（4 个变异对照）；
@@ -80,7 +81,7 @@
 
 | 项 | 决策 |
 |---|---|
-| **形态** | ★ **开放核**（P1）：对外暴露 `ch_stream` 端口，取指/访存由外部供给<br>★ **本 ADR 同时是开放项 O-5 的架构解**（契约 §8：「让 Verilator 侧免掉『每 ELF 一次编译』：**把 ELF 从 elaboration 期移出**（imem 初始化改运行期加载）」，归属「architect 评估」）⇒ 开放核的 ELF 走**端口**而非 elaboration 期预载 ⇒ 网表不再随 ELF 变 ⇒ **O-4/O-5 一并解开** |
+| **形态** | ★ **开放核**（P1）：对外暴露 `ch_stream` 端口，取指/访存由外部供给<br>★ ~~**本 ADR 同时是开放项 O-5 的架构解**~~（契约 §8：「让 Verilator 侧免掉『每 ELF 一次编译』：**把 ELF 从 elaboration 期移出**（imem 初始化改运行期加载）」）⇒ ★★ **v1.13 更正**：★ **O-5 未解**（★ 运行期注入路径**不可行** —— ★ 上游 `Simulator::set_memory` 是**空 stub**，★ 见 §D3a.11）⇒ ★ ★ **本 ADR 解开的是 O-4**（网表与 ELF **解耦**：ELF 走**端口**而非预载 ⇒ ★ **核的网表不随 ELF 变**）★ ⇒ ★ **O-5（每 corpus 一次编译）仍开放** ⇒ ★ 归上游 |
 | **实现位置** | ★ **`ip/cpu/core/`**（新目录）—— 形态差异**由目录表达**，不用版本号 |
 | **预载核** | ★ **原样不动**（`ip/cpu/plugins/*_chmem.h` + `cpu_factory_chmem.h`）⇒ 现有 52 case parity 基线**零风险** |
 | **退役** | 预载核的移除**待开放核通过全部测试后另行裁决**（★ 归 ADR-088 阶段 C，**不在本 ADR**） |
@@ -97,7 +98,13 @@ ip/cpu/core/
 └── verify_mem_model_chmem.h  # ★ 验证实现（内存模型 + ELF 加载）—— ip 级单测用
 ```
 
-★ **复用（形态无关，直接共享）**：`ip/cpu/arch/riscv/decoder_table.h`（ISA 解码表）· `ip/cpu/arch/riscv/int_alu_chmem.h`（ALU 语义）· `ip/cpu/core/payload_common.h` + `ip/cpu/arch/riscv/payload_riscv.h`（★ **payload key 契约，必须共享，否则新旧核语义漂移**）。
+★ ★★ **复用清单（★ v1.13 按 A-1 重新分类 —— ★ 原文把 `int_alu_chmem.h` 列为「直接共享」，★ 实测其含 `<ch.hpp>` ⇒ ★ **G-1b 禁止 include** ⇒ ★ 已修正）**：
+| 类别 | 文件 | 处置 |
+|---|---|---|
+| ★ **纯算法 / 契约头** | ★ `decoder_table.h`（ISA 解码表）· ★ `payload_riscv.h` · ★ `mul_div_fsm.h`（★ 含 FSM ⇒ ADR-046 豁免标记）· ★ `ip/cpu/core/payload_common.h` | ★ ★ **可直接 include**（★ **必须共享** ⇒ ★ **payload key 契约共享，否则新旧核语义漂移** ⇒ ADR-083 §4.1） |
+| ★ **双模 plugin 头**（★ 含 `PluginBase`，★ **不含** `<ch.hpp>`） | ★ `branch.h` · ★ `csr.h` · ★ `decode.h` · ★ `int_alu.h` · ★ `lsu.h` · ★ `mul.h` | ★ ★ **语义可参考**，★ ★ **MUST NOT include**（★ 它们的**注册语义绑预载核的 stage 命名** ⇒ ★ include 即污染开放核的 stage 图）⇒ ★ **移植**到新建的开放核 plugin |
+| ★ **CH_MEM plugin 头**（★ 含 `<ch.hpp>`） | ★ `int_alu_chmem.h` | ★ ★★ **MUST NOT include**（★ **G-1b**：★ `module.h:13` 缺 `inline` ⇒ ★ 2+ TU include 即 multiple definition）⇒ ★ **移植其 select 树语义** |
+⇒ ★ **「复用」的准确含义 = 复用算法语义 + 复用纯算法头**；★ **MUST NOT include 任何 plugin 头**。
 
 ### D2 ★ 验证实现的角色：**slave（内存模型）**，通过标准端口响应请求
 
@@ -244,10 +251,36 @@ ADR-083 §4.2 当初拒绝的理由之一是「强握手语义对单周期同步
 | ★ ★ **载体通则** | ★ **每个顶层观测量 MUST 是顶层 `ch_out` 端口**（★ H-2）⇒ ★ **MUST NOT** 是内部 `ch_reg`（★ 内部节点不在 Verilator 的 `port_access_` ⇒ ★ 只能穿透 ⇒ ★ 违背 H-2）⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 读内部层级 |
 | ★ ★ **`resolve_node_id` 的兼容** | ★ `parity_sim_runner` 的 `resolve_node_id` 遍历 `ctx.get_nodes()` ⇒ ★ **顶层端口节点也在其中** ⇒ ★ ⇒ ★ 载体改为顶层 `ch_out` 后 ★ **解释器侧 runner 零改动**（★ 这正是「顶层 `ch_out` 是唯一自洽解」的原因） |
 | ★ **`memsig` / `mem_sig_updates`** | ★ 归属**从设备**（§D3a.6）★ 载体 MUST 是**顶层 `ch_out`**（★ 名 `mem_sig` / `mem_sig_updates`）⇒ ★ **补齐 §D3a.6 未写的「载体」这一半**（★ §D3a.6 只写了「节点名」）⇒ ★ 节点名不变 ⇒ ★ runner 零改动 |
-| ★ **`tohost`** | ★ 归属**从设备**（★ 开放核**不持有内存** ⇒ ★ 核侧无法 `aread` ⇒ ★ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`（`dmem_chmem.h:278`）⇒ ★ **开放核无对应物**）★ 载体 MUST 是**顶层 `ch_out`**（★ 名 `tohost`） |
+| ★ **`tohost`** | ★ 归**从设备**（★ 开放核**不持有内存** ⇒ ★ 核侧无法 `aread` ⇒ ★ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`（`dmem_chmem.h:278`）⇒ ★ **开放核无对应物**）★ 载体 MUST 是**顶层 `ch_out`**<br>★ ★★ **v1.13 更正（A-3）：★ 契约名 = **`tohost_probe_data_proxy`**（★ **不是** `tohost`）★★ ★ 理由：★ 预载核的观测节点名 = `"tohost_probe" + "_data_proxy"`（★ `CppHDL/include/core/mem.h:141-142` ⇒ ★ **完全可控**）⇒ ★ **同名** ⇒ ★ `resolve_node_id(ctx, "tohost_probe_data_proxy")` **两侧都命中** ⇒ ★ **parity runner 零改动** ✔ ⇒ ★ 若用 `tohost` ⇒ ★ 预载核侧命中、★ **开放核侧落空** ⇒ ★ runner 须特判 ✘ |
 | ★ **`regs[32]`** | ★ 归属**核**（★ 核持有寄存器堆）★ 载体 MUST 是**顶层 `ch_out`**（★ 名 `reg_1`..`reg_31` ⇒ ★ `reg_0` 为 x0 恒 0 ⇒ ★ 沿用 parity runner 的 1..31 口径）⇒ ★ **契约名 MUST NOT 改**（★ runner 按 `reg_<i>` 采集）⇒ ★ ★ **两侧载体不同**（★ 预载核 = 内部 `ch_reg` ⇒ 冻结集不动；★ 开放核 = 顶层端口）⇒ ★ **但 runner 零改动**（★ `resolve_node_id` 两侧都能命中）⇒ ★ **Verilator 侧**须分别处理（★ 归 A6） |
 | ★ **`pchash` / `pc`** | ★ 归属**核** ★ 载体 MUST 是**顶层 `ch_out`** ⇒ ★ **但契约名 `open_pc` MUST NOT 改**（★ 已进 ADR/tasks/测试 ⇒ 改名面大）⇒ ★ ⇒ ★ **parity runner 加 1 处 fallback**（★ 先试 `pc` ⇒ 未命中则试 `open_pc`）⇒ ★ 归 A6（★ **runner 改动，非契约**） |
 | ★ **`cycles`** | ★ 轨迹观测量 ⇒ ★ **MUST 走 ADR-089 例外白名单**（★ H-3；★ scope 限定「开放核 vs 预载核」）⇒ ★ **不改** |
+
+#### D3a.10 ★ 开放核 plugin 的**来源策略**（★ **A-1 裁决**，2026-10-30）
+
+> ★ **推导与证据**（`ip/cpu/arch/riscv/` 逐文件的 include 扫描 · 「复用」在技术上不可能的证明 · 双副本漂移风险）⇒ **`.rddf/plans/backend-parity-open-core.md` §K31** ⇒ ★ 本节只留**契约**。
+
+| 项 | 决策 |
+|---|---|
+| ★ **结论** | ★ **全部新建**（★ 与 tasks 2.3 的 v1.12 细化**一致**）⇒ ★ **D1 原句「复用 `int_alu_chmem.h`」作废**（★ 见 D1 的重新分类） |
+| ★ ★ **「复用」的准确含义** | ★ **复用算法语义 + 复用纯算法头** ⇒ ★ **MUST NOT include 任何 plugin 头**（★ 含 `<ch.hpp>` 者违 **G-1b**；★ 不含者**注册语义绑预载核 stage** ⇒ ★ include 即污染开放核的 stage 图） |
+| ★ **可 include 的纯算法头** | ★ `decoder_table.h`（ISA 解码表）· ★ `payload_riscv.h` · ★ `mul_div_fsm.h`（★ ADR-046 FSM 豁免）· ★ `ip/cpu/core/payload_common.h`（★ **payload key 契约必须共享** ⇒ ADR-083 §4.1） |
+| ★ **必须移植的语义源** | ★ ALU 的 select 树（★ `int_alu_chmem.h`，★ 462 行）· ★ decode 的译码（★ `decode.h` + `decoder_table.h`）· ★ csr / lsu / mul / branch 的语义 |
+| ★ ★ **双副本漂移风险** | ★ ★★ 移植 select 树 = **第二份 ALU 实现** ⇒ ★ **正是 ADR-083 §4.1 拒绝的「双副本漂移」形态** ⇒ ★ ⇒ ★ **MUST** 以 **H-3 等价性自检**兜底（★ 3 终值逐位相等 ⇒ ★ `regs` 覆盖 ALU 结果）⇒ ★ **H-3 是本决策的承重判据**，★ 不是「附加验收」 |
+| ★ **工作量口径** | ★ ★ 「移植」**不是**复制粘贴：★ 每个移植的 unit MUST 有**语义锚测试**（★ 对标 `test_cpu_chmem_alu_semantics.cpp` 的 288 assertions 强度）**+ 3 个变异对照**（★ V-9 纪律） |
+
+#### D3a.11 ★ ELF 加载路线与 **O-5** 的诚实标注（★ **A-2 裁决**，2026-10-30）
+
+| 项 | 决策 |
+|---|---|
+| ★ **路线** | ★ **elaboration init vector**（★ 解析 ELF ⇒ 填 `ch_mem` 的初值 vector ⇒ `ch_mem` 构造时载入）⇒ ★ **唯一可行** |
+| ★ ★ **运行期注入不可行（★ 实证）** | ★ 上游 `CppHDL/src/simulator.cpp:161-168`：`Simulator::get_memory` **返回 `{}`**、`set_memory` **空实现** ⇒ ★ 且整段被**未启用的** `ENABLE_MEMORY_API` 包住 ⇒ ★ ⇒ ★ **无运行期注入通道** |
+| ★ ★ **O-4 已解** | ★ **核的网表不随 ELF 变**（★ ELF 走**端口**而非预载）⇒ ★ 契约 §8 的 O-4（网表与 ELF 解耦）★ **解开** ✔ |
+| ★ ★★ **O-5 仍开放** | ★ 「每 corpus 一次编译」★ **未解** ⇒ ★ ⇒ ★ **D1「O-4/O-5 一并解开」降级为诚实标注**（★ 本节即该更正）⇒ ★ 归**上游**（★ 需 `Simulator` 内存 API 实装） |
+| ★ **对 A6 的影响** | ★ ★ Verilator 侧对**每个 ELF** 仍需一次编译（★ 虽核网表不变，★ 但**从设备**的网表含**初值 vector** ⇒ 随 ELF 变）⇒ ★ ⇒ ★ **A6 的 Verilator 侧 MUST 接受「每 ELF 一次编译」**（★ 或改走 O-5 的上游方案） |
+| ★ ★ **ELF 路由 MUST 逐位复制预载核** | ★ 预载核 `ip/cpu/cpu_factory_chmem.h:268-336` 有 **4 条 quirk**：★ ① `PF_R`-only 段被静默丢弃 ② `p_filesz/4` 尾字节丢弃 ③ 越界读时 `words.clear(); break;` 后仍以空 vector 调用 ④ `X+W` 段**只进 dmem**（取指取不到）⇒ ★ ⇒ ★ **MUST 逐位复制**（★ 「顺手修正」= ★ **H-3 假红**）⇒ ★ 每条 MUST 有 case |
+| ★ **地址映射** | ★ 预载核用 `(p_vaddr - 0x80000000)/4`（★ 相对）· 运行期用 `bits<15,2>`（★ 截断到 64KB 窗口）⇒ ★ ★ **MUST 复刻**（★ 含 64KB 窗外**静默别名**这一已知边界） |
+| ★ **ELF 段越界** | ★ MUST **fail-closed**（★ 段地址 MUST 落在 `[0x80000000, 0x80010000)`）⇒ ★ 预载核侧是**未定义**（★ 越界即截断）⇒ ★ ★ **开放核可更严，但 MUST 在契约里写明** |
 
 ### D4 ★ 两套 bundle 并存（新核用新 bundle，老核代码不动）
 
@@ -382,13 +415,14 @@ module top (
 |---|---|---|
 | **H-1** | ★ **每个端口字段 MUST ≤ 64 bit**（`PortBitwidthOverflow`）⇒ `MemReq.address`(64) / `MemReq.data`(64) **恰好卡在上限** ⇒ **禁止再加宽**（如 128-bit 地址）⇒ 需加宽时 MUST 拆字段或走解释器后端 | `verilator_backend.cpp:631-643` |
 | **H-2** | ★ **观测 MUST 走顶层 `ch_out`** ⇒ MUST NOT 依赖 `--public-flat-rw` 读内部层级 | 上游 `rv32i_pipeline_top.h` 注释 |
-| **H-3** | ★ **开放核与预载核 MUST 有机器可判的等价性自检**：同一 ELF 分别跑两核 ⇒ ★★ **v1.6 修正：3 个终值观测量（`tohost`/`regs`/`memsig`）逐位相等**（★ 这才是「语义等价」的机器可判形式 ⇒ 满足 ADR-083 §4.1「防双副本漂移」的本意）⇒ ★ **2 个轨迹观测量（`cycles`/`pchash`）MUST 走 ADR-089 例外白名单**（★ 结构性不可比 —— 流水结构不同构，见 §D3a.4）⇒ ★ 例外 scope MUST 限定为「开放核 vs 预载核」对比语料，★ **MUST NOT 扩散到双后端 parity 语料**（★ 双后端线 MUST 保持逐拍相等）⇒ ★ **白名单扩张权归 architect**（★ 本条即 2026-10-28 architect 扩张） | ADR-083 §4.1 + ADR-089 §D3 观测量集与例外白名单 |
+| **H-3** | ★ **开放核与预载核 MUST 有机器可判的等价性自检**：同一 ELF 分别跑两核 ⇒ ★★ **v1.6 修正：3 个终值观测量（`tohost`/`regs`/`memsig`）逐位相等**（★ ★ **v1.13 补（A-5）**：★ **H-3 × 契约 S-9a 的交集效应** ⇒ ★ 在「开放核 vs 预载核」scope 下 `pchash` 已走例外 ⇒ ★ ⇒ ★ **截断（partial）case 的承重判据 = `regs` + `memsig`**（★ 而契约 §S-9a 称 `pchash` 是**最强**判据）⇒ ★ ⇒ ★ **该交集 MUST 在 ADR-089 / parity-gate-contract 登记**，★ 否则后人误判判据强度）（★ 这才是「语义等价」的机器可判形式 ⇒ 满足 ADR-083 §4.1「防双副本漂移」的本意）⇒ ★ **2 个轨迹观测量（`cycles`/`pchash`）MUST 走 ADR-089 例外白名单**（★ 结构性不可比 —— 流水结构不同构，见 §D3a.4）⇒ ★ 例外 scope MUST 限定为「开放核 vs 预载核」对比语料，★ **MUST NOT 扩散到双后端 parity 语料**（★ 双后端线 MUST 保持逐拍相等）⇒ ★ **白名单扩张权归 architect**（★ 本条即 2026-10-28 architect 扩张） | ADR-083 §4.1 + ADR-089 §D3 观测量集与例外白名单 |
 | **H-4** | ★ **新核 MUST NOT 引入 TLM 依赖**（不引 `cf::plugin::uint_t`、不引 `cpptlm`）⇒ `ip/cpu/core/**` 全部文件 MUST 为 CH_MEM-only | ADR-040 v3.0 + ADR-088 §10 |
 | **H-5** | ★ **每个顶层端口字段 MUST 在两个后端上都能读到** ⇒ 门禁 MUST 以「顶层端口」为唯一观测量来源 | ADR-089 D2 |
 
 ### ★ 正文长度自检（★ 诚实标注 —— 不在本次顺手重构）
 
-★ 本 ADR 已 **> 250 行**（★ 正文 = 决策本身；★ v1.12 后约 520 行）⇒ ⇒ ★ **推导与证据已外移**（★ §D3a.4 → plan §K13~K15 · ★ §D3a.5 → §K20 · ★ §D3a.6 → §K21 · ★ §D3a.7 → §K24）（§D3a.4 的推导 → plan §K13~K15）⇒ ★ **建议后续拆分**：★ 「核形态决策」与「端口契约 + 实测约束（G-1 系列）」可拆为 **ADR-091 + 1 篇主题文档** ⇒ ★ **归后续独立 change**（★ 不在本次顺手改写 —— 存量文档不追溯）。
+★ 本 ADR 已 **> 250 行**（★ 正文 = 决策本身；★ v1.13 后约 560 行）⇒ ⇒ ★ **推导与证据已外移**（★ §D3a.4 → plan §K13~K15 · ★ §D3a.5 → §K20 · ★ §D3a.6 → §K21 · ★ §D3a.7 → §K24）（§D3a.4 的推导 → plan §K13~K15）⇒ ★ **建议后续拆分**：★ 「核形态决策」与「端口契约 + 实测约束（G-1 系列）」可拆为 **ADR-091 + 1 篇主题文档** ⇒ ★ **归后续独立 change**（★ 不在本次顺手改写 —— 存量文档不追溯）。
+⇒ ★ ★ **v1.13 复核拆分时机**：★ **现在拆为时尚早**（★ G-1 系列仍在增长 —— ★ v1.12 刚加 G-1p、★ v1.13 仍在补契约）⇒ ★ 中途拆会让「契约在哪」变**二义** ⇒ ★ ⇒ ★ **拆分时点 = A6 收官后一次性做**。
 
 ### D7 ★ DSE 的定位与可扫维度清单
 
@@ -428,7 +462,7 @@ module top (
 
 ### 正面
 
-1. ★ **B-1/B-2/B-3/B-4 四个阻塞一次性解开**：顶层端口 ⇒ `VerilatorBackend` 可用 + 观测走契约 + SoC 互联有路 + O-4/O-5 有解
+1. ★ **B-1/B-2/B-3/B-4 四个阻塞一次性解开**：顶层端口 ⇒ `VerilatorBackend` 可用 + 观测走契约 + SoC 互联有路（★ ★ **v1.13 更正**：★ **O-4 已解**（★ 核网表与 ELF 解耦）★ **O-5 仍开放** ⇒ ★ 见 §D3a.11）
 2. ★ **零回归**：预载核不动 ⇒ 现有 52 case parity 基线**不需重跑**（★ 这是「不原地改 `_chmem.h`」的直接收益）
 3. ★ **D0-c（双后端必过）落地**：上游 `DUAL_BACKEND_TEST_PAIR` 范式可直接借鉴；`VerilatorBackend` 只需 `ctx` ⇒ **不引入 CppHDL 的 Component 体系**
 4. ★ **H-3 等价性自检**把「两核语义漂移」变成机器可判 ⇒ 规避 ADR-083 §4.1 拒绝的「双副本漂移」
@@ -478,11 +512,25 @@ module top (
 - [ ] **V-12** ★ **折叠算法逐位同款**（v1.11）：★ 从设备的折叠算法 MUST 与预载核 `dmem_chmem.h:244-270` **逐位一致**（★ 同一写序列 ⇒ 同一 `mem_sig` / `mem_sig_updates`）⇒ ★ 变异对照：★ 改一处常量（★ 如 `0x9E3779B1` → `0x9E3779B2`）⇒ MUST RED
 - [ ] **V-13** ★ **从设备强契约**（v1.11）：★ 任一作为 DUT 一部分的从设备 MUST 暴露 `mem_sig`/`mem_sig_updates` ⇒ ★ **MUST NOT** 新增 ADR-089 例外白名单条目来绕过 ⇒ ★ 白名单条目数 MUST 保持 1（★ 那 1 条是**合成**自检条目，★ 不计真实例外）
 - [ ] **V-14** ★ **端口名解耦**（v1.11，★ G-1o）：★ 生成网表的顶层端口名 MUST **等于**契约名（★ 如 `open_pc` / `open_flush`）⇒ ★ **MUST NOT** 出现 `_N` 后缀改名 ⇒ ★ 变异对照：★ 把内部 `ch_reg` 改回与端口同名 ⇒ MUST RED（★ 由「端口存在」断言 + 「端口名精确匹配」断言共同捕获）
-- [ ] **V-15** ★ **端口断言精确化**（v1.11）：★ 顶层端口断言 MUST 用**精确名匹配** ⇒ ★ **MUST NOT** 用子串匹配（★ 子串匹配会让改名后的端口「通过」⇒ ★ 假绿）⇒ ★ 变异对照：★ 断言一个**不完整**的名字（★ 如 `open_pc` 对 `open_pc_1`）⇒ MUST RED
+- [ ] **V-15** ★ **端口断言精确化**（v1.11；★ **v1.13 澄清措辞**）：★ 顶层端口断言 MUST 用**精确名匹配** ⇒ ★ **MUST NOT** 用子串匹配（★ 子串匹配会让改名后的端口「通过」⇒ ★ 假绿）
+  ⇒ ★★ **v1.13 澄清（A-4）**：★ **正向断言**（★ 契约名 MUST 精确存在）= **主断言**；★ **反向断言**（★ 改名形式 MUST **不**存在）= **第二道护栏** ⇒ ★ ★ **二者并存**：★ 反向断言连「子串匹配」的漏洞都能堵（★ 实测：★ 子串匹配 + 无反向断言 ⇒ ★ **假绿复现**）⇒ ★ ⇒ ★ **变异对照**：★ ① 把 helper 降级回**子串匹配** ⇒ ★ 则「内部节点撞名 ⇒ 端口改名」这一变异**不再 RED**（★ 假绿复现）★ ② 断言一个**不完整**的名字 ⇒ MUST RED
 - [ ] **V-16** ★ **两层范式可落地**（v1.12）：★ `ch::Component` 单元 MUST 能在 ChipForge 的 ctx 里 `build()` ⇒ ★ 其 `io()` 输出 MUST 能被桥接 plugin 读出并写成 `Payload<T>` ⇒ ★ **变异对照**：★ 传 `nullptr` 让 Component 自建 ctx（★ 破 G-1p）⇒ MUST RED（★ 组件输出端口从 `data_map` 消失）
 - [ ] **V-17** ★ **单元契约名稳定**（v1.12）：★ regfile 的 reg 名 MUST 是 `reg_0`..`reg_31` ⇒ ★ **MUST NOT** 因默认构造泄漏孤儿节点（★ 实证：`reg_file_chmem.h:160-172` ⇒ Verilator `Duplicate declaration of signal '_reg_N'`）⇒ ★ 变异对照：★ 改用 `std::array` 默认构造 ⇒ MUST RED（★ Verilator 侧编译失败或节点撞名）
-- [ ] **V-18** ★ **观测载体是顶层端口**（v1.12）：★ 生成网表的顶层 MUST 含 `mem_sig` / `mem_sig_updates` / `tohost` / `reg_1..reg_31` / `open_pc` ⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 穿透读内部层级（★ H-2）⇒ ★ 变异对照：★ 把 `mem_sig` 改成内部 `ch_reg` ⇒ MUST RED（★ Verilator 侧 `port_access_` 读不到）
+- [ ] **V-18** ★ **观测载体是顶层端口**（v1.12；★ **v1.13 更正 `tohost` 名**）：★ 生成网表的顶层 MUST 含 `mem_sig` / `mem_sig_updates` / ★ **`tohost_probe_data_proxy`** / `reg_1..reg_31` / `open_pc` ⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 穿透读内部层级（★ H-2）⇒ ★ 变异对照：★ 把 `mem_sig` 改成内部 `ch_reg` ⇒ MUST RED（★ Verilator 侧 `port_access_` 读不到）
 - [ ] **V-19** ★ **`resolve_node_id` 兼容**（v1.12）：★ 载体改为顶层 `ch_out` 后 ★ `parity_sim_runner` 的 `resolve_node_id(ctx, "<name>")` MUST 仍能命中（★ 因顶层端口节点在 `ctx.get_nodes()` 里）⇒ ★ runner **零改动** ⇒ ★ 变异对照：★ 换一个**未声明**的名字 ⇒ MUST RED（★ 观测缺失 ⇒ fail-closed）
+- [ ] **V-20** ★ **开放核 plugin 来源纪律**（v1.13，★ A-1）：★ `ip/cpu/core/**` MUST NOT include 任何
+  `ip/cpu/plugins/*_chmem.h`（★ **G-1b**）⇒ ★ 也 MUST NOT include `ip/cpu/arch/riscv/*` 的**双模 plugin 头**
+  （★ `branch.h`/`csr.h`/`decode.h`/`int_alu.h`/`lsu.h`/`mul.h`/`int_alu_chmem.h`）⇒ ★ **只允许** include
+  纯算法/契约头（★ `decoder_table.h` · `payload_riscv.h` · `mul_div_fsm.h` · `payload_common.h`）⇒ ★ 变异对照：★
+  ★ include 一个双模 plugin 头 ⇒ MUST RED（★ 编译期失败即证据）
+- [ ] **V-21** ★ **ELF 路由逐位同款**（v1.13，★ A-2）：★ 同一 ELF 经**预载核路由**与**开放核加载**后，
+  ★ 内存内容 MUST **逐字相等**（★ 含 4 条 quirk 的等价行为：★ `PF_R`-only 段丢弃 / ★ 尾字节丢弃 /
+  ★ 越界行为 / ★ `X+W` 段只进 dmem）⇒ ★ 变异对照：★ 开放核「顺手修正」任一 quirk ⇒ MUST RED（★ **H-3 假红的守卫**）
+- [ ] **V-22** ★ **ELF 段越界 fail-closed**（v1.13，★ A-2）：★ 段地址 MUST 落在
+  `[0x80000000, 0x80010000)` ⇒ 越界 MUST **报错**（★ **MUST NOT** 静默截断）⇒ ★ 变异对照：★ 去掉越界检查 ⇒ MUST RED
+- [ ] **V-23** ★ **观测契约名两侧一致**（v1.13，★ A-3）：★ `tohost_probe_data_proxy` / `mem_sig` /
+  `mem_sig_updates` / `reg_1..reg_31` MUST 在**开放核与预载核两侧**都可被 `resolve_node_id` 命中
+  ⇒ ★ ⇒ ★ **parity runner 零改动** ⇒ ★ 变异对照：★ 开放核侧改契约名 ⇒ MUST RED
 - [ ] **V-9** ★ **变异对照纪律**（v1.8）：★ 每条「实测约束」MUST 有**变异对照**（★ 撤掉该写法 ⇒ 测试 MUST RED）⇒ ★ 否则「约束」只是**猜测**，会被后人当铁律继承 ⇒ ★ ★ **本轮实测**：★ 8 条候选里 **4 条被证伪**（★ `&&`/`||` 失效 / `==` 走指针比较 / 跨宽构造须 `zext` / ctx 名必须唯一 ⇒ ★ 全部**不成立**）⇒ ⇒ ★ **只有 2 条（G-1l / G-1m）配登记为硬约束** ⇒ ★ 证据见 plan §K17
 - [ ] **V-8** ★ **写语义完备**（v1.7）：★ `CpuBusReq` MUST 含 `size`（3 bit）⇒ ★ `size` MUST 表达 1/2/4/8 四种字节宽度 ⇒ ★ **sub-word store 的 byte-strobe 语义 MUST 可表达** ⇒ ★ 契约测试 MUST 覆盖 `size` 的 4 种取值 ⇒ ★ **MUST NOT** 让 CPU 侧承担 RMW（★ 那会引入读响应依赖 ⇒ 写延迟 ⇒ stall/forwarding）
 - [ ] **V-7** ★ **DSE 正名生效**：`ip/cpu/docs/dse_architecture.md` 与 `tools/dse/README.md` 的表述与 D7 一致（★ 「表容量/存储深度的参数敏感度分析」；★ 明确列出**不可配**维度）⇒ ⚠️ **不得**仍以「7 维 576-config」描述 CH_MEM 路径
