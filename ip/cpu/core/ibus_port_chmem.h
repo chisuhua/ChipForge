@@ -94,6 +94,11 @@ struct IBusPortPorts {
   ch::core::ch_in<ch::core::ch_uint<32>>*  rsp_data = nullptr;   // 指令字
   ch::core::ch_in<ch::core::ch_uint<1>>*   rsp_valid = nullptr;  // 响应有效
   // ── 观测（顶层端口 ⇒ ADR-091 §D6 H-2）──
+  // ★★ **G-1o**：★ 顶层端口名 MUST NOT 与内部 `ch_reg`/`ch_node` 名同名
+  //   ⇒ ★ CppHDL codegen 按 `eval_list` 建名表 ⇒ **内部 node 先占名**
+  //     ⇒ 重名者加 `_N` 后缀 ⇒ ★ 顶层端口被静默改名（`open_pc` → `open_pc_1`）
+  //   ⇒ ★ **两后端端口名不一致** ⇒ ★ 破 H-5
+  //   ⇒ ★ 故内部 reg 一律用 `_reg` 后缀（`open_pc_reg` / `open_flush_reg`）
   ch::core::ch_out<ch::core::ch_uint<32>>* pc = nullptr;         // 当前 PC（逐拍）
   /// ★ 「本拍发布的指令是错路」⇒ 供 dmem 抑制 store（ADR-091 §D3a.5 ③）
   ch::core::ch_out<ch::core::ch_uint<1>>* flush = nullptr;
@@ -159,7 +164,7 @@ class IBusPortPlugin : public cf::plugin::PluginBase {
     if (!pc_reg_) {
       // ★ `to_operand` 支持整数 ⇒ 运行期初值在此转成字面量（此时有 ctx）
       pc_reg_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<32>>>(
-          initial_pc_, "open_pc");
+          initial_pc_, "open_pc_reg");
     }
     return *pc_reg_;
   }
@@ -175,7 +180,7 @@ class IBusPortPlugin : public cf::plugin::PluginBase {
   ch::core::ch_reg<ch::core::ch_uint<1>>& get_flush_reg() {
     if (!flush_reg_) {
       flush_reg_ = std::make_unique<ch::core::ch_reg<ch::core::ch_uint<1>>>(
-          ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}), "open_flush");
+          ch::core::ch_uint<1>(ch::core::ch_literal<0, 1>{}), "open_flush_reg");
     }
     return *flush_reg_;
   }
