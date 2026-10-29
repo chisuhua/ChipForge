@@ -131,6 +131,14 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
     //   ⇒ ★ parity runner 的 `resolve_node_id` 两侧都能命中（★ 零改动）
     ch::core::ch_out<U32>* mem_sig = nullptr;
     ch::core::ch_out<U32>* mem_sig_updates = nullptr;
+    // ── ★ **`tohost` 探针**（★ ADR-091 v1.12 §D3a.9）──
+    // ★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`）
+    // ★ ★ **契约名 = `tohost_probe_data_proxy`**（★ 与预载核
+    //   `dmem_chmem.h:278` 的 `mem.aread(probe_addr, "tohost_probe")`
+    //   生成的**内部** proxy 节点名**完全一致**）⇒ ★
+    //   ⇒ ★ **parity runner 的 `resolve_node_id` 两侧都命中** ⇒ ★ **零改动** ✔
+    // ★ ★ 载体 MUST 是**顶层 `ch_out`**（★ H-2）⇒ ★ 而非内部 proxy
+    ch::core::ch_out<U32>* tohost_probe = nullptr;
   };
 
   void bind_ports(const Ports& p) { ports_ = p; }
@@ -139,6 +147,13 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
   ///   ⇒ ★ 诚实标注：★ **ELF 加载尚未实现**（★ tasks 4.2 的另一半）
   void set_elf_image(const std::vector<std::uint8_t>& bytes) {
     elf_image_ = bytes;
+  }
+
+  /// ★★ **`tohost` 探针的字索引**（★ 与预载核 `dmem_chmem.h:57` **同款 API**）
+  ///   ⇒ ★ 预载核由 `cpu_factory_chmem.h:333` 设 `0x400`（★ 字节 0x1000）
+  void set_tohost_probe_word(std::size_t word) {
+    tohost_probe_word_ = word;
+    tohost_probe_enabled_ = true;
   }
   bool has_elf_image() const { return !elf_image_.empty(); }
 
@@ -275,6 +290,23 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
           *ports_.mem_sig_updates = ch::core::ch_uint<32>(sig_upd);
         }
       }
+
+      // ★★★ **`tohost` 探针**（★ ADR-091 v1.12 §D3a.9）
+      //   ★ 预载核同款：`mem.aread(probe_addr, "tohost_probe")`
+      //   ⇒ ★ 生成的**内部** proxy 节点名 = `"tohost_probe" + "_data_proxy"`
+      //   ★ ★★ 本实现的**内部** proxy 用 `tohost_probe_internal`（★ 避开同名）
+      //     ⇒ ★ **顶层端口**才能用契约名 `tohost_probe_data_proxy`
+      //     ⇒ ★ 否则同名 ⇒ ★ CppHDL 唯一化把端口改名 ⇒ ★ **破契约**（★ G-1o）
+      if (tohost_probe_enabled_ && ports_.tohost_probe && !tohost_probe_port_) {
+        const auto probe_addr = ch::core::ch_uint<14>(
+            static_cast<std::uint32_t>(tohost_probe_word_));
+        tohost_probe_port_ = std::make_unique<
+            ch::core::ch_mem<U32, kMemWords>::read_port>(
+            mem.aread(probe_addr, "tohost_probe_internal"));
+      }
+      if (ports_.tohost_probe && tohost_probe_port_) {
+        *ports_.tohost_probe = ch::core::ch_uint<32>(tohost_probe_port_->impl());
+      }
     }
   }
 
@@ -313,6 +345,10 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
   std::unique_ptr<ch::core::ch_mem<U32, kMemWords>> mem_;
   std::unique_ptr<ch::core::ch_reg<U32>> mem_sig_;
   std::unique_ptr<ch::core::ch_reg<U32>> mem_sig_updates_;
+  /// ★ `tohost` 探针的读端口（★ 组合 `aread` ⇒ 0 拍）
+  std::unique_ptr<ch::core::ch_mem<U32, kMemWords>::read_port> tohost_probe_port_;
+  std::size_t tohost_probe_word_ = 0;
+  bool tohost_probe_enabled_ = false;
   Ports ports_{};
   std::vector<std::uint8_t> elf_image_;
 };
