@@ -43,7 +43,7 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
-#include "tests/cpu/open_core_verilog_helper.h"
+#include "tests/cpu/open_core_verilog_helper_chmem.h"
 #include "ip/cpu/core/ibus_port_chmem.h"
 
 namespace {

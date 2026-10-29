@@ -36,7 +36,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cpu/core/verify_mem_model_chmem.h"
-#include "tests/cpu/open_core_verilog_helper.h"
+#include "tests/cpu/open_core_verilog_helper_chmem.h"
 
 namespace {
 
