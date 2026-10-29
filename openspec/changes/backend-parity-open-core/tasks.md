@@ -67,6 +67,20 @@ depends_on:
     · ✗ **分支预测**（★ BP / BTB / GShare ⇒ 归 `feat-bp-btb-gshare`）
     · ✗ **多拍错路**（★ 当前只 flush **1 拍**错路 ⇒ ★ 与预载核的两级取指同深度）
     · ✗ **异常 / 中断重定向**（★ 归 `mmu-chmem-phase-b-c-launch` 的异常通路）
+- [x] 3.2c [GREEN] ★ **A2.5 收尾：端口名解耦 + 断言精确化**（★ ADR-091 v1.11 G-1o / V-14 / V-15）
+  ⇒ ★ **G-1o 修复**：★ 内部 `ch_reg` 名 `open_pc` → `open_pc_reg` · `open_flush` → `open_flush_reg`
+    ⇒ ★ **顶层端口名保持契约名**（★ 生成物实测：`open_pc` / `open_flush`，★ **无 `_1` 后缀**）
+  ⇒ ★ **断言精确化**：★ 新建 `tests/cpu/open_core_verilog_helper.h`（★ 共享 helper）
+    ⇒ ★ `top_port_declared` 改**精确名匹配**（★ 原先 ibus/dmem 各一份**相同的子串匹配**⇒ 假绿）
+  ⇒ ★ **覆盖缺口修复**：★ `test_cpu_open_core_branch.cpp` **补 `toVerilog`**
+    ⇒ ★ A2 之前 `branch` 测试从未生成 Verilog ⇒ 新增的 `flush_reg` + `open_flush` 端口**从未过 codegen**
+  ⇒ ★ **反向断言**：★ `open_pc_1` / `open_flush_1` MUST **不在**顶层（★ 第二道护栏）
+  ⇒ ★ **变异对照 4 组全测**（★ plan §K22.2）：
+    · M-V14（内部 reg 撞名）→ **2 case 失败** ✔
+    · M-V15+V14（子串匹配 + 撞名）→ **1 case 失败**（★ 捕获来自反向断言）
+    · M-V15b（子串匹配 + 去反向断言 + 撞名）→ ★ **全绿 = 假绿复现** ⇒ 证明精确匹配必需
+  ⇒ ★ **诚实标注**：★ ADR v1.11 的 **V-15 措辞有歧义**（★ 实测后的准确表述见 plan §K22.2）
+    ⇒ ★ 本轮**不改**已签批的 ADR 决策文字 ⇒ 归 backlog（下一轮 architect 澄清）
 - [x] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
   ⇒ ★ **实现**：`ip/cpu/core/dmem_port_chmem.h` + `tests/cpu/test_cpu_open_core_dmem.cpp`
     （★ **4 case / 92 assertions 实测全过**）⇒ ★ **8 个访存端口 + 1 个观测端口进网表顶层**
