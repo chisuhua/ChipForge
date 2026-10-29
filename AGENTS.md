@@ -448,6 +448,10 @@ bash tools/run_chipforge_tests.sh --no-build        # ★ 跳过 build ⇒ 改�
 #   ⇒ 只在出现**新**失败时退出码非 0（★ 原先 ctest entry 恒红 ⇒ 信号不存在）
 #   ⇒ baseline-aware 运行器：tools/run_catch2_with_baseline.sh
 # ★ ctest 的 cf_build_all fixture ⇒ 编译失败 ⇒ 依赖测试 Not Run ⇒ 整体 FAIL（fail-closed）
+# ★ ★ C1 补强（2026-10-30）：★ `run_catch2_with_baseline.sh` **新增产物新鲜度 fail-closed**
+#   ⇒ ★ binary 的 mtime MUST 晚于全部编译输入 ⇒ ★ 否则**拒绝运行**（退出码 2）
+#   ⇒ ★ 判据**按 binary 收窄**（★ TLM binary 排除 `*_chmem.h` + CH_MEM-only 测试文件）
+#   ⇒ ★ 堵死「变异改动未生效 → 编译失败 → ★ **旧 binary 仍输出 All tests passed**」
 python tools/doc_checker.py --format text --verbose  # 文档健康检查
 pre-commit run --all-files                          # 格式化/空白/JSON 检查
 ```

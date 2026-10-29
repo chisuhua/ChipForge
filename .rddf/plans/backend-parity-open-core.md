@@ -282,12 +282,17 @@
 |---|---|---|---|
 | ★ **G-1l** | payload「累加式 select」（`X = select(cond, v, X)`）**需上游 stage 先写 `X`** | ★ **gdb 栈**：`muximpl::create_instruction` → `lnodeimpl::id(nullptr)` ⇒ `Simulator::initialize` 段错误 | ✅ **登记为硬约束** |
 | ★ **G-1m** | **`ch_bool` 禁用于 `?:` / `if`**（⇒ MUST 用节点级 `select()`） | ★ **变异对照 RED**：把 `select()` 换回 `?:` ⇒ 62 assertions ⇒ 2 处 FAILED（★ **写使能恒 0** + ★ **符号扩展失效**） | ✅ **登记为硬约束** |
-| G-1n（候选） | `ch_bool` 的 `&&` / `\|\|` 失效 | ★ **变异对照**：改回 `&&` / `\|\|` ⇒ **92 assertions 全绿** | ❌ **证伪 ⇒ 撤回** |
-| G-1o（候选） | `ch_uint` 的 `==` 走 `logic_buffer::operator==`（**节点指针比较**）⇒ 须显式限定调用 | ★ **变异对照**：改回 `a == b` ⇒ **92 assertions 全绿** | ❌ **证伪 ⇒ 撤回**（★ 显式限定调用仍保留，但降级为**防御性写法**） |
-| G-1p（候选） | 跨宽构造 `ch_uint<64>(ch_uint<32>)` 只支持截断 ⇒ 须用 `zext<64>` | ★ **变异对照**：改用跨宽构造 ⇒ **92 assertions 全绿** | ⚠️ **降级**（★ 原始 null impl 日志真实，但**已被后续修复覆盖** ⇒ 当前形态等效） |
-| G-1q（候选） | ctx 名必须唯一（否则节点 id aliasing） | ★ **变异对照**：全部场景用**同名 ctx** ⇒ **92 assertions 全绿** | ⚠️ **降级**为防御性写法（★ 该现象来自 **S3a** 的历史观测，本轮**未复现**） |
-| G-1r（候选） | `ch_reg<ch_uint<1>> <<= ch_bool` 与 `<<= ch_uint<1>` 路径不同 | ★ 未做对照实验 | ⚠️ **降级**（★ 实现本就显式转换 ⇒ 无需约束） |
-| G-1s（候选） | `bits<>` / `select()` 结果须显式转 `ch_uint` | ★ 未做对照实验 | ⚠️ **降级**为防御性写法（★ 显式化只提升可读性） |
+> ★★★ **候选编号空间 = `CAND-n`**（★ 2026-10-30 修正）：★ 原用 `G-1n`~`G-1s`
+> ⇒ ★ **与已登记的正式约束 G-1n / G-1o / G-1p 撞号**（★ 该候选表写于 v1.9 前，
+> ★ 后来 n/o/p 被**正式登记**为硬约束）⇒ ★ 引用会**二义**
+> ⇒ ★ ⇒ ★ 候选编号**独立命名空间**，★ 永不与已登记约束共用。
+
+| 候选 | 内容 | 变异对照 | 裁决 | `ch_bool` 的 `&&` / `\|\|` 失效 | ★ **变异对照**：改回 `&&` / `\|\|` ⇒ **92 assertions 全绿** | ❌ **证伪 ⇒ 撤回** |
+| CAND-2 | `ch_uint` 的 `==` 走 `logic_buffer::operator==`（**节点指针比较**）⇒ 须显式限定调用 | ★ **变异对照**：改回 `a == b` ⇒ **92 assertions 全绿** | ❌ **证伪 ⇒ 撤回**（★ 显式限定调用仍保留，但降级为**防御性写法**） |
+| CAND-3 | 跨宽构造 `ch_uint<64>(ch_uint<32>)` 只支持截断 ⇒ 须用 `zext<64>` | ★ **变异对照**：改用跨宽构造 ⇒ **92 assertions 全绿** | ⚠️ **降级**（★ 原始 null impl 日志真实，但**已被后续修复覆盖** ⇒ 当前形态等效） |
+| CAND-4 | ctx 名必须唯一（否则节点 id aliasing） | ★ **变异对照**：全部场景用**同名 ctx** ⇒ **92 assertions 全绿** | ⚠️ **降级**为防御性写法（★ 该现象来自 **S3a** 的历史观测，本轮**未复现**） |
+| CAND-5 | `ch_reg<ch_uint<1>> <<= ch_bool` 与 `<<= ch_uint<1>` 路径不同 | ★ 未做对照实验 | ⚠️ **降级**（★ 实现本就显式转换 ⇒ 无需约束） |
+| CAND-6 | `bits<>` / `select()` 结果须显式转 `ch_uint` | ★ 未做对照实验 | ⚠️ **降级**为防御性写法（★ 显式化只提升可读性） |
 
 ⇒ ★★ **裁决纪律**（★ 已升为 ADR-091 §D6 **V-9**）：
 ★ 每条「实测约束」MUST 有**变异对照**（撤掉该写法 ⇒ 测试 MUST RED）⇒
@@ -949,7 +954,7 @@ mem.write(word_addr, merged, we)      ★ ★ 写使能为 0 ⇒ 整个字不写
 |---|---|---|
 | ① | ★ `ch_bool(ch_in<ch_uint<1>>)` ⇒ 编译错 | ★ ★ `ch_bool` **无**从 `ch_in<U1>` 的构造路径 ⇒ ★ 保持 `ch_uint<1>` 类型（★ `select` 的 cond 走 `to_operand` ⇒ **不限** `ch_bool`） |
 | ② | ★ `ch_mem` 构造报「Initial data must be integral type」 | ★ 初值 MUST 是 `std::vector<std::uint32_t>`（★ **不是** `vector<ch_uint<32>>`） |
-| ③ | ★ `bits<15,2>` 的结果又包 `ch_uint<15>` ⇒ 跨宽构造 | ★ ★ `bits<15,2>` 的宽度 = **14 bit**（= `ch_mem` 的 addr 宽度）⇒ ★ **MUST NOT** 再包（★ G-1r：★ 跨宽构造须 `zext`，★ 语义未文档化） |
+| ③ | ★ `bits<15,2>` 的结果又包 `ch_uint<15>` ⇒ 跨宽构造 | ★ ★ `bits<15,2>` 的宽度 = **14 bit**（= `ch_mem` 的 addr 宽度）⇒ ★ **MUST NOT** 再包（★ ★ **已证伪**：★ ADR-091 v1.8 的候选 **CAND-3**（★ 原编号 G-1p）实测「改用跨宽构造 ⇒ 92 assertions 全绿」⇒ ★ **不是约束** ⇒ ★ 此处仅作**本地写法选择**） |
 | ④ | ★★ **`ch_out` 端口的值在 simulator 里更新于 `tick`** ⇒ ★ 未 tick 就读 ⇒ ★ 读到**初值 0** ⇒ ★ 假失败 | ★ ★ 断言端口值前**必须先 tick** |
 
 ★ ★★ **④ 的连带发现（★ 覆盖缺口）**：★ 既有 `test_cpu_open_core_ibus.cpp` /
@@ -1074,6 +1079,117 @@ struct SigRef {                       // ★ 复刻预载核折叠
 ⇒ ★ 改动未生效 ⇒ ★ **编译错 12 个** ⇒ ★ 但旧 binary 仍输出
 「All tests passed (761 assertions)」⇒ ★ ⇒ ★ **必须先确认编译 0 错再读测试结果**
 （★ 已在 A4-0 的 commit message 记过一次 ⇒ ★ **本轮再犯** ⇒ ★ **强化**）。
+
+### K29 — ★ oracle + metis 双审查结论（★ 2026-10-30）+ ★ 一条**公开更正**
+
+> ★ 审查方法：★ 委派 `oracle`（架构审查）+ `metis`（gap 分析）⇒ ★ **7 条关键结论
+> 全部由本 agent 读代码/文档**独立核实（★ 不采信 subagent 的转述）。
+
+#### K29.1 ★★★ **公开更正**（★ 我自己写错的诚实标注）
+
+★ commit `17e9a4c` 的 message 里有：
+★ 「★★ 连带发现：★ 既有 ibus/dmem 测试**只断言端口声明、从不读值**
+★ ⇒ 「端口存在但恒 0」的假绿在那两处未被捕获 ⇒ 归 **backlog**」
+
+★★★★ ★ **该标注不属实**（★ 已实测核实）★：
+★ `test_cpu_open_core_ibus.cpp:169,170,189` **逐拍读值**
+（★ `req_addr` / `pc` / `req_valid`）★ `test_cpu_open_core_dmem.cpp` 有 **6 个**
+★ `get_port_value` helper（★ `:83,87,91,95,99,103`）⇒ ★ **两者都读值**。
+
+⇒ ★ ⇒ ★ **真实缺口不是「不读值」，而是**：
+★ ★★ **「核 ↔ 从设备从未对接」** —— ★ `test_cpu_open_core_mem_model.cpp` 的
+★ `MemRig` **直接驱动从设备端口**（★ `:68-187`）★ 而 ibus/dmem 测试
+★ **由 host 直接喂 `rsp_data`** ⇒ ★ ★ **两侧各自绿，但从未连过** ⇒ ★ ★★
+★ 这才是该登记的 backlog 项（★ 已进 tasks）。
+
+★ ★ ★ **教训**：★ 「诚实标注」本身也须**可核实** ⇒ ★ 未核实就写进 commit message
+★ ⇒ ★ 该标注随 commit 永久留存 ⇒ ★ ★★ **只能靠后续公开更正，不能靠「悄悄改」**。
+
+#### K29.2 ★ 候选编号空间撞号（★ 已修）
+
+★ plan §K17.1 的候选表原用 `G-1n`~`G-1s` ⇒ ★ 但 **G-1n / G-1o / G-1p
+已被 ADR-091 v1.9~v1.12 正式登记**（★ stage 首现序 / 端口名解耦 / Component 共用 ctx）
+⇒ ★ **撞号** ⇒ ★ 引用会二义。
+
+⇒ ★ ⇒ ★ 候选编号**独立命名空间** `CAND-1`~`CAND-6`（★ 永不与已登记约束共用）
+⇒ ★ ⇒ ★ 代码里 2 处引用不存在的 **G-1r** 已清：
+· `ip/cpu/core/dmem_port_chmem.h`（★ 「`ch_bool` 禁 `?:`」实为 **G-1m**）
+· `ip/cpu/core/verify_mem_model_chmem.h` + plan §K26.4（★ 「跨宽构造须 `zext`」
+  ★ **v1.8 已证伪** ⇒ 改标为**本地写法选择，非约束**）
+
+#### K29.3 ★ 审查结论汇总（★ 12 项，★ 已核实项标 ✔）
+
+| # | 结论 | 核实 | 处置 |
+|---|---|---|---|
+| ① | ★★ 我写的「ibus/dmem 不读值」标注**不属实** | ✔ | ★ **公开更正**（§K29.1）+ 改记真实缺口 |
+| ② | ★★ **G-1r / G-1n / G-1o / G-1p 候选撞号** | ✔ | ★ **已修**（§K29.2） |
+| ③ | ★★ **tasks 3.4b 「已裁决」段与「待裁决」段并存**（★ `tohost` 写两遍） | ✔ | ★ **已修**（拆子项 + 去重） |
+| ④ | ★★ **spec.md 两处漂移**（★ 「MUST 抛异常」/「五观测量逐位相等」） | ✔ | ★ **已修** |
+| ⑤ | ★★★ **`rd_we × flush` 无人掩码**（★ 预载核 `reg_file_chmem.h:232` 有 `&& !flush`；★ 开放核 regfile 只屏蔽 x0、★ 桥接**透传** `rd_we`） | ✔ | ★★★ **错路指令会写寄存器** ⇒ ★ **H-3 的 `regs` 必挂** ⇒ ★ **任何文档都没写这条** ⇒ ★ 归 **A4-2 的隐藏硬需求** |
+| ⑥ | ★★★ **decode/alu 三处契约矛盾**（★ ADR D1「复用 `int_alu_chmem.h`」★ 但该文件 include `<ch.hpp>` + `plugin_base.h` ⇒ 是**完整 plugin**；★ 与 tasks 2.3「全部新建」矛盾） | ✔ | ★ **A4-2 之前必须裁决**（★ reuse ≈0.5 人日 / rewrite ≈3~5 人日） |
+| ⑦ | ★★ **A5-2 必须逐位复制预载核 ELF 路由的 4 条 quirk**（★ `cpu_factory_chmem.h:268-336`：PF_R-only 段丢弃 / 尾字节丢弃 / 越界 clear+break / X+W 段只进 dmem） | ✔ | ★ 「顺手修正」= **H-3 假红** ⇒ ★ MUST 复制 + 逐条登记 |
+| ⑧ | ★★ **Verilator 侧「采集零改动」只对解释器侧成立**（★ `sim_main.cpp:96-126` 全是 `top__DOT___reg_N` 穿透） | ✔ | ★ A6 的 6c 是**实质性新代码**（★ 走 `port_access_`） |
+| ⑨ | ★★ **A5-2 路线选择**（★ 上游 `Simulator::get_memory/set_memory` 是**空 stub**，★ `simulator.cpp:162-167`）⇒ ★ 走 init vector ⇒ **O-5 未解** | ✔ | ★ ADR D1「O-4/O-5 一并解开」需**诚实标注** |
+| ⑩ | ★ **C1 防护链断在底层**（★ `run_catch2_with_baseline.sh:75` 只查 `-x`；★ 而 `run_chipforge_tests.sh:193-201` **有** mtime 校验） | ✔ | ★ 「直接跑 binary」绕过全部三层防护 ⇒ ★ 建议 mtime fail-closed 下沉 |
+| ⑪ | ★ **G-1o 需框架级机检**（★ `declare_out` 无撞名检查；★ 3 次命中证明是**系统性问题**） | ✔ | ★ `PipeBuilder` 加端口名唯一性 sweep |
+| ⑫ | ★ **H-3 × S-9a 交集未登记**（★ 截断 case 的 `pchash` 被豁免 ⇒ 承重判据只剩 `regs`+`memsig`） | ✔ | ★ 登记进 ADR-089 / parity-gate-contract |
+
+#### K29.4 ★ 待 **architect** 裁决（★ 5 项，★ builder 不得自行决定）
+
+| # | 待裁决 | 为何阻塞 |
+|---|---|---|
+| **A-1** | ★ **decode/alu/csr/branch 的 reuse-vs-rewrite**（★ 三处契约矛盾，★ 证据见 ⑥） | ★ **A4-2 不可启动** |
+| **A-2** | ★ **A5-2 的 ELF 加载路线**（★ elaboration init vector vs 运行期 data_map 注入）⇒ ★ 连带 O-5 的表述 | ★ **A5-2 不可启动** |
+| **A-3** | ★ **ADR-091 §D3a.9 的 `tohost` 名** ⇒ ★ 改为 `tohost_probe_data_proxy`（★ 证据 plan §K28.1） | ★ 措辞错误会误导装配 |
+| **A-4** | ★ **ADR-091 §D6 V-15 措辞**（★ 正向断言 = 主断言 / 反向断言 = 第二道护栏，★ 证据 §K22.2） | ★ 同上 |
+| **A-5** | ★ **H-3 × S-9a 交集**（★ 截断 case 承重判据）⇒ ★ 登记进 ADR-089 或 parity-gate-contract | ★ 判据强度误判 |
+
+★ ★ ★ **另 2 项已被明确否决的「看似可行」路径**（★ 供后人参考）：
+★ ① 「G-1o 用 CI grep 机检」⇒ ★ **否决**（★ 撞名是**elaboration 期**现象，
+★   内部 reg 名散落在字符串参数里 ⇒ 文本 grep 既漏报又误报 ⇒ ★ W3 已实测放弃同类）
+★ ② 「ADR-091 现在就拆」（★ 已 505 行）⇒ ★ **否决**（★ G-1 系列仍在增长
+★   ⇒ 中途拆会让「契约在哪」变二义 ⇒ ★ **A6 收官后一次性拆**）
+
+### K30 — ★ C1 防护链**下沉到最底层**（★ 审查项 ⑩ 的实施）
+
+> ★ **触发**：★ oracle 审查发现「`run_catch2_with_baseline.sh` 只查 `-x`（存在性）、
+> ★ **不查新鲜度**」⇒ ★ 「**直接执行 binary**」的路径**绕过**全部三层防护
+> ★ （`run_chipforge_tests.sh` 的 mtime 校验 + ctest 的 `cf_build_all` fixture）
+> ⇒ ★ ★ **本轮已两次**命中：★ 变异脚本改动未生效 ⇒ 编译失败 ⇒ ★ **旧 binary
+> 仍输出「All tests passed」** ⇒ ★ **假绿**。
+
+#### K30.1 ★ 实施（★ 判据 = binary mtime vs 编译输入 mtime）
+
+★ ★ 与 `run_chipforge_tests.sh:193-201` 的 `--no-build` 路径**同款**。
+
+★ ★★ **判据必须按 binary 收窄**（★ 本轮实测踩了两次）：
+
+| 情形 | 判据 | 理由 |
+|---|---|---|
+| ★ **CH_MEM binary** | ★ 查全部编译输入 | ★ 含 `*_chmem.h` |
+| ★ **TLM binary** | ★ 排除 `*_chmem.h` + ★ **CH_MEM-only 测试文件** | ★ `*_chmem.h` 含 `<ch.hpp>` ⇒ ★ **绝不可能**被 TLM 引用 |
+
+★ ★★ **CH_MEM-only 测试的排除清单从 `tests/CMakeLists.txt` 的
+★ `CHMEM_ONLY_TEST_SOURCES` 自动提取**（★ ★★ **自动同步** ⇒ ★ 不会漂移）。
+
+★★ ★★ **两个实测踩坑**（★ 记录以免后人重犯）：
+
+| # | 坑 | 正解 |
+|---|---|---|
+| ① | ★ ★ **bash 数组传 find 的括号表达式** ⇒ ★ 数组元素**不参与 shell 转义** ⇒ ★ `\(` 变字面量 ⇒ ★ **find 的括号分组失效** | ★ ★ **不用数组传括号** ⇒ ★ 直接两套 `find` 命令 |
+| ② | ★ ★ **helper 头不在排除清单**（★ 清单只列 `.cpp`）⇒ ★ 改它就误判 TLM binary stale | ★ ★ **重命名为 `*_chmem.h`**（★ 它只服务 CH_MEM-only 测试）⇒ ★ ⇒ ★ 排除规则**自动覆盖**，★ **零额外机制** |
+
+#### K30.2 ★ 鉴别力验证（★ 变异对照）
+
+| 场景 | CH_MEM binary | TLM binary | 判据 |
+|---|---|---|---|
+| ★ 改 CH_MEM-only 测试文件 | ★ **STALE 拒绝** ✔ | ★ **PASS**（★ 正确排除）✔ | ★ **精确**：抓真 stale + 不误报 |
+| ★ 改双模头（`pipe_builder.h`） | ★ STALE ✔ | ★ STALE ✔ | ★ 真 stale 双向捕获 |
+| ★ 改 `*_chmem.h` | ★ STALE ✔ | ★ PASS ✔ | ★ 同上 |
+| ★ 编译后 | ★ PASS ✔ | ★ PASS ✔ | ★ 不误伤正常流程 |
+
+★ ★ **实测**：★ 改 CH_MEM-only 文件 ⇒ ★ CH_MEM **拒绝** + ★ TLM **PASS**（67463 assertions）
+⇒ ★ ★ **C1 假绿通道在底层被封堵** ✔✔
 
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
