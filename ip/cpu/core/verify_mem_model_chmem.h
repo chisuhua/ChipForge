@@ -122,6 +122,15 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
     ch::core::ch_out<U1>* dmem_req_ready = nullptr;
     ch::core::ch_out<U64>* dmem_rsp_data = nullptr;
     ch::core::ch_out<U1>* dmem_rsp_valid = nullptr;
+    // ── ★★★ **观测端口**（★ ADR-091 v1.11 §D3a.6 + v1.12 §D3a.9）──
+    // ★ `mem_sig` / `mem_sig_updates` = ★ **DUT 侧自算**的内存签名
+    //   （★ 折叠算法 MUST 与预载核 `dmem_chmem.h:244-270` **逐位同款**）
+    // ★ ★ 载体 MUST 是**顶层 `ch_out`**（★ H-2：★ Verilator 后端
+    //   `port_access_` 只认顶层端口 ⇒ ★ MUST NOT 依赖 `--public-flat-rw` 穿透）
+    // ★ ★ 名字 MUST 与预载核**同名**（★ `mem_sig` / `mem_sig_updates`）
+    //   ⇒ ★ parity runner 的 `resolve_node_id` 两侧都能命中（★ 零改动）
+    ch::core::ch_out<U32>* mem_sig = nullptr;
+    ch::core::ch_out<U32>* mem_sig_updates = nullptr;
   };
 
   void bind_ports(const Ports& p) { ports_ = p; }
@@ -224,6 +233,48 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
       //   ⇒ ★ ⇒ ★ `final_data` **MUST NOT** 用 `select(we, ...)` 兜底
       //     （★ 多余的一次 mux ⇒ ★ DAG 变大）
       mem.write(dmem_word, merged, we, "dmem_write");
+
+      // ★★★ **`memsig` 折叠**（★ ADR-091 v1.11 §D3a.6）
+      //   ★ MUST 与预载核 `ip/cpu/plugins/dmem_chmem.h:244-270` **逐位同款**：
+      //     mix      = word_addr * 31 + store_wdata + sig_upd * 0x9E3779B1
+      //     sig_next = is_store_active ? ((sig * 16777619) ^ mix) : sig
+      //     sig_upd += is_store_active
+      //   ★ ★ `store_wdata` = **RMW 后的最终字**（★ 上面的 `merged`）
+      //   ★ ★ `is_store_active` = 写使能（★ 开放核的 flush 抑制**在核侧**
+      //     ⇒ ★ `dmem_req_we` 已含抑制 ⇒ ★ 从设备无需再判 flush）
+      //   ★ ★ **只观测、不参与 datapath** ⇒ ★ 零 cycle 影响
+      {
+        auto& sig = get_mem_sig();
+        auto& sig_upd = get_mem_sig_updates();
+        // ★★★ **必须显式取值**（★ 预载核注释点名的坑）：
+        //   ★ 直接写 `sig * X` ⇒ ★ 走 ch_uint 的**编译期值**路径（恒 0）
+        //   ⇒ ★ 整条表达式退化成常量 ⇒ ★ **reg 无驱动逻辑**
+        //   ⇒ ★ **被 codegen 裁掉**（★ Verilog 里根本没有 `mem_sig`）
+        ch::core::ch_uint<32> sig_val(sig);
+        ch::core::ch_uint<32> sig_upd_val(sig_upd);
+
+        // ★ `dmem_word` = `bits<15,2>(byte_addr)`（★ 14 bit）⇒ ★ 与预载核的
+        //   `word_addr` **同宽同义** ⇒ ★ 折叠逐位同款 ✔
+        const auto mix =
+            (dmem_word * ch::core::ch_uint<32>(ch::core::ch_literal<31, 32>{})) +
+            ch::core::ch_uint<32>(merged) +
+            (sig_upd_val * ch::core::ch_uint<32>(
+                 ch::core::ch_literal<0x9E3779B1, 32>{}));
+        const auto sig_next = ch::core::ch_uint<32>(ch::core::select(
+            we, (sig_val * ch::core::ch_uint<32>(
+                     ch::core::ch_literal<16777619, 32>{})) ^ mix,
+            sig_val));
+        sig <<= sig_next;
+        sig_upd <<= ch::core::ch_uint<32>(ch::core::select(
+            we, sig_upd_val + ch::core::ch_uint<32>(ch::core::ch_literal<1, 32>{}),
+            sig_upd_val));
+
+        // ★ 顶层观测端口（★ 名 `mem_sig` / `mem_sig_updates` —— 契约名）
+        if (ports_.mem_sig) *ports_.mem_sig = ch::core::ch_uint<32>(sig);
+        if (ports_.mem_sig_updates) {
+          *ports_.mem_sig_updates = ch::core::ch_uint<32>(sig_upd);
+        }
+      }
     }
   }
 
@@ -240,7 +291,28 @@ class VerifyMemModelPlugin : public cf::plugin::PluginBase {
     return *mem_;
   }
 
+  /// ★★ **内部签名寄存器**（★ 名带 `open_` 前缀 —— G-1o：★ 不与顶层
+  ///   观测端口名 `mem_sig` / `mem_sig_updates` **撞名**）
+  ///   ⇒ ★ 契约名由**顶层端口**承担 ⇒ ★ `resolve_node_id` 仍能命中 ✔
+  ch::core::ch_reg<U32>& get_mem_sig() {
+    if (!mem_sig_) {
+      mem_sig_ = std::make_unique<ch::core::ch_reg<U32>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}), "open_mem_sig");
+    }
+    return *mem_sig_;
+  }
+  ch::core::ch_reg<U32>& get_mem_sig_updates() {
+    if (!mem_sig_updates_) {
+      mem_sig_updates_ = std::make_unique<ch::core::ch_reg<U32>>(
+          ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}),
+          "open_mem_sig_updates");
+    }
+    return *mem_sig_updates_;
+  }
+
   std::unique_ptr<ch::core::ch_mem<U32, kMemWords>> mem_;
+  std::unique_ptr<ch::core::ch_reg<U32>> mem_sig_;
+  std::unique_ptr<ch::core::ch_reg<U32>> mem_sig_updates_;
   Ports ports_{};
   std::vector<std::uint8_t> elf_image_;
 };
