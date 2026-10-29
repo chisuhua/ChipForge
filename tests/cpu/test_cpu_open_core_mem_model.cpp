@@ -30,11 +30,13 @@
 #include <core/uint.h>
 
 #include <cstdint>
+#include <fstream>
 #include <memory>
 #include <string>
 
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cpu/core/verify_mem_model_chmem.h"
+#include "tests/cpu/open_core_verilog_helper.h"
 
 namespace {
 
@@ -85,6 +87,10 @@ struct MemRig {
   std::unique_ptr<ch::core::ch_out<U64>> dmem_rsp_data;
   std::unique_ptr<ch::core::ch_out<U1>> dmem_rsp_valid;
 
+  // ★★ **观测端口**（★ 契约名 `mem_sig` / `mem_sig_updates`）
+  std::unique_ptr<ch::core::ch_out<U32>> mem_sig;
+  std::unique_ptr<ch::core::ch_out<U32>> mem_sig_updates;
+
   std::unique_ptr<cf::cpu::core::VerifyMemModelPlugin> mem;
 
   MemRig() {
@@ -116,6 +122,11 @@ struct MemRig {
     dmem_rsp_valid = std::make_unique<ch::core::ch_out<U1>>(
         must(pb.declare_out<U1>("dmem_rsp_valid")));
 
+    mem_sig = std::make_unique<ch::core::ch_out<U32>>(
+        must(pb.declare_out<U32>("mem_sig")));
+    mem_sig_updates = std::make_unique<ch::core::ch_out<U32>>(
+        must(pb.declare_out<U32>("mem_sig_updates")));
+
     mem = std::make_unique<cf::cpu::core::VerifyMemModelPlugin>();
     mem->bind_ports({imem_req_addr.get(), imem_req_valid.get(),
                      imem_req_ready.get(), imem_rsp_data.get(),
@@ -123,7 +134,8 @@ struct MemRig {
                      dmem_req_data.get(), dmem_req_size.get(),
                      dmem_req_we.get(), dmem_req_valid.get(),
                      dmem_req_ready.get(), dmem_rsp_data.get(),
-                     dmem_rsp_valid.get()});
+                     dmem_rsp_valid.get(), mem_sig.get(),
+                     mem_sig_updates.get()});
     pb.register_plugin(std::move(mem));
   }
 
@@ -162,6 +174,56 @@ struct MemRig {
     sim->tick();
     // ★ 撤销写使能（★ 后续读不被写影响）
     sim->set_input_value(*dmem_req_we, 0);
+  }
+};
+
+/// ★★ **C++ 侧 reference**：★ 复刻预载核 `dmem_chmem.h:244-270` 的折叠
+///   ⇒ ★ 与从设备实现**逐拍对照** ⇒ ★ 「逐位同款」的**直接证据**
+struct SigRef {
+  std::uint32_t sig = 0;
+  std::uint32_t upd = 0;
+
+  /// ★ 一次写（★ `word_addr` = 字地址；★ `store_wdata` = **RMW 后的最终字**）
+  void store(std::uint32_t word_addr, std::uint32_t store_wdata) {
+    const std::uint32_t mix =
+        word_addr * 31u + store_wdata + upd * 0x9E3779B1u;
+    const std::uint32_t next = (sig * 16777619u) ^ mix;
+    sig = next;
+    upd += 1u;
+  }
+};
+
+/// ★★ **影子内存**（★ C++ 侧）⇒ ★ 复刻从设备的 byte-strobe RMW
+///   ⇒ ★ 提供 reference 需要的 `store_wdata`
+struct ShadowMem {
+  std::vector<std::uint32_t> words;
+
+  explicit ShadowMem(std::size_t n_words, std::uint32_t init = 0u)
+      : words(n_words, init) {}
+
+  std::uint32_t read(std::uint32_t word_addr) const {
+    return words[word_addr & 0x3FFFu];
+  }
+
+  /// ★ 返回**写入后的最终字**（★ 即从设备的 `merged`）
+  std::uint32_t store(std::uint64_t byte_addr, std::uint32_t data,
+                      std::uint32_t size) {
+    const std::uint32_t word_addr =
+        static_cast<std::uint32_t>((byte_addr >> 2) & 0x3FFFu);
+    const std::uint32_t off = static_cast<std::uint32_t>(byte_addr & 3u);
+    const std::uint32_t cur = words[word_addr];
+    std::uint32_t merged = cur;
+    if (size == 1u) {
+      const std::uint32_t shift = off * 8u;
+      merged = (cur & ~(0xFFu << shift)) | ((data & 0xFFu) << shift);
+    } else if (size == 2u) {
+      const std::uint32_t shift = (off & 2u) * 8u;
+      merged = (cur & ~(0xFFFFu << shift)) | ((data & 0xFFFFu) << shift);
+    } else {
+      merged = data;
+    }
+    words[word_addr] = merged;
+    return merged;
   }
 };
 
@@ -219,6 +281,85 @@ TEST_CASE("open_core: mem model does byte-strobe RMW by size (ADR-091 v1.7)",
 
   // ★ ⑧ **未写过的位置保持 0**（★ 另一个字）
   REQUIRE(rig.read_word(static_cast<std::uint32_t>(kWordAddr + 4)) == 0u);
+}
+
+TEST_CASE("open_core: memsig folding is bit-identical to the preloaded core "
+          "(ADR-091 v1.11 D3a.6)",
+          "[open-core][chmem]") {
+  // ★★★ **§D3a.6 的兑现**：★ `memsig` 折叠 MUST 与预载核
+  //   `ip/cpu/plugins/dmem_chmem.h:244-270` **逐位同款**
+  //   ⇒ ★ 本 case 用 **C++ 侧 reference**（★ 复刻预载核算法）**逐拍对照**
+  //   ⇒ ★ 这是「逐位同款」的**直接证据**（★ 不是「两边都跑通」）
+  MemRig rig;
+  rig.build_and_run();
+
+  SigRef ref;
+  ShadowMem shadow(1u << 14, 0u);
+
+  // ★ ★ **写序列**（★ 混合 1/2/4 字节 + 不同 byte_off ⇒ ★ 覆盖 RMW 分支）
+  struct WriteOp {
+    std::uint64_t addr;
+    std::uint32_t data;
+    std::uint32_t size;
+  };
+  const WriteOp ops[] = {
+      {0x80000100u, 0xAABBCCDDu, 4u},
+      {0x80000100u, 0x11u, 1u},
+      {0x80000101u, 0x22u, 1u},
+      {0x80000103u, 0x44u, 1u},
+      {0x80000100u, 0xBEEFu, 2u},
+      {0x80000102u, 0xCAFEu, 2u},
+      {0x80000200u, 0xDEADBEEFu, 4u},
+      {0x80000204u, 0x5Au, 1u},
+  };
+
+  for (const auto& op : ops) {
+    // ★ C++ 侧：★ 影子内存先算 RMW 后的最终字（★ = 从设备的 `merged`）
+    const std::uint32_t merged =
+        shadow.store(op.addr, op.data, op.size);
+    // ★ C++ 侧：★ reference 折叠
+    ref.store(static_cast<std::uint32_t>((op.addr >> 2) & 0x3FFFu), merged);
+
+    // ★ DUT 侧：★ 驱动一次写 + tick
+    rig.write(op.addr, op.data, op.size);
+
+    // ★★★ **逐拍对照**（★ 端口值 = tick 末的 sig ⇒ 与 reference 同步）
+    REQUIRE(pv(*rig.sim, *rig.mem_sig) == ref.sig);
+    REQUIRE(pv(*rig.sim, *rig.mem_sig_updates) == ref.upd);
+  }
+
+  // ★★ **自校验锚**（★ ADR-089 契约 S-6）：★ 写过 ⇒ 计数 MUST > 0
+  REQUIRE(pv(*rig.sim, *rig.mem_sig_updates) == static_cast<std::uint64_t>(
+      sizeof(ops) / sizeof(ops[0])));
+}
+
+TEST_CASE("open_core: memsig is exposed as top-level ports with contract names "
+          "(ADR-091 v1.12 D3a.9)",
+          "[open-core][chmem]") {
+  // ★★ 载体 MUST 是**顶层 `ch_out`**（★ H-2）⇒ ★ 契约名
+  //   `mem_sig` / `mem_sig_updates`（★ 与预载核同名 ⇒ runner 零改动）
+  MemRig rig;
+  rig.build_and_run();
+
+  const std::string vpath = "/tmp/opencode/open_core_memsig_top.v";
+  {
+    ch::core::ctx_swap guard(&rig.ctx);
+    ch::toVerilog(vpath, &rig.ctx);
+  }
+  using cf_test::open_core::top_port_declared;
+
+  REQUIRE(top_port_declared(vpath, "mem_sig"));
+  REQUIRE(top_port_declared(vpath, "mem_sig_updates"));
+  // ★★ **反向断言（G-1o）**：★ 端口名 MUST **NOT** 被改名
+  REQUIRE_FALSE(top_port_declared(vpath, "mem_sig_1"));
+  REQUIRE_FALSE(top_port_declared(vpath, "mem_sig_updates_1"));
+  // ★ 内部实现名 MUST 带 `open_` 前缀（★ 不与契约名撞名）
+  std::ifstream f(vpath);
+  REQUIRE(f.good());
+  std::string all;
+  std::string line;
+  while (std::getline(f, line)) all += line + "\n";
+  REQUIRE(all.find("open_mem_sig") != std::string::npos);
 }
 
 TEST_CASE("open_core: mem model write enable gates the write (ADR-091 S4)",
