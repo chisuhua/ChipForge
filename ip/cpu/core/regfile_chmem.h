@@ -157,14 +157,23 @@ class RegFileComponent : public ch::Component {
       regs_ = std::make_unique<std::vector<ch::core::ch_reg<Data>>>();
       regs_->reserve(kNumRegs);
       for (std::size_t i = 0; i < kNumRegs; ++i) {
-        // ★★ **显式命名 `reg_N`**（★ 契约名：★ parity runner 按 `reg_<i>`
-        //   采集 ⇒ ★ **MUST NOT** 改名）★★
-        // ★★ **MUST NOT** 用 `std::array` 默认构造（★ 泄漏孤儿节点 ⇒ 撞名 ⇒
-        //   Verilator `Duplicate declaration of signal '_reg_N'` —— 实证见
-        //   预载核 `ip/cpu/plugins/reg_file_chmem.h:160-172`）
+        // ★★ **显式命名**（★ MUST NOT 用默认名 —— 否则 32 个同名节点
+        //   ⇒ ★ 撞名 ⇒ ★ Verilator `Duplicate declaration of signal '_reg_N'`
+        //   —— 实证见预载核 `ip/cpu/plugins/reg_file_chmem.h:160-172`）
+        //
+        // ★★★ **名字 MUST 带 `open_` 前缀**（★ G-1o）：
+        //   ★ **观测契约名 = `reg_<i>`**（★ parity runner 按 `reg_<i>` 采集）
+        //   ★ ★ 但契约名由**顶层 `ch_out` 端口**承担（★ ADR-091 v1.12 §D3a.9：
+        //     每个顶层观测量 MUST 是顶层 `ch_out` ⇒ ★ H-2）
+        //   ★ ★ 若内部 `ch_reg` 也叫 `reg_<i>` ⇒ ★ **与顶层端口同名**
+        //     ⇒ ★ CppHDL 唯一化把**端口改名**（`reg_1` → `reg_1_1`）
+        //     ⇒ ★ **破契约**（★ 正是 G-1o 要防的）
+        //   ⇒ ★ ⇒ ★ **内部实现名用 `open_reg_<i>`**（★ 不撞名）
+        //   ⇒ ★ ★ 契约名不受影响：★ `resolve_node_id(ctx, "reg_1")` 会命中
+        //     **顶层端口节点**（★ 顶层端口也在 `ctx.get_nodes()` 里）✔
         regs_->emplace_back(
             ch::core::ch_uint<32>(ch::core::ch_literal<0, 32>{}),
-            ("reg_" + std::to_string(i)).c_str());
+            ("open_reg_" + std::to_string(i)).c_str());
       }
     }
     return *regs_;

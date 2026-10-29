@@ -50,6 +50,7 @@
 #include <core/bool.h>
 #include <core/uint.h>
 
+#include <cstddef>
 #include <memory>
 #include <string>
 
@@ -92,7 +93,24 @@ class RegFileBridgePlugin : public cf::plugin::PluginBase {
     ch::core::ch_in<ch::core::ch_bool>* rd_we = nullptr;  // ★ 写使能
   };
 
+  /// ★★★ **顶层观测端口**（★ `regs[32]` —— ADR-091 v1.12 §D3a.9）
+  ///
+  /// ★★ **契约名 = `reg_1`..`reg_31`**（★ parity runner 按 `reg_<i>` 采集
+  ///   ⇒ ★ **MUST NOT** 改名）★★
+  /// ★ ★ `reg_0`（x0）**不需要**（★ RISC-V x0 恒 0 ⇒ ★ 恒定值）
+  /// ★ ★ **MUST 是顶层 `ch_out`**（★ H-2：★ 观测走顶层端口
+  ///   ⇒ ★ Verilator 后端 `port_access_` 只认顶层端口
+  ///   ⇒ ★ MUST NOT 依赖 `--public-flat-rw` 穿透内部层级）
+  /// ★ ★ **MUST NOT** 与内部 `ch_reg` 名同名（★ G-1o）
+  ///   ⇒ ★ 内部实现名用 `open_reg_<i>`（★ 见 `regfile_chmem.h`）
+  struct ObsPorts {
+    std::unique_ptr<ch::core::ch_out<T>> reg[32];   // ★ [0] 不用（x0）
+  };
+
   void bind_ports(const Ports& p) { ports_ = p; }
+
+  /// ★ 绑定**顶层观测端口**（★ `reg_1..reg_31`；★ [0] 不用）
+  void bind_obs_ports(ObsPorts&& p) { obs_ = std::move(p); }
 
   void setup(cf::plugin::PipeBuilder& pb) override {
     // ★★ **G-1p（★ 本文件是 G-1p 的唯一执行点）**：
@@ -135,6 +153,19 @@ class RegFileBridgePlugin : public cf::plugin::PluginBase {
             ch::core::ch_uint<5>(regfile_->io().rd_addr);
       }
     });
+
+    // ★★★ **顶层观测端口驱动**（★ `reg_1..reg_31` —— §D3a.9）
+    //   ★ 源 = Component 的 `ch_reg`（★ 内部名 `open_reg_<i>`）
+    //   ★ ★ 顶层端口名 = `reg_<i>`（★ 契约名）⇒ ★ 与内部名**不撞名**（★ G-1o）
+    //   ★ ★ **MUST NOT** 用 `<<=`（★ 那是**连接**语义）；顶层 `ch_out` 用 `=`
+    pb.at_stage("decode", cf::plugin::Phase::NORMAL, [this] {
+      const auto& regs = regfile_->regs();
+      for (std::size_t i = 1; i < RegFileComponent::kNumRegs; ++i) {
+        if (obs_.reg[i]) {
+          *obs_.reg[i] = ch::core::ch_uint<32>(regs[i]);
+        }
+      }
+    });
   }
 
   void build(cf::plugin::PipeBuilder&) override {}
@@ -145,6 +176,7 @@ class RegFileBridgePlugin : public cf::plugin::PluginBase {
  private:
   std::unique_ptr<RegFileComponent> regfile_;
   Ports ports_{};
+  ObsPorts obs_{};
 };
 
 }  // namespace core
