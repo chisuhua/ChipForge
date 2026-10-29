@@ -229,22 +229,35 @@ depends_on:
       ⇒ ★ 变异对照 **3 个全 RED**（★ 探针地址错 / 内部 proxy 撞名 / 不驱动）
   ⇒ ★ 变异对照 **3 个有效 RED**（★ 写使能忽略 → 2 case · RMW 退化 → 1 · byte_off 忽略 → 1）
     + 1 个**无效变异**（★ `aread`→`sread` ⇒ **编译失败** ⇒ ★ 诚实记录，见 plan §K26.3）
-- [ ] ★ **A4-0** [裁决] ★ **decode/alu/csr/branch 的 reuse-vs-rewrite**（★ **A4-2 不可启动**）
+- [x] ★ **A4-0** [裁决] ★ **decode/alu/csr/branch 的 reuse-vs-rewrite**（★ **已裁决 2026-10-30**，★ ADR-091 **v1.13 §D3a.10**）
   ⇒ ★★ **三处契约矛盾**：★ ADR-091 D1「复用 `ip/cpu/arch/riscv/int_alu_chmem.h`（ALU 语义）」
     ⇒ ★ ★★ 但**实测**：★ 该文件 include `<ch.hpp>` + `plugin_base.h` + `pipe_builder.h`
       ⇒ ★ 它**不是纯算法头**，★ 而是**完整 plugin**（★ `RiscvIntAluPlugin : PluginBase`）
       ⇒ ★ ⇒ ★ **绝不能**被开放核 include（★ G-1b：★ `<ch.hpp>` ⇒ 多 TU 链接失败）
     ⇒ ★ 与 tasks 2.3 的「**全部 plugin 均为新建**」**矛盾**
     ⇒ ★ **工作量差 3~5 人日**（★ reuse ≈0.5 vs rewrite ≈3~5 含语义锚测试）
-  ⇒ ★ ⇒ ★ **裁决前 A4-2 不可启动**（★ 证据见 plan §K29.3 ⑥）
-- [ ] ★ **A5-0** [裁决] ★ **ELF 加载路线**（★ **A5-2 不可启动**）
+  ⇒ ★⇒ ★ **裁决（v1.13 §D3a.10）**：★ **全部新建** + ★ ★★ **「复用」= 复用算法语义 + 复用纯算法头**
+    ⇒ ★ **MUST NOT include 任何 plugin 头**（★ 含 `<ch.hpp>` 者违 **G-1b**；
+      ★ 不含者**注册语义绑预载核 stage** ⇒ ★ 污染开放核 stage 图 ⇒ ★ 与 **G-1n** 冲突）
+    ⇒ ★ **可 include**：`decoder_table.h` · `payload_riscv.h` · `mul_div_fsm.h` · `payload_common.h`
+    ⇒ ★ ★★ **双副本漂移风险**：★ 移植 ALU select 树（★ 462 行）= 第二份 ALU 实现
+      ⇒ ★ **ADR-083 §4.1 拒绝的形态** ⇒ ★ ⇒ ★ **H-3 是承重判据**（★ 非「附加验收」）
+    ⇒ ★ ★ 每个移植 unit MUST 有**语义锚测试**（★ 对标 288 assertions 强度）+ **3 个变异对照**
+    ⇒ ★ 证据见 plan §K31.1；★ 验收判据 = **V-20**
+- [x] ★ **A5-0** [裁决] ★ **ELF 加载路线**（★ **已裁决 2026-10-30**，★ ADR-091 **v1.13 §D3a.11**）
   ⇒ ★ 路线 1 = **elaboration init vector**（★ `ch_mem` 构造时填初值）⇒ ★ 简单
     ⇒ ★ ★★ 但 **O-5 未解**（★ 网表仍随 ELF 变 ⇒ Verilator 需逐 ELF 重编译）
   ⇒ ★ 路线 2 = **运行期 data_map 注入** ⇒ ★ O-5 真解
     ⇒ ★ ★★ 但上游 `Simulator::get_memory/set_memory` 是**空 stub**
       （★ `CppHDL/src/simulator.cpp:162-167`）⇒ ★ 需上游工作或新增机制
-  ⇒ ★ ⇒ ★ 连带：★ ADR-091 D1「O-4/O-5 一并解开」**可能需降级为诚实标注**
-  ⇒ ★ **证据见 plan §K29.3 ⑨**
+  ⇒ ★⇒ ★ **裁决（v1.13 §D3a.11）**：★ **elaboration init vector**（★ **唯一可行**）
+    ⇒ ★ 运行期注入**不可行**（★ 上游 `Simulator::set_memory` 是**空 stub**，
+      ★ `simulator.cpp:161-168` ⇒ ★ 且被未启用的 `ENABLE_MEMORY_API` 包住）
+    ⇒ ★ ★★ **O-4 已解**（★ 核的网表不随 ELF 变）★ **O-5 仍开放**
+      ⇒ ★ ⇒ ★ **D1「O-4/O-5 一并解开」已降级为诚实标注**（★ v1.13 已改）
+    ⇒ ★ ★ **对 A6 的连带影响**：★ Verilator 侧对**每个 ELF** 仍需一次编译
+      （★ 虽核网表不变，★ 但**从设备**网表含初值 vector ⇒ 随 ELF 变）
+    ⇒ ★ 证据见 plan §K31.2；★ 验收判据 = **V-21 / V-22**
 - [ ] ★ **A5-3** [RED+GREEN] ★ **核 ↔ 从设备集成测试**（★ **真实缺口**）
   ⇒ ★★★ **缺口**：★ `test_cpu_open_core_mem_model.cpp` 的 `MemRig` **直接驱动从设备端口**
     ⇒ ★ 而 ibus/dmem 测试**由 host 直接喂 `rsp_data`** ⇒ ★ ★ **两侧各自绿，但从未连过**
@@ -253,6 +266,26 @@ depends_on:
   ⇒ ★ ★ **注**：★ commit `17e9a4c` 写的「ibus/dmem 只断言端口声明、从不读值」
     ⇒ ★★ **该标注不属实**（★ 实测 ibus `:169,170,189` **逐拍读值**）
     ⇒ ★ ⇒ ★ **真实缺口是本条**（★ 公开更正见 plan §K29.1）
+- [ ] ★ **A5-2** [RED+GREEN] ★ **ELF 加载**（★ 路线已裁决：★ elaboration init vector）
+  ⇒ ★ ★★ **MUST 逐位复制预载核路由的 4 条 quirk**（★ 「顺手修正」= ★ **H-3 假红**）：
+    · ★ ① `PF_R`-only 段被**静默丢弃**
+    · ★ ② `p_filesz/4` **尾字节丢弃**
+    · ★ ③ 越界读时 `words.clear(); break;` ⇒ 仍以空 vector 调 `preload_segment`（★ 静默空操作）
+    · ★ ④ `X+W` 段**只进 dmem**（★ 取指取不到）
+  ⇒ ★ **地址映射 MUST 复刻**：★ `(p_vaddr - 0x80000000)/4`（★ 相对）+ 运行期
+    `bits<15,2>`（★ 截断到 64KB 窗口 ⇒ ★ 窗外**静默别名**）
+  ⇒ ★ **ELF 段越界 MUST fail-closed**（★ 段地址 MUST 落在 `[0x80000000, 0x80010000)`）
+    ⇒ ★ 预载核侧是**未定义** ⇒ ★ 开放核可更严，★ 但 MUST 写明
+  ⇒ ★ **验收**：★ 同一 ELF 经**预载核路由**与**开放核加载**后内存**逐字相等**（★ V-21）
+- [ ] ★ **A4-3** [RED+GREEN] ★★★ **`rd_we × flush` 掩码**（★ **A4-2 的隐藏硬需求**）
+  ⇒ ★★★ **缺口**：★ 预载核 `ip/cpu/plugins/reg_file_chmem.h:232` 做
+    `we = writes_rd && (rd_addr != 0) && !flush`
+    ⇒ ★ ★★ 但开放核的 `RegFileComponent`（★ **只屏蔽 x0**）与 `RegFileBridgePlugin`
+    （★ **透传 `rd_we`**）★ **都不做 flush 掩码**
+    ⇒ ★ ⇒ ★ **错路指令会写寄存器** ⇒ ★ ⇒ ★ **H-3 的 `regs` 终值必挂**
+  ⇒ ★ ★★ **该需求此前不在任何 tasks / ADR 条目里**（★ 双审查发现）
+  ⇒ ★ **归属**：★ 写入路径（★ 尚不存在的 writeback / decode 侧）★ 或 regfile 桥接层
+    ⇒ ★ ★ **MUST 在 A4-2 装配设计里明确落点**
 - [ ] ★ **B5** [backlog] ★ `chmem_vendored_elf_tohost1` **拆分 / 子进程化**
   ⇒ ★ 47 个 DYNAMIC_SECTION 在**同一进程内累积 47 个 CPU 网表**（★ CppHDL 不释放节点）
     ⇒ ★ 单次跑 **> 25 分钟** ⇒ ★ 全量 CH_MEM 回归**无法一次跑完**
