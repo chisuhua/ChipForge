@@ -205,7 +205,17 @@ depends_on:
     ⇒ ★ 直接做 plugin（★ 理由见 plan §K26.1）
   ⇒ ★ ★ **诚实标注（本版本未实现）**：
     · ✗ **ELF 加载**（★ 只提供 `set_elf_image()` 钩子 ⇒ ★ **不解析**）⇒ ★ 归 **A5-2**
-    · ✗ **`mem_sig` / `mem_sig_updates`**（★ ADR-091 v1.11 §D3a.6）⇒ ★ 归 **A5-3**
+    · ✓ **`mem_sig` / `mem_sig_updates`**（★ ADR-091 v1.11 §D3a.6）⇒ ★ **A5-3 已实现**
+      ⇒ ★ 折叠 **逐位同款**（★ `mix = word_addr*31 + store_wdata + sig_upd*0x9E3779B1`
+        · `sig = (sig*16777619) ^ mix` · `sig_upd += 写使能`）
+      ⇒ ★ `store_wdata` = **RMW 后的最终字**（★ `merged`）⇒ ★ **只有持有内存者能算**
+      ⇒ ★ 载体 = **顶层 `ch_out`**（★ 契约名 `mem_sig` / `mem_sig_updates`）
+        ⇒ ★ 内部 `ch_reg` 名 `open_mem_sig`（★ G-1o：不撞名）
+      ⇒ ★ ★ **逐位同款的直接证据**：★ C++ 侧 reference + 影子内存**逐拍对照**
+        （★ 8 次写 × 混合 1/2/4 字节）⇒ 全等
+      ⇒ ★ 变异对照 **4 个有效 RED**（★ mix 常数 / 写次数 / 乘数 / ★ `store_wdata` 用原始数据）
+        + **2 个无效变异**（★ 「必须显式取值」在开放核侧**不复现** ⇒ ★ 按 V-9 纪律
+        **不登记为硬约束**，★ 见 plan §K27.3）
     · ✗ **`tohost` 探针**（★ ADR-091 v1.12 §D3a.9）⇒ ★ 归 **A5-4**
   ⇒ ★ 变异对照 **3 个有效 RED**（★ 写使能忽略 → 2 case · RMW 退化 → 1 · byte_off 忽略 → 1）
     + 1 个**无效变异**（★ `aread`→`sread` ⇒ **编译失败** ⇒ ★ 诚实记录，见 plan §K26.3）
