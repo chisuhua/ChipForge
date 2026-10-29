@@ -1,22 +1,10 @@
 {
   "schema_version": "role-v1",
   "current_role": "builder",
-  "updated_at": "2026-10-28T02:56:55Z",
+  "updated_at": "2026-10-29T06:56:46Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "planner",
-      "at": "2026-10-24T10:41:06Z",
-      "by": "user",
-      "trigger": "用户指令『然后切换到planner并检查是否需要修订后续执行规划』"
-    },
-    {
-      "role": "builder",
-      "at": "2026-10-24T10:43:52Z",
-      "by": "user",
-      "trigger": "用户指令『最后再切换到builder继续推进』"
-    },
     {
       "role": "planner",
       "at": "2026-10-24T11:49:41Z",
@@ -124,6 +112,18 @@
       "at": "2026-10-28T02:56:55Z",
       "by": "user",
       "trigger": "A0 深化完成（ADR-091 v1.6 + v1.7 + plan §K13~K16）⇒ 切 builder 实施 A1（dmem 端口化）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-29T01:13:29Z",
+      "by": "user",
+      "trigger": "A2 完成后裁决 memsig 的观测来源（开放核不持有内存 ⇒ 核侧算不出 ⇒ 需定 S5 契约）"
+    },
+    {
+      "role": "builder",
+      "at": "2026-10-29T06:56:46Z",
+      "by": "user",
+      "trigger": "ADR-091 v1.11 裁决落地后切回 builder，实施 A2.5（端口名解耦 G-1o + 断言精确化 V-15 + branch 测试补 toVerilog）"
     }
   ]
 }
