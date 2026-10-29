@@ -53,6 +53,7 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
+#include "tests/cpu/open_core_verilog_helper.h"
 #include "ip/cpu/core/dmem_port_chmem.h"
 
 
@@ -73,18 +74,9 @@ namespace {
 using U32 = ch::core::ch_uint<32>;
 using U64 = ch::core::ch_uint<64>;
 
-// 在生成的网表里查顶层端口声明
-bool top_port_declared(const std::string& verilog_path, const std::string& name) {
-  std::ifstream f(verilog_path);
-  if (!f) return false;
-  std::string line;
-  while (std::getline(f, line)) {
-    const bool is_decl = line.find("input") != std::string::npos ||
-                         line.find("output") != std::string::npos;
-    if (is_decl && line.find(name) != std::string::npos) return true;
-  }
-  return false;
-}
+// ★ 在生成的网表里查顶层端口声明
+// ★★★ **精确名匹配**（★ ADR-091 v1.11 V-15）⇒ ★ 共享 helper
+using cf_test::open_core::top_port_declared;
 
 std::uint64_t port_value(const ch::Simulator& sim,
                          const ch::core::port<ch::core::ch_uint<64>, ch::core::output_direction>& p) {

@@ -43,22 +43,16 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
+#include "tests/cpu/open_core_verilog_helper.h"
 #include "ip/cpu/core/ibus_port_chmem.h"
 
 namespace {
 
-// 在生成的网表里查顶层端口声明
-bool top_port_declared(const std::string& verilog_path, const std::string& name) {
-  std::ifstream f(verilog_path);
-  if (!f) return false;
-  std::string line;
-  while (std::getline(f, line)) {
-    const bool is_decl = line.find("input") != std::string::npos ||
-                         line.find("output") != std::string::npos;
-    if (is_decl && line.find(name) != std::string::npos) return true;
-  }
-  return false;
-}
+// ★ 在生成的网表里查顶层端口声明
+// ★★★ **精确名匹配**（★ ADR-091 v1.11 V-15）⇒ ★ 共享 helper
+//   （★ 原本本文件与 dmem 测试各有一份**子串匹配**实现 ⇒ ★ 掩盖端口改名
+//     ⇒ ★ 假绿；★ 现抽到 `open_core_verilog_helper.h` ⇒ 逻辑只有一份）
+using cf_test::open_core::top_port_declared;
 
 // 读一个顶层 output 端口的当前值
 std::uint32_t read_out(const ch::Simulator& sim,

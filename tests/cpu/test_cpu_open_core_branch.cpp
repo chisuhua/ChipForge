@@ -49,6 +49,7 @@
 
 #include "cf/plugin/pipe_builder.h"
 #include "ip/cpu/core/branch_iface_chmem.h"
+#include "tests/cpu/open_core_verilog_helper.h"
 #include "ip/cpu/core/dmem_port_chmem.h"
 #include "ip/cpu/core/ibus_port_chmem.h"
 
@@ -269,6 +270,64 @@ TEST_CASE("open_core: branch redirect — pc follows branch target (ADR-091 S3.2
     REQUIRE(tr.flush[2] == 0u);  // 拍 3（taken(2)=0）
     REQUIRE(tr.flush[3] == 0u);
   }
+}
+
+TEST_CASE("open_core: top-level port names are stable (ADR-091 v1.11 G-1o)",
+          "[open-core][chmem]") {
+  // ★★★ **V-14**：★ 生成网表的顶层端口名 MUST **等于**契约名
+  //   ⇒ ★ **MUST NOT** 出现 `_N` 后缀改名
+  // ★ 机制（CppHDL codegen `codegen_verilog.cpp:64-76`）：★ 按 `eval_list`
+  //   顺序建 `name_counts` ⇒ ★ **内部 node 先占名** ⇒ 重名者加 `_N` 后缀
+  //   ⇒ ★ 若内部 `ch_reg` 与顶层端口同名 ⇒ ★ 端口被静默改名
+  //   ⇒ ★ ⇒ 内部 reg 一律用 `_reg` 后缀（`open_pc_reg` / `open_flush_reg`）
+  // ★★ **本 case MUST 走 `toVerilog`**（★ A2 之前 `branch` 测试**未生成**
+  //   Verilog ⇒ ★ 新增的 `flush_reg` + `open_flush` 端口从未过 codegen）
+
+  ch::core::context ctx("open_core_branch_verilog");
+  cf::plugin::PipeBuilder pb(&ctx);
+
+  auto imem_req_addr  = must(pb.declare_out<U32>("imem_req_addr"));
+  auto imem_req_valid = must(pb.declare_out<U1>("imem_req_valid"));
+  auto imem_req_ready = must(pb.declare_in<U1>("imem_req_ready"));
+  auto imem_rsp_data  = must(pb.declare_in<U32>("imem_rsp_data"));
+  auto imem_rsp_valid = must(pb.declare_in<U1>("imem_rsp_valid"));
+  auto open_pc        = must(pb.declare_out<U32>("open_pc"));
+  auto open_flush     = must(pb.declare_out<U1>("open_flush"));
+
+  auto ibus = std::make_unique<cf::cpu::core::IBusPortPlugin<U32>>();
+  ibus->bind_ports({&imem_req_addr, &imem_req_valid, &imem_req_ready,
+                    &imem_rsp_data, &imem_rsp_valid, &open_pc, &open_flush});
+  pb.register_plugin(std::move(ibus));
+
+  {
+    ch::core::ctx_swap guard(&ctx);
+    REQUIRE(pb.build().has_value());
+    REQUIRE(pb.elaborate().has_value());
+  }
+
+  const std::string vpath = "/tmp/opencode/open_core_branch_top.v";
+  ch::toVerilog(vpath, &ctx);
+
+  // ★★★ **精确名匹配**（★ ADR-091 v1.11 V-15 ⇒ 共享 helper）
+  //   ★ 子串匹配会让改名后的 `open_pc_1`「通过」⇒ ★ 假绿
+  using cf_test::open_core::top_port_declared;
+
+  REQUIRE(top_port_declared(vpath, "imem_req_addr"));
+  REQUIRE(top_port_declared(vpath, "imem_req_valid"));
+  REQUIRE(top_port_declared(vpath, "imem_req_ready"));
+  REQUIRE(top_port_declared(vpath, "imem_rsp_data"));
+  REQUIRE(top_port_declared(vpath, "imem_rsp_valid"));
+  // ★★ 观测端口：**MUST NOT** 被改名 ⇒ ★ 名字精确等于契约名
+  REQUIRE(top_port_declared(vpath, "open_pc"));
+  REQUIRE(top_port_declared(vpath, "open_flush"));
+
+  // ★★ **反向断言（★ 辅助护栏）**：★ 若端口被改名成 `open_pc_1`
+  //   ⇒ ★ 契约名 `open_pc` MUST **不在**顶层
+  // ★ 作用：★ **即使**正向断言被降级为子串匹配 ⇒ ★ 反向断言仍能捕获改名
+  //   ⇒ ★ 实测（plan §K22）：★ 子串匹配 + 无反向断言 ⇒ **假绿复现**
+  //     ⇒ ★ 反向断言是**独立**的第二道护栏
+  REQUIRE_FALSE(top_port_declared(vpath, "open_pc_1"));
+  REQUIRE_FALSE(top_port_declared(vpath, "open_flush_1"));
 }
 
 TEST_CASE("open_core: FLUSH suppresses wrong-path stores (ADR-091 S3.2b)",
