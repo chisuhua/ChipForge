@@ -1,16 +1,10 @@
 {
   "schema_version": "role-v1",
-  "current_role": "builder",
-  "updated_at": "2026-10-29T06:56:46Z",
+  "current_role": "architect",
+  "updated_at": "2026-10-29T08:20:13Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "planner",
-      "at": "2026-10-24T11:49:41Z",
-      "by": "user",
-      "trigger": "用户指令『请切到planner, 总结到目前任务还有哪些』"
-    },
     {
       "role": "builder",
       "at": "2026-10-24T12:07:25Z",
@@ -124,6 +118,12 @@
       "at": "2026-10-29T06:56:46Z",
       "by": "user",
       "trigger": "ADR-091 v1.11 裁决落地后切回 builder，实施 A2.5（端口名解耦 G-1o + 断言精确化 V-15 + branch 测试补 toVerilog）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-29T08:20:13Z",
+      "by": "user",
+      "trigger": "A2.6 完成后切 architect —— 裁决观测契约 4 项（plan §K23.3）+ A4 微架构调研（register re-naming / 乱序 / 层次化 plugin / regfile 做成 ch::component+ch_stream）"
     }
   ]
 }
