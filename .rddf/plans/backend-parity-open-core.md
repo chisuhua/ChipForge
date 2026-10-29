@@ -897,6 +897,67 @@ for (const auto& node : ctx.get_nodes()) {
 ⇒ ★ 按 **G-1d** ⇒ 不进 `port_access_` ⇒ ★ 但 Component 的 io **本来就不是**顶层端口
 ⇒ ★ **无影响** ✔。
 
+### K26 — ★ A5-1（验证实现 / 从设备）的实测证据与踩坑
+
+> ★ **ADR-091 §D8 S4 正文只留契约** ⇒ ★ 本节承载证据与踩坑。
+
+#### K26.1 ★★ 从设备的**架构定位**（★ 核外 ⇒ 不套层 1/层 2）
+
+| 层 | 归属 | 本次 |
+|---|---|---|
+| ★ **层 1** | 核内 stage 间（`PluginBase` + `at_stage` + `Payload`） | ★ 核侧 plugin（ibus / dmem / bridge） |
+| ★ **层 2** | 可复用 IP 单元（`ch::Component` + `io()`） | ★ regfile 单元 |
+| ★ **核外** | ★ **DUT 的外部边界** | ★★★ **从设备（验证实现）** |
+
+★ ★★ **为什么从设备不做成层 2（`Component`）**：★ 它的接口**就是网表顶层端口**
+⇒ ★ 若做成 `Component` ⇒ ★ 它的 `io()` **不是**顶层端口 ⇒ ★ 仍需「桥接」
+把 io 接到顶层 ⇒ ★ ⇒ ★ **同义反复** ⇒ ★ 直接做 **plugin**（★ 用
+`pb.declare_in/out` 声明自己的顶层端口）★
+
+#### K26.2 ★ 写语义（★ 本次的核心）
+
+★ `size` = **字节数**（★ `dmem_port_chmem.h` 的 `size_val` 编码：1/2/4）
+★ 写数据 = **原始写数据的低 32 bit**（★ **未移位**）
+⇒ ★ **从设备**按 `size` + `address` 低 2 位做 **byte-strobe RMW**：
+
+```
+byte_new = (cur & ~byte_mask) | ((wdata << byte_shift) & byte_mask)
+half_new = (cur & ~half_mask) | ((wdata << half_shift) & half_mask)
+merged   = select(size==1, byte_new, select(size==2, half_new, wdata))
+mem.write(word_addr, merged, we)      ★ ★ 写使能为 0 ⇒ 整个字不写
+```
+
+★ ★★ **与预载核的差异（★ 关键）**：★ 预载核由**指令 funct3** 决定宽度
+⇒ ★ **CPU 侧**做 RMW；★ 本次由**端口 `size`** 决定 ⇒ ★ **从设备**做 RMW
+⇒ ★ **CPU 侧不做 RMW** ⇒ ★ 写**无延迟**（★ ADR-091 §D3a.4）。
+
+★ ★ **写使能为 0 ⇒ `merged` MUST NOT 再用 `select(we, ...)` 兜底**
+（★ `mem.write` 的 enable 语义已保证 ⇒ ★ 多余的一次 mux ⇒ ★ DAG 变大）。
+
+#### K26.3 ★ 变异对照（★ 3 个有效 + 1 个无效）
+
+| # | 变异 | 结果 | 判据 |
+|---|---|---|---|
+| **M1** | ★ 写使能忽略（★ 恒写） | ★ **2 case 失败** | ★ 写使能门控有效 |
+| **M2** | ★ RMW 退化为整字写（★ 不做 byte-strobe） | ★ **1 case 失败** | ★ byte-strobe 语义 |
+| **M3** | ★ `byte_off` 忽略（★ 恒写最低字节） | ★ **1 case 失败** | ★ byte_off 参与定位 |
+| **M4** | ★ `aread` → `sread`（★ 想测「组合 vs 1 拍」） | ★★ **编译失败**（★ `sread` 签名不同）⇒ ★ **无效变异** | ★ 组合读的鉴别力由 ★「同拍应答」断言覆盖 |
+
+#### K26.4 ★★ 4 个 API 契约（★ 本轮实测踩到）
+
+| # | 坑 | 正解 |
+|---|---|---|
+| ① | ★ `ch_bool(ch_in<ch_uint<1>>)` ⇒ 编译错 | ★ ★ `ch_bool` **无**从 `ch_in<U1>` 的构造路径 ⇒ ★ 保持 `ch_uint<1>` 类型（★ `select` 的 cond 走 `to_operand` ⇒ **不限** `ch_bool`） |
+| ② | ★ `ch_mem` 构造报「Initial data must be integral type」 | ★ 初值 MUST 是 `std::vector<std::uint32_t>`（★ **不是** `vector<ch_uint<32>>`） |
+| ③ | ★ `bits<15,2>` 的结果又包 `ch_uint<15>` ⇒ 跨宽构造 | ★ ★ `bits<15,2>` 的宽度 = **14 bit**（= `ch_mem` 的 addr 宽度）⇒ ★ **MUST NOT** 再包（★ G-1r：★ 跨宽构造须 `zext`，★ 语义未文档化） |
+| ④ | ★★ **`ch_out` 端口的值在 simulator 里更新于 `tick`** ⇒ ★ 未 tick 就读 ⇒ ★ 读到**初值 0** ⇒ ★ 假失败 | ★ ★ 断言端口值前**必须先 tick** |
+
+★ ★★ **④ 的连带发现（★ 覆盖缺口）**：★ 既有 `test_cpu_open_core_ibus.cpp` /
+`test_cpu_open_core_dmem.cpp` **只断言「顶层端口已声明」**（★ `top_port_declared`）
+⇒ ★★ **从不读端口值** ⇒ ★ 「**端口存在但恒 0**」的假绿在那两处**未被捕获**。
+⇒ ★ 本轮在 regfile 测试里已补了值断言（★ `reg_5` == 0xDEAD）✔
+⇒ ★ ★ **ibus / dmem 的输出端口仍缺值断言** ⇒ ★ 归 **backlog**。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
