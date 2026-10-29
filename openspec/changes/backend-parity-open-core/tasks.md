@@ -41,7 +41,29 @@ depends_on:
 - [x] 2.1 [RED] `tests/cpu/schema/test_cpu_bus_iface.cpp`（新）：`CpuBusReq`/`CpuBusResp` 字段与宽度断言（★ 每字段 ≤64 bit）[ADR-091 §D6 H-1]
 - [x] 2.2 [GREEN] 新建 `ip/cpu/core/bus_iface_chmem.h`：`bundle_base` 派生 + `CH_BUNDLE_FIELDS_T` + 纯 `ch::core::ch_uint`（★ 零 `cf::plugin::uint_t`）· ★ 真名 **MUST NOT** `MemReqBundle`（该名代码中不存在）[ADR-091 §D3a.3, §D6 H-1/H-4]
 - [ ] 2.3 [GREEN] 新建 `ip/cpu/core/cpu_core_chmem.h`：装配骨架（复用 `ip/cpu/arch/riscv/` + `ip/cpu/core/payload_common.h`）[ADR-091 §D1]
+  ⇒ ★★ **v1.12 裁决后的细化**（★ ADR-091 v1.12 §D3a.7 / §D3a.8）：
+    · ★ **全部 plugin 均为新建**（★ 不改 `ip/cpu/plugins/*_chmem.h` ⇒ ADR-092 冻结集零风险）
+    · ★ **两层范式**：★ 层 1 = `PluginBase` + `at_stage` + `Payload`（★ 核内 stage 间）
+      · ★ 层 2 = `ch::Component`（★ 可复用 IP 单元：★ regfile 等）
+      · ★ **桥接 plugin** = 层 2 → 层 1 的唯一通道（★ 读 `io()` ⇒ 写 `Payload`）
+    · ★ ★ **框架缺口 #4（G-6）**：★ `PipeBuilder` 暴露只读 ctx accessor
+      （★ `ctx_` 当前 private ⇒ 无法把 ctx 传给 `Component::build(external_ctx)`
+      ⇒ ★ 破 G-1p ⇒ 组件输出端口从 `data_map` 消失 ⇒ **静默读不到**）
+    · ★ ★ **装配 MUST 按流水顺序注册 plugin**（★ G-1n：★ `setup()` 在 `build()` 时
+      按 `plugins_` 顺序调 ⇒ ★ 注册顺序 = stage 首现序）
+    · ★ ★ **端口名 MUST NOT 与内部 `ch_reg` 同名**（★ G-1o）
+    · ★ **Component MUST 共用 ctx**（★ G-1p）⇒ ★ **MUST NOT** `build(nullptr)`
+    · ★ **MUST NOT** 用 `ch_module<T>`（★ 需 active parent Component ⇒ ChipHDL 无此机制）
+    · ★ **MUST NOT** 用 `ch_stream` 做单元接口（★ 越层：★ ADR-092 §D4 定其为 IP 间接口）
   ⇒ ★ **推迟到 Phase 3**（★ 装配骨架需要 Phase 3 的端口数据通路才有意义 ⇒ 单独提交一个空骨架是纯形式）
+- [ ] 2.3b [RED+GREEN] ★ **可复用单元：regfile**（★ ADR-091 v1.12 §D3a.7 两层范式 · §D3a.8 register re-naming）
+  ⇒ ★ **层 2（`ch::Component` 子类）**：★ `io()` struct（★ `rs1_addr`/`rs1_data`/`rs2_*`/`rd_addr`/`rd_data`/`rd_we`）
+    ⇒ ★ 上游先例：`include/cpu/pipeline/rv32i_regfile.h`
+  ⇒ ★ ★ **MUST 用 `std::vector` + 显式命名 `reg_0..reg_31`**（★ 实证：`reg_file_chmem.h:160-172`
+    ⇒ ★ `std::array` 默认构造泄漏 32 对孤儿节点 ⇒ 撞名 ⇒ Verilator `Duplicate declaration of signal '_reg_N'`）
+  ⇒ ★ **契约名 `reg_N` MUST NOT 改**（★ runner 按 `reg_<i>` 采集）
+  ⇒ ★ **桥接 plugin**（★ 层 1）：★ 在 `setup()` 里 `build(pb_ctx)` ⇒ ★ 在 `at_stage` 闭包读 `io()` ⇒ 写 `Payload`
+  ⇒ ★ **变异对照**：★ ① 传 `nullptr` 让 Component 自建 ctx（★ 破 G-1p）② 改 `std::array` 默认构造（★ 破 §D3a.8）⇒ MUST RED
 - [x] 2.4 零回归 + 八门禁
 
 ## 3. Phase 3 — S3：端口数据通路 + 顶层观测端口
@@ -82,8 +104,20 @@ depends_on:
   ⇒ ★ **诚实标注**：★ ADR v1.11 的 **V-15 措辞有歧义**（★ 实测后的准确表述见 plan §K22.2）
     ⇒ ★ 本轮**不改**已签批的 ADR 决策文字 ⇒ 归 backlog（下一轮 architect 澄清）
 - [ ] 3.4b [RED+GREEN] ★ **顶层观测端口补全**：`tohost` / `regs[32]` / `pchash`
-  ⇒ ★★ **前置：观测「载体 + 命名 + 归属」待 architect 裁决**（★ plan §K23.3 的 4 项）
-    ⇒ ★ **本条暂不实施**（★ 实施方式未定 ⇒ ★ 避免返工）
+  ⇒ ★★ **观测契约已裁决**（★ ADR-091 **v1.12 §D3a.9**，★ 2026-10-29）⇒ ★ 可实施：
+    · ★ **载体通则**：★ 每个顶层观测量 MUST 是**顶层 `ch_out`**（★ H-2）
+      ⇒ ★ **MUST NOT** 是内部 `ch_reg`（★ 不在 Verilator `port_access_` ⇒ 只能穿透）
+      ⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 读内部层级
+    · ★ **`memsig` / `mem_sig_updates`**：★ 归**从设备**（§D3a.6）★ 顶层 `ch_out`
+      ⇒ ★ 节点名不变 ⇒ ★ **parity runner 零改动**
+    · ★ **`tohost`**：★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`
+      ⇒ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`
+      ⇒ 开放核**无对应物**）★ 顶层 `ch_out`（★ 名 `tohost`）⇒ ★ **依赖 A5**
+    · ★ **`regs[32]`**：★ 归**核**★ 顶层 `ch_out`（★ 名 `reg_1`..`reg_31`
+      ⇒ ★ `reg_0` 为 x0 恒 0 ⇒ 沿用 runner 的 1..31 口径）⇒ ★ **依赖 A4 的 regfile**
+    · ★ **`pchash` / `pc`**：★ 归**核**★ 顶层 `ch_out` ⇒ ★ **契约名 `open_pc` MUST NOT 改**
+      ⇒ ★ **parity runner 加 1 处 fallback**（★ 先 `pc` ⇒ 未命中则 `open_pc`）⇒ ★ 归 A6
+  ⇒ ★ **Verilator 侧**须分别处理（★ 预载核走穿透 / 开放核走 `port_access_`）⇒ ★ 归 A6
   ⇒ ★ **`tohost`**：★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`
     ⇒ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`
     ⇒ 开放核**无对应物**）⇒ ★ 依赖 A5
