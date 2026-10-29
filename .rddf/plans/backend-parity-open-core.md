@@ -1191,6 +1191,120 @@ struct SigRef {                       // ★ 复刻预载核折叠
 ★ ★ **实测**：★ 改 CH_MEM-only 文件 ⇒ ★ CH_MEM **拒绝** + ★ TLM **PASS**（67463 assertions）
 ⇒ ★ ★ **C1 假绿通道在底层被封堵** ✔✔
 
+### K31 — ★ A-1~A-5 五项裁决的推导与证据（★ 2026-10-30，双审查后）
+
+> ★ **ADR-091 v1.13 正文只留契约**（§D3a.10 / §D3a.11 + D1 两处修正 + V-15/V-18 修正
+> + H-3 补交集 + V-20~V-23）⇒ ★ 本节承载推导与证据。
+
+#### K31.1 ★★ A-1：「复用 `int_alu_chmem.h`」在**技术上不可能**（★ 逐文件实测）
+
+★ `ip/cpu/arch/riscv/` 逐文件扫描（★ `<ch.hpp>` / `PluginBase` 继承）：
+
+| 文件 | `<ch.hpp>` | `PluginBase` | 性质 | 处置 |
+|---|---|---|---|---|
+| ★ `decoder_table.h` | 0 | 0 | ★ **纯表** | ★ **可 include** |
+| ★ `payload_riscv.h` | 0 | 0 | ★ **纯 payload 契约** | ★ **可 include** |
+| ★ `mul_div_fsm.h` | 0 | 0 | ★ **纯 FSM 算法**（★ ADR-046 豁免标记） | ★ **可 include** |
+| ★ `branch.h` | 0 | 1 | ★ 双模 plugin | ★ **语义可参考，MUST NOT include** |
+| ★ `csr.h` | 0 | 1 | ★ 同上 | ★ 同上 |
+| ★ `decode.h` | 0 | 1 | ★ 同上 | ★ 同上 |
+| ★ `int_alu.h` | 0 | 1 | ★ 同上 | ★ 同上 |
+| ★ `lsu.h` | 0 | 1 | ★ 同上 | ★ 同上 |
+| ★ `mul.h` | 0 | 1 | ★ 同上 | ★ 同上 |
+| ★ ★★ `int_alu_chmem.h` | ★ **1** | 1 | ★★ **含 `<ch.hpp>`** | ★ ★★ **MUST NOT include**（★ **G-1b**） |
+
+★ ★★ ⇒ ★ ADR-091 **D1 明文**写的「★ **复用**：… · `int_alu_chmem.h`（ALU 语义）· …」
+★ ★★ **其中 `int_alu_chmem.h` 这一半是错的** ⇒ ★ **v1.13 已修正 D1**（★ 重新分类为三类）。
+
+★ ★★ **两类「MUST NOT include」的**不同**理由**（★ 勿混为一谈）：
+
+| 类别 | 理由 | 证据 |
+|---|---|---|
+| ★ 含 `<ch.hpp>` | ★ **G-1b**：★ `module.h:13` 缺 `inline` ⇒ ★ 2+ TU include 即 multiple definition | ★ ADR-091 §D5.1 G-1b |
+| ★ 双模 plugin（无 `<ch.hpp>`） | ★ 其**注册语义绑预载核的 stage 命名** ⇒ ★ include 即**污染开放核的 stage 图** ⇒ ★ 与 **G-1n**（stage 首现序）冲突 | ★ `branch.h` / `decode.h` 等的 `at_stage("decode", …)` |
+
+★ ★★ **双副本漂移风险**（★ §D3a.10 已登记）：★ 移植 ALU 的 select 树（★ `int_alu_chmem.h`
+★ 462 行）= **第二份 ALU 实现** ⇒ ★ ★★ **正是 ADR-083 §4.1 拒绝的形态** ⇒ ★ ⇒ ★
+★ **H-3 等价性自检是本决策的承重判据**（★ `regs` 覆盖 ALU 结果）★ ⇒ ★ **不是「附加验收」**。
+
+#### K31.2 ★★ A-2：运行期注入**不可行**（★ 上游 stub 实证）
+
+★ `CppHDL/src/simulator.cpp:161-168`（★ 原文）：
+
+```cpp
+#ifdef ENABLE_MEMORY_API
+std::vector<uint8_t> Simulator::get_memory(uint32_t addr, size_t size) const {
+    return {};                                   // ★ 空 stub
+}
+void Simulator::set_memory(uint32_t addr, const std::vector<uint8_t>& data) {
+}                                               // ★ 空 stub
+#endif
+```
+
+⇒ ★ ★★ **整段被未启用的 `ENABLE_MEMORY_API` 包住** ⇒ ★ ⇒ ★ **无运行期注入通道**
+⇒ ★ ⇒ ★ **A5-2 唯一可行路线 = elaboration init vector** ⇒ ★ ★★ **O-5 未解**
+⇒ ★ ⇒ ★ **D1「O-4/O-5 一并解开」必须降级为诚实标注**（★ v1.13 已改）。
+
+★ ★★ **对 A6 的连带影响**（★ 新的）：★ Verilator 侧对**每个 ELF** 仍需一次编译
+（★ 虽**核**的网表不变，★ 但**从设备**的网表含**初值 vector** ⇒ 随 ELF 变）
+⇒ ★ ⇒ ★ **A6 的 Verilator 侧 MUST 接受「每 ELF 一次编译」**（★ 或等上游 O-5 方案）。
+
+★ ★★ **4 条 MUST 逐位复制的 quirk**（★ 预载核 `ip/cpu/cpu_factory_chmem.h:268-336`）：
+
+| # | quirk | 后果 |
+|---|---|---|
+| ① | ★ `PF_R`-only 段被**静默丢弃**（★ 两个分支 `is_exec&&!is_writable` / `is_writable` 不覆盖只读数据段） | ★ 只读数据段不进内存 |
+| ② | ★ `nwords = p_filesz / 4` ⇒ **尾字节丢弃** | ★ 非 4 倍数的段丢尾 |
+| ③ | ★ 越界读时 `words.clear(); break;` ⇒ ★ **仍以空 vector 调 `preload_segment`**（★ 静默空操作） | ★ 越界段不加载且不报错 |
+| ④ | ★ `X+W` 段**只进 dmem**（★ 取指取不到） | ★ 可执行+可写的段不映到 imem |
+
+⇒ ★ ⇒ ★ **「顺手修正」= H-3 假红** ⇒ ★ **MUST 逐位复制** + 每条 MUST 有 case（★ V-21）。
+
+#### K31.3 ★ A-3：`aread` 的 proxy 节点名**完全可控**
+
+★ `CppHDL/include/core/mem.h:141-142`（★ 原文）：
+
+```cpp
+auto *data_proxy = ctx->create_node<proxyimpl>(data_width, name + "_data_proxy", sloc);
+```
+
+⇒ ★ ★★ 观测节点名 = `name + "_data_proxy"` ⇒ ★ **完全可控** ⇒ ★ ⇒ ★
+★ 顶层端口名取 **`tohost_probe_data_proxy`** ⇒ ★ **与预载核同名** ⇒ ★
+★ `resolve_node_id` **两侧都命中** ⇒ ★ **runner 零改动** ✔
+
+★ ★★ ⇒ ★ **§D3a.9 的「名 `tohost`」是错的** ⇒ ★ **v1.13 已改**（★ 连带 **V-18** 一并改）。
+
+#### K31.4 ★ A-4：V-15 的准确表述（★ 实测对照表）
+
+| 断言组合 | 能否捕获「端口被改名」 |
+|---|---|
+| ★ 子串匹配 + 无反向断言 | ❌ **不能**（★ 实测全绿 ⇒ **假绿复现**） |
+| ★ 子串匹配 + **有**反向断言 | ✔ 能 |
+| ★ **精确匹配** + 无反向断言 | ✔ 能（★ 主断言） |
+| ★ **精确匹配 + 反向断言** | ✔ 能（★ 当前实现） |
+
+⇒ ★ ⇒ ★ **正向精确断言 = 主断言**；★ **反向断言 = 第二道护栏**（★ 它连「子串匹配」的漏洞都能堵）
+⇒ ★ **二者并存** ⇒ ★ ⇒ ★ 最坏情况（helper 降级 + 反向断言被删）才假绿（★ 实测已复现）。
+
+#### K31.5 ★ A-5：H-3 × 契约 S-9a 的交集效应
+
+★ 契约 `docs/architecture/parity-gate-contract.md` 的 S-9a 规定：★ **截断（partial）case**
+★ `tohost` / `cycles` 视为 vacuous（★ 截断后不可判）⇒ ★ **承重判据 = `regs` + `memsig` + `pchash`**。
+
+★ ★★ 而 **H-3** 在「开放核 vs 预载核」scope 下把 **`pchash` 豁免**（★ 流水结构不同构）
+⇒ ★ ⇒ ★ **交集后，截断 case 的承重判据只剩 `regs` + `memsig`**（★ 而契约称 `pchash` 是**最强**判据）。
+
+⇒ ★ ⇒ ★ 该交集**任何文档都没登记** ⇒ ★ ⇒ ★ **v1.13 在 H-3 行补记**
+⇒ ★ ⇒ ★ **正式登记归 ADR-089 / parity-gate-contract**（★ 例外契约的 SSOT 在那边）。
+
+#### K31.6 ★ ADR-091 拆分时机的复核（★ v1.13）
+
+★ 已 **553 行**（★ 远超其自身 250 行自检线）⇒ ★ 但 ★ **现在拆为时尚早**：
+★ G-1 系列仍在增长（★ v1.12 加 G-1p · ★ v1.13 仍在补契约）⇒ ★ 中途拆会让
+★「契约在哪」变**二义** ⇒ ★ ⇒ ★ **拆分时点 = A6 收官后一次性做**
+⇒ ★ 边界（★ oracle 建议）：★ ADR-091 留 D1/D2/D8/D9 + 决策史 + Related；
+★ 新建 `docs/architecture/chmem-open-core-port-contract.md` 承接 §D3a.1~11 + G-1 全系列 + V-10~V-23。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
