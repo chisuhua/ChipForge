@@ -1,16 +1,10 @@
 {
   "schema_version": "role-v1",
   "current_role": "architect",
-  "updated_at": "2026-10-29T08:20:13Z",
+  "updated_at": "2026-10-29T17:29:56Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "builder",
-      "at": "2026-10-24T12:07:25Z",
-      "by": "user",
-      "trigger": "用户指令『请切builder 后执行』（planner 阶段规划已交付: 8 处失真修复 + ⑤ 拆分 + 2 份 plan + ② 实施边界简报）"
-    },
     {
       "role": "architect",
       "at": "2026-10-24T12:34:49Z",
@@ -124,6 +118,12 @@
       "at": "2026-10-29T08:20:13Z",
       "by": "user",
       "trigger": "A2.6 完成后切 architect —— 裁决观测契约 4 项（plan §K23.3）+ A4 微架构调研（register re-naming / 乱序 / 层次化 plugin / regfile 做成 ch::component+ch_stream）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-29T17:29:56Z",
+      "by": "user",
+      "trigger": "双审查（oracle+metis）产出 A-1~A-5 待裁决项 ⇒ 落 ADR 修订"
     }
   ]
 }
