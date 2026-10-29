@@ -747,6 +747,104 @@ for (const auto& node : ctx.get_nodes()) {
 ★ **仅 `pchash` 的载体形态**可先行（★ 但它撞 ④ 的命名问题）⇒ ★
 ★ `tohost` / `regs` / `memsig` **全部依赖上述裁决** ⇒ ★ **A3 应在 architect 裁决之后实施**。
 
+### K24 — ★ A4 架构裁决的调研证据（★ 2026-10-29，用户裁决 A/B + architect 主持）
+
+> ★ **ADR-091 v1.12 正文只留契约**（§D3a.7 / §D3a.8 / §D3a.9 + G-1p + G-6 + V-16~V-19）
+> ⇒ ★ 本节承载调研过程与证据。
+
+#### K24.1 ★ 上游先例确认（★ 用户提的 B4「regfile 做成独立 Component」**确有先例**）
+
+| 上游文件 | 形态 | 关键事实 |
+|---|---|---|
+| `include/cpu/pipeline/rv32i_regfile.h` | ★ `class Rv32iRegFile : public ch::Component` | ★ 有 `create_ports()` + `describe()` + `io()` struct（★ `rs1_addr`/`rs1_data`/`rs2_*`/`rd_addr`/`rd_data`/`rd_we`/`clk`/`rst`）★ 316 行 |
+| `examples/riscv-mini/src/rv32i_pipeline_top.h` | ★ `class Rv32iPipelineTop : public ch::Component` | ★ 用**成员**持有 `pipeline`/`itcm`/`dtcm`（★ `ch::ch_module<T>`）★ 在 `describe()` 里**直连**（★ `itcm.io().addr <<= pipeline.io().instr_addr`）★ 观测上引（★ `io().obs_instr_addr <<= pipeline.io().instr_addr`） |
+| `include/cpu/pipeline/rv32i_pipeline.h` | ★ `ch::ch_module<IfStage> if_stage{"if_stage"}` 等 5 个 stage | ★ ★ **每个 stage 是一个独立 Component** ★ 635 行 |
+
+#### K24.2 ★★ 范式冲突：★ 上游用「直连 DAG」，★ ChipForge 用「stage + Payload」
+
+| 维度 | 上游 `ch::Component` | ChipForge `PluginBase` |
+|---|---|---|
+| 顺序保证 | ★ **组合直连的 DAG 依赖**（★ `rv32i_pipeline.h:240` `id_stage.io().pc <<= if_stage.io().pc`）⇒ ★ 由**数据依赖**自动拓扑排序 | ★ **stage 首现序**（★ `at_stage(name, phase)`）⇒ ★ **G-1n 硬约束** |
+| 跨单元通信 | ★ 直连信号 | ★ `Payload<T>` 全局 key（★ `PayloadStore` 按 key 指针索引） |
+| 子组件 | ★ `create_child<T>()` | ★ **无** |
+| 生命周期 | ★ `build(external_ctx)` → `create_ports()` → `describe()` | ★ `setup(pb)` → `build(pb)` → `at_stage` 闭包 |
+
+⇒ ★★ **核心冲突**：★ `Component` **无 stage 概念** ⇒ ★ 若 regfile 变 Component（直连）
+⇒ ★ 它的输出**不进任何 stage** ⇒ ★ 核内其它 plugin 用 payload 读它
+⇒ ★ **跨 stage 可见性无保障** ⇒ ★ **与 G-1n 直接冲突**。
+
+⇒ ★★ ⇒ ★ **裁决（用户裁决 A）= 两层范式**：★ **层 1 = 核内 stage 间**
+（`PluginBase` + `at_stage` + `Payload`）★ **层 2 = 可复用 IP 单元**（`ch::Component` + `io()`）
+⇒ ★ **层 2 → 层 1 的唯一通道 = 桥接 plugin**。
+
+#### K24.3 ★ 为什么 `ch_stream` 不适合做单元接口（★ 用户裁决 B = 纯 `Payload`）
+
+| 依据 | 事实 |
+|---|---|
+| ★ **越层** | ★ ADR-083 v1.2 §1.2 + ADR-092 §D4 的分层：★ `ch_stream<T>` = **IP 间 / 核↔从设备**；★ `Payload<T>` = **核内 stage 间** ⇒ ★ 单元是**核内**部件 ⇒ ★ 用 `ch_stream` **越层** |
+| ★ **延迟** | ★ `ch_stream` 带 FIFO（★ `stream_fifo<T, DEPTH>` / `stream_queue` ⇒ `include/chlib/stream.h:41-51`）⇒ ★ 引入不可控延迟 ⇒ ★ H-3「逐位相等」更不可比 |
+| ★ **无先例** | ★ 上游 `ch_stream` 只出现在 `examples/stream/*`（★ 纯 stream 运算 demo）⇒ ★ **无 Component 用 `ch_stream` 做 IO 的先例** ⇒ ★ 用它等于自创范式 |
+
+⇒ ★ ⇒ ★ **裁决（用户裁决 B）= 纯 `Payload<T>`**：★ 复用 `ip/cpu/core/payload_common.h`
+现有 key（★ `RS1`/`RS2`/`RD_DATA`/`RD_IDX`/`RESULT` 已够用）★ **不另造 IO 类型**。
+
+#### K24.4 ★ 可行性验证（★ 逐条读上游源码，★ **4/4 通过**）
+
+| # | 验证项 | 结论 | 依据 |
+|---|---|---|---|
+| ① | ★ Component 能否与 ChipForge **共用 ctx** | ✔ **可以** | ★ `Component::build(external_ctx)`（`component.cpp:107-110`）⇒ ★ `ctx_ = external_ctx` ⇒ ★ 无 node-id aliasing |
+| ② | ★ 不传外部 ctx 会怎样 | ✘ **子 ctx ⇒ 踩坑** | ★ `component.cpp:115-117` ⇒ ★ `new context(name_, parent_ctx)` + `ctx_owner_ = true` ⇒ ★ ★ **上游已踩**（`include/device.h:12-19` 明载「child context for ops ⇒ 节点 id aliasing ⇒ 丢失 component 的 output ports」）⇒ ★ **硬约束 G-1p** |
+| ③ | ★ 需要外部维护 `Component::current()` 吗 | ✘ **不需要** | ★ `build_internal`（`component.cpp:128-132`）⇒ ★ `ctx_swap` + `current_ = this` + `CHSCOPE_EXIT` 恢复 ⇒ ★ **自动** |
+| ④ | ★ 能用 `ch_module<T>` 便利包装吗 | ✘ **不能** | ★ `module.h:44` 报「No active parent Component found when creating ch_module!」⇒ ★ `Component::current()` 是 **thread_local** ⇒ ★ ChipForge 无此机制 ⇒ ★ ⇒ ★ 用 **`Component` 子类 + 成员 + `build(ctx)`** |
+
+⇒ ★★ **可行性结论**：★ **两层范式可落地** ★ **但需要 1 个框架级新增**：
+★ ★ **`PipeBuilder` 暴露只读 ctx accessor**（★ `ctx_` 当前 private 无 accessor ⇒ §D5 **G-6**）。
+
+#### K24.5 ★ build 时机与 G-1n 的同源性
+
+| 时刻 | 谁跑 | 关系 |
+|---|---|---|
+| ★ `PipeBuilder::build()` | ★ 按 `plugins_` 顺序调 `setup()` / `build()` | ★ ★ 桥接 plugin 在 `setup()` 里建 Component ⇒ ★ **早于** stage 闭包 |
+| ★ `PipeBuilder::elaborate()` | ★ 跑全部 `at_stage` 闭包 | ★ 桥接 plugin 的闭包读 Component 的 `io()` ⇒ ★ 写成 `Payload` |
+
+⇒ ★ ★ **与 G-1n 同源**：★ `setup()` 按 `plugins_` 顺序调 ⇒ ★ **注册顺序 = stage 首现序**
+⇒ ★ ⇒ ★ MUST 按**流水顺序**注册 plugin（★ A4 装配骨架的硬约束）。
+
+#### K24.6 ★ `register re-naming` 的实证（★ 用户提的 B1）
+
+★ 预载核 `ip/cpu/plugins/reg_file_chmem.h:160-172` 注释（原文）：
+
+> 关键: 用 vector 逐个 push_back 显式命名的 ch_reg, 而非 std::array 默认构造
+> (默认名 "reg" 会泄漏 32 对孤儿 regimpl/proxy 节点进 context, 与显式命名的
+> reg_0..reg_31 撞名 → Verilator Duplicate declaration of signal '_reg_N' 错误).
+
+⇒ ★★ **三条裁决**：
+① ★ **需要** re-naming（★ 已实证）
+② ★ 开放核 regfile MUST 用 `std::vector` + 显式命名（★ 不重蹈 `std::array`）
+③ ★ **契约名 `reg_N` MUST 保持**（★ `parity_sim_runner` 按 `reg_<i>` 采集 ⇒ 改名 ⇒ runner 失效）
+
+#### K24.7 ★ 乱序（★ 用户提的 B2）的裁决依据
+
+| 事实 | 依据 |
+|---|---|
+| ★ 现状 = **in-order 5 级全组合** | ★ 预载核 `cpu_factory_chmem.h:431-435` 无 stage 寄存器 |
+| ★ 「流水结构不同构」已裁 | ★ ADR-091 §D3a.4（★ `cycles` / `pchash` 已结构性不可比） |
+| ★ 乱序是**更大**的结构差异 | ★ 需 issue queue / ROB / 乱序提交 ⇒ ★ 3 终值判据失效 |
+
+⇒ ★ ⇒ ★ **裁决：不支持 + 明确排除**（★ 归 §D9）⇒ ★ 未来要 OoO ⇒ ★ **另立 ADR**
+（★ 不得在本 ADR 内顺手扩范围 —— ★ 与 ADR-092 §D9「不在本 ADR 范围内」同款纪律）。
+
+#### K24.8 ★ 「兼顾 TLM 灵活性 + CH_MEM 可生成 Verilog」的**分层实现**
+
+| 层 | 载体 | 双模表现 |
+|---|---|---|
+| ★ **算法** | ★ `ip/cpu/core/lib/`（★ 纯 C++） | ★ TLM = 直接调用；★ CH_MEM = 需 1:1 转 DAG（★ ADR-040 的 `lib/` → `plugins/` 转换纪律） |
+| ★ **行为** | ★ `ch::Component`（★ CH_MEM 侧） | ★ `describe()` 发射 DAG ⇒ ★ 可生成 Verilog |
+| ★ **边界** | ★ `Payload<T>`（★ 双模共用） | ★ TLM = POD；★ CH_MEM = `ch_uint`/`ch_bool`（★ 模式化类型） |
+
+⇒ ★ ⇒ ★ **「兼顾」不是靠同一份代码两用**，★ 而是靠**分层**：★ 算法双模复用 ·
+行为 CH_MEM 发射 · 边界双模一致。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
