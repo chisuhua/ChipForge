@@ -216,7 +216,15 @@ depends_on:
       ⇒ ★ 变异对照 **4 个有效 RED**（★ mix 常数 / 写次数 / 乘数 / ★ `store_wdata` 用原始数据）
         + **2 个无效变异**（★ 「必须显式取值」在开放核侧**不复现** ⇒ ★ 按 V-9 纪律
         **不登记为硬约束**，★ 见 plan §K27.3）
-    · ✗ **`tohost` 探针**（★ ADR-091 v1.12 §D3a.9）⇒ ★ 归 **A5-4**
+    · ✓ **`tohost` 探针**（★ ADR-091 v1.12 §D3a.9）⇒ ★ **A5-4 已实现**
+      ⇒ ★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`）
+      ⇒ ★ 字索引 **0x400**（★ 字节 0x1000）★ API `set_tohost_probe_word()`（★ 同预载核）
+      ⇒ ★ 载体 = **顶层 `ch_out`**；★ ★★ **契约名 = `tohost_probe_data_proxy`**
+        （★ 与预载核**内部** proxy 节点名**完全一致** ⇒ ★ **parity runner 零改动**）
+        ⇒ ★ ★ **注**：★ §D3a.9 原文写「名 `tohost`」⇒ ★ **MUST 修正**
+          （★ 证据见 plan §K28.1）⇒ ★ **提请 architect 落 ADR**
+        ⇒ ★ 内部 proxy MUST 用**别的**名字（★ `tohost_probe_internal` ⇒ **G-1o**）
+      ⇒ ★ 变异对照 **3 个全 RED**（★ 探针地址错 / 内部 proxy 撞名 / 不驱动）
   ⇒ ★ 变异对照 **3 个有效 RED**（★ 写使能忽略 → 2 case · RMW 退化 → 1 · byte_off 忽略 → 1）
     + 1 个**无效变异**（★ `aread`→`sread` ⇒ **编译失败** ⇒ ★ 诚实记录，见 plan §K26.3）
 - [ ] 4.3 零回归 + 八门禁（★ A5-1 已跑：★ 六门禁全 PASS + CH_MEM 无新回归）
