@@ -13,7 +13,7 @@
 #### Scenario: 无 current context 时 fail-closed
 
 - **WHEN** 在没有 current context 的情况下声明端口
-- **THEN** 框架 MUST **抛异常**
+- **THEN** 框架 MUST **返回错误**（★ `Result` + `std::unexpected(PluginError::NullContextPtr)`）⇒ ★ **fail-closed 语义不变**（★ ADR-091 v1.8 **G-1c 修正**：★ 原为 `throw`，★ 违反 ADR-047 Check 10「静态配置头文件禁 throw」）
 - **AND** MUST NOT 静默跳过节点创建（★ CppHDL 的 `ch_logic_in` 构造是 `if (ctx) {...}` ⇒ 无 ctx 时 `impl()` 为空且不报错 ⇒ 会造成「端口消失而门禁照绿」的假绿通道）
 
 #### Scenario: 被内部驱动的输入端口不作为顶层端口
@@ -112,10 +112,13 @@ ip 级单元测试 MUST 提供一个**符合接口契约的验证实现**承担�
 
 开放核与既有预载核 MUST 有机器可判的等价性保证，防止二者分叉为「双副本漂移」。
 
-#### Scenario: 同输入下五观测量逐位相等
+#### Scenario: 同输入下三终值观测量逐位相等
 
 - **WHEN** 同一 ELF 分别在开放核与预载核上执行
-- **THEN** `tohost` / 寄存器 / 内存签名 / 总拍数 / 逐拍 PC 流 hash **五项 MUST 逐位相等**
+- **THEN** `tohost` / 寄存器 / 内存签名 **三项 MUST 逐位相等**
+  （★ **ADR-091 v1.6 H-3 修正**：★ 原写「五观测量逐位相等」⇒ ★ **流水结构不同构**
+  ⇒ ★ `总拍数` / `逐拍 PC 流 hash` **结构性不可比** ⇒ ★ 两者 MUST 已登记为
+  ★ **ADR-089 例外**（★ scope 限定「开放核 vs 预载核」⇒ 双后端线不受影响））
 
 #### Scenario: 等价性检查具备鉴别力
 

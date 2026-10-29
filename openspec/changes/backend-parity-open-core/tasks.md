@@ -65,7 +65,10 @@ depends_on:
   ⇒ ★ **桥接 plugin**（★ 层 1）：★ 在 `setup()` 里 `build(pb_ctx)` ⇒ ★ 在 `at_stage` 闭包读 `io()` ⇒ 写 `Payload`
   ⇒ ★ **实测**：★ `ip/cpu/core/regfile_chmem.h`（★ 层 2 Component）
     + `ip/cpu/core/regfile_bridge_chmem.h`（★ 层 1 桥接 plugin）
-    + `tests/cpu/test_cpu_open_core_regfile.cpp`（★ **3 case / 75 assertions**）
+    + `tests/cpu/test_cpu_open_core_regfile.cpp`（★ **4 case**）
+    ⇒ ★ ★ **注**：★ 勾选时记的是「3 case / 75 assertions」⇒ ★ 后增
+      「regs 顶层端口契约」case ⇒ ★ 现为 **4 case**
+      ⇒ ★ `[open-core]` 整体 **18 case / 812 assertions**（★ 与 AGENTS.md 一致）
   ⇒ ★ **变异对照 4/4 RED**（★ plan §K25.1）：★ ① `build(nullptr)`（★ 破 G-1p）→ **2 case**
     ② reg 名用默认名（★ 破 §D3a.8）→ 1 ③ 桥接不发布 payload → 1 ④ 允许写 x0 → 1
   ⇒ ★★ **6 个契约陷阱**（★ plan §K25.2）：★ `namespace` alias 不能带模板参数 ·
@@ -112,29 +115,28 @@ depends_on:
     · M-V15b（子串匹配 + 去反向断言 + 撞名）→ ★ **全绿 = 假绿复现** ⇒ 证明精确匹配必需
   ⇒ ★ **诚实标注**：★ ADR v1.11 的 **V-15 措辞有歧义**（★ 实测后的准确表述见 plan §K22.2）
     ⇒ ★ 本轮**不改**已签批的 ADR 决策文字 ⇒ 归 backlog（下一轮 architect 澄清）
-- [ ] 3.4b [RED+GREEN] ★ **顶层观测端口补全**：`tohost` / `regs[32]` / `pchash`
-  ⇒ ★★ **观测契约已裁决**（★ ADR-091 **v1.12 §D3a.9**，★ 2026-10-29）⇒ ★ 可实施：
-    · ★ **载体通则**：★ 每个顶层观测量 MUST 是**顶层 `ch_out`**（★ H-2）
+- [x] 3.4b [RED+GREEN] ★ **顶层观测端口补全**：`tohost` / `regs[32]` / `memsig` / `pchash`
+  ⇒ ★★ **观测契约已裁决**（★ ADR-091 **v1.12 §D3a.9**，★ 2026-10-29）
+    ⇒ ★ **载体通则**：★ 每个顶层观测量 MUST 是**顶层 `ch_out`**（★ H-2）
       ⇒ ★ **MUST NOT** 是内部 `ch_reg`（★ 不在 Verilator `port_access_` ⇒ 只能穿透）
       ⇒ ★ **MUST NOT** 依赖 `--public-flat-rw` 读内部层级
-    · ★ **`memsig` / `mem_sig_updates`**：★ 归**从设备**（§D3a.6）★ 顶层 `ch_out`
-      ⇒ ★ 节点名不变 ⇒ ★ **parity runner 零改动**
-    · ★ **`tohost`**：★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`
-      ⇒ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`
-      ⇒ 开放核**无对应物**）★ 顶层 `ch_out`（★ 名 `tohost`）⇒ ★ **依赖 A5**
-    · ★ **`regs[32]`**：★ 归**核**★ 顶层 `ch_out`（★ 名 `reg_1`..`reg_31`
-      ⇒ ★ `reg_0` 为 x0 恒 0 ⇒ 沿用 runner 的 1..31 口径）⇒ ★ **依赖 A4 的 regfile**
-    · ★ **`pchash` / `pc`**：★ 归**核**★ 顶层 `ch_out` ⇒ ★ **契约名 `open_pc` MUST NOT 改**
-      ⇒ ★ **parity runner 加 1 处 fallback**（★ 先 `pc` ⇒ 未命中则 `open_pc`）⇒ ★ 归 A6
-  ⇒ ★ **Verilator 侧**须分别处理（★ 预载核走穿透 / 开放核走 `port_access_`）⇒ ★ 归 A6
-  ⇒ ★ **`tohost`**：★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`
+  · ★★ **`memsig` / `mem_sig_updates`**：★ 归**从设备**（§D3a.6）★ 顶层 `ch_out`
+    ⇒ ★ 节点名不变 ⇒ ★ **parity runner 零改动** ⇒ ★ **已完成**（★ A5-3）
+  · ★★ **`tohost`**：★ 归**从设备**（★ 开放核**不持有内存** ⇒ 核侧无法 `aread`
     ⇒ 预载核的 `tohost_probe_data_proxy` 来自 dmem 的 `mem.aread`
-    ⇒ 开放核**无对应物**）⇒ ★ 依赖 A5
-  ⇒ ★ **`regs[32]`**：★ 归**核**（★ 寄存器堆）⇒ ★ **依赖 A4 的 regfile plugin**
-    ⇒ ★ 且预载核是**内部** `ch_reg`（`reg_0..reg_31`）⇒ ★ 若开放核走顶层端口
-      ⇒ ★ **两侧结构不同构** ⇒ H-3 对比时两侧读法不同 ⇒ ★ 待裁决
-  ⇒ ★ **`pchash`**：★ 归**核**（★ 每拍 PC 值）⇒ ★ 预载核 pc 节点名 = `pc`（内部）
-    ⇒ 开放核现有顶层端口名 = `open_pc` ⇒ ★ **契约名不一致** ⇒ ★ 待裁决
+    ⇒ 开放核**无对应物**）★ 顶层 `ch_out`
+    ⇒ ★ ★ **契约名 = `tohost_probe_data_proxy`**（★ 与预载核**同名** ⇒ runner 零改动）
+    ⇒ ★ **已完成**（★ A5-4）⇒ ★ ★ **注**：★ §D3a.9 原文写「名 `tohost`」
+      ⇒ ★ **MUST 修正**（★ 证据 plan §K28.1）⇒ ★ **提请 architect**
+  · ★★ **`regs[32]`**：★ 归**核**★ 顶层 `ch_out`（★ 名 `reg_1`..`reg_31`
+    ⇒ ★ `reg_0` 为 x0 恒 0 ⇒ 沿用 runner 的 1..31 口径）
+    ⇒ ★ 内部 `ch_reg` 名 `open_reg_<i>`（★ G-1o：不撞名）⇒ ★ **已完成**（★ A3-1）
+  · ★★ **`pchash` / `pc`**：★ 归**核**★ 顶层 `ch_out` ⇒ ★ **契约名 `open_pc` MUST NOT 改**
+    ⇒ ★ **parity runner 加 1 处 fallback**（★ 先 `pc` ⇒ 未命中则 `open_pc`）⇒ ★ **归 A6**
+    ⇒ ★ ⇒ ★ **本子项未完成**（★ 归 A6）
+  ⇒ ★ **Verilator 侧**须分别处理（★ 预载核走穿透 / 开放核走 `port_access_`）⇒ ★ **归 A6**
+    ⇒ ★ ★ **注**：★ 「采集零改动」**只对解释器侧成立**（★ `sim_main.cpp:96-126`
+      全是穿透读法）⇒ ★ A6 的 6c 是**实质性新代码**（★ plan §K29.3 ⑧）
 - [x] 3.3 [GREEN] `ip/cpu/core/dmem_port_chmem.h`：访存走端口
   ⇒ ★ **实现**：`ip/cpu/core/dmem_port_chmem.h` + `tests/cpu/test_cpu_open_core_dmem.cpp`
     （★ **4 case / 92 assertions 实测全过**）⇒ ★ **8 个访存端口 + 1 个观测端口进网表顶层**
@@ -227,7 +229,36 @@ depends_on:
       ⇒ ★ 变异对照 **3 个全 RED**（★ 探针地址错 / 内部 proxy 撞名 / 不驱动）
   ⇒ ★ 变异对照 **3 个有效 RED**（★ 写使能忽略 → 2 case · RMW 退化 → 1 · byte_off 忽略 → 1）
     + 1 个**无效变异**（★ `aread`→`sread` ⇒ **编译失败** ⇒ ★ 诚实记录，见 plan §K26.3）
-- [ ] 4.3 零回归 + 八门禁（★ A5-1 已跑：★ 六门禁全 PASS + CH_MEM 无新回归）
+- [ ] ★ **A4-0** [裁决] ★ **decode/alu/csr/branch 的 reuse-vs-rewrite**（★ **A4-2 不可启动**）
+  ⇒ ★★ **三处契约矛盾**：★ ADR-091 D1「复用 `ip/cpu/arch/riscv/int_alu_chmem.h`（ALU 语义）」
+    ⇒ ★ ★★ 但**实测**：★ 该文件 include `<ch.hpp>` + `plugin_base.h` + `pipe_builder.h`
+      ⇒ ★ 它**不是纯算法头**，★ 而是**完整 plugin**（★ `RiscvIntAluPlugin : PluginBase`）
+      ⇒ ★ ⇒ ★ **绝不能**被开放核 include（★ G-1b：★ `<ch.hpp>` ⇒ 多 TU 链接失败）
+    ⇒ ★ 与 tasks 2.3 的「**全部 plugin 均为新建**」**矛盾**
+    ⇒ ★ **工作量差 3~5 人日**（★ reuse ≈0.5 vs rewrite ≈3~5 含语义锚测试）
+  ⇒ ★ ⇒ ★ **裁决前 A4-2 不可启动**（★ 证据见 plan §K29.3 ⑥）
+- [ ] ★ **A5-0** [裁决] ★ **ELF 加载路线**（★ **A5-2 不可启动**）
+  ⇒ ★ 路线 1 = **elaboration init vector**（★ `ch_mem` 构造时填初值）⇒ ★ 简单
+    ⇒ ★ ★★ 但 **O-5 未解**（★ 网表仍随 ELF 变 ⇒ Verilator 需逐 ELF 重编译）
+  ⇒ ★ 路线 2 = **运行期 data_map 注入** ⇒ ★ O-5 真解
+    ⇒ ★ ★★ 但上游 `Simulator::get_memory/set_memory` 是**空 stub**
+      （★ `CppHDL/src/simulator.cpp:162-167`）⇒ ★ 需上游工作或新增机制
+  ⇒ ★ ⇒ ★ 连带：★ ADR-091 D1「O-4/O-5 一并解开」**可能需降级为诚实标注**
+  ⇒ ★ **证据见 plan §K29.3 ⑨**
+- [ ] ★ **A5-3** [RED+GREEN] ★ **核 ↔ 从设备集成测试**（★ **真实缺口**）
+  ⇒ ★★★ **缺口**：★ `test_cpu_open_core_mem_model.cpp` 的 `MemRig` **直接驱动从设备端口**
+    ⇒ ★ 而 ibus/dmem 测试**由 host 直接喂 `rsp_data`** ⇒ ★ ★ **两侧各自绿，但从未连过**
+  ⇒ ★ ⇒ ★ 本条 = ibus + dmem + verify_mem_model **三者对接**
+    ⇒ ★ 跑手工编码的 `add` + `sw` 序列 ⇒ ★ 直至 `mem_sig_updates > 0`
+  ⇒ ★ ★ **注**：★ commit `17e9a4c` 写的「ibus/dmem 只断言端口声明、从不读值」
+    ⇒ ★★ **该标注不属实**（★ 实测 ibus `:169,170,189` **逐拍读值**）
+    ⇒ ★ ⇒ ★ **真实缺口是本条**（★ 公开更正见 plan §K29.1）
+- [ ] ★ **B5** [backlog] ★ `chmem_vendored_elf_tohost1` **拆分 / 子进程化**
+  ⇒ ★ 47 个 DYNAMIC_SECTION 在**同一进程内累积 47 个 CPU 网表**（★ CppHDL 不释放节点）
+    ⇒ ★ 单次跑 **> 25 分钟** ⇒ ★ 全量 CH_MEM 回归**无法一次跑完**
+  ⇒ ★ 现仅登记在 AGENTS.md ⇒ ★ **本条补进 tasks**（★ 审查发现）
+- [x] 4.3 零回归 + 八门禁（★ **2026-10-30 实测**：★ 六门禁全 PASS
+  + ★ CH_MEM **215 case / 4735 assertions** 无新回归 + ★ TLM 无新回归）
 
 ## 5. Phase 5 — S5：双后端必过（D0-c）+ 等价性自检（H-3）
 
