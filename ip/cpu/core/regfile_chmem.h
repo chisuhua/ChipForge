@@ -109,7 +109,9 @@ class RegFileComponent : public ch::Component {
       // ── 写端口 ──
       ch::core::ch_in<Addr> rd_addr;
       ch::core::ch_in<Data> rd_data;
-      ch::core::ch_in<ch::core::ch_bool> rd_we;
+      // ★ 写使能（★ **1-bit `ch_uint<1>`** —— ★ 与桥接的 `Ports::rd_we`
+      //   及 `dmem_port_chmem.h` 的 `dmem_req_we` **同款** ⇒ ★ 类型必须一致）
+      ch::core::ch_in<ch::core::ch_uint<1>> rd_we;
   )
 
   explicit RegFileComponent(ch::Component* parent = nullptr,
@@ -132,7 +134,7 @@ class RegFileComponent : public ch::Component {
         ch::core::ch_out<Data>("regfile_rs2_data"),
         ch::core::ch_in<Addr>("regfile_rd_addr"),
         ch::core::ch_in<Data>("regfile_rd_data"),
-        ch::core::ch_in<ch::core::ch_bool>("regfile_rd_we"),
+        ch::core::ch_in<ch::core::ch_uint<1>>("regfile_rd_we"),
     };
   }
 
@@ -201,6 +203,7 @@ class RegFileComponent : public ch::Component {
       // ★ `select` 嵌套（★ MUST NOT 用 `&&` —— ADR-091 §K17 已证伪其可用性）
       // ★ `ch_bool` **无**从 `port` 的隐式转换（★ 只有 `ch_uint` 有
       //   `operator ch_uint<W>()`）⇒ ★ MUST 走 `port::impl()`。
+      // ★ `rd_we` 是 `ch_uint<1>`（★ 1-bit）⇒ ★ 读它的 impl
       const auto we_i = ch::core::ch_bool(ch::core::select(
           sel, ch::core::ch_bool(io().rd_we.impl()),
           ch::core::ch_bool(ch::core::ch_literal<0, 1>{})));
