@@ -277,15 +277,27 @@ depends_on:
   ⇒ ★ **ELF 段越界 MUST fail-closed**（★ 段地址 MUST 落在 `[0x80000000, 0x80010000)`）
     ⇒ ★ 预载核侧是**未定义** ⇒ ★ 开放核可更严，★ 但 MUST 写明
   ⇒ ★ **验收**：★ 同一 ELF 经**预载核路由**与**开放核加载**后内存**逐字相等**（★ V-21）
-- [ ] ★ **A4-3** [RED+GREEN] ★★★ **`rd_we × flush` 掩码**（★ **A4-2 的隐藏硬需求**）
+- [x] ★ **A4-3** [RED+GREEN] ★★★ **`rd_we × flush` 掩码**（★ **已完成 2026-10-30**）
   ⇒ ★★★ **缺口**：★ 预载核 `ip/cpu/plugins/reg_file_chmem.h:232` 做
     `we = writes_rd && (rd_addr != 0) && !flush`
     ⇒ ★ ★★ 但开放核的 `RegFileComponent`（★ **只屏蔽 x0**）与 `RegFileBridgePlugin`
     （★ **透传 `rd_we`**）★ **都不做 flush 掩码**
     ⇒ ★ ⇒ ★ **错路指令会写寄存器** ⇒ ★ ⇒ ★ **H-3 的 `regs` 终值必挂**
   ⇒ ★ ★★ **该需求此前不在任何 tasks / ADR 条目里**（★ 双审查发现）
-  ⇒ ★ **归属**：★ 写入路径（★ 尚不存在的 writeback / decode 侧）★ 或 regfile 桥接层
-    ⇒ ★ ★ **MUST 在 A4-2 装配设计里明确落点**
+  ⇒ ★⇒ ★ **落点 = 桥接层**（★ 层 1）⇒ ★ 理由：★ Component 是**层 2**
+    ⇒ ★ **不依赖层 1** ⇒ ★ 读不到 `Payload` ⇒ ★ 掩码 MUST 由桥接承担
+  ⇒ ★ ★★ **`flush` MUST 走「顶层 `ch_out`」（★ `open_flush`），MUST NOT 走 payload**
+    ⇒ ★ ★★ **实测根因**：★ payload 在 **`elaborate()`** 时才写，★ 而 `setup()` 时**未写**
+      ⇒ ★ `has(FLUSH)` = false ⇒ ★ **永久 fail-open** ⇒ ★ 静默失效
+    ⇒ ★ ⇒ ★ **新硬约束**（★ 两层范式的第 2 条，★ 第 1 条是 G-1n）：
+      ★ **「层 2 单元的输入 MUST 走组合端口，MUST NOT 走 `Payload<T>`」**
+      ⇒ ★ ⇒ ★ **必须落 ADR-091 §D3a.7 补充** ⇒ ★ **提请 architect**
+    ⇒ ★ ★ **零新增端口**（★ `open_flush` 本是观测端口 ⇒ ★ 顺带成控制信号载体）
+  ⇒ ★ ★ **类型统一**：`Ports::rd_we` / `io().rd_we` / `dmem_req_we` **一律 `ch_uint<1>`**
+    ⇒ ★ ★★ 不一致 ⇒ ★ 驱动接不上 ⇒ ★ **静默失效**（★ 本轮实测踩到）
+  ⇒ ★ ★ **变异对照 3/3 RED**：★ 无掩码 → 1 case · ★ 条件方向反 → 2 case
+    · ★★ **`flush` 源改回 payload → 1 case**（★ 验证「MUST 走顶层端口」）
+  ⇒ ★ 证据见 plan §K32
 - [ ] ★ **B5** [backlog] ★ `chmem_vendored_elf_tohost1` **拆分 / 子进程化**
   ⇒ ★ 47 个 DYNAMIC_SECTION 在**同一进程内累积 47 个 CPU 网表**（★ CppHDL 不释放节点）
     ⇒ ★ 单次跑 **> 25 分钟** ⇒ ★ 全量 CH_MEM 回归**无法一次跑完**
