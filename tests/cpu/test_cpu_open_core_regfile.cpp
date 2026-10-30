@@ -37,6 +37,8 @@
 #include <vector>
 
 #include "cf/plugin/pipe_builder.h"
+#include "ip/cpu/core/branch_iface_chmem.h"
+#include "ip/cpu/core/ibus_port_chmem.h"
 #include "ip/cpu/core/payload_common.h"
 #include "ip/cpu/core/regfile_bridge_chmem.h"
 #include "ip/cpu/core/regfile_chmem.h"
@@ -76,7 +78,7 @@ struct Rig {
   std::unique_ptr<ch::core::ch_in<U5>> rs2_addr_v;
   std::unique_ptr<ch::core::ch_in<U5>> rd_addr_v;
   std::unique_ptr<ch::core::ch_in<U32>> rd_data_v;
-  std::unique_ptr<ch::core::ch_in<ch::core::ch_bool>> rd_we_v;
+  std::unique_ptr<ch::core::ch_in<U1>> rd_we_v;
 
   std::unique_ptr<ch::core::ch_out<U32>> open_rs1_v;
   std::unique_ptr<ch::core::ch_out<U32>> open_rs2_v;
@@ -90,7 +92,7 @@ struct Rig {
   ch::core::ch_in<U5>* rs2_addr = nullptr;
   ch::core::ch_in<U5>* rd_addr = nullptr;
   ch::core::ch_in<U32>* rd_data = nullptr;
-  ch::core::ch_in<ch::core::ch_bool>* rd_we = nullptr;
+  ch::core::ch_in<U1>* rd_we = nullptr;
   ch::core::ch_out<U32>* open_rs1 = nullptr;
   ch::core::ch_out<U32>* open_rs2 = nullptr;
   ch::core::ch_out<U32>* open_rd_data = nullptr;
@@ -106,8 +108,8 @@ struct Rig {
         must(pb.declare_in<U5>("rf_rd_addr")));
     rd_data_v = std::make_unique<ch::core::ch_in<U32>>(
         must(pb.declare_in<U32>("rf_rd_data")));
-    rd_we_v = std::make_unique<ch::core::ch_in<ch::core::ch_bool>>(
-        must(pb.declare_in<ch::core::ch_bool>("rf_rd_we")));
+    rd_we_v = std::make_unique<ch::core::ch_in<U1>>(
+        must(pb.declare_in<U1>("rf_rd_we")));
 
     open_rs1_v = std::make_unique<ch::core::ch_out<U32>>(
         must(pb.declare_out<U32>("open_rs1")));
@@ -134,7 +136,7 @@ struct Rig {
     }
 
     bridge = std::make_unique<cf::cpu::core::RegFileBridgePlugin<U32>>();
-    bridge->bind_ports({rs1_addr, rs2_addr, rd_addr, rd_data, rd_we});
+    bridge->bind_ports({rs1_addr, rs2_addr, rd_addr, rd_data, rd_we, nullptr});
     bridge->bind_obs_ports(std::move(obs));
     pb.register_plugin(std::move(bridge));
   }
@@ -240,6 +242,144 @@ TEST_CASE("open_core: regfile bridge publishes layer-2 outputs as payload",
   REQUIRE(pv(*rig.sim, *rig.open_reg_v[5]) == 0xDEADu);
   // ★ 未写过的 x7 ⇒ ★ 仍为初值 0
   REQUIRE(pv(*rig.sim, *rig.open_reg_v[7]) == 0u);
+}
+
+// ★★★ **branch 提供者**（★ MUST 做成 plugin 且注册在 ibus **之后** —— ★ G-1n）
+class BranchTakenProvider : public cf::plugin::PluginBase {
+ public:
+  explicit BranchTakenProvider(ch::core::ch_in<U1>* taken)
+      : taken_(taken) {}
+
+  void setup(cf::plugin::PipeBuilder& pb) override {
+    pb.at_stage("branch", cf::plugin::Phase::EARLY, [this, &pb] {
+      auto* n = pb.node_of_logic_stage("branch").get();
+      if (n) {
+        namespace BK = cf::cpu::core::branch_keys;
+        n->operator()(BK::BRANCH_TAKEN) = ch::core::ch_bool(
+            ch::core::operator==(U1(*taken_), U1(ch::core::ch_literal<1, 1>{})));
+      }
+    });
+  }
+
+  void build(cf::plugin::PipeBuilder&) override {}
+
+ private:
+  ch::core::ch_in<U1>* taken_;
+};
+
+TEST_CASE("open_core: FLUSH suppresses wrong-path register writes (ADR-091 A4-3)",
+          "[open-core][chmem]") {
+  // ★★★ **A4-3**（★ ADR-091 v1.13 · tasks A4-3）：★ **错路指令 MUST NOT 写寄存器**
+  //   ★ 预载核 `reg_file_chmem.h:222-232` 做 `we = writes_rd && (rd != 0) && !flush`
+  //   ★ ⇒ ★ 开放核 MUST 同款（★ 掩码在**桥接层** —— ★ Component 是层 2，读不到 payload）
+  //   ★ ★★ **不掩码的后果**：★ H-3 的 `regs` 终值必挂（★ 错路写会留痕）
+  //
+  // ★ **集成级**验证（★ 不只是单元）：★ ibus（产生 FLUSH）+ branch 提供者
+  //   （产生 `BRANCH_TAKEN`）+ regfile bridge（做掩码）★ 三者对接。
+
+  ch::core::context ctx{"open_core_regfile_flush"};
+  cf::plugin::PipeBuilder pb(&ctx);
+
+  // ★★ **端口 MUST 用 `unique_ptr` 持有**（★ 禁 `&must(...)` —— ★ 那是对
+  //   **临时对象**取地址 ⇒ ★ 端口 `impl_` 失效 ⇒ ★ 端口「消失」⇒ ★ **假绿**）
+  // ── 取指侧（★ 提供 `FLUSH` 的生产者）──
+  auto imem_req_addr  = std::make_unique<ch::core::ch_out<U32>>(
+      must(pb.declare_out<U32>("imem_req_addr")));
+  auto imem_req_valid = std::make_unique<ch::core::ch_out<U1>>(
+      must(pb.declare_out<U1>("imem_req_valid")));
+  auto imem_req_ready = std::make_unique<ch::core::ch_in<U1>>(
+      must(pb.declare_in<U1>("imem_req_ready")));
+  auto imem_rsp_data  = std::make_unique<ch::core::ch_in<U32>>(
+      must(pb.declare_in<U32>("imem_rsp_data")));
+  auto imem_rsp_valid = std::make_unique<ch::core::ch_in<U1>>(
+      must(pb.declare_in<U1>("imem_rsp_valid")));
+  auto open_pc        = std::make_unique<ch::core::ch_out<U32>>(
+      must(pb.declare_out<U32>("open_pc")));
+  auto open_flush     = std::make_unique<ch::core::ch_out<U1>>(
+      must(pb.declare_out<U1>("open_flush")));
+
+  // ── regfile 侧（★ 桥接的输入）──
+  auto rf_rd_addr = std::make_unique<ch::core::ch_in<U5>>(
+      must(pb.declare_in<U5>("rf_rd_addr")));
+  auto rf_rd_data = std::make_unique<ch::core::ch_in<U32>>(
+      must(pb.declare_in<U32>("rf_rd_data")));
+  auto rf_rd_we   = std::make_unique<ch::core::ch_in<U1>>(
+      must(pb.declare_in<U1>("rf_rd_we")));
+  // ★ 观测端口（★ 契约名 `reg_1..reg_31`）
+  std::vector<std::unique_ptr<ch::core::ch_out<U32>>> reg_ports(32);
+  cf::cpu::core::RegFileBridgePlugin<U32>::ObsPorts obs;
+  for (std::size_t i = 1; i < 32; ++i) {
+    reg_ports[i] = std::make_unique<ch::core::ch_out<U32>>(
+        must(pb.declare_out<U32>("reg_" + std::to_string(i))));
+    obs.reg[i] = std::make_unique<ch::core::ch_out<U32>>(*reg_ports[i]);
+  }
+  // ★ branch 提供者的输入
+  auto branch_taken_in = std::make_unique<ch::core::ch_in<U1>>(
+      must(pb.declare_in<U1>("branch_taken_in")));
+
+  // ★ ★★ **注册顺序 = 流水顺序**（★ G-1n：★ 首现序 MUST 等于流水顺序）
+  //   ★ ibus（建 `fetch` + `branch`）→ ★ bridge（建 `decode`）→ ★ provider（`branch` 已存在）
+  auto ibus = std::make_unique<cf::cpu::core::IBusPortPlugin<U32>>();
+  ibus->bind_ports({imem_req_addr.get(), imem_req_valid.get(),
+                    imem_req_ready.get(), imem_rsp_data.get(),
+                    imem_rsp_valid.get(), open_pc.get(), open_flush.get()});
+  pb.register_plugin(std::move(ibus));
+
+  auto bridge = std::make_unique<cf::cpu::core::RegFileBridgePlugin<U32>>();
+  // ★ ★★ `flush_src` = ibus 的 `open_flush`（★ **顶层 `ch_out`** ⇒ ★ 组合节点
+  //   ⇒ ★ 在 `build()` 时已有效 ⇒ ★ 掩码逐拍正确）
+  bridge->bind_ports({nullptr, nullptr, rf_rd_addr.get(), rf_rd_data.get(),
+                      rf_rd_we.get(), open_flush.get()});
+  bridge->bind_obs_ports(std::move(obs));
+  pb.register_plugin(std::move(bridge));
+
+  pb.register_plugin(
+      std::make_unique<BranchTakenProvider>(branch_taken_in.get()));
+
+  std::unique_ptr<ch::Simulator> sim;
+  {
+    ch::core::ctx_swap guard(&ctx);
+    REQUIRE(pb.build().has_value());
+    REQUIRE(pb.elaborate().has_value());
+    auto sim_res = pb.create_simulator();
+    REQUIRE(sim_res.has_value());
+    sim = std::move(sim_res.value());
+  }
+
+  sim->set_input_value(*imem_req_ready, 1);
+  sim->set_input_value(*imem_rsp_valid, 1);
+  sim->set_input_value(*imem_rsp_data, 0x00000013u);
+  sim->set_input_value(*rf_rd_addr, 5);
+  sim->set_input_value(*rf_rd_we, 1);
+  sim->set_input_value(*branch_taken_in, 0);
+
+  auto read_reg5 = [&sim, &reg_ports]() -> std::uint64_t {
+    return static_cast<std::uint64_t>(sim->get_port_value(*reg_ports[5]));
+  };
+
+  // ★★★ **拍 0**：★ 无 flush ⇒ ★ 写入生效（★ 写 x5 = 0xDEAD）
+  sim->set_input_value(*rf_rd_data, 0xDEADu);
+  sim->tick();
+  // ★ tick 后读 = 下一拍的值 ⇒ ★ 拍 1 读到 0xDEAD
+  REQUIRE(read_reg5() == 0xDEADu);
+
+  // ★★★ **拍 1**：★ `BRANCH_TAKEN = 1` ⇒ ★ 拍 1 末 `flush_reg` 生效
+  //   ⇒ ★ ⇒ ★ **拍 2 的 `FLUSH` = 1** ⇒ ★ **拍 2 的写入 MUST 被抑制**
+  sim->set_input_value(*branch_taken_in, 1);
+  sim->tick();
+  REQUIRE(static_cast<std::uint64_t>(sim->get_port_value(*open_flush)) == 1u);
+
+  // ★★★ **拍 2**：★ 写 x5 = 0xBEEF ⇒ ★ **被 flush 抑制** ⇒ ★ 值不变
+  sim->set_input_value(*rf_rd_data, 0xBEEFu);
+  sim->tick();
+  REQUIRE(read_reg5() == 0xDEADu);   // ★ ★ 未被 0xBEEF 覆盖
+
+  // ★ **拍 3**：★ `FLUSH` 撤销 ⇒ ★ 写入恢复
+  sim->set_input_value(*branch_taken_in, 0);
+  sim->tick();
+  sim->set_input_value(*rf_rd_data, 0xCAFEu);
+  sim->tick();
+  REQUIRE(read_reg5() == 0xCAFEu);   // ★ ★ 恢复后写入生效
 }
 
 TEST_CASE("open_core: regs observation is exposed as top-level ports "
