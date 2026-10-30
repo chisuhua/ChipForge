@@ -1305,6 +1305,95 @@ auto *data_proxy = ctx->create_node<proxyimpl>(data_width, name + "_data_proxy",
 ⇒ ★ 边界（★ oracle 建议）：★ ADR-091 留 D1/D2/D8/D9 + 决策史 + Related；
 ★ 新建 `docs/architecture/chmem-open-core-port-contract.md` 承接 §D3a.1~11 + G-1 全系列 + V-10~V-23。
 
+### K32 — ★ A4-3（`rd_we × flush` 掩码）的实现证据 + ★★ 一条**新硬约束**的发现
+
+> ★ **ADR-091 v1.13 §D3a.5 ③ + tasks A4-3** 的实现证据。
+> ★ ★ **本轮产出一条必须落 ADR 的新约束**（★ 见 §K32.2）⇒ ★ **提请 architect**。
+
+#### K32.1 ★ 掩码的落点与形态
+
+★ ★★ **落点 = 桥接层**（★ 层 1）⇒ ★ 理由（★ ADR-091 v1.12 §D3a.7）：
+★ Component 是**层 2** ⇒ ★ **不依赖层 1** ⇒ ★ 它**没有** `PipeBuilder`/`PipeNode`
+⇒ ★ ⇒ ★ **读不到 `Payload`** ⇒ ★ ⇒ ★ 掩码 MUST 由**桥接 plugin** 承担。
+
+★ ★★ **与预载核逐位同款**（★ `ip/cpu/plugins/reg_file_chmem.h:222-232`）：
+
+| 项 | 预载核 | 开放核（本实现） |
+|---|---|---|
+| ★ `flush` 来源 | ★ `fch->operator()(IBusPlugin<T>::FLUSH)`（★ **payload**） | ★ ★ **顶层 `ch_out`**（★ `open_flush`）★ 见 §K32.2 |
+| ★ 读取时机 | ★ 在 **`writeback` stage 的 `at_stage` 闭包内** ⇒ ★ payload **已写** | ★ 在 **`setup()`** ⇒ ★ payload **未写** ⇒ ★ **不能读 payload** |
+| ★ 写使能 | ★ `we = writes_rd && (rd_addr != 0) && !flush` | ★ `we = rd_we && !flush`（★ **x0 屏蔽在 Component 内逐寄存器做**，★ 与预载核的 `for (i = 1; …)` **同款**） |
+| ★ `flush` 缺失 | ★ `ch_bool(false)`（★ fail-open） | ★ 同款（★ `flush_src == nullptr` ⇒ 0） |
+
+★ ★★ **类型统一**（★ 本轮修）：★ `Ports::rd_we` / `Component::io().rd_we` /
+★ `dmem_req_we` **一律 `ch_uint<1>`**（★ 1-bit）⇒ ★ ★★ **类型不一致 ⇒ 驱动接不上 ⇒ 写使能恒 0**
+⇒ ★ 这是**静默失效**（★ 编译通过、测试才发现）★ ⇒ ★ 端口类型 MUST 三处一致。
+
+#### K32.2 ★★★ **新硬约束的发现**：★ 层 2 的输入 **MUST 走组合端口，MUST NOT 走 payload**
+
+★★ ★★ **现象**：★ 第一版实现在桥接的 `setup()` 里读 `fetch` stage 的 `FLUSH` **payload**
+⇒ ★ ★★ **掩码永久失效**（★ 写入照旧发生 ⇒ 测试 RED）。
+
+★★ ★★ **根因（★ 时序事实）**：
+
+| 时刻 | 谁跑 | `FLUSH` payload 的状态 |
+|---|---|---|
+| ★ `PipeBuilder::build()` | ★ 按 `plugins_` 顺序调 `setup()` / `build()` | ★ **尚未写**（★ payload 在 stage 闭包里写） |
+| ★ `PipeBuilder::elaborate()` | ★ 跑全部 `at_stage` 闭包 | ★ ★ **此时才写** |
+
+⇒ ★ ★★ `setup()` 时 `has(FLUSH)` = **false** ⇒ ★ ⇒ ★ **永久 fail-open**
+⇒ ★ ★★ ⇒ ★ **「payload」是 elaboration 期的产物** ⇒ ★ **MUST NOT** 用作
+★ **`setup()` 期的驱动源** ⇒ ★ ⇒ ★ **层 2（Component）的输入 MUST 由「组合节点」供给**
+⇒ ★ ★★ **顶层 `ch_out` 在 `build()` 时已是有效节点** ✔ ⇒ ★ ★★ **零新增端口**
+（★ `ibus_port_chmem.h` 的 `open_flush` 本是**观测端口** ⇒ ★ **顺带成了控制信号载体**）★★
+
+★ ★★ ★★ **对比**：★ 预载核的 regfile 在 **`writeback` stage 的 `at_stage` 闭包内**读 payload
+⇒ ★ 那时 payload **已写** ⇒ ★ ⇒ ★ **两者语义等价**（★ 都拿到「本拍 flush」）
+⇒ ★ ★★ **但机制不同** ⇒ ★ **不可照搬**。
+
+★ ★★ ⇒ ★ ⇒ ★ **必须落 ADR-091 §D3a.7 的补充**（★ 属 architect 职权）：
+★ ★ **两层范式的第 2 条硬约束**（★ 第 1 条是 **G-1n**：stage 首现序）：
+★ ★★ **「层 2 单元的输入 MUST 走组合端口（顶层 `ch_out` / 组件 `ch_in` 直连），
+★ MUST NOT 走 `Payload<T>`」** ⇒ ★ 违反后果 = ★ **永久 fail-open** ⇒ ★ **静默失效**。
+
+#### K32.3 ★★ `select` 的条件方向（★ 本轮踩的第二个坑）
+
+★ `select(cond, true_val, false_val)` ⇒ ★ ★★ **`cond` 为真时取 `true_val`**。
+★ 我写成 `select(flush == 0, 0, rd_we)` ⇒ ★ ★★ **「无 flush」时反而取 0**
+⇒ ★ ⇒ ★ **写使能恒 0** ⇒ ★ ⇒ ★ **写入永不发生**（★ 症状：读端口恒 0）。
+
+★ ⇒ ★ 正确：`select(flush != 0, 0, rd_we)`（★ 「flush 非 0 ⇒ 抑制」）。
+★ ⇒ ★ ★★ **教训**：★ **`select` 的两臂顺序**（★ cond 为真取**前者**）★
+★ 是**极易反**的 ⇒ ★ ⇒ ★ **MUST 有变异对照**（★ 本轮 M2' 覆盖：★ 反向 ⇒ 2 case RED）。
+
+#### K32.4 ★ 变异对照（★ 3 个有效，全 RED）
+
+| # | 变异 | 结果 | 判据 |
+|---|---|---|---|
+| **M1** | ★ 去掉 flush 掩码（★ 直连 `rd_we`） | ★ **1 case 失败** | ★ 掩码存在性 |
+| **M2'** | ★ 掩码条件方向反（★ `flush == 0`） | ★ **2 case 失败** | ★ 条件方向 |
+| **M3** | ★ ★★ `flush` 源改回 **payload** | ★ **1 case 失败** | ★★★ **验证「MUST 走顶层端口」**（★ 读 payload ⇒ setup 时取不到 ⇒ 永久 fail-open） |
+
+★ ★★ **M3 是本轮最有价值的变异** ⇒ ★ 它把 §K32.2 的新约束**变成了可执行的判据**。
+
+#### K32.5 ★ 本轮的其他踩坑（★ 记录以免重犯）
+
+| # | 坑 | 正解 |
+|---|---|---|
+| ① | ★ ★★ **端口 MUST 用 `unique_ptr` 持有**（★ 新 case 里又踩了一次「`&must(...)` 取临时地址」） | ★ `port::operator=` 被 delete ⇒ ★ `optional<port>` 也不行 ⇒ ★ 只能 `unique_ptr` |
+| ② | ★ ★ **端口类型三处 MUST 一致**（★ `Ports::rd_we` / `io().rd_we` / 对端） | ★ 不一致 ⇒ ★ 驱动接不上 ⇒ ★ **静默失效** |
+| ③ | ★ ★★ **测试 MUST 走 `run_catch2_with_baseline.sh`** | ★ ★★ 直接跑 binary **绕过**刚加的新鲜度防护 ⇒ ★ ★ 我本轮因此**误读了一次旧 binary 的「All tests passed」**（★ C1 假绿）⇒ ★ **防护当场拦住了后续那次** ✔ |
+| ④ | ★ ★ **编译验证 MUST 前置于读测试结果** | ★ 编译失败 ⇒ 旧 binary 顶替 ⇒ ★ 假绿（★ 本轮又踩一次） |
+| ⑤ | ★ ★ **`git checkout --` 恢复变异** ⇒ ★ 丢掉未提交改动 | ★ 已第 4 次踩 ⇒ ★ **一律用 `cp <gold>` 覆盖** |
+
+#### K32.6 ★ context pollution flake 的复现率**疑似升高**
+
+★ ★★ CH_MEM 全量跑偶发 `[ERROR] [node_builder] No active context for literal creation`
+（★ AGENTS.md 已记同族：★ `cpphdl_poc_chbool_contextual_conversion`）
+⇒ ★ 本轮观测：★ **4 次里 2 次命中**（★ 此前约 1/4）⇒ ★ ★★ **疑似与本轮新增的
+regfile 测试相关**（★ 更多 `ch_reg` 创建 ⇒ ★ 更多对 current context 的依赖）
+⇒ ★ **根因未定位** ⇒ ★ 归 **backlog**（★ 非本轮引入的缺陷，★ 但频率值得盯）。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
