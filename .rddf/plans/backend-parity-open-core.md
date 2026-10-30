@@ -1394,6 +1394,66 @@ auto *data_proxy = ctx->create_node<proxyimpl>(data_width, name + "_data_proxy",
 regfile 测试相关**（★ 更多 `ch_reg` 创建 ⇒ ★ 更多对 current context 的依赖）
 ⇒ ★ **根因未定位** ⇒ ★ 归 **backlog**（★ 非本轮引入的缺陷，★ 但频率值得盯）。
 
+### K33 — ★ G-1q 的推导与证据（★ 「层 2 输入 MUST 走组合端口」）
+
+> ★ **ADR-091 v1.14 正文只留契约**（§D3a.7 补充 + G-1q + V-24）⇒ ★ 本节承载证据。
+> ★ 详细的踩坑清单见 **§K32**（★ A4-3 的实现过程）。
+
+#### K33.1 ★★ 现象与根因
+
+★ ★★ **现象**：★ 第一版 A4-3 在桥接的 `setup()` 里读 `fetch` stage 的 `FLUSH` **payload**
+⇒ ★ ⇒ ★ **掩码永久失效**（★ 抑制不发生 ⇒ 错路指令写进寄存器 ⇒ H-3 的 `regs` 必挂）。
+
+★ ★★ **根因 = 两条时序线交叉**：
+
+| 线 | 何时跑 | `FLUSH` payload 状态 |
+|---|---|---|
+| ★ `PipeBuilder::build()` | ★ 按 `plugins_` 顺序调 `setup()` / `build()`（★ `Component::build` ⇒ `describe()` 也在此） | ★ ★ **尚未写** |
+| ★ `PipeBuilder::elaborate()` | ★ 跑全部 `at_stage` 闭包（★ payload 在此写） | ★ ★ **此时才写** |
+
+⇒ ★ ★★ `setup()` 期读 payload ⇒ `has()` = **false** ⇒ ★ ⇒ ★ **永久 fail-open**
+⇒ ★ ⇒ ★ ★★ **这不是「读不到」而是「读到的永远是 0」** ⇒ ★ **静默失效**。
+
+#### K33.2 ★★ 为什么**不能**照搬预载核的做法
+
+★ 预载核 `ip/cpu/plugins/reg_file_chmem.h:222` 读的是
+★ `fch->operator()(IBusPlugin<T>::FLUSH)`（★ **payload**）⇒ ★ 看起来「可行」。
+
+★ ★★ **但两者的读取时机不同**：
+
+| | 预载核 regfile | 开放核层 2（Component） |
+|---|---|---|
+| ★ 读取位置 | ★ **`writeback` stage 的 `at_stage` 闭包内** | ★ **`setup()` 内**（★ `describe()` 在 `build()` 时跑） |
+| ★ 此时 payload | ★ **已写**（★ `elaborate()` 已跑） | ★ ★ **未写** |
+| ★ 结果 | ✔ 拿到「本拍 flush」 | ✘ **永久 fail-open** |
+
+⇒ ★ ⇒ ★ **语义等价但机制不同** ⇒ ★ **不可照搬** ⇒ ★ 这正是「照搬预载核」类缺陷的典型。
+
+#### K33.3 ★★ 裁决（G-1q）
+
+★ ★★ **层 2（`ch::Component`）的输入 MUST 走「组合节点」**（★ 顶层 `ch_out` / 组件 `ch_in` 直连）
+⇒ ★ ★★ **MUST NOT** 走 `Payload<T>` ⇒ ★ ⇒ ★ **跨层信号 MUST 走组合端口**；
+★ **`Payload<T>` 只用于层 1 内部**（★ stage 间）。
+
+★ ★★ **推论（★ 架构级）**：★ **层 2 → 层 1 的唯一通道 = 桥接 plugin**
+（★ 其**输入**走组合端口 · ★ 其**输出**发布成 payload）⇒ ★ ⇒ ★
+★ **「两层范式」的两条硬约束**：
+
+| # | 约束 | 后果（违反） |
+|---|---|---|
+| ★ **G-1n** | ★ stage 首现序 MUST = 流水顺序 | ★ 跨 stage payload 可见性反转 |
+| ★ ★ **G-1q** | ★ 层 2 输入 MUST 走组合端口 | ★ **永久 fail-open** ⇒ 静默失效 |
+
+★ ★★ **零新增端口的好解**（★ A4-3 的实现）：★ 复用**已有的顶层观测端口**
+（★ `ibus_port_chmem.h` 的 `open_flush`）⇒ ★ ⇒ ★ **观测端口顺带成了控制信号载体**
+⇒ ★ **不新增任何端口** ⇒ ★ **H-2 / G-1o 均不受影响**。
+
+#### K33.4 ★ 判据可执行（★ 变异对照）
+
+★ V-24 的变异对照：★ 把某个层 2 输入的驱动源改成 **payload** ⇒ MUST RED。
+★ ★★ **实测**：★ A4-3 的「`flush` 源改回 payload」变异 ⇒ **1 case 失败** ✔
+⇒ ★ ⇒ ★ **新约束已被变成可执行判据**（★ 而非仅文档条款）。
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
