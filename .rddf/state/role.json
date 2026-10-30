@@ -1,16 +1,10 @@
 {
   "schema_version": "role-v1",
-  "current_role": "builder",
-  "updated_at": "2026-10-29T17:33:45Z",
+  "current_role": "architect",
+  "updated_at": "2026-10-30T03:03:41Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "planner",
-      "at": "2026-10-24T13:15:06Z",
-      "by": "user",
-      "trigger": "用户指令『切planner后再做openspec change立项，对change内容通过 oracle + metis 审查修订通过后，切builder进行实施』（architect 简报 v2.1 已双审通过）"
-    },
     {
       "role": "builder",
       "at": "2026-10-24T14:08:21Z",
@@ -124,6 +118,12 @@
       "at": "2026-10-29T17:33:45Z",
       "by": "user",
       "trigger": "ADR-091 v1.13 五项裁决落地后切回 builder，实施 A4-3（rd_we × flush 掩码）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-10-30T03:03:41Z",
+      "by": "user",
+      "trigger": "A4-3 实施期发现「层 2 输入 MUST 走组合端口，MUST NOT 走 payload」⇒ 落 ADR（★ A4-2 前置）"
     }
   ]
 }
