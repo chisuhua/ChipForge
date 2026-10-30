@@ -1,0 +1,14 @@
+# ★ 本 change **不修改任何 spec**（★ 纯 tooling 加固：★ 只改 `tools/parity_runner/parity_sim_runner.cpp`）
+# ★ ⇒ 归档时 `openspec archive <change> --skip-specs` 合规
+# ★ ★ 依据：★ ADR-091 v1.15 的 Verification **V-25**（★ 「同名解析 MUST fail-closed」）
+# ★   是 **Verification 条目**（★ 判据）★ 而非 spec capability 的 Requirement
+# ★ ⇒ ★ 因此**无** spec delta 可写
+# ★ ★ 另：★ 本文件**不改** spec-level 行为（★ 只把「静默取首个匹配」改成「同名 ⇒ ERROR(2)」
+# ★   ⇒ ★ 判据从「ADR 文字」升级为「代码防线」★ 而 spec 描述的是**系统行为**★ 不含此实现细节）
+
+schema: spec-driven
+created: 2026-10-30
+goal: 让 parity runner 的观测契约名解析 fail-closed（同名 ⇒ ERROR(2)），消除「静默取首个匹配 ⇒ 假绿」
+affected_areas:
+  - tools/parity_runner
+skip_specs: true
