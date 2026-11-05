@@ -1,11 +1,11 @@
 {
   "schema_version": "scope-v1",
   "current_scope": {
-    "category": "ip",
-    "target": "cpu",
-    "sub_target": "core"
+    "category": "governance",
+    "target": "governance",
+    "sub_target": null
   },
-  "updated_at": "2026-10-28T10:36:50Z",
+  "updated_at": "2026-11-05T07:32:01Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
@@ -64,6 +64,13 @@
       "at": "2026-10-28T10:36:50Z",
       "by": "user",
       "trigger": "用户指令「做 C2」⇒ 复核 ADR-091 §D5.1 的 G-1a~G-1k ⇒ scope 回 ip/cpu"
+    },
+    {
+      "from": "ip/cpu",
+      "to": "governance/governance",
+      "at": "2026-11-05T07:32:01Z",
+      "by": "user",
+      "trigger": "AGENTS.md 清理任务落在治理层（项目 AGENTS.md + docs/agent/）⇒ scope 切 governance"
     }
   ]
 }

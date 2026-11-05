@@ -1,16 +1,10 @@
 {
   "schema_version": "role-v1",
-  "current_role": "planner",
-  "updated_at": "2026-10-30T07:54:37Z",
+  "current_role": "builder",
+  "updated_at": "2026-11-05T07:32:01Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "planner",
-      "at": "2026-10-25T22:53:48Z",
-      "by": "user",
-      "trigger": "用户指令『切planner角色并列出后续任务还有哪些』"
-    },
     {
       "role": "builder",
       "at": "2026-10-26T02:58:28Z",
@@ -124,6 +118,12 @@
       "at": "2026-10-30T07:54:37Z",
       "by": "user",
       "trigger": "起草 C-1 change（parity 观测名解析 fail-closed）—— ★ ADR-091 v1.15 的 V-25 落地"
+    },
+    {
+      "role": "builder",
+      "at": "2026-11-05T07:32:01Z",
+      "by": "user",
+      "trigger": "用户裁决：AGENTS.md 清理走 L2（~330 行）+ 历史 RCA 直接删 + 『切 builder 直接落地』"
     }
   ]
 }
