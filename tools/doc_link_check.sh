@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # tools/doc_link_check.sh
-# 功能描述: 检查所有用户面向 markdown 文档的相对路径交叉引用, 列出断链
+# 功能描述: 检查文档中的相对路径引用 (markdown 链接 + 反引号包裹的仓库路径), 列出断链
 # 作者: ChipForge Build System
-# 最后修改日期: 2026-06-13
+# 最后修改日期: 2026-11-05
 #
 # 用途:
 #   - 本地手动运行: ./tools/doc_link_check.sh
 #   - CI 集成: 失败时 exit 1 (可作为 architecture-gates.yml 的额外 step)
 #
 # 范围:
-#   - 扫描: docs/, ip/*/README.md, src/cf_plugin/README.md
-#   - 跳过: .omo/ (gitignored, 非用户面向), build/, .git/, 各种 cache 目录
-#   - 类型: 仅 .md 相对路径 (跳过 http://, mailto:, #anchor-only)
+#   - [检查 1] markdown 链接: 扫描 docs/, ip/, src/cf_plugin/ + 根级文档
+#                (AGENTS.md / README.md / CONTRIBUTING.md)
+#   - [检查 2] 反引号路径: **仅**根级文档 (AGENTS.md / README.md / CONTRIBUTING.md)
+#                —— docs/ 下架构文档含大量历史/规划态路径引用, 全量扫描噪声过高, 故不纳入
+#   - 跳过: .omo/ (gitignored, 非用户面向), build/ (构建产物), .git/, 各种 cache 目录
+#   - 类型: markdown 相对路径 (.md) + 反引号包裹的仓库相对路径 (带已知扩展名或目录)
 #
 # 退出码:
 #   0 = 0 broken links
@@ -22,6 +25,8 @@
 #   - .omo/boulder.json work 2026-06-13 文档债审计
 #   - commit 080cd28 (37 broken links 修复)
 #   - tools/verify_adr.sh (类似的 shell 验证脚本风格)
+#   - 2026-11-05: 增加「反引号路径」检查 (AGENTS.md 曾出现 6 处死引用, 如
+#     .rddf/roadmap/archive/phase-6-declarative.md / code-test-ownership-report.md)
 
 set -uo pipefail
 
@@ -32,12 +37,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-# 扫描路径: 用户面向的 docs/ + 各 IP + cf_plugin README
+# 根级文档: 用户/agent 的第一入口 —— 死引用危害最大, 纳入两类检查
+ROOT_DOCS=(
+  "AGENTS.md"
+  "README.md"
+  "CONTRIBUTING.md"
+)
+
+# 扫描路径: 用户面向的 docs/ + 各 IP + cf_plugin README + 根级文档
 SCAN_PATHS=(
   "docs"
   "ip"
   "src/cf_plugin"
+  "${ROOT_DOCS[@]}"
 )
+
+# 检查 2 (反引号路径) 的适用范围 —— 仅根级文档
+PATH_CHECK_DOCS=("${ROOT_DOCS[@]}")
+
+# 检查 2 的忽略清单: 每行一个路径 (允许"故意不存在"的引用), # 开头为注释
+PATH_IGNORE_FILE="tools/doc_link_check_ignore.txt"
 
 # 跳过目录 (在 SCAN_PATHS 内的子目录)
 SKIP_DIRS=(
@@ -85,23 +104,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ----------------------------------------------------------------------------
-# 主流程
+# 检查 1: markdown 相对链接
 # ----------------------------------------------------------------------------
 [[ $QUIET -eq 0 ]] && log "Scanning markdown cross-references in: ${SCAN_PATHS[*]}"
 
-# 收集所有 .md 文件
-MD_FILES=$(find "${SCAN_PATHS[@]}" -name "*.md" 2>/dev/null | sort)
-TOTAL=$(echo "$MD_FILES" | wc -l)
-[[ $QUIET -eq 0 ]] && log "Found $TOTAL markdown files"
-
-# 检查每对 (file, link) — Python 内嵌 (无 jq 依赖, 跨平台)
 BROKEN_LINES=$(python3 - "${SCAN_PATHS[@]}" <<'PY'
 import os, re, sys
 
-# 收集所有 .md 文件
+# 收集所有 .md 文件 (目录递归 + 单文件)
 md_files = []
 for path_str in sys.argv[1:]:
     if not os.path.exists(path_str):
+        continue
+    if os.path.isfile(path_str):
+        if path_str.endswith('.md'):
+            md_files.append(path_str)
         continue
     for root, dirs, fs in os.walk(path_str):
         # 过滤 SKIP_DIRS (与 bash 端同步)
@@ -146,21 +163,102 @@ for path in sorted(md_files):
 sys.exit(0 if broken_count == 0 else 1)
 PY
 )
+LINK_RC=$?
 
-if [[ $? -eq 0 ]]; then
+# ----------------------------------------------------------------------------
+# 检查 2: 反引号包裹的仓库相对路径 (仅根级文档)
+# ----------------------------------------------------------------------------
+BROKEN_PATHS=$(python3 - "$PATH_IGNORE_FILE" "${PATH_CHECK_DOCS[@]}" <<'PY'
+import os, re, sys
+
+ignore_file = sys.argv[1]
+docs = sys.argv[2:]
+
+# 允许的仓库路径前缀
+PREFIXES = ('docs/', 'ip/', 'tools/', 'src/', 'include/', 'tests/', 'openspec/',
+            '.rddf/', 'bundles/', 'soc/', '.github/', 'scripts/')
+# 构建产物 / gitignored 目录 —— 不校验存在性
+EXCLUDE_PREFIXES = ('build/', '.omo/')
+# 已知扩展名 (裸文件名如 `verify_adr.sh` 不带路径前缀, 不在校验范围)
+EXTS = ('.md', '.sh', '.h', '.hpp', '.cpp', '.c', '.py', '.yaml', '.yml',
+        '.json', '.txt', '.csv', '.ld')
+
+# 忽略清单
+ignored = set()
+if os.path.exists(ignore_file):
+    with open(ignore_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                ignored.add(line.rstrip('/'))
+
+tick_re = re.compile(r'`([^`\n]+)`')
+
+broken_count = 0
+for path in docs:
+    if not os.path.exists(path):
+        continue
+    with open(path) as f:
+        content = f.read()
+    for m in tick_re.finditer(content):
+        cand = m.group(1).strip()
+        # 含空格 / 占位符 / glob / 命令前缀 ⇒ 不是纯路径
+        if ' ' in cand or any(ch in cand for ch in '<>{}*?$(),:'):
+            continue
+        if not cand.startswith(PREFIXES):
+            continue
+        if cand.startswith(EXCLUDE_PREFIXES):
+            continue
+        is_dir = cand.endswith('/')
+        if not is_dir and not cand.endswith(EXTS):
+            continue
+        target = cand.rstrip('/')
+        if target in ignored:
+            continue
+        if not os.path.exists(target):
+            broken_count += 1
+            line_no = content[:m.start()].count('\n') + 1
+            print(f"BROKEN_PATH\t{path}:{line_no}\t`{cand}`")
+
+sys.exit(0 if broken_count == 0 else 1)
+PY
+)
+PATH_RC=$?
+
+# ----------------------------------------------------------------------------
+# 结果汇总
+# ----------------------------------------------------------------------------
+if [[ $LINK_RC -eq 0 && $PATH_RC -eq 0 ]]; then
   [[ $QUIET -eq 0 ]] && log "✅ All markdown cross-references valid (0 broken)"
+  [[ $QUIET -eq 0 ]] && log "✅ All backtick path references valid (0 broken)"
   exit 0
 fi
 
-# 输出断链
+if [[ $LINK_RC -ne 0 ]]; then
+  echo ""
+  echo "================================================================"
+  echo "BROKEN MARKDOWN CROSS-REFERENCES"
+  echo "================================================================"
+  echo "$BROKEN_LINES" | grep "^BROKEN" | column -t -s$'\t' 2>/dev/null || echo "$BROKEN_LINES" | grep "^BROKEN"
+  echo ""
+  echo "Total broken: $(echo "$BROKEN_LINES" | grep -c "^BROKEN" || echo 0)"
+  echo ""
+  echo "Fix: update relative paths in source markdown files."
+fi
+
+if [[ $PATH_RC -ne 0 ]]; then
+  echo ""
+  echo "================================================================"
+  echo "BROKEN BACKTICK PATH REFERENCES"
+  echo "================================================================"
+  echo "$BROKEN_PATHS" | grep "^BROKEN_PATH" | column -t -s$'\t' 2>/dev/null || echo "$BROKEN_PATHS" | grep "^BROKEN_PATH"
+  echo ""
+  echo "Total broken: $(echo "$BROKEN_PATHS" | grep -c "^BROKEN_PATH" || echo 0)"
+  echo ""
+  echo "Fix: update the path, or add it to $PATH_IGNORE_FILE"
+  echo "      (ignore list = paths that intentionally do not exist)."
+fi
+
 echo ""
-echo "================================================================"
-echo "BROKEN MARKDOWN CROSS-REFERENCES"
-echo "================================================================"
-echo "$BROKEN_LINES" | grep "^BROKEN" | column -t -s$'\t' 2>/dev/null || echo "$BROKEN_LINES" | grep "^BROKEN"
-echo ""
-echo "Total broken: $(echo "$BROKEN_LINES" | grep -c "^BROKEN" || echo 0)"
-echo ""
-echo "Fix: update relative paths in source markdown files."
 echo "Run \`bash tools/doc_link_check.sh --quiet\` for re-check after fix."
 exit 1
