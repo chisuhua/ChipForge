@@ -8,10 +8,10 @@
 
 | 脚本 | 用途 | 退出码 | CI 集成 |
 |------|------|--------|---------|
-| `tools/verify_adr.sh` | 验证 ADR 注册表与代码实现对齐 (39 条 ADR) | 0=PASS / 1=❌ Critical drift / 2=脚本错误 | ✅ `architecture-gates.yml` step 1 (PR 阻塞) + `doc_check.yml` smoke (`--only=ADR-024`) |
+| `tools/verify_adr.sh` | 验证 ADR 注册表与代码实现对齐 (条数见 `docs/architecture/adr.md`) | 0=PASS / 1=❌ Critical drift / 2=脚本错误 | ✅ `architecture-gates.yml` step 1 (PR 阻塞) + `doc_check.yml` smoke (`--only=ADR-024`) |
 | `tools/verify_plugin_decision.sh` | D4 Plugin-style 业务代码静态检查 (无 tick/无状态机/uint_t<N>) | 0=PASS / 1=❌ D4 违规 | ✅ `architecture-gates.yml` step 2 (PR 阻塞) |
 | `tools/check_plugin_portability.sh` | ADR-040 移植性约束 (Tier-1: 早返/ch_mem 渗透/pb.run/array_store) | 0=PASS / 1=❌ 移植性违规 | ✅ `architecture-gates.yml` step 3 (PR 阻塞) |
-| `tools/doc_link_check.sh` | 文档相对路径交叉引用完整性 (防止 2026-06-13 发现的 42 个死链回归) | 0=全 PASS / 1=有断链 | (推荐) `architecture-gates.yml` step 4 |
+| `tools/doc_link_check.sh` | 文档路径引用完整性 —— 检查 1: markdown 相对链接 (docs/ ip/ src/cf_plugin/ + 根级文档); 检查 2: 反引号包裹的仓库路径 (仅根级文档) | 0=全 PASS / 1=有断链 | (推荐) `architecture-gates.yml` step 4 |
 | `tools/check_xlen_hygiene.sh` | ADR-087 §D6 XLEN 假设 hygiene 软门禁 (新增 `kXlenBits` 定义点须登记 `ip/cpu/docs/rv64_readiness_gap.md` §5) | 0=PASS (含 warn) / 1=STRICT 模式下有未登记定义点 | ✅ `architecture-gates.yml` step 4 (**warn 级**, `continue-on-error: true`) |
 | `tools/check_tlm_freeze.sh` | ADR-088 §2 TLM-only 代码冻结门禁 (相对 baseline 新增的函数定义须登记 `.rddf/state/tlm-freeze-allowlist.txt`；检测面 = `ip/` 下非 `_chmem.h` 的 `.h` 减去 9 个双模共享文件) | 0=PASS / 1=有未登记的新增函数 | ✅ `architecture-gates.yml` step 5 (**warn 级**, `continue-on-error: true`) |
 | `tools/gen_coverage_parity_ledger.sh` | ADR-088 §4 覆盖平价台账生成器 (从两个 binary 的 `--list-tests` 差集生成条目骨架 + 重算闭合校验；数字不写死) | 0=闭合 OK / 1=口径不闭合 | (本地工具, CI 不调用) |
@@ -29,7 +29,7 @@
 ### 2.1 `verify_adr.sh`
 
 - **类别**: A 框架架构 / B CppTLM / C CppHDL / D 注册 / E 端口 / F Bundle / G Plugin / H Pipe / I 验证 / J 目录
-- **ADR 状态**: 30 ✅ + 1 ⚠️ (ADR-024) + 8 🚧 (Phase 1 提案), 39 总
+- **ADR 状态**: 条数与分布以 `docs/architecture/adr.md` 注册表为准 (脚本运行时实测, 本文件不写死快照)
 - **关键防护**:
   - ADR-024 (`verify_adr.sh:538-543`): 主动拒绝 `bundles/bundle_mapper.h` 提前实现, 推迟到 Phase 5/6
   - ADR-033: CtrlLink 4-control-API 验证 (`include/cf/plugin/ctrl_link.h:34/40/46/52`)
@@ -49,6 +49,21 @@
   2. `ip/*/tlm/` 无 `ch_mem` / `ch_reg` / `ch_uint` / `ch::core` 渗透 (TLM/RTL 隔离)
   3. Plugin `build()` 不调用 `pb.run()` (由 PipeBuilder 调度)
   4. 存储声明优先 `array_store` (非 `std::array` 直用)
+
+### 2.4 `doc_link_check.sh`
+
+两项检查 (2026-11-05 起):
+
+| # | 检查 | 范围 | 覆盖的失效类型 |
+|---|------|------|--------------|
+| 1 | markdown 相对链接 | `docs/` `ip/` `src/cf_plugin/` + 根级文档 (`AGENTS.md` / `README.md` / `CONTRIBUTING.md`) | `](路径)` 形式的死链 |
+| 2 | 反引号包裹的仓库路径 | 仅根级文档 (`AGENTS.md` / `README.md` / `CONTRIBUTING.md`) | `` `docs/xxx.md` `` 形式的裸路径死引用 |
+
+- **检查 2 为何只限根级文档**：`docs/` 下架构文档含大量历史 / 规划态路径引用 (实测 92 条), 全量扫描噪声过高 ⇒ 限定在"用户/agent 第一入口"，那里死引用危害最大且内容是人工维护的
+- **忽略清单**：`tools/doc_link_check_ignore.txt` —— 允许"**故意**不存在"的引用 (如陈述"某目录已删除")；**不得**用来掩盖真实死引用
+- **退出码**：任一检查有断链 ⇒ `1`；全过 ⇒ `0`
+- **输出**：`BROKEN MARKDOWN CROSS-REFERENCES` / `BROKEN BACKTICK PATH REFERENCES` 两段，带 `文件:行号`
+- `--quiet` 只输出断链，不打进度日志
 
 ## 3. 本地运行
 
@@ -83,7 +98,7 @@ bash tools/build.sh --no-build
 bash tools/build.sh -j 8
 
 # 仅运行测试 (假设 build/ 已存在)
-bash tools/run_chipforge_tests.sh                    # TLM only (411 cases, ~0.6s)
+bash tools/run_chipforge_tests.sh                    # TLM only (case 总数运行时实测打印)
 
 # 一键: 构建 + 测试
 bash tools/run_chipforge_tests.sh --build
@@ -95,11 +110,11 @@ bash tools/run_chipforge_tests.sh --asan
 bash tools/run_chipforge_tests.sh --tag "[cache]"
 bash tools/run_chipforge_tests.sh --exclude "[mmu]"
 
-# 全量 (TLM + CH_MEM + Verilator smoke + gate, ~130s)
+# 全量 (TLM + CH_MEM + Verilator smoke + gate)
 bash tools/run_chipforge_tests.sh --all
 
 # Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2)
-./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]  # 4 Catch2 cases (10+26 assertions)
+./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]  # Verilator 两个 family
 ./build/bin/cpu_verilator_sim --elf tests/cpu/riscv_tests/elf/rv32ui-p-add  # 1 ELF smoke (开发者 debug 入口)
 
 # 详细输出
@@ -121,7 +136,7 @@ bash tools/verify_plugin_decision.sh
 # 4. ADR-040 移植性
 bash tools/check_plugin_portability.sh
 
-# 5. 文档链接交叉引用 (新增, 防 2026-06-13 发现的 42 死链回归)
+# 5. 文档链接交叉引用 (markdown 链接 + 反引号路径, 防文档债审计发现的死链回归)
 bash tools/doc_link_check.sh
 bash tools/doc_link_check.sh --quiet  # 仅断链, 无进度输出
 ```
@@ -150,12 +165,9 @@ bash tools/doc_link_check.sh --quiet  # 仅断链, 无进度输出
 
 ## 6. 相关文档
 
-- AGENTS.md §构建与测试 (5 种构建模式矩阵)
-
-
+- AGENTS.md §3 构建与测试 (构建模式矩阵) / §6 工作流 (验证命令 + CI 集成)
 - `docs/architecture/adr.md` ADR-043 (CI 集成决策, 2026-06-12)
 - `docs/architecture/adr.md` ADR-024 (Bundle 三层分层, ⚠️ Mapper 推迟)
 - `docs/architecture/adr.md` ADR-033 (CtrlLink 4-control-API)
 - `docs/architecture/adr.md` ADR-040 (TLM→HDL 移植性约束)
-- `.omo/drafts/fix-plan-2026-06-12-design.md` §3 Change 4 (CI 集成设计依据)
-
+- `tools/baseline_known_failures.txt` (baseline-known 失败清单 = 「回归是否通过」的判定真源)

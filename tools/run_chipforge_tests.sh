@@ -4,7 +4,8 @@
 # 功能描述: 运行 ChipForge 自身测试
 #
 # 默认路径 (Oracle 2026-10-06 修订): delegate 到 build/bin/chipforge_tests (TLM Catch2 binary)
-#   — TLM 全部 ~515 cases, 无 whitelist, 无 silent-failure
+#   — TLM 全部, 无 whitelist, 无 silent-failure
+#     (★ case 总数由运行时 --list-tests 实测打印, 本文件不写死快照数字)
 #   — **不**覆盖 chipforge_tests_chmem (CH_MEM/Verilator), 见 --all
 #
 # ★★★ C1（2026-10-28）「旧产物顶替」假绿通道修复 —— ★ 三条硬约束：
@@ -15,17 +16,17 @@
 #   ③ **baseline-aware 判定**：★ 委托 `tools/run_catch2_with_baseline.sh`
 #      ⇒ ★ 判定「是否有**新**失败」而非「是否有任何失败」
 #      ⇒ ★ 清单 = `tools/baseline_known_failures.txt`
-# --all:    调 ctest, 包含 TLM + CH_MEM (含 [verilator]/[mmu-verilator] 4 cases)
+# --all:    调 ctest, 包含 TLM + CH_MEM (含 [verilator]/[mmu-verilator] 两个 family)
 #           + cpu_verilator_sim_add (Phase 6d.5 E8 standalone runner smoke)
-#           + verify_plugin_decision (PA-4b 缓解: 139 CppHDL internal 预期 'Not Run')
+#           + verify_plugin_decision (PA-4b 缓解: CppHDL internal 预期 'Not Run')
 # --tag:    按 Catch2 tag 过滤 (仅作用于默认的 chipforge_tests binary;
 #           [verilator]/[mmu-verilator] family 仅在 chipforge_tests_chmem 中,
 #           需要配合 --all 或直接跑 ./build/bin/chipforge_tests_chmem [tag])
 # 作者: ChipForge Build System
-# 最后修改日期: 2026-10-06
+# 最后修改日期: 2026-11-05
 #
 # 用法:
-#   tools/run_chipforge_tests.sh                       # TLM 全部 (411 cases, ~0.6s)
+#   tools/run_chipforge_tests.sh                       # TLM 全部 (case 总数运行时实测打印)
 #   tools/run_chipforge_tests.sh --build               # 先 build 再 test (调 tools/build.sh)
 #   tools/run_chipforge_tests.sh --rebuild-deps        # 重建 deps + build + test
 #   tools/run_chipforge_tests.sh --asan                # ASan 构建 + test
@@ -37,9 +38,9 @@
 #   tools/run_chipforge_tests.sh --all                 # ctest (TLM + CH_MEM + verilator smoke + gate)
 #
 # Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2):
-#   tools/run_chipforge_tests.sh --all                 # 推荐 (1 个 ctest + 4 个 Catch2 cases)
+#   tools/run_chipforge_tests.sh --all                 # 推荐 (1 个 ctest + Verilator 两个 family)
 #   或:
-#   ./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]   # 4 Catch2 cases (10+26 assertions)
+#   ./build/bin/chipforge_tests_chmem [verilator],[mmu-verilator]   # Verilator 两个 family
 #   ./build/bin/cpu_verilator_sim --elf tests/cpu/riscv_tests/elf/rv32ui-p-add  # 开发者 debug 入口
 #
 # 退出码:
