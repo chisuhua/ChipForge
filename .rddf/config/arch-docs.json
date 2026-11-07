@@ -1,6 +1,6 @@
 {
   "schema_version": "arch-docs-v1",
-  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除。",
+  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除。★ 诊断与待决策项见 `.rddf/reviews/architecture-docs-governance-recommendations.md`（★ §4 选项 2 = arch_paths 覆盖范围）。",
   "arch_paths": [
     "docs/architecture/adr",
     "docs/architecture/adr.md",
@@ -9,7 +9,6 @@
     "docs/architecture/parity-gate-contract.md",
     "docs/architecture/testing-and-dse.md",
     "docs/architecture/roadmap-evolution.md",
-    "ip/cpu/docs/adr",
     "ip/mmu/docs/adr",
     "ip/cache/docs/adr",
     "docs/architecture/hierarchical-plugin-architecture.md"
@@ -20,6 +19,6 @@
     "build",
     "3rdparty"
   ],
-  "updated_at": "2026-11-07",
+  "updated_at": "2026-11-08",
   "updated_by": "architect"
 }
