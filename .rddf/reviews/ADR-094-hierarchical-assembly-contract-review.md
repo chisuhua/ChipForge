@@ -258,3 +258,62 @@
 | 4 | critic | **文本**（v0.1 首版） | APPROVE_WITH_CONDITIONS | 0 |
 | 5 | critic | **文本**（终审 · 含 D-01~D-21 与全部修复） | ★ **APPROVE_WITH_CONDITIONS · 可 commit** | ★ **0** |
 | — | oracle | 文本终审（独立） | ★ **PASS-WITH-NOTES · 可 commit** | ★ **0** |
+
+---
+
+## 7h. ★ 导航层（入口）化（2026-11-07 · oracle + critic 一轮）
+
+> ★ 用户问：「`docs/architecture/hierarchical-plugin-architecture.md` 可以作为层次化 plugin **所有文档的入口**吗？」
+
+### 7h.1 architect 的定位判定（★ 结论先行）
+
+| 入口类型 | 判定 | 依据 |
+|---|---|---|
+| ★ **导航入口**（读者找路的起点） | ★ **可以** | 它是唯一横跨「决策 / 契约 / 推导 / 实施 / 实现 / 验证 / 上游」的主题文档 |
+| ★ **权威入口**（真相所在） | ★ **不能，也本就不该** | ★ 权威分布 = ADR-094（装配）· ADR-091 v1.16（两层范式）· `parity-gate-contract.md`（门禁面）· plan / 台账（推导证据）· change `tasks.md`（AC）· 上游 ADR-058~062 ⇒ ★ 主题文档首行即写「决策不在这里」⇒ ★ 若兼任权威入口 ⇒ **自我矛盾**（与 ADR-094 讲同一件事时必然漂移） |
+
+### 7h.2 ★ 三类缺口（★ 全部实测，非推测）
+
+| # | 缺口 | 实测依据 |
+|---|---|---|
+| ① | ★ **覆盖面不够**：§6「与既有文档的关系」仅 6 行 ⇒ 漏上游 Parent（5 ADR）/ 实现面（层 2 唯一实例）/ 验证面 / 治理面（5 处 dated 注记） | 全仓 + 上游扫描 |
+| ② | ★ **反向可达性不完整** ⇒ 「入口」名不副实：★ 仅 3 处回指 ⇒ ★ **ADR-091 自身未回指**（其 Related 列了 7 个 ADR + 契约文档，唯独未列 ADR-094 与主题文档）· ★ **`parity-gate-contract.md` 未回指** ⇒ ★ 读者从最可能的两个入口进入 ⇒ **走到死路** | `grep -rn "hierarchical-plugin-architecture"` |
+| ③ | ★ **硬断链**：§6/§8/头部写 `plan §K17~§K36` ⇒ ★ 实测 plan **最大只到 K33** | `grep "^### K3[4-6]"` 零命中 |
+
+### 7h.3 ★ 更深的长期问题（★ 比上面三条更重要）
+
+「入口文档」的**内在风险 = 随时间腐化**（文档增删 / 改名 / 状态翻转 ⇒ 导航表过时）⇒ ★ 且 `tools/doc_link_check.sh` **既不查反向可达、连本表条目的正向都不覆盖**（检查 2 仅根级 3 文档 · 检查 1 只认 markdown 链接形态 · `SCAN_PATHS` 不含 `.rddf/`）⇒ ★ **导航表腐化不会被现有门禁发现**。
+★ 更关键：§1 是**当前态快照** ⇒ ①-A~①-D 落地后**立即过时** ⇒ ★ 高频易变内容（§1）与低频稳定内容（导航）混在同一文件 ⇒ ★ §1 要 builder 持续更新，但它是 architect 拥有的文档 ⇒ ⇒ **职责冲突 + 必然腐化**。
+⇒ ★ 解法：★ §0 导航层独立成节（低频 · architect 维护）· ★ §1 降级为 **dated 快照**（权威明确交给实施面）· ★ §0.4 M-1~M-5 写死防腐化纪律 · ★ §7 残留 ⑩ 登记「无机检」缺口 + 候选方案 + owner。
+
+### 7h.4 审查结论
+
+| 轮 | 审查者 | 结论 | BLOCKER |
+|---|---|---|---|
+| oracle | 文本级 | ★ **PASS-WITH-NOTES** | ★ **0** |
+| critic | arch + plan 档 | ★ **APPROVE_WITH_CONDITIONS · mergeable: yes** | ★ **0** |
+
+★ **oracle 的 finding（2 SHOULD_FIX + 5 NIT）已全修**：
+- ★ **SHOULD_FIX-1（M-4 假安全感）**：★ oracle 读码发现 `doc_link_check.sh` 的 `PATH_CHECK_DOCS` **仅根级 3 文档** · 检查 1 只匹配 markdown 链接形态 · `SCAN_PATHS` **不含** `.rddf/` ⇒ ★ architect 原写的「MUST 与 `doc_link_check.sh` 同步修」= **假安全感** ⇒ ★ 改写为**诚实口径**（明写「本表条目当前零机检覆盖」+ 失效检测 = 纯人工）+ 连带顺 §7 残留 ⑩ 的措辞（★ 避免两处口径打架）
+- ★ **SHOULD_FIX-2**：§0.2 补上游 `HIERARCHICAL-RTL-AUTHORING-GUIDE.md`（★ 其 D1 = r.11 的上游同源纪律 · D2 = **ADR-091 v1.16 订正③ 的上游依据**）+ `COMPONENT-LIFECYCLE-GUIDE.md`；§0.1 路径 2 追加上游写作指南
+- ★ NIT ×5：§0.1 补「门禁红了怎么排查」路径 · `adr.md` 行删「§2.4 统计口径」（★ 那不是层次化内容）· §0.3「当前态快照」行改「权威（实施中）」· M-2 补「改名方 SHOULD 反向 grep」· §0.2 上游行的 D1/D2/D4 映射降险（★ 明示「仅供定位 · 以各文档正文为准」）
+
+★ **critic 的 finding（1 SHOULD_FIX + 2 NIT）已全修**：
+- ★ **SHOULD_FIX（M-5 vs §0.2 状态列冲突 · ★ 真问题）**：★ §0.2 状态列承载的恰是**最高频**状态（ADR-094 Proposed · K34~K36 待起草 · 3 个 change proposed/待立项）⇒ ★ 而 M-5 说「本文件不再承载需高频刷新的状态」+ M-2 触发面只含「新增/删除/改名」⇒ ★ ⇒ architect 要么被迫追 builder 事件（★ 正是 §0 引言要防的「高频内容拖累低频内容」），要么状态列静默腐化 ⇒ ★ **三条同改**：★ ① 状态列表头降级为「dated · 活状态以该权威文档头部为准」★ ② M-2 触发面扩到「**状态翻转**」★ ③ M-5 明写「architect MUST NOT 为追平 builder/planner 状态事件而维护本表」
+- ★ NIT-1：上游 authoring guide 行的条款映射降险（★ 明示「仅供定位」）
+- ★ NIT-2：文件标题体现「入口」
+
+### 7h.5 ★ 门禁事件（★ 真实事件，非工具误报）
+
+★ 中途 `doc_link_check.sh` 报 **1 broken**：★ architect 在 M-4 里写的**说明性示例**（markdown 链接形态的字面示例）**被检查 1 的正则当成了真链接** ⇒ ★ 已改写为纯描述（★ 不给字面示例）⇒ ★ 复跑 ✅ 0 broken。
+⇒ ★ **教训**：★ 在本仓写「链接形态示例」时 MUST 避开检查 1 的正则形态，★ 否则**自己的说明会变成断链**。
+
+### 7h.6 ★ 落地清单
+
+| 文件 | 改动 |
+|---|---|
+| `docs/architecture/hierarchical-plugin-architecture.md` | ★ 新增 **§0 导航层**（0.1 阅读路径 9 条 · 0.2 文档全景表 18 行 · 0.3 权威分布表 7 面 · 0.4 M-1~M-5）· ★ 头部加「本文在体系中的位置」声明 · ★ 标题加「入口」· ★ 修断链（§K17~§K36 ⇒ §K17~§K33）· ★ §7 残留 8 ⇒ **11 条**（⑨ 反向可达 ✅已闭合 · ⑩ 无门禁 ⚠️归 builder · ⑪ `ip/cpu/core/` 零 `.md` ⚠️归 builder）· ★ §11 治理状态更新 |
+| `docs/architecture/adr/ADR-091-...md` | ★ §Related 加 2 行（ADR-094 = 装配唯一权威 · 主题文档 = 导航入口）⇒ ★ **回指 3 → 5** |
+| `docs/architecture/parity-gate-contract.md` | ★ 头部加 1 行（导航入口指针 + 「本文件是门禁面唯一权威 · 不承载装配与命名规则」） |
+
+★ **门禁**：`verify_adr.sh` ✅（33 / 0 STALE / 0 FAILED）· `doc_link_check.sh` ✅ 0 broken。
