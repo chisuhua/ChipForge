@@ -3,7 +3,7 @@
 > ★ **本文件 = 架构主题文档**：只承载**当前态快照** · **下游需求** · **目标形态的结构事实** · **已知残留**。
 > ★ **决策不在这里** ⇒ 决策在 **[`ADR-094`](adr/ADR-094-chmem-hierarchical-assembly-contract.md)**（装配契约 / 粒度 / 端口纪律 / 交付定位 / `chlib` 边界 / 迁移顺序）与 **[`ADR-091`](adr/ADR-091-chmem-open-core-port-architecture.md) v1.16**（两层范式 / 硬约束 / 观测量载体）⇒ ★ 本文件只**引用**，MUST NOT 重述条款（★ 避免两处全文 ⇒ 必然漂移）。
 > ★ **过程日志**（议题 / 裁决 / 审稿）⇒ `.rddf/reviews/ADR-094-decision-ledger.md`（台账）· `.rddf/reviews/ADR-094-hierarchical-assembly-contract-review.md`（审稿记录）。
-> ★ ★ **本文在体系中的位置（2026-11-07 补 · 入口层）**：★ 本文件是**层次化 Plugin 主题的导航入口**（★ §0）⇒ ★ 读者**从本文出发**即可定位全部相关文档；但 ★ **本文件不是权威入口** —— ★ **权威分布** = **决策** → ADR-094 / ADR-091 · ★ **门禁面** → `parity-gate-contract.md` · ★ **推导证据** → plan / 台账 · ★ **实施面** → openspec change 的 `tasks.md` · ★ **上游机制** → CppHDL ADR-058~062 ⇒ ★ 本文件 §1~§11 只承载**当前态快照 + 结构事实 + 需求 + 残留**，★ **MUST NOT** 与上述权威文档重述同一结论。
+> ★ ★ **本文在体系中的位置（2026-11-07 · 入口层）**：★ 本文件是**层次化 Plugin 的「真相导航入口」**（★ §0）⇒ ★ 读者**从本文出发**即可定位**全部真相**（★ **六类**：决策 / 契约 / **实现** / **上游** / **运行时** / 证据 —— ★ 真相**不只在文档里**）⇒ ★ 每条真相带**可复核锚点** + **时效标记**；但 ★ **本文件不是权威入口** —— ★ **权威分布** = **决策** → ADR-094 / ADR-091 · ★ **契约** → `parity-gate-contract.md` · ★ **AC** → change `tasks.md` · ★ **推导证据** → plan / 台账 · ★ **上游** → CppHDL（★ **独立仓库** ⇒ 须锚定 commit）⇒ ★ 本文件 §1~§11 只承载**当前态快照 + 结构事实 + 需求 + 残留**，★ **MUST NOT** 与上述权威文档重述同一结论。
 
 - Date: 2026-11-07
 - Author: architect
@@ -17,7 +17,22 @@
 
 > ★ **本节 = 入口的唯一职责**：★ 「要查层次化 Plugin 的某件事 ⇒ 去哪篇」。★ **本节不含任何决策 / 结论**（★ 结论一律在 §0.3 指向的权威文档里）⇒ ★ 本节**可长期稳定**，而 §1~§11 随实施演进 ⇒ ★ 两者**更新频率不同 ⇒ 分离**（★ 防「高频内容拖累低频内容 ⇒ 整篇腐化」）。
 
-### 0.1 ★ 按意图的阅读路径（★ 「我想做 X ⇒ 读哪几篇」）
+### 0.1 ★ 真相的**六种类型**（★ 分类学 —— ★ 关键前提：**真相不只在文档里**）
+
+> ★ 「层次化 Plugin 的真相」**不止是 ADR 与契约文档** ⇒ ★ 漏了代码 / 上游 / 运行时 / 证据，就**不是**「所有真相的导航入口」⇒ ★ 故先立分类学，再列全景表。
+
+| 类 | 真相是什么 | ★ 权威形态 | ★ 锚点形态 | ★ 漂移方式（★ 决定该盯什么） |
+|---|---|---|---|---|
+| ① **决策真相** | 「该怎么做」 | ★ **单一权威文档** | 文档 + 版本 + Parent 版本 | 决策漂移 ⇒ ★ 须走**取代流程**（不得单方面改） |
+| ② **契约真相** | 「名字 / 载体 / 判据是什么」 | ★ **单一权威文档**（★ S-编号） | 文档 + **S-编号** | 契约漂移 ⇒ ★ 须改 S-编号（★ 改编号 = 改契约） |
+| ③ **实现真相** | 「代码现在**是**什么」 | ★ ★ **无单一真源**（★ 代码即真相） | 路径 + 行号 | ★ ★ **代码与决策不一致 ⇒ 这本身就是真相的一部分**（★ 不可掩盖） |
+| ④ **上游真相** | 「CppHDL 提供了什么」 | ★ **上游仓库**（★ 独立仓库 ⇒ 会漂移） | 路径 + ★ **commit** + ADR 版本 | ★ ★ **上游 rebase / 改写 ⇒ 我方文档静默失真**（★ 最隐蔽的一类） |
+| ⑤ **运行时真相** | 「跑出来是什么」 | ★ **每次运行产生**（★ 产物不持久；★ ★ **判据本身归 ② 契约真相** ⇒ 双轨：机制指针在本表 · 判据在契约文档） | 产物落点 + 判据脚本 | ★ 产物易过期 ⇒ ★ 入口只能指「**怎么产生 + 落在哪 + 判据是什么**」 |
+| ⑥ **证据真相** | 「为什么这么定」 | 证据链（★ 实测 + 变异对照） | plan 章节 + 探针路径 | ★ ★ **临时路径不持久 ⇒ 探针 MUST 入仓**（★ 否则证据不可复算） |
+
+> ★ **分类学边界（★ 堵读者疑问）**：★ **配置面**（`ip/*/configs/` + `params_schema.json`）归 **② 契约真相**（★ 配置面契约）；★ **测试语料 / ELF 语料** = **工具输入**、★ **不是**「X 是什么」的真相（★ 其判据仍归 ②）；★ **SoC 集成面** = ★ 本主题**显式排除**项（★ §7 残留 ③ ⇒ 跨 ctx 多 root 需另立 ADR）⇒ ★ 故不另立类。
+
+### 0.2 ★ 按意图的阅读路径（★ 「我想做 X ⇒ 读哪几篇」）
 
 | 意图 | 读这几篇（★ 按顺序） | 读完得到 |
 |---|---|---|
@@ -26,35 +41,69 @@
 | ★ **要改「契约名 ↔ 节点名」或观测** | ★ **`parity-gate-contract.md` S-17 / S-17.1 / S-10** → ★ **ADR-094 D-3**（端口归属 / 契约身份 / 命名纪律） | 登记簿 / manifest / provider / error_kind 的单一真源 |
 | ★ **要实施（builder）** | ★ 台账 **§9.2**（5 批 + 出口判据）→ plan **§K17~§K33**（推导证据）→ 对应 change 的 **`tasks.md`**（★ AC 权威） | 批次边界、判据、验收清单 |
 | ★ **要查上游机制**（归属 / 粒度 / 端口策略 / 等价性） | ★ 上游 **ADR-058~062**（全 Accepted）→ 上游主题文档 `CppHDL/docs/architecture/2026-11-02-hierarchical-rtl-output.md` | 上游侧的实现事实与决策依据 |
-| ★ **要判断「某条规则归谁」** | 本文 **§0.3 权威分布表** → 对应权威文档 | 避免误改错文档 |
+| ★ **要判断「某条规则归谁」** | 本文 **§0.4 权威分布表** → 对应权威文档 | 避免误改错文档 |
 | ★ **要查现有层 2 实例** | ★ `ip/cpu/core/regfile_chmem.h` · `regfile_bridge_chmem.h`（★ 唯一实例）→ ★ `tests/cpu/test_cpu_open_core_regfile.cpp` | 当前唯一的层 2 装配形态与其验证 |
-| ★ **要查未决 / 已知边界** | 本文 **§7**（残留 11 条） | 什么**没做**、什么**未核** |
+| ★ **要查未决 / 已知边界** | 本文 **§7**（残留 13 条） | 什么**没做**、什么**未核** |
+| ★ **要查「真相在哪 / 有没有被更新过」** | 本文 **§0.3 真相全景表**（★ 每条带**锚点** + **时效**）⇒ ★ 六类真相分别指向不同形态的权威 | ★ 定位到真相本体 + 判断它可不可信 |
 | ★ **门禁红了怎么排查** | ★ **`parity-gate-contract.md` S-10**（`error_kind` 允许取值清单）→ **S-17 REG-3**（两道机械闸）→ **S-17 REG-4**（allowlist 治理）→ 本文 **§4**（归属↔语义耦合） | 按 `error_kind` 定位失败类别 ⇒ 对应闸与判据 |
 
-### 0.2 ★ 文档全景表（★ 按「哪一层」分类 · ★ 覆盖全部相关文档）
+### 0.3 ★ 真相全景表（★ 按 **§0.1 六类真相** 分类 · ★ 每条带**锚点** + **时效**）
 
-| 层 | 文档 | 承载什么 | 权威性 | ★ **状态（★ dated · ★ 活状态以该权威文档头部为准）** |
-|---|---|---|---|---|
-| ★ **决策** | `docs/architecture/adr/ADR-094-chmem-hierarchical-assembly-contract.md` | ★ **装配契约（G-1r r.1~r.16）** · 粒度 · 端口归属 / 契约身份 / 命名纪律 · `chlib` 边界 · 两阶段迁移 | ★ **权威** | 🚧 Proposed v0.1 |
-| ★ **决策** | `docs/architecture/adr/ADR-091-chmem-open-core-port-architecture.md` | 两层范式 · 硬约束 G-1a~G-1q · 观测量载体（§D3a.9）· §D5.1.3 G-1r 索引 | ★ **权威**（★ 装配部分让位 ADR-094） | ✅ Accepted v1.16 |
-| ★ **门禁契约** | `docs/architecture/parity-gate-contract.md` | ★ S-17 登记簿 / S-17.1 逻辑契约名清单 / S-10 error_kind / GN-1 | ★ **权威**（门禁面） | ✅ v1.8 |
-| ★ **注册表** | `docs/architecture/adr.md` | ADR-091 行（v1.16）· ADR-094 行（★ 层次化主题的**决策注册入口**） | 索引 | ✅ |
-| ★ **描述性总览** | `docs/architecture/overview.md` · `interface-design.md` | 总体架构 / 接口形态（含 v1.16 补注） | 描述（★ 非规则） | — |
-| ★ **推导证据** | `.rddf/plans/backend-parity-open-core.md` | ★ **§K17~§K33**（★ 实测约束与变异对照） | 证据（★ 非规则） | ★ **K34~K36 待 builder 起草** |
-| ★ **过程日志** | `.rddf/reviews/ADR-094-decision-ledger.md` | 17 议题 · 裁决 D-01~D-21 · §9 交接总览 | ★ **过程**（★ 不引用为规则） | ✅ |
-| ★ **过程日志** | `.rddf/reviews/ADR-094-hierarchical-assembly-contract-review.md` | 五轮 critic + oracle 终审的 finding 与处置 | ★ **过程** | ✅ |
-| ★ **实施面** | `openspec/changes/backend-parity-open-core/` | 开放核 change（★ `tasks.md` = **AC 权威**） | 实施 | proposed |
-| ★ **实施面** | `openspec/changes/parity-observation-ambiguity-fail-closed/` | C-1 三态化（★ 阶段 1 前置） | 实施 | proposed |
-| ★ **实施面** | `openspec/changes/chmem-hierarchical-assembly/` · `chmem-hierarchical-unit-landing/` | ★ ADR-094 的 2 个 change（★ **尚未立项** ⇒ 归 planner） | 实施 | ★ **待立项** |
-| ★ **实现面** | `ip/cpu/core/regfile_chmem.h` · `regfile_bridge_chmem.h` | ★ **层 2 唯一实例** + 其桥接 plugin | 代码 | ★ 现状 = 裸 `make_unique`（帧残留）· ★ **该目录 0 个 `.md`** ⇒ 残留 ⑪ |
-| ★ **验证面** | `tests/cpu/test_cpu_open_core_regfile.cpp` | 层 2 实例的验证 | 代码 | ✅ |
-| ★ **治理面** | `docs/architecture/adr/ADR-046/083/089/092/093` | 5 处 dated 注记 / 管辖域注记 / 编号撞名澄清 | ★ **注记**（★ 各自主文档的决策不变） | ✅ |
-| ★ **上游** | `CppHDL/docs/adr/ADR-058~062` | 层次化输出 / 归属命名 / 端口策略 / 粒度 / 单元接口类型 | ★ **上游权威** | ✅ 全 Accepted |
-| ★ **上游** | `CppHDL/docs/architecture/2026-11-02-hierarchical-rtl-output.md` | 上游版主题文档（含等价性 helper 等收口记录） | 上游描述 | ✅ 已转正 |
-| ★ **上游** | `CppHDL/docs/developer_guide/patterns/HIERARCHICAL-RTL-AUTHORING-GUIDE.md` | ★ **层次化 RTL 写作指南（用户视角）**：§1 **7 条纪律 D1~D7**（★ **D1** 子模块接口用 `ch_in`/`ch_out` 标量、禁 bundle 成员跨层；★ **D2** 子模块 `ch_out` 无人消费 ⇒ 污染扁平顶层端口表；★ **D4** 子模块每个输入 MUST 被显式驱动 —— ★ ★ **本行与本仓条款的对应关系仅供定位**（★ D1↔r.11 · D2↔ADR-091 v1.16 订正③ · D4↔r.5）⇒ ★ **以两份文档各自正文为准**，★ 本行不承载规则）+ §2 粒度（**ADR-061**）+ §3 三种写法风格 | 上游指南 | ✅ Active |
-| ★ **上游** | `CppHDL/docs/developer_guide/patterns/COMPONENT-LIFECYCLE-GUIDE.md` | `ch_device<T>`（独立模式）vs `ch_module<T>`（层次模式）生命周期与用法 ⇒ ★ 关联 **V-26 / V-30**（层 2 独立复用形态） | 上游指南 | ✅ Active |
+> ★ **读法**：★ 「**锚点**」= 读者据此**自己复核**该条真相的**具体位置**（路径 / 版本 / commit / S-编号 / 行号）⇒ ★ **MUST NOT** 代替读者下结论；★ 「**时效**」= 该锚点**什么时候核对过**（★ dated = 会过期的快照 ⇒ ★ 以权威文档头部为准）。
 
-### 0.3 ★ 权威分布表（★ 「同一主题只允许一处说了算」）
+#### ① 决策真相
+
+| 真相 | 锚点（★ 可复核） | 时效 |
+|---|---|---|
+| ★ **装配契约**（G-1r r.1~r.16 · 粒度 · 端口归属 / 契约身份 / 命名纪律 · `chlib` 边界 · 两阶段迁移） | `docs/architecture/adr/ADR-094-chmem-hierarchical-assembly-contract.md`（★ r.1~r.16 在 §Decision 表 · D-3 在 §Decision 表 · D-6 两阶段迁移表 · V-27~V-43 在 §Verification） | ★ 🚧 **Proposed v0.1**（★ 转正前置 = 治理收口：立项 + AC 回填） |
+| ★ **两层范式 / 硬约束 / 观测量载体** | `docs/architecture/adr/ADR-091-chmem-open-core-port-architecture.md`（★ G-1a~G-1q 在 §D5.1 · §D3a.7 接口载体 · §D3a.9 观测量载体 · §D5.1.3 = G-1r 索引） | ✅ Accepted **v1.16**（2026-11-07） |
+| ★ **上游 Parent 决策** | `CppHDL/docs/adr/ADR-058` **v2.17** · `ADR-059` **v2.3.2** · `ADR-060` **v1.15** · `ADR-061` **v1.6.4**（★ ★ Status 行 v1.6.4 · 版本史最新 v1.6.5（★ 决策零变更））· `ADR-062` **v1.4**（★ 全部 Accepted） | ★ **2026-11-07 核对**（★ ★ **上游独立仓库 ⇒ 版本号会变** ⇒ 见残留 ⑬） |
+| ★ **ADR 注册表** | `docs/architecture/adr.md`（★ ADR-091 行 · ADR-094 行 · ★ `verify_adr.sh` 机检其漂移） | ✅ 活（★ 机检） |
+
+#### ② 契约真相
+
+| 真相 | 锚点（★ 可复核） | 时效 |
+|---|---|---|
+| ★ **门禁面契约**（登记簿 / 逻辑契约名清单 / error_kind / 通用总则） | `docs/architecture/parity-gate-contract.md`（★ **S-17** 登记簿与 manifest · **S-17.1** 逻辑契约名清单（机器可读 JSON）· **S-10** `error_kind` 清单 · **GN-1** 通用总则） | ✅ **v1.8**（★ S-17 / S-17.1 **自 ADR-094 阶段 2 起生效**） |
+| ★ **验收判据（AC）** | ★ **change 的 `tasks.md`**（★ ADR-094 的 AC 映射 = **生成镜像**，MUST 由工具产出 + 机检相等） | ★ 随 change 生命周期（★ 2 个 change **尚未立项**） |
+
+#### ③ 实现真相（★ **无单一真源** —— 代码即真相）
+
+| 真相 | 锚点（★ 可复核） | 时效 |
+|---|---|---|
+| ★ **框架的顶层端口 / 装配面** | `include/cf/plugin/pipe_builder.h`（★ `:476` ctx 构造 · `:417` `elaborate()`（含自动 build）· `:538` / `:550` `declare_in/out` ⇒ ★ **顶层端口创建点 owner == nullptr**） | ★ **2026-11-07 读码**（★ ★ 阶段 2 后 owner 切换 ⇒ 此锚点语义将变） |
+| ★ **层 2 唯一实例 + 其桥接** | `ip/cpu/core/regfile_chmem.h`（★ 7 个标量端口）· `ip/cpu/core/regfile_bridge_chmem.h`（★ `:124` 裸 `make_unique` ⇒ **作用域帧残留**） | ★ **2026-11-07 读码**（★ ①-A~①-D 后必变 ⇒ ★ 本条**预期会过时** ⇒ 以 code 为准） |
+| ★ **观测解析（门禁侧）** | `tools/parity_runner/parity_sim_runner.cpp:249`（★ `resolve_node_id` = **精确名相等** ⇒ 阶段 1 前为唯一解析路径）· `tools/verilator_runner/`（★ 自建单文件 Verilator + `top__DOT__*` 穿透） | ★ **2026-11-07 读码**（★ C-1 三态化后变） |
+| ★ **层 2 实例的验证** | `tests/cpu/test_cpu_open_core_regfile.cpp` | ✅ 活（★ 随代码） |
+
+#### ④ 上游真相（★ 独立仓库 ⇒ 最易静默漂移）
+
+| 真相 | 锚点（★ 可复核） | 时效 |
+|---|---|---|
+| ★ **上游层次化机制（实现）** | `CppHDL/include/hierarchy_verilog.h`（`toVerilogHierarchical`）· `CppHDL/src/hierarchy_analysis.cpp`（★ 前置校验 + 归属空洞）· `CppHDL/src/core/lnodeimpl.cpp`（★ 节点名无条件前缀）· `CppHDL/src/component.cpp`（★ `node_owner` / `add_child`）· `CppHDL/include/core/io.h`（★ 4 处方向守卫） | ★ ★ **锚定 commit `824e2d0`**（★ **核对过的** commit，★ **不是**「当前 HEAD」——★ **写「当前 HEAD」是注定过期的写法**）⇒ ★ ★ **实测：落笔 20 分钟内上游 HEAD 推进 3 次**（`824e2d0` → `afdcab9` → `6c43d05` → `9f2986f`，★ 全是 planner 文档面）⇒ ★ ★ **但层次化实现与 5 ADR 自 `824e2d0` 起 `git diff --stat` 为空 ⇒ 锚点语义仍成立**（★ 残留 ⑬） |
+| ★ **上游写作指南（用户视角）** | `CppHDL/docs/developer_guide/patterns/HIERARCHICAL-RTL-AUTHORING-GUIDE.md`（★ §1 **7 条纪律 D1~D7**）· `COMPONENT-LIFECYCLE-GUIDE.md`（★ `ch_device` vs `ch_module`） | ✅ Active（★ 同 commit 锚） |
+| ★ **上游主题文档** | `CppHDL/docs/architecture/2026-11-02-hierarchical-rtl-output.md`（★ 含等价性 helper 等收口记录） | ✅ 已转正（★ 同 commit 锚） |
+
+#### ⑤ 运行时真相（★ 每次运行产生 ⇒ 入口只指「怎么产生 + 落在哪 + 判据」）
+
+| 真相 | 锚点（★ 可复核） | 时效 |
+|---|---|---|
+| ★ **回归判定器（fail-closed）** | `tools/run_catch2_with_baseline.sh`（★ 失败集合 ⊆ 清单 ⇒ 退出码 0；⊋ ⇒ 非 0）· `tools/baseline_known_failures.txt`（★ 已知失败基线，★ 每条 MUST 附根因 + owner + 收敛期限） | ★ **每次运行产生**（★ 清单本身也要被 review） |
+| ★ **双后端差分门禁** | `tools/parity/parity_gate.py` · `parity_report.py` · `parity_replay.py` | ★ 每次运行产生 |
+| ★ **架构漂移 / 移植性门禁** | `tools/verify_adr.sh`（★ ADR 漂移）· `tools/check_plugin_portability.sh`（★ ADR-040 移植性）· `tools/verify_no_ghost_refs.sh` | ★ 每次运行产生 |
+| ★ **门禁判定口径的书面契约** | `docs/architecture/parity-gate-contract.md`（★ S-1 / S-9a / S-16 等） | ✅ v1.8 |
+
+#### ⑥ 证据真相（★ 「为什么这么定」）
+
+| 真相 | 锚点（★ 可复核） | 时效 |
+|---|---|---|
+| ★ **实测约束与变异对照** | `.rddf/plans/backend-parity-open-core.md` **§K17~§K33**（★ ★ **K34~K36 待 builder 起草**） | ★ dated（★ 逐条带 file:line + 变异对照） |
+| ★ **议题与裁决台账** | `.rddf/reviews/ADR-094-decision-ledger.md`（★ 17 议题 · 裁决 D-01~D-21 · §9 交接总览） | ✅ |
+| ★ **审稿记录** | `.rddf/reviews/ADR-094-hierarchical-assembly-contract-review.md`（★ 五轮 critic + oracle 终审 + §7g 落笔后终审 + §7h 导航层轮） | ✅ |
+| ★ **可复算探针** | ★ ⚠️ **A-1 的探针脚本已在会话临时目录中失效**（★ `/tmp/opencode/probe_scope.cpp` **不存在**）⇒ ★ ★ **结论可复核（§9 描述 + `regfile_bridge_chmem.h:124` + 上游 `component.h:140-156`）⇒ 但脚本本身不可复算** ⇒ ★ **MUST 随 ①-A 固化入仓**（★ 归 builder · 残留 ⑫） | ★ ⚠️ **已失效**（★ 2026-11-07 实测） |
+| ★ **上游探针** | `CppHDL/docs/architecture/2026-11-02-hierarchical-rtl-output.md` §9（★ 附录 A —— 可复算的归属探针） | ✅ 上游已入仓（★ ★ 对照：★ 我方 A-1 **未**入仓 ⇒ 差距） |
+
+### 0.4 ★ 权威分布表（★ 「唯一权威」= 同一主题只允许一处说了算；★ ★ **唯一例外 = 实现真相**：★ 无单一真源 ⇒ **代码即真相**）
 
 | 主题面 | ★ 唯一权威 | ★ 其余文档的角色 |
 |---|---|---|
@@ -64,17 +113,22 @@
 | 推导与证据 | **plan §K17~§K33** + 台账 | ADR / 主题文档只引用结论 |
 | 验收判据（AC） | ★ **change 的 `tasks.md`** | ADR 侧 = **生成镜像**（MUST 由工具产出） |
 | 上游机制 | **CppHDL ADR-058~062** | 本仓 ADR 只承接与澄清 |
-| ★ **当前态快照** | ★ **权威（实施中）= 实施面**（`tasks.md` / plan）⇒ ★ **实施批次落地后即以实施面为准** | ★ 本文件 §1 = **截至 2026-11-07 的 dated 快照**（★ 实施前的事实）⇒ ★ **不由 builder 持续维护**（★ 防职责冲突 ⇒ 防腐化） |
+| ★ **实现真相**（★ 代码现在**是**什么） | ★ ★ **无单一真源** —— ★ **代码即真相** | ★ 代码与决策不一致 ⇒ ★ **偏差本身就是真相的一部分**（★ 不得掩盖）⇒ ★ 本文件 §1.2 只**陈述**当前偏差（如裸 `make_unique` ⇒ 帧残留）⇒ ★ ★ **★ 但「偏差 = 真相」≠「偏差 = 合理」**：★ 该偏差同时是**待消解的债**（★ 权威 = **ADR-094 D-6 批次 ①-A~①-D** · 判据 = **V-40 变异对照**）⇒ ★ ★ 承认违规事实 ≠ 许可违规 |
+| ★ **运行时真相**（跑出来是什么） | ★ **判据脚本 + 产物落点**（★ 产物每次运行产生 ⇒ 不持久） | ★ 入口只指「怎么产生 + 落在哪 + 判据」⇒ ★ **不指具体某次结果** |
+| ★ **证据真相**（为什么这么定） | ★ **plan §K17~§K33** + 台账 + 审稿记录 | ★ dated（★ 逐条带 file:line + 变异对照）⇒ ★ 探针**必须入仓**才可复算 |
+| ★ **当前态快照**（★ ★ **非 §0.1 六类之一** = ★ 本文件 §1~§11 的**角色定位**声明） | ★ **权威（实施中）= 实施面**（`tasks.md` / plan）⇒ ★ **实施批次落地后即以实施面为准** | ★ 本文件 §1 = **截至 2026-11-07 的 dated 快照**（★ 实施前的事实）⇒ ★ **不由 builder 持续维护**（★ 防职责冲突 ⇒ 防腐化） |
 
-### 0.4 ★ 导航表的维护规则（★ 防腐化）
+### 0.5 ★ 导航表的维护规则（★ 防腐化）
 
 | 规则 | 内容 |
 |---|---|
 | ★ **M-1 单一真源** | ★ 本表是**指针表** ⇒ **MUST NOT** 在此重述任何权威文档的结论（★ 重述 = 必然漂移） |
-| ★ **M-2 变更触发** | ★ 新增 / 删除 / 改名 / **状态翻转**（★ 如 ADR-094 转 Accepted、change 立项）**任一相关文档** ⇒ MUST 同步本表（★ 判据：★ 该文档是否被 §0.1 任一阅读路径或 §0.3 任一权威面触及）· ★ ★ **无触发机制** ⇒ ★ **改名 / 状态变更方 SHOULD 反向 grep 本文件**（★ `grep -rn "<旧名>" docs/ .rddf/ openspec/`）⇒ ★ 最低成本纪律 |
+| ★ **M-2 变更触发** | ★ 新增 / 删除 / 改名 / **状态翻转**（★ 如 ADR-094 转 Accepted、change 立项）**任一相关文档** ⇒ MUST 同步本表（★ 判据：★ 该文档是否被 §0.2 任一阅读路径或 §0.4 任一权威面触及）· ★ ★ **无触发机制** ⇒ ★ **改名 / 状态变更方 SHOULD 反向 grep 本文件**（★ `grep -rn "<旧名>" docs/ .rddf/ openspec/`）⇒ ★ 最低成本纪律 |
 | ★ **M-3 反向可达** | ★ 任一相关文档 SHOULD 在其「Related / 关联」段回指本文件 ⇒ ★ **读者从任一入口进入 ⇒ 都能找到本文件**（★ 当前仅 3 处回指 ⇒ ★ 缺口见 §7 残留 ⑨） |
 | ★ **M-4 失效检测（★ 诚实口径 · 无门禁兜底）** | ★ ⚠️ **本表条目当前零机检覆盖** —— ★ `tools/doc_link_check.sh` 的**检查 2（反引号路径）仅覆盖根级 3 文档**（`AGENTS.md` / `README.md` / `CONTRIBUTING.md`）· ★ **检查 1 只认 markdown 链接语法**（★ 形如「方括号文本 + 紧接圆括号路径」的 `.md` 链接 ⇒ ★ 本表条目**不是**该形态 ⇒ 不被覆盖） · ★ `SCAN_PATHS` **不含** `.rddf/` ⇒ ⇒ ★ 本表条目**既不被正向检查、也不被反向检查覆盖** ⇒ ★ **失效检测 = 纯人工**（★ 复查本表时逐条 `ls` 一次）⇒ ★ 机检方案见 §7 残留 ⑩ |
-| ★ **M-5 更新归属** | ★ 本节（§0）由 **architect** 维护（★ 低频）；★ §1~§11 的**结论性内容**归各权威文档 ⇒ ★ ★ **本文件不再承载需高频刷新的状态** ⇒ ★ **§0.2 状态列 = dated 快照**（★ 见该列表头）⇒ ★ **architect MUST NOT 为追平 builder / planner 的状态事件而维护本表**（★ 那正是 §0 引言要防的「高频内容拖累低频内容」）⇒ ★ **状态以各权威文档头部为准** |
+| ★ **M-6 锚点维护（★ 真相入口的生命线）** | ★ §0.3 每条真相 MUST 带**可复核锚点**（路径 + 版本 / commit / S-编号 / 行号）⇒ ★ **锚点失效 = 该条真相不可核实** ⇒ ★ ★ **锚点 MUST 与被指对象同步更新**（★ 文档改名 / 版本推进 / 上游 commit 变 / 代码行号移位 ⇒ 同步改锚点）⇒ ★ 「时效」列的 dated 值 = **上次核对日期** ⇒ ★ **dated 越久 ⇒ 越不可信** |
+| ★ **M-7 上游漂移守卫（★ 独立仓库专项）** | ★ 上游 CppHDL 是**独立仓库** ⇒ ★ 我方文档引用上游时 **MUST 带 commit 锚点**（★ 单写「全 Accepted」= **不可核实**）⇒ ★ ★ **上游 HEAD 变化时 MUST 复核受影响的锚点**（★ 触发 = 上游 rebase / 新 commit 改写层次化实现）⇒ ★ ★ **已实证一次漂移**：★ 台账记录的 `dbc9801` → ★ 实际 HEAD `824e2d0`（★ 2026-11-07 实测）⇒ ★ 该漂移**未影响任何决策**（★ 差异在 planner 文档面）⇒ 但**机制缺口成立** ⇒ 残留 ⑬ |
+| ★ **M-5 更新归属** | ★ 本节（§0）由 **architect** 维护（★ 低频）；★ §1~§11 的**结论性内容**归各权威文档 ⇒ ★ ★ **本文件不再承载需高频刷新的状态** ⇒ ★ **§0.3 状态列 = dated 快照**（★ 见该列表头）⇒ ★ **architect MUST NOT 为追平 builder / planner 的状态事件而维护本表**（★ 那正是 §0 引言要防的「高频内容拖累低频内容」）⇒ ★ **状态以各权威文档头部为准** |
 
 ---
 
@@ -123,7 +177,7 @@
 | **N1** | ★ 层 2 单元 MUST 能成为**独立 Verilog module**（交付 / 可单独综合 / 可复用） | 上游 ADR-058（层次化输出） | ADR-094 D-1/D-2 |
 | **N2** | ★ 装配点**可无 active parent** ⇒ 「成层判定」与「装配点」**解耦**；★ 但组件 MUST 登记进组件树（否则上游 FATAL） | 上游 ADR-061 决策⑥ · `hierarchy_analysis.cpp:211-227` | ADR-094 r.2 / r.7 |
 | **N3** | ★ Component MUST 共用**宿主的 ctx**（子 ctx ⇒ node-id aliasing ⇒ 组件 output 端口从 simulator `data_map` 消失 ⇒ 观测静默读不到） | 上游 `CppHDL/include/device.h:12-19`（上游自己踩过） | ADR-091 **G-1p** · ADR-094 r.3 |
-| **N4** | ★ 顶层端口名 MUST NOT 与内部 `ch_reg` / `ch_node` 同名（★ **v1.16 扩面**：判定对象 = **ctx 节点名** vs **顶层端口名**） | `CppHDL/src/codegen_verilog.cpp:64-76`（全局去重 ⇒ 重名者加 `_N` ⇒ 端口被改名 ⇒ 两后端端口名不一致） | ADR-091 **G-1o** · ADR-094 D-3.6 |
+| **N4** | ★ 顶层端口名 MUST NOT 与内部 `ch_reg` / `ch_node` 同名（★ **v1.16 扩面**：判定对象 = **ctx 节点名** vs **顶层端口名**） | ★ `CppHDL/include/codegen_naming.h:72-88`（★ **`build_verilog_name_table` = 全局去重的真实实现**：★ 同 base 名 ⇒ 加 `_N` ⇒ 端口被改名 ⇒ 两后端端口名不一致）· `CppHDL/src/codegen_verilog.cpp:71-79`（★ 扁平端口收集） | ADR-091 **G-1o** · ADR-094 D-3.6 |
 | **N5** | ★ **节点名唯一性** MUST 有 **opt-in** 的创建期 fail-fast（解释器侧不改名 / Verilator 侧改名 ⇒ 按名解析会**静默采到错节点**） | 上游 `NodeNamePolicy::kRejectDuplicates`（`CppHDL/include/core/context.h:51-55`，已实现） | ADR-091 **G-1o** / V-25 · ADR-094 D-6 阶段 1 |
 | **N6** | ★ **公共头 ODR 安全**（★ 上游**已修**：`build_hierarchical_name` 移到 `component.h:266` 且 `inline`）⇒ ★ ChipForge 的 G-1b **换根**（ODR 根消失 ⇒ 理由 = include 面最小化 + `ch::detail` 命名二义） | `CppHDL/include/component.h:266` | ADR-091 **G-1b** · ADR-094 **V-34** |
 | **N7** | ★ 观测 MUST 按**逻辑契约名**解析（★ 不再要求「契约名 == ctx 节点名」）⇒ ⇒ 契约身份与节点名**解耦** | 上游 `ch_device` 的顶层端口**本身就带 `top_` 前缀**（`top.<port>` → `top_<port>`）⇒ ★ 「裸名」是 ChipForge 侧约定 | ADR-094 **D-3.1~D-3.9** · 契约文档 **S-17 / S-17.1** |
@@ -256,9 +310,11 @@
 | ⑥ | ★ **层次化路径在既有语料上零覆盖**（★ 上游**已收口其自身**的等价性语料，但★ **仅限 5 个专用 DUT**；★ **ChipForge 侧**仍**从零开始**、既有语料零覆盖） | ⚠️ 已知边界 |
 | ⑦ | ★ ADR-046 §1.2 的「`ch_state_machine` 不能在 simulator 内推进」为**过时陈述**（★ 已附 dated 注 + 2026-11-07 实测）⇒ ★ 正式订正待其下次修订 | ⚠️ 已登记 |
 | ⑧ | ★ `docs/architecture/adr.md` §2.4 统计**截止 ADR-086**（★ ADR-087 起未纳入）⇒ ★ 口径已显式登记，★ 补登归 backlog | ⚠️ 已登记 |
-| ⑨ | ★ **反向可达性不完整**（★ 2026-11-07 补录 · 入口化后暴露）：★ 当前**仅 3 处**回指本文件（ADR-094 §Related · `overview.md` · `interface-design.md`）⇒ ★ **ADR-091 自身未回指**（★ 其 Related 列了 7 个 ADR + 契约文档，唯独未列 ADR-094 与本文件）· ★ **`parity-gate-contract.md` 未回指** ⇒ ★ 读者从「两层范式权威」或「门禁契约权威」这两个最可能入口进入 ⇒ **走到死路** ⇒ ★ 违反 §0.4 **M-3** | ✅ **已闭合**（2026-11-07：★ ADR-091 §Related 补 ADR-094 + 本文件两条 · ★ 契约文档头部补导航入口一行 ⇒ ★ 回指方 **3 → 5**） |
+| ⑨ | ★ **反向可达性不完整**（★ 2026-11-07 补录 · 入口化后暴露）：★ 当前**仅 3 处**回指本文件（ADR-094 §Related · `overview.md` · `interface-design.md`）⇒ ★ **ADR-091 自身未回指**（★ 其 Related 列了 7 个 ADR + 契约文档，唯独未列 ADR-094 与本文件）· ★ **`parity-gate-contract.md` 未回指** ⇒ ★ 读者从「两层范式权威」或「门禁契约权威」这两个最可能入口进入 ⇒ **走到死路** ⇒ ★ 违反 §0.5 **M-3** | ✅ **已闭合**（2026-11-07：★ ADR-091 §Related 补 ADR-094 + 本文件两条 · ★ 契约文档头部补导航入口一行 ⇒ ★ 回指方 **3 → 5**） |
+| ⑩ | ★ **导航表无反向完备性门禁**：★ `tools/doc_link_check.sh` 只查**正向**断链（文档内引用的路径是否存在）⇒ ★ **无法发现「相关文档未被入口收录」或「入口表条目已失效但未被引用」** ⇒ ★ ★ **且 §0 全景表条目本身也不被覆盖**（★ `doc_link_check.sh` 检查 2 仅根级 3 文档 · 检查 1 只查 markdown 链接 · `SCAN_PATHS` 不含 `.rddf/`）⇒ ★ ⇒ 本表**正向与反向均无机检** ⇒ ★ 当前缓解 = §0.5 **M-2/M-4** 的人工纪律（★ 无机检）⇒ ★ 候选 = 在 `doc_link_check.sh` 增加「§0 全景表条目 ⇒ 路径必须存在」的单向校验（★ **低成本**，★ 不需反向可达判定） | ⚠️ **未建**（★ 归 builder：★ architect 不写 `tools/`） |
 | ⑪ | ★ **层 2 唯一实例的实现目录无文档落点**：★ `ip/cpu/core/` 下 **8 个头文件、0 个 `.md`**（★ 唯一层 2 实例 `RegFileComponent` + 其桥接 plugin 都在这里）⇒ ★ ★ **§0 导航层能指到代码，但代码侧无任何自述文档** ⇒ ★ 「装配形态为何是裸 `make_unique`」「为何裸 `make_unique` 是错的」这两条知识**只存在于本文件 §1.2 与 ADR-094** ⇒ ★ **实现侧读者无就近落点** ⇒ ★ 候选 = `ip/cpu/core/README.md`（★ ★ **归 builder**：★ `ip/cpu/core/` 不在 architect 的 `arch_paths` 内 ⇒ ★ architect 不写） | ⚠️ **未建**（★ 归 builder） |
-| ⑩ | ★ **导航表无反向完备性门禁**：★ `tools/doc_link_check.sh` 只查**正向**断链（文档内引用的路径是否存在）⇒ ★ **无法发现「相关文档未被入口收录」或「入口表条目已失效但未被引用」** ⇒ ★ ★ **且 §0 全景表条目本身也不被覆盖**（★ `doc_link_check.sh` 检查 2 仅根级 3 文档 · 检查 1 只查 markdown 链接 · `SCAN_PATHS` 不含 `.rddf/`）⇒ ★ ⇒ 本表**正向与反向均无机检** ⇒ ★ 当前缓解 = §0.4 **M-2/M-4** 的人工纪律（★ 无机检）⇒ ★ 候选 = 在 `doc_link_check.sh` 增加「§0 全景表条目 ⇒ 路径必须存在」的单向校验（★ **低成本**，★ 不需反向可达判定） | ⚠️ **未建**（★ 归 builder：★ architect 不写 `tools/`） |
+| ⑫ | ★ **探针 A-1 的脚本已失效**（★ 2026-11-07 实测：`/tmp/opencode/probe_scope.cpp` **不存在**）⇒ ★ **证据不可复算**（★ 结论仍可由三条独立依据复核 ⇒ 见 §9）⇒ ★ ★ **MUST 随 ①-A 把探针固化入仓**（★ 归 builder：★ architect 不写 `tests/`）⇒ ★ 对照：★ **上游的探针已入仓**（`CppHDL/docs/architecture/2026-11-02-hierarchical-rtl-output.md` §9）⇒ ★ 我方是**明确落后项** | ⚠️ **已失效**（★ 归 builder） |
+| ⑬ | ★ **上游 commit 锚点漂移（★ 已实证一次）**：★ 台账 §6 记录的复核依据 = 上游 HEAD `dbc9801`（2026-11-06）⇒ ★ **2026-11-07 实测实际 HEAD = `824e2d0`** ⇒ ★ 差异落在上游 planner 文档面（`improvement v4` 等）⇒ ★ **未影响任何决策**（★ 本仓 ADR 的 Parent 行锚的是 **ADR 版本号** `v2.17` / `v2.3.2` / `v1.15` / `v1.6.4` / `v1.4` ⇒ **不受影响**）⇒ ★ 但 ★ **机制缺口成立**：★ 「上游 = 独立仓库 + 无版本闸」⇒ ★ 任何依赖上游实现细节的锚点都会静默漂移 ⇒ ★ 已在 §0.5 **M-7** 立守卫（引用上游 MUST 带 commit）⇒ ★ ★ **残余缺口 = 守卫无触发器**（★ 上游 HEAD 变了，谁来提醒？）⇒ ★ 候选 = CI 定期比对上游 HEAD 并在漂移时报出（★ 归 builder）⇒ ★ ★ **★ 二次实证（同一落笔会话内）**：★ oracle 审查期间上游 HEAD **又推进 2 次**（`824e2d0` → `afdcab9` → `6c43d05` → `9f2986f`）⇒ ★ ⇒ ★ **「上游 HEAD 持续漂移」不是理论风险，是每 20 分钟发生一次的事实** ⇒ ★ ⇒ ★ **锚点必须写「核对过的 commit」而非「当前 HEAD」**（★ 已在 §0.3 ④ 改正）⇒ ★ **仍需触发器** | ⚠️ **已实证两次**（★ 守卫已立 · 触发器未建） |
 
 ---
 
@@ -284,7 +340,8 @@
 | **A-2** | ★ **节点名无条件前缀**：`lnodeimpl` 的 `parent_ != nullptr ⇒ name_ = parent_->name() + "." + name` | ★ 与「组件侧 `build_hierarchical_name` 会跳空父路径前缀」**不一致** ⇒ ★ 上游回执候选（U-5） |
 | **A-3** | ★ **FSM 私有 ctx**：`multi_cycle_fsm.h:93` / `mul_div_fsm_chmem.h:108` 的 `new ch::core::context(...)` | ★ **FSM 状态不在宿主 ctx** ⇒ ★ 层次化分析看不见（残留 ④） |
 
-★ 探针脚本位置：★ A-1 已在会话中实测（★ 临时路径 `/tmp/opencode/probe_scope.cpp`）⇒ ★ **随 ①-A 固化入仓**（★ 理由：上游主题文档 §9 的教训 —— **临时目录的探针不可复算** ⇒ 探针 MUST 入仓才能作为判据）⇒ ★ **A-2 / A-3 为读码结论，未跑探针**（★ 诚实标注）。
+★ ★ **探针脚本的可复算性（★ 2026-11-07 实测复核）**：★ A-1 曾在会话临时路径 `/tmp/opencode/probe_scope.cpp` 实测通过，★ 但 **该路径已失效（2026-11-07 复核：`test -f` 判定不存在）** ⇒ ★ ⇒ **A-1 的脚本当前不可复算**；★ ★ **但 A-1 的结论仍可复核**（三条独立依据：★ ① `ip/cpu/core/regfile_bridge_chmem.h:124` 的裸 `make_unique` 读码 · ② 上游 `CppHDL/include/component.h:140-156` 明写「直接构造 ⇒ 帧保留到析构」· ③ 上游 `CppHDL/src/component.cpp` 的 `node_owner` 实现）⇒ ★ **结论有效、脚本待补** ⇒ ★ **MUST 随 ①-A 固化入仓**（★ 理由 = 上游主题文档 §9 的教训 —— **临时目录的探针不可复算** ⇒ 探针 MUST 入仓才能作为判据）⇒ ★ 归 builder（★ 残留 ⑫）。
+★ **A-2 / A-3 为读码结论，未跑探针**（★ 诚实标注）⇒ ★ A-3（FSM 私有 ctx）**至今未实测**（★ 残留 ④）。
 
 ---
 
