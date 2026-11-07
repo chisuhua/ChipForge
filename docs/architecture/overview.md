@@ -175,6 +175,8 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 
 > ★ **层次区分（ADR-092 §D4 / ADR-091 §D3a.1）**：★ **核内 stage 间** = `Payload<T>` + `PipeNode`（无握手，同拍数据通路）· ★ **IP 之间 / 核 ↔ 从设备** = ★ **CppHDL 的 `ch_stream<T>`**（带 `valid`/`ready` 握手）⇒ ★ **两者层次不同，不是竞争关系** ⇒ MUST NOT 以「采用 `ch_stream`」为理由删除 `Payload<T>`。
 
+> ★ **v1.16 补注（2026-11-07 · ADR-094）**：★ 层次区分的**第三档**已补齐 —— ★ **层 2 单元（`ch::Component`）的接口 = 逐字段标量端口**（★ **MUST NOT** 用 bundle / `ch_stream` 作单元接口：★ bundle 成员是 `type_proxy`、不是端口 ⇒ 被上游接口白名单排除；★ `ch_in<ch_stream<…>>` 会退化成**整宽 blob 的单个 `type_input`** ⇒ 语义空壳）⇒ ★ 决策见 **ADR-094 r.11 / r.16 / D-5**；★ **层次化 Plugin 的结构事实**见 [`hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)（★ 本文件只记当前态，★ 决策不在此）。
+
 > **历史背景**（Phase 1 早期）：本节之前描述了"CppHDL `__input(Bundle)` / `__output(Bundle)` 定义 RTL 端口"——这是 Phase 5 RTL 实体模型描述方式。在 Plugin-style + CH_MEM 架构下，**不再需要手工桥接**：业务代码用 `Payload<T>` 即可，CH_MEM 模式经 `pb.elaborate(ctx)` 自动产生 stage 间连接。
 
 ### SoC 层是 IP 组合器
