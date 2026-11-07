@@ -11,7 +11,8 @@
     "docs/architecture/roadmap-evolution.md",
     "ip/cpu/docs/adr",
     "ip/mmu/docs/adr",
-    "ip/cache/docs/adr"
+    "ip/cache/docs/adr",
+    "docs/architecture/hierarchical-plugin-architecture.md"
   ],
   "exclude_paths": [
     "docs/architecture/tlm-coverage-parity-ledger.md",
@@ -19,6 +20,6 @@
     "build",
     "3rdparty"
   ],
-  "updated_at": "2026-10-27",
+  "updated_at": "2026-11-07",
   "updated_by": "architect"
 }
