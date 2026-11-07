@@ -97,13 +97,16 @@ Plugin-style 不再使用 `ImplMode` enum（该 enum 在 doc-code-realignment 20
 | **TLM**（默认，兼容） | 不加 flag | POD (`uint8_t`/`uint16_t`/`uint32_t`/`uint64_t`) | `pb.run()` 每周期执行 | 最快（~0.6s 全套） |
 | **CH_MEM**（v0.3.0+ 新正道，ADR-040 v2.0） | `-DCF_PLUGIN_USE_CH_MEM` | `ch::core::ch_uint<N>` | `pb.elaborate(ctx)` 一次性发射 lnode DAG | 较慢（含 PoC 验证 ~300s） |
 
-**CH_MEM 模式下可选后端**（运行时选择）：
+> ★ ★ **dated 注（2026-11-08 · ADR-092 / ADR-088 / ADR-093）**：★ 本表描述的是**当前可用形态**；★ ★ **目标态不是「双模式并存」** ⇒ ★ **TLM 是过渡期的第三条腿**（★ 提供亚秒级快环，★ **不是** parity 的一条腿）⇒ ★ **目标态 = 一个模型（CH_MEM）+ 两个后端（CppHDL Simulator / Verilator）+ 一道差分门禁**（★ ADR-088 §10 / ADR-089）⇒ ★ **TLM 的删除时点绑 ADR-088 §5.2 的 B3**（★ 硬前置 = 差分门禁已绿 + CI build 能力）⇒ ★ ★ 故「TLM（默认，兼容）」是**冻结期事实**，★ **不是目标态**。
+
+**CH_MEM 模式下可选后端**（使用时选择）：
 
 | 后端 | 用途 | 启动方式 |
 |------|------|---------|
 | **CppHDL Simulator** | 周期精确直仿（C++ 仿真器，无需 EDA 工具） | `ch::core::Simulator::run(ctx, N)` |
 | **Verilog 生成** | 输出 `.v` 文件供外部综合/后端流程使用 | `ch::toVerilog(ctx) → file.v` |
 | **Verilator 联合仿真** | 周期精确 + 与 C++ 仿真器对比验证 | `verilator --cc file.v → linked library` + VerilatorBackend |
+| ★ **层次化 RTL 输出**（★ 交付路径 · 2026-11-08 补） | ★ 输出**单文件多 module**（★ 层 2 单元成独立 module ⇒ 可单独综合 / 单独交付）| ★ `ch::toVerilogHierarchical(out_path, root, options)`（★ 上游已落地；★ **默认未声明成层者 inline**（ADR-094 Options C）⇒ 产物与扁平一致）|
 
 业务代码不感知模式差异——同一份源码经由编译期条件展开绑定到不同类型后端。CI 通过两个独立 binary 验证双模式：
 
@@ -136,6 +139,8 @@ Level A（单元测试）：纯逻辑验证，无框架依赖，毫秒级反馈
 
 Level B（集成测试）：ch_stream 握手验证，含 EventQueue
     +-- 驱动模块 tick()，验证 valid/ready 协议和数据流
+
+> ★ **dated 注（2026-11-08 · ADR-083 §4.2）**：★ 本行是 **TLM / CppTLM 时代**的集成测试模型（★ `ch_stream` 握手 + `tick()` 驱动）⇒ ★ **业务 IP 侧不再使用 CppTLM 的 `ch_stream` / `ChStreamModuleBase` 组件范式**（★ 仅 **Bridge 适配层** `src/cf_plugin/bridge/` 例外）⇒ ★ 目标态的集成验证 = **层 1 `Payload<T>` + `PipeNode`**（核内 stage 间）/ **层 2 逐字段标量端口**（可复用单元间）⇒ ★ 详见 [`hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)（★ 层次区分的第三档）。
 
 Level C（端到端测试）：JSON 配置驱动完整拓扑
     +-- TrafficGenTlm -> 被测 IP -> MemoryTlm，统计驱动验证
@@ -223,6 +228,8 @@ Phase 6c:  cf::plugin + CH_MEM 编译开关 (-DCF_PLUGIN_USE_CH_MEM)
 Phase 6d:  ch::toVerilog(ctx) 输出 .v 文件
                 -> verilator --cc 编译
                 -> VerilatorBackend 联合仿真 ([verilator] 1/1 PASS, 5 ELF)
+Phase 6d+: ch::toVerilogHierarchical(root) 输出单文件多 module  ← ★ 2026-11-08 补
+                （层 2 单元成独立 module ⇒ 可单独综合 / 单独交付；★ 默认全 inline）
 Phase 7+  : 未来扩展 (外部综合/FPGA / 多核 / 形式化验证)
 ```
 
