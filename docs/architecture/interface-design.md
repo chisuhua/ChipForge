@@ -17,6 +17,7 @@ ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐
 #### 1.0.1 已实现 POD vs 设计目标 bundle_base 对照表
 
 > ⚠️ **Phase 1 当前状态是 POD**, 不是 `bundle_base` 派生类。`bundle_base` 是 Phase 5+ 设计目标。
+> ★ **定性（★ 2026-11-08 治理修订）**：★ 本行 = **实施态**（★ 「现在是什么」），★ **下表右列「Phase 5+（设计目标）」= 目标态**（★ 「该是什么」）⇒ ★ ⇒ ★ **目标态以右列为准**；★ 本行的当前态**不作为目标态引用**（★ 纪律样板见 [`hierarchical-plugin-architecture.md` §0.1](./hierarchical-plugin-architecture.md)）。
 
 | 维度 | Phase 1 (已实现) | Phase 5+ (设计目标) | 升级路径 |
 |------|------------------|--------------------|----------|
