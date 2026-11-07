@@ -4,6 +4,7 @@
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
+> ★ **导航入口**: ★ 层次化 Plugin 主题的**导航入口** = [`docs/architecture/hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)（★ §0 = 文档全景表 + 按意图阅读路径 + 权威分布表）⇒ ★ 本文件是**门禁面的唯一权威**（★ S-10 / S-17 / S-17.1），★ 但**不承载**装配与命名规则（★ 那些在 **ADR-094**）
 
 ---
 
