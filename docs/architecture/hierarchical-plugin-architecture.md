@@ -65,9 +65,10 @@
 |---|---|---|
 | ★ **本主题文档**（★ 当前态快照 / 结构事实 / 需求 / 残留） | `docs/architecture/hierarchical-plugin-architecture.md`（★ §3 目标形态 · §5 命名规则 · §4 归属↔语义耦合） | 🚧 Draft（★ §1 = dated 实施态快照） |
 | ★ **门禁面契约**（登记簿 / 逻辑契约名清单 / error_kind / 通用总则） | `docs/architecture/parity-gate-contract.md`（★ **S-17** · **S-17.1**（机器可读 JSON）· **S-10** · **GN-1**） | ✅ **v1.8**（★ S-17 / S-17.1 **自 ADR-094 阶段 2 起生效**） |
-| ★ **框架层架构**（★ Plugin 范式 + ★ §4.2 `ch::Component` 与 Plugin 的关系） | `docs/architecture/plugin-framework.md`（★ §4「与 CppTLM / CppHDL 关系」· §4.2 Component） | ✅ v1.2（★ ★ **不在 `arch_paths`** ⇒ ★ architect 不改它，★ 只导航） |
+| ★ **框架层架构**（★ Plugin 范式 + ★ §4.2 `ch::Component` 与 Plugin 的关系） | `docs/architecture/plugin-framework.md`（★ §4「与 CppTLM / CppHDL 关系」· §4.2 Component） | ⚠️ **v1.2 · 2026-06-09 · §4.2 已过时**（★ 仍写「Plugin 仅在 TLM 模式生效 / 同一 IP 可有 TLM 版 + RTL 版」⇒ ★ 与 ADR-091 v1.16 两层范式 + ADR-083 单一 source of truth **冲突**）⇒ ★ **以 ADR-091 v1.16 / ADR-094 为准**（★ ★ 该文件**不在 `arch_paths`** ⇒ ★ architect 不改它 ⇒ ★ 残留 ⑮） |
 | ★ **框架代码映射**（★ 架构概念 ↔ CppHDL 代码位置） | `docs/architecture/code-framework-mapping.md`（★ **§3.1 组件模型表** = `Component`（★ RTL 组件基类）· `ch_module<T>`（子模块实例化）· `ch_device<T>`（顶层设备）· `ch.hpp`） | ✅（★ ★ **锚点是代码路径 ⇒ 随上游漂移** ⇒ 须按 M-6/M-7 复核；★ 该文自带「版本敏感性声明」） |
-| ★ **总体架构 / 接口形态**（★ 描述性总览） | `docs/architecture/overview.md` · `docs/architecture/interface-design.md`（★ 两者含 v1.16 补注） | ✅ |
+| ★ **总体架构 / 接口形态**（★ 描述性总览） | `docs/architecture/overview.md` · `docs/architecture/interface-design.md`（★ 两者含 v1.16 补注；★ `interface-design.md` §「层 2 单元接口」= 目标形态示范） | ✅ |
+| ★ **版本节点架构演进 SSOT**（★ **层次化的版本落点在此**） | `docs/architecture/roadmap-evolution.md`（★ §4.5 **v0.11.0 目标表**含层次化装配行 · §8 **跨版本对比表**含层次化行） | ✅（★ 2026-11-08 已补） |
 
 #### D. 架构文档（★ 上游）
 
@@ -77,7 +78,7 @@
 | ★ **层次化 RTL 写作指南**（★ 用户视角） | `CppHDL/docs/developer_guide/patterns/HIERARCHICAL-RTL-AUTHORING-GUIDE.md`（★ §1 **7 条纪律 D1~D7** · §2 粒度（ADR-061）· §3 三种写法风格） | ✅ Active |
 | ★ **组件生命周期指南**（★ `ch_device` vs `ch_module`） | `CppHDL/docs/developer_guide/patterns/COMPONENT-LIFECYCLE-GUIDE.md` | ✅ Active |
 
-> ★ **排除说明（★ 为什么有些架构文档不在表内）**：★ `docs/architecture/` 下其余文档与本主题**无直接耦合** ⇒ 不列（★ 避免稀释信号）：★ `performance-guide.md` / `testing-and-dse.md` 的「层次化」命中 = ★ **同词异义**（★ 「StatGroup 层次化统计组」/「层次化统计收集」⇒ ★ 与 Plugin 层次化无关）· ★ `roadmap-evolution.md` · `tech-selection.md` · `ip-catalog.md` · `background-and-goals.md` · `error-handling.md` · `tlm-*.md`（★ 命中数 0）· ★ `m4-dse-cpufactory-real-pr-description.md`（★ 命中 0）· ★ `plugin-research/external-plugin-architectures.md`（★ **研究态**：★ 主题是 SpinalHDL 等**外部**架构 ⇒ 非本仓目标架构；★ 且 `arch-docs.json` 的 `exclude_paths` 已排除）· ★ ★ **`declarative-hybrid-framework.md`（★ 混合态 ⇒ 移出）**：★ 该文头部自声明「⚠️ **本文档混合了"已实现框架"与"Phase 1 设计提案"**」⇒ ★ ★ **提案不是「已定的目标」⇒ 混入真相区会让未决内容冒充目标态** ⇒ ★ 故只作**背景参考**，不进真相区。
+> ★ **排除说明（★ 为什么有些架构文档不在表内）**：★ `docs/architecture/` 下其余文档与本主题**无直接耦合** ⇒ 不列（★ 避免稀释信号）：★ `performance-guide.md` / `testing-and-dse.md` 的「层次化」命中 = ★ **同词异义**（★ 「StatGroup 层次化统计组」/「层次化统计收集」⇒ ★ 与 Plugin 层次化无关）· ★ `tech-selection.md` · `ip-catalog.md` · `background-and-goals.md` · `error-handling.md` · `tlm-*.md`（★ 命中数 0）· ★ `m4-dse-cpufactory-real-pr-description.md`（★ 命中 0）· ★ `plugin-research/external-plugin-architectures.md`（★ **研究态**：★ 主题是 SpinalHDL 等**外部**架构 ⇒ 非本仓目标架构；★ 且 `arch-docs.json` 的 `exclude_paths` 已排除）· ★ ★ **`declarative-hybrid-framework.md`（★ 混合态 ⇒ 移出）**：★ 该文头部自声明「⚠️ **本文档混合了"已实现框架"与"Phase 1 设计提案"**」⇒ ★ ★ **提案不是「已定的目标」⇒ 混入真相区会让未决内容冒充目标态** ⇒ ★ 故只作**背景参考**，不进真相区。
 
 ### 0.4 ★ 目标态 ⇄ 实施态（★ **真相区 vs 实施区**）
 
@@ -183,7 +184,7 @@
 
 ---
 
-## 3. 目标形态的结构事实
+## 3. ★ 理想目标态（★ 目标形态的结构事实 · 验证形态 · 版本落点）
 
 ### 3.1 语义定义（★ 权威在 ADR-094 D-1/D-2）
 
@@ -192,6 +193,8 @@
 - ★ **归属**：★ **决策真源 = 上游 ADR-059**（节点归属与组件命名）；★ **现行机制实现 = 上游 `Component::node_owner()`**（★ ★ **实现不是真源** —— ★ 真源是决策文档，★ 实现只是其机制载体）⇒ ★ ChipForge 的 root-scope 覆盖**整个构建期**（`build()` + `elaborate()`）⇒ 插件级节点归 root、单元内部节点归单元。
 
 ### 3.2 模块关系（★ 结构图）
+
+> ★ ★ **本图 = 目标形态**（★ **不含**实施态时点语汇 ⇒ ★ 「哪条路径今天已接入」见 **§1.1**）。
 
 ```
         ┌──────────────────────── 宿主（runner / factory）────────────────────────┐
@@ -222,7 +225,7 @@
                      │                                    │
                      ▼                                    ▼
         ┌────────────────────────┐          ┌──────────────────────────────┐
-        │ 扁平 RTL（今天的门禁路径）│          │ 层次化 RTL（交付路径 · 尚未接入）│
+        │ 扁平 RTL（★ 门禁路径）    │          │ 层次化 RTL（★ 交付路径）        │
         │ ch::toVerilog → module top│          │ toVerilogHierarchical → 多 module│
         └────────────────────────┘          └──────────────────────────────┘
 ```
@@ -237,20 +240,39 @@
 | **两道机械闸**（闸① 框架内 / 闸② gate 侧） | 框架 + 门禁 | ADR-094 D-3.7 · 契约 **REG-3** |
 | **ctx 节点表** | 上游（单一 ctx ⇒ 单一节点表 ⇒ 无 node-id aliasing） | ADR-091 G-1p |
 
-### 3.4 装配时序（★ 阶段 1 / 阶段 2）
+### 3.4 装配时序（★ **指针** —— ★ 不重述条款）
 
-```
-阶段 1（owner 仍 == nullptr）              阶段 2（不可拆的一批）
-★ 注：★ 此处「owner == nullptr」仅指**顶层端口与插件级节点**（root-scope 未启用）⇒ ★ **不含**单元内部节点（单元内部节点归单元）
-─────────────────────────────            ─────────────────────────────
-① 宿主建 ctx → PipeBuilder(ctx)           ① owner 切换（root-scope 全局化）
-② plugin setup()：declare_in/out 建端口     ② 登记簿上线（自动 + 例外通道）
-③ plugin setup()：层 2 单元 create_child    ③ manifest 产出 + provider 安装
-   + build(ctx)（★ 共用宿主 ctx）          ④ 闸①（框架内）+ 闸②（gate 侧）
-④ 阶段 1 前置：同名普查（★ 不通过 ⇒ 先修）   ⑤ r.14 归属守卫生效
-⑤ C-1 三态化（精确名解析）                ⑥ 迁移期基线捕获 + V-35/V-36 比对
-★ 不产 manifest ⇒ 不走闸②                ★ 两条判据验收后退役
-```
+| 阶段 | 目标态不变量（一句话） | ★ 权威 |
+|---|---|---|
+| ★ **阶段 1** | ★ 顶层端口与插件级节点的 owner 仍为 `nullptr`（★ 单元内部节点归单元）⇒ ★ 观测按**精确名**解析（三态化）⇒ ★ **不产 manifest / 不走闸②** | ★ **ADR-094 D-6 阶段 1** |
+| ★ **阶段 2** | ★ owner 切换（root-scope 覆盖整个构建期）+ 登记簿与 manifest 上线 + **归属守卫**生效 —— ★ **不可拆的一批** | ★ **ADR-094 D-6 阶段 2** |
+
+> ★ **两阶段的具体步骤与前置（★ 含同名普查的前置条件）⇒ 一律以 ADR-094 D-6 为准**；★ 本文件**不重述条款**（★ 避免两处全文 ⇒ 必然漂移）。
+
+### 3.5 ★ 验证形态（★ 目标态的「怎么证明对」）
+
+> ★ **目标态的验证 = 多维互补，★ 缺一不可**（★ 各抓不同类缺陷 ⇒ ★ 不可互相替代；★ ★ **互补证据 = ②③④**（★ 变换 / 后端 / 可交付性）· ★ **① 是装配规则自身的门禁**（★ 框架侧））：
+
+| 层 | 判什么 | ★ 机制锚 / 权威 | ★ 抓不到的（★ 判别力边界） |
+|---|---|---|---|
+| ① **装配契约** | 装配 / 成层 / 登记 / 命名 是否**符合规则** | ★ **判据全集 = ADR-094 V-27~V-43**；★ 其中**等价性判据（V-28 / V-29）的机制锚见 ②** · **迁移期判据（V-35 / V-36）阶段 2 验收后退役**；★ 其余 = 框架侧机检 | ★ 不判「网表行为对不对」· ★ **迁移安全已在 ① 全集内（V-35 / V-36）⇒ 不存在第五个正确性维度** |
+| ② ★ **层次化 ≡ 扁平** | ★ **「层次化变换」本身**有没有引入行为分叉（★ 单后端 · 两份产物比较） | ★ ★ **上游 `ch::hier_eq`**（`CppHDL/include/hierarchy_equivalence.h`）—— ★ namespace `ch::hier_eq` · ★ **7 项闭合公共面**：`DrivenInput` / `Observation` / `ProductSet` / `Result` / `emit` / `compare` / `make_observation` · ★ **fail-closed**（★ 错误前缀如 `observation-not-visible` / `empty-observations` / `emit-failed`） | ★ ★ **抓不到「扁平/层次化共享的发射底座算错」**（★ 两产物同源 ⇒ 一起错）⇒ ★ 上游明写该 helper **MUST NOT** 替代双后端 parity |
+| ③ **双后端 parity** | ★ **两套执行后端**不一致（★ 异源 ⇒ 抓「后端算错」） | ★ **ADR-089**（★ 同一模型 × CppHDL Simulator / Verilator 差分执行）· 门禁面契约 `parity-gate-contract.md` | ★ ★ **抓不到「变换算错」**（★ 同源 ⇒ 一起对）⇒ ★ ★ **故 ② 与 ③ 互补**：★ ② 抓「变换」，③ 抓「后端」 |
+| ④ ★ **可交付性** | ★ 层 2 单元**能否独立复用 / 独立验证** + ★ 产物**是否可用**（★ 可综合 / 可被工具链接受） | ★ **V-30**（★ `ch_device<RegFileComponent>` 独立复用形态）· ★ **V-33**（★ 产物 lint / 工具链 exit 0） | ★ 不判「行为对不对」（★ ⇒ 那是 ② ③） |
+
+⇒ ★ ★ **结论（★ 目标态的验证形态）**：★ **层次化交付 SHOULD 同时具备 ② 与 ③ 的证据**（★ 缺 ② ⇒ 「层次化变换错了」无人发现；★ 缺 ③ ⇒ 「后端算错了」无人发现）⇒ ★ ① 是**装配规则**自身的门禁（★ 框架侧）· ④ 是**可交付性**门禁。
+> ★ ★ ★ **★ 诚实标注（本条是**目标态要求**，★ 不是已登记的交付门禁）**：★ ★ **③ 的「层次化产物适用面」未在 `ADR-089` / `parity-gate-contract.md` 登记**（★ 读码实测：ADR-089 全文**无**层次化适用面声明；★ 契约文档 grep「层次化 / hierarch」**零命中**）⇒ ★ ⇒ ★ 故本条**故意用 SHOULD 而非 MUST**：★ ★ **MUST 的门禁地位需先在 ADR-089 / 契约文档登记适用面后才成立**（★ 归 architect 的 backlog ⇒ 见 §7 残留 ⑭）。★ ★ 同理，★ ② 的依据（★ ADR-094 V-28 / V-29）**已登记** ⇒ ★ ② 侧无此缺口。
+⇒ ★ ★ **机制锚点缺口（★ 本节新发现）**：★ 上游 `ch::hier_eq` 于 2026-11-06 落地，★ 但 ★ **ChipForge 侧全仓 0 引用**（★ `grep -rn "hier_eq" docs/ .rddf/ ip/` 零命中）⇒ ★ ★ ADR-094 **V-28 / V-29**（层次化等价性判据）⇒ ★ **判据存在而机制锚未接** ⇒ ⇒ ★ **方向已定**（★ 本节 ② 已把 `ch::hier_eq` 定为等价性判据的**机制锚**）⇒ ★ ★ **缺的是 ADR-094 侧的登记**（★ V-28 / V-29 补一句机制锚注 ⇒ ★ **属 ADR-094 范围**（★ V-28 / V-29 是其判据）⇒ ★ **无需另立 ADR**）⇒ ★ ★ **另需登记**：★ ③ 的「层次化产物适用面」在 `ADR-089` / 契约文档**尚无登记** ⇒ ★ ⇒ ★ 故上文结论句用 **SHOULD 而非 MUST** ⇒ ★ 归 backlog（★ 见 §7 残留 ⑭）。
+
+### 3.6 ★ 版本落点与延迟项（★ 目标态何时落地）
+
+| 项 | 内容 | ★ 权威 |
+|---|---|---|
+| ★ **版本落点**（★ **建议** —— ★ architect 按批次依赖推定） | ★ **v0.11.0 窗口** = ADR-094 装配契约 + 阶段 1（框架地基 / 观测登记 / 三态化）⇒ ★ **v1.0.0** = 阶段 2（owner 切换）+ 首批成层单元（ALU） | ★ ★ **已写入** `docs/architecture/roadmap-evolution.md` §4.5 + §8（★ 2026-11-08 architect 补，★ 两处均标「待 objective 登记」）⇒ ★ ★ **待 planner 登记进** `objective-soc-cpu-v0110-launch.md` ⇒ ★ ★ **本行是建议、★ 非已决归属**（★ ADR-094 与台账只有**批次**、★ 无版本映射 ⇒ ★ 不自引为「权威」） |
+| ★ **落点口径** | ★ v0.11.0 行是**「窗口内目标」而非 archive 硬门禁**（★ 沿用既有口径）⇒ ★ 不因层次化未完成而单方面加硬 gate | ★ `.rddf/roadmap/strategy.md`（★ 版本节点表的既有口径，★ 该文件**不在 `arch_paths`** ⇒ ★ architect 不可写 ⇒ ★ 登记归 planner） |
+| ★ **已知延迟项**（★ 目标态的「不做/未决」面） | ★ 多 root / 多核形态（★ 跨 ctx 多 root ⇒ 违 G-1p ⇒ 另立 ADR）· ★ FSM 私有 ctx 的归属形态未核 · ★ r.14 的「创建时机维度」缺口 | ★ **§7 残留 ② / ③ / ④**（★ 不在本文重述） |
+
+> ★ ★ **本节不含实施批次 / 退出判据 / AC**（★ 那些属台账 §9.2 + change `tasks.md`）⇒ ★ 本节只回答「**目标态落在哪个版本**」。
 
 ---
 
@@ -313,6 +335,11 @@
 | ⑪ | ★ **层 2 唯一实例的实现目录无文档落点**：★ `ip/cpu/core/` 下 **8 个头文件、0 个 `.md`**（★ 唯一层 2 实例 `RegFileComponent` + 其桥接 plugin 都在这里）⇒ ★ ★ **§0 导航层能指到代码，但代码侧无任何自述文档** ⇒ ★ 「装配形态为何是裸 `make_unique`」「为何裸 `make_unique` 是错的」这两条知识**只存在于本文件 §1.2（★ **实施态**）与 ADR-094（★ **目标态**）** ⇒ ★ **实现侧读者无就近落点** ⇒ ★ 候选 = `ip/cpu/core/README.md`（★ ★ **归 builder**：★ `ip/cpu/core/` 不在 architect 的 `arch_paths` 内 ⇒ ★ architect 不写） | ⚠️ **未建**（★ 归 builder） |
 | ⑫ | ★ **探针 A-1 的脚本已失效**（★ ★ 属**实施区 / 证据侧** ⇒ ★ **不影响真相区**；★ 但 §9 引用它 ⇒ 故须诚实标注）（★ 2026-11-07 实测：`/tmp/opencode/probe_scope.cpp` **不存在**）⇒ ★ **证据不可复算**（★ 结论仍可由三条独立依据复核 ⇒ 见 §9）⇒ ★ ★ **MUST 随 ①-A 把探针固化入仓**（★ 归 builder：★ architect 不写 `tests/`）⇒ ★ 对照：★ **上游的探针已入仓**（`CppHDL/docs/architecture/2026-11-02-hierarchical-rtl-output.md` §9）⇒ ★ 我方是**明确落后项** | ⚠️ **已失效**（★ 归 builder） |
 | ⑬ | ★ **上游 commit 锚点漂移（★ 已实证一次 · ★ 2026-11-08 定性升级）**：★ ★ **上游 ADR-058~062 是「真相区」的一部分** ⇒ ★ ⇒ ★ **上游 ADR 被改写 = 真相变了**（★ 不只是「锚点过期」）⇒ ★ ★ 故 **M-7 的守卫是真相区的完整性守卫**，★ 非仅引用卫生 ⇒ ★ ★ 台账 §6 记录的复核依据 = 上游 HEAD `dbc9801`（2026-11-06）⇒ ★ **2026-11-07 实测实际 HEAD = `824e2d0`** ⇒ ★ 差异落在上游 planner 文档面（`improvement v4` 等）⇒ ★ **未影响任何决策**（★ 本仓 ADR 的 Parent 行锚的是 **ADR 版本号** `v2.17` / `v2.3.2` / `v1.15` / `v1.6.4` / `v1.4` ⇒ **不受影响**）⇒ ★ 但 ★ **机制缺口成立**：★ 「上游 = 独立仓库 + 无版本闸」⇒ ★ 任何依赖上游实现细节的锚点都会静默漂移 ⇒ ★ 已在 §0.5 **M-7** 立守卫（引用上游 MUST 带 commit）⇒ ★ ★ **残余缺口 = 守卫无触发器**（★ 上游 HEAD 变了，谁来提醒？）⇒ ★ 候选 = CI 定期比对上游 HEAD 并在漂移时报出（★ 归 builder）⇒ ★ ★ **★ 二次实证（同一落笔会话内）**：★ oracle 审查期间上游 HEAD **又推进 2 次**（`824e2d0` → `afdcab9` → `6c43d05` → `9f2986f`）⇒ ★ ⇒ ★ **「上游 HEAD 持续漂移」不是理论风险，是每 20 分钟发生一次的事实** ⇒ ★ ⇒ ★ **锚点必须写「核对过的 commit」而非「当前 HEAD」**（★ 已在 §0.3 ④ 改正）⇒ ★ **仍需触发器** | ⚠️ **已实证两次**（★ 守卫已立 · 触发器未建） |
+| ⑭ | ★ **`ch::hier_eq` 机制锚未接**（★ 2026-11-08 新发现）：★ 上游 `ch::hier_eq`（7 项闭合公共面 · fail-closed）于 2026-11-06 落地，★ 但 ★ **ChipForge 侧全仓 0 引用**（★ `grep -rn "hier_eq" docs/ .rddf/ ip/` 零命中）⇒ ★ ★ ADR-094 **V-28 / V-29**（层次化等价性判据）⇒ ★ **判据存在而机制锚未接** ⇒ ★ ⇒ ★ **方向已定**（★ §3.5 ② 已把 `ch::hier_eq` 定为等价性判据的**机制锚**）⇒ ★ ★ **缺的是 ADR-094 侧的登记**（★ V-28 / V-29 补一句机制锚注 ⇒ ★ **属 ADR-094 范围** ⇒ ★ **无需另立 ADR**）⇒ ★ ★ **另需登记**：★ ③ 的「层次化产物适用面」在 `ADR-089` / 契约文档**尚无登记** ⇒ ★ ⇒ ★ 故 §3.5 的结论句用 **SHOULD 而非 MUST** | ⚠️ **部分已定 · 待登记**（★ 归 architect） |
+| ⑮ | ★ **`plugin-framework.md` §4.2 已过时但 architect 不可写**：★ 该文（★ v1.2 · 2026-06-09）仍写「Plugin 仅在 TLM 模式生效 / 同一 IP 可同时有 TLM 版和 RTL 版」⇒ ★ 与 ADR-091 v1.16 **两层范式** + ADR-083 **单一 source of truth** 冲突 ⇒ ★ 但该文件**不在 `arch_paths`**（★ `arch-docs.json` 实测）⇒ ★ ⇒ ★ 处置二选一：★ ① **扩 `arch_paths`**（★ 治理变更）★ ② 走 owner 加 dated 注（★ **当前唯一可行**）⇒ ★ ★ **局部改写治标不治本**（★ 该文整体处于 Phase 0/1 历史态）⇒ ★ 整体重写归 backlog；★ ★ **已做的最大处置 = 导航面警语**（★ §0.3-C 行内标明「§4.2 已过时 · 以 ADR-091 v1.16 / ADR-094 为准」）⇒ ★ 剩「文件内 dated 注」归 owner | ⚠️ **待决**（★ 治理面） |
+| ⑯ | ★ **`tech-selection.md` §8 演进计划无 TLM 退役行**：★ §4 的 CppTLM 角色描述仍准，★ 但 §8 的演进计划止于「Phase 7+」⇒ ★ 未反映 ADR-088 / 092 / 093 的退役路线 ⇒ ★ 该文件**不在 `arch_paths`** ⇒ 归 owner | ⚠️ **待 owner** |
+| ⑰ | ★ **`code-framework-mapping.md` §3.1 组件模型表缺层次化符号**：★ 该表 = `Component` / `ch_module<T>` / `ch_device<T>` / `ch.hpp`，★ 缺 `create_child` / `__io` / `toVerilogHierarchical` / `hier_eq` ⇒ ★ 且 `ch_module` 被 ADR-091 **G-1b** 禁用于 ChipForge 层 2 ⇒ ★ 该文自带「版本敏感性声明」⇒ ★ 归 owner 按其声明补行 | ⚠️ **待 owner** |
+| ⑱ | ★ **`error-handling.md` §3 + `background-and-goals.md` 的 dated 注待补**：★ 前者 §3 仍用旧名 `MemRespBundle`（★ 真名 `cf::bundles::MemResp`，★ `overview.md:167` 已更正）+ §4.3 COMPARE 模式叙事随 ADR-088 退役；★ 后者仍写「TLM 模式（默认）」无冻结注 ⇒ ★ 两份**均不在 `arch_paths`** ⇒ 归 owner | ⚠️ **待 owner** |
 
 ---
 
