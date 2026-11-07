@@ -1,6 +1,6 @@
 # ADR-089 — 双后端差分 parity 门禁（同一模型 × 两后端）
 
-> **Status**: ✅ **Accepted（v1.4，2026-10-27，architect 主持；v1.2 = A1 代码事实更正 · v1.3 = C-1 归类裁决 + 吞吐实测更正 · ★ **v1.4 = A3 首跑结果：既存后端分歧清单 = 空**）**
+> **Status**: ✅ **Accepted（v1.4，2026-10-27，architect 主持；v1.2 = A1 代码事实更正 · v1.3 = C-1 归类裁决 + 吞吐实测更正 · ★ **v1.4 = A3 首跑结果：既存后端分歧清单 = 空**）** · ★ **v1.4 附注（2026-11-07 · ADR-094 v0.1 配套）**：★ §D3 新增「v1.16 适用范围注记」—— ★ **执行的是 ADR-091 v1.13（A-5）已签批的登记义务**（例外白名单 scope 限定「开放核 vs 预载核」），**非新决策**；★ 决策内容与版本号**不变**。
 > **上游**: ADR-083（Plugin-style 单一 source of truth）· ADR-040 v2.0（CH_MEM 是新正道）· ADR-088（TLM 后端退役；本 ADR 是其 **B3 删除的前置契约**）
 > **下游**: `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A）· `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（阶段 B/C）· `objective-ip-cpu-tlm-backend-retirement`（B3 门禁）
 > **执行文件（待 planner 落）**: `.rddf/plans/`（阶段 A 的 change 计划，★ 归 builder 起草）
@@ -81,6 +81,7 @@
   ⇒ ★★ **扩张权**：★ **白名单的扩张 MUST 经 architect 审**，**实施者不得自行扩张**（★ 2026-10-26 用户裁决）⇒ 门禁脚本对「白名单变更」MUST 要求 commit message 引裁决编号
   ⇒ ★★ **规模护栏**：★ 例外条目数 > **N**（N 由 A1 细则定，初始建议 10）⇒ **强制 architect 复审**（★ 仿项目既有模式：`ADR-088 §2.1` 的「白名单 > 5 条 ⇒ 提示 ADR 复审」）⇒ ★ **MUST NOT** 以「条目数硬上限 ⇒ 门禁红」作为护栏（★ 会逼出假登记）
   ⇒ ★ **常驻合成例外条目**：★ 门禁 MUST 自带 **1 条合成例外**（用于持续验证白名单机制本身不会随清零而腐化）⇒ 走**常驻 fixture**，不计入真实例外计数。
+  ⇒ ★★ **v1.16 适用范围注记（与 ADR-091 H-3 / ADR-094 的分工）**：★ 本节的**例外白名单 scope 限定**为「**开放核 vs 预载核**」这一对比语境（`pchash` 因流水结构不同构而被豁免）⇒ ★ **MUST NOT** 将该豁免扩散到**双后端 parity** 语料（后者 MUST 保持逐拍相等）⇒ ★ 该语境下 partial case 的承重判据 = `regs` + `memsig`（登记见 `parity-gate-contract.md` **S-9a** 的 v1.16 注）。★ 白名单/allowlist 的**扩张权仍归 architect**（本节既有规则不变）。
 - ★ **先例**：上游 `c27543d` 把 `aread` 对齐为 0-cycle vs 0-cycle ⇒ ★ **默认路径是「上游补齐对齐」**，例外是**待收敛项**而非终态。
 
 ### D4 ★ corpus（Q2 裁决）：**vendored 47 + branchbench 4 档**；Dhrystone **后置**
