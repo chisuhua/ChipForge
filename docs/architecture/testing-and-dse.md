@@ -93,6 +93,8 @@ public:
 
 ### 当前实际状态 (2026-06-17 实证)
 
+> ★ ★ **定性（★ 2026-11-08 治理修订）**：★ **本节 = 实施态快照**（★ dated **2026-06-17** ⇒ ★ **近 5 个月未复核**）⇒ ★ **不是目标态**（★ 「该长什么样」见本节之上的设计描述）⇒ ★ ⇒ ★ **MUST NOT 被当作目标态引用**；★ **当前进度以 [`roadmap-evolution.md`](./roadmap-evolution.md) + [`.rddf/roadmap/`](../../.rddf/roadmap/) 为准** ⇒ ★ **本节不作为进度真源**（★ 纪律样板见 [`hierarchical-plugin-architecture.md` §0.1](./hierarchical-plugin-architecture.md)）。
+
 > **本节由审计添加, 区分"文档承诺"vs"实际可用"**。详细 DSE 设计见 [`../../ip/cpu/docs/dse_architecture.md`](../../ip/cpu/docs/dse_architecture.md)。
 
 | 工具/脚本 | 本文档描述 | 2026-06-17 实际状态 |
