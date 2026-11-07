@@ -107,6 +107,8 @@
 **验收方式**：机检（报告 schema 里 5 个 key 必须齐备，多出未声明 key ⇒ 拒收）。
 **归属**：A2b（校验）+ A2a（产出）。
 
+> ★ **v1.16（ADR-094 D-3.2）**：本节的 5 个观测量**逻辑契约名**与 ctx **节点名解耦** —— 节点名可能带组件路径前缀（★ root 名 = 契约常量 **`cpu`** ⇒ raw 节点名 `cpu.reg_1` ⇒ Verilog 名 `cpu_reg_1`），但契约身份由**契约登记簿**（见 **S-17**）承载。★ 报告 / 白名单 / 脚本参数一律只用**逻辑契约名**。
+
 ---
 
 ### S-2 确定性前置校验（先于任何观测量比对）
@@ -260,9 +262,31 @@ case 在 cycle cap 处被截断（两侧 `done=false`）时，`tohost`（两侧�
 **验收方式**：机检（构造 3 组输入：全等 ⇒ PASS；单观测不等 ⇒ FAIL；观测缺失 ⇒ ERROR）+ ★ partial 四情形（v1.5）。
 **归属**：A2b（判定实现）· A3（语料接入后暴露并修）。
 
+> ★★ **v1.16（与 ADR-091 H-3 的交集登记 —— 补齐 H-3 自带待办的后半）**：★ 在「**开放核 vs 预载核**」对比语境下，`pchash` 已按 **ADR-089 §D3 例外白名单**豁免（流水结构不同构）⇒ ★ **该语境下 partial case 的承重判据 = `regs` + `memsig`**（★ 不是本节默认的 3 项）⇒ ★ **MUST NOT** 把「本节默认 = `regs`+`memsig`+`pchash`」直接套到该语境（否则判据强度被**高估**）。★ 例外 scope MUST 限定为「开放核 vs 预载核」，**MUST NOT** 扩散到双后端 parity 语料。
+
 ---
 
 ### S-10 三态退出码与错误分类
+
+> ★★ **通用总则 GN-1（门禁面）**：★ **判定机制自身失效 MUST 响亮失败，MUST NOT 表现为「无问题」** ⇒ ★ 任何「靠**采集 / 匹配**得出结论」的机制 MUST 自带「**采集本身是否有效**」的自检 ⇒ ★ 否则机制失效会表现为**恒绿**（最坏假绿）⇒ ★ 已覆盖：① **V-36** 的日志抓取器自检（★ 一轮零匹配 ⇒ ERROR）② **provider 安装期自检**（★ `provider_conflict`）③ 未来同类机制。
+>
+> ★ **v1.16（ADR-094 配套）· `error_kind` 允许取值清单（★ 单一真源）**：★ `error_kind` 的**允许取值** MUST 登记在本表；★ 框架侧（`PluginError` typed 枚举）⇒ runner 报告 ⇒ gate 分类**三处只消费本表**，MUST NOT 各自另立 ⇒ ★ 新增错误码 MUST **先改本表**，再改框架映射与 gate 判定。
+>
+> | error_kind | verdict | 来源 | 含义 |
+> |---|---|---|---|
+> | `determinism_missing` | ERROR(2) | 既有 | 确定性字段缺失 |
+> | `determinism_mismatch` | ERROR(2) | 既有 | 两侧 `node_count` / `names_hash` 不一致 |
+> | `observation_missing:<key>` | ERROR(2) | 既有 | 观测量缺失（逐键 · **无**候选） |
+| ★ **`observation_ambiguous:<key>`** | ★ **ERROR(2)** | ★ ADR-094 **阶段 1**（C-1 三态化） | ★ 观测量解析**歧义**（**多个**同名候选 ⇒ `resolve_node_id` 不再「取首个」）⇒ ★ 阶段 2 后由创建期/登记期**消除**（稳态不再出现） |
+> | `completion_missing` | ERROR(2) | 既有 | `done` 字段缺失 |
+> | `completion_mismatch` | FAIL(1) | 既有 | 两侧截断状态不一致 |
+> | `backend_divergence` | FAIL(1) | 既有 | 两侧观测值分歧 |
+> | ★ **`contract_registry_mismatch`** | ★ **ERROR(2)** | ★ ADR-094 闸① | ★ 顶层 `type_output` 未登记（漏登记 ⇒ 最坏假绿） |
+> | ★ **`contract_keyset_mismatch`** | ★ **ERROR(2)** | ★ ADR-094 闸② | ★ manifest 键集 ≠ 契约清单 `node_keys` |
+> | ★ **`manifest_missing`** | ★ **ERROR(2)** | ★ ADR-094 闸② | ★ 契约清单声明 MUST 提供 manifest 的一侧未提供 ⇒ 门禁能力**静默退化** |
+| ★ **`provider_conflict`** | ★ **ERROR(2)** | ★ ADR-094 **r.15** | ★ provider **安装期自检**不通过（★ 同一逻辑名解析到**不同节点** ⇒ 观测会读到错节点）⇒ ★ 消息点名逻辑名 + 两个候选节点名 |
+| ★ **`node_ownership_escape`** | ★ **ERROR(2)** | ★ ADR-094 **r.14** | ★ 某节点的 owner ∉ `{root}` ∪ `{已登记单元}`（★ 典型成因 = 作用域帧泄漏 ⇒ 节点错归某单元） |
+
 
 **要求**
 - `0 = PASS` · `1 = FAIL`（**后端分歧**）· `2 = ERROR`（**门禁自身/环境故障**）。
@@ -395,6 +419,73 @@ case 在 cycle cap 处被截断（两侧 `done=false`）时，`tohost`（两侧�
 
 **验收方式**：机检（A2b/A3/A4 的 tasks.md 每条含 `S-\d+`；矩阵无空行）；人工（architect 签）。
 **归属**：全部 + G-A2。
+
+---
+
+### S-17 契约登记簿与 manifest（★ v1.16 新增 · ADR-094 D-3）
+
+> ★ ★ **生效阶段（★ 2026-11-07 裁决 D-02 / D-13 补记）**：★ **本节全部规则自 ADR-094 的**阶段 2**（owner 切换批）起生效**；★ **阶段 1**（`owner == nullptr`）**不产出 manifest、不走闸②、不要求 provider** ⇒ ★ 否则阶段 1 两侧无 manifest ⇒ `manifest_missing` **恒红** ⇒ ★ **门禁恒红**。
+
+> ★ **为什么放在本契约**：契约身份（逻辑名）与解析语义（S-2/S-4/S-5、三态退出码 S-10）同属**门禁面** ⇒ 单一权威放在这里，ADR-094 只引用。
+> ★ **命名**：本节 **MUST NOT** 占用 ADR-091 的 `G-1*` 命名空间（避免与硬约束编号混淆）。
+
+| # | 规则 |
+|---|---|
+| **REG-1** | ★ **登记点**：★ **默认且唯一** = `PipeBuilder::declare_in/out` **自动登记**（★ **输入端口 `declare_in` 同样登记** —— 输入也是契约面）；★ **受控例外通道** = `register_observation()`（用于「来源不是顶层端口」的观测）⇒ ★ 例外 MUST 带**来源说明**且 MUST 进闸①的 allowlist 面；★ **MUST NOT** 存在第三个登记入口（★ 否则闸①的扫描面与登记面脱钩 ⇒ 漏登记不可见）。 |
+| **REG-2** | ★ **manifest**：JSON，**value-only**；键 = **逻辑契约名**；值 = `{ node_id, raw_name, has_driver, source }`（`source` ∈ {`declare`, `register_observation`}）。★ `raw_name` = ctx 节点名（可能带 `cpu.` 前缀）。★ **先不带** `sanitized_name`（★ 触发条件：某观测**不是**顶层端口、且 Verilator 侧**必须**按 Verilog 名直读时 ⇒ MUST 增补）。★ **产出者 = 框架**、**时机 = `elaborate()` 收尾**、**位置 = `<build>/contract_manifest.json`**；★ **每侧各生成**（`node_id` 是 **ctx 私有编号** ⇒ 两侧编号空间不保证相同 ⇒ MUST NOT 共享一份）。★ **root 名 = 本设计的契约常量 `cpu`**（进 raw 名 ⇒ 进 Verilog 名 ⇒ 改名 = 契约变更；★ **多 root 场景**（多核 SoC）下每个 root 的名字**各自**成为契约常量，且 MUST NOT 与其它设计的 root 名相同 ⇒ 拼接撞名面）。★ `source` MUST 是**受控枚举**（`declare` / `register_observation`）⇒ 可 grep、可被闸①检查（MUST NOT 退化为自由文本）。 |
+| **REG-3** | ★ **两道机械闸（硬约束）**（★ 闸的**实现位置与失败语义** = 决议题 **T3**，★ 本行只定「闸是硬约束」与其扫描对象）：★ **期望键集 MUST 由调用方注入**（框架 MUST 只做「扫 + 比 + fail-closed」⇒ MUST NOT 内置 parity 概念 ⇒ 将来 SoC 级门禁可另配一套）；★ 闸①失败 = `ERROR(2)` + `error_kind = contract_registry_mismatch`；★ 闸②失败 = `ERROR(2)` + `error_kind = contract_keyset_mismatch`；★ **某侧 manifest 缺失** = `ERROR(2)` + `error_kind = manifest_missing`（★ 否则闸②会退化为「有 manifest 才查」⇒ **静默退化**）：**闸①** `elaborate()` 收尾扫「`type_output` 且（`owner == root` ∨ `owner == nullptr`）」⇒ 每个 MUST ∈ 登记簿 ∪ 显式 allowlist（`type_clock`/`type_reset` 与 `owner ∈ 子组件` 的端口**显式排除**）；**闸②** manifest 的**观测键集** MUST == 契约文件的观测键集（diff ⇒ `ERROR(2)`）。 |
+| **REG-4** | ★ **allowlist 治理**：allowlist **落本文件**；**变更 MUST 经 architect 审**（MUST NOT 随手编辑；commit message MUST 引裁决/审稿编号）；★ 每个条目 MUST 带 **owner + 退役条件**（★ 否则 allowlist 变成永久沉淀）；★ allowlist 内容 MUST **出现在报告里**（可审计 ⇒ MUST NOT 静默增长）。 |
+| **REG-5** | ★ **绑定提供者模型**（★ 「契约解析」= **逻辑契约名 → 节点** 的绑定；★ 绑定来源**可插拔**，两个实现）：★ ① **`manifest` provider**（运行时表）—— 开放核侧（★ 登记簿落地后）；★ ② **`identity` provider**（★ 用**同一份** `node_keys`（S-17.1）做**精确名匹配** ⇒ ★ **零第二份清单** ⇒ 无漂移面）—— 预载核侧（★ 其节点名 == 逻辑契约名 ⇒ 恒等绑定；★ 其观测是**插件内 `ch_reg`** ⇒ 结构上进不了登记簿 ⇒ 这是**结构必然**、非临时将就）。★ ★★ **两侧语义一致**（都是「逻辑名 → 节点」⇒ **不构成第二套解析语义**；★ 差异**仅在绑定来源**）⇒ ★ 退役条件 = **载体统一**（★ 预载核观测也走顶层 `ch_out` ⇒ 自然获得 `declare_out` ⇒ 自然切到 `manifest` provider）★ + **机械判据** = `identity` provider 的**使用计数 = 0**（★ 报告可见 ⇒ 可监督） | ★ **全 corpus** 口径（★ 非单 case ⇒ 使用计数 = 0 才算退役）。| **REG-6** | ★ **报告 MUST 标注每个观测的解析来源**（`manifest` / `identity`）⇒ ⇒ fallback（identity）的覆盖面**可见** ⇒ ★ 临时态有**终止机制的可见证据**（★ 防「临时态永久化」） |
+
+★ **解析语义（与 S-2 的关系）**：`resolve_node_id` 的**三态**（`kOk` / `kMissing` / `kAmbiguous`）中，`kAmbiguous` **MUST** 在**创建期**（`NodeNamePolicy::kRejectDuplicates`）与**登记期**（同一逻辑契约名登记两次）消除 ⇒ ★ **runner 侧 MUST NOT 保留「扫描取首个」的可歧义路径**。
+
+**验收方式**：机检（REG-3 闸①②各 1 条负向对照；REG-5 fallback 1 条正/负对照）。
+
+---
+
+### S-17.1 ★ 逻辑契约名清单（★ **单一真源** · 机器可读）
+
+> ★ **生效阶段**：★ 同 **S-17**（★ 自 ADR-094 阶段 2 起生效；★ 阶段 1 不产出 manifest ⇒ 闸②不在阶段 1 运行）。
+
+> ★ **为什么需要**：★ 契约名此前**散落**在 ADR-091 §D3a.9 / V-18 / V-23 / V-25、runner 代码与本契约各处 ⇒ **漂移面**；★ 且「**节点级契约名**」与「**报告层观测量 id**」是**两类**，★ 闸②只能比前者（★ 把派生观测量混进键集 ⇒ 恒红）。
+> ★ **本清单 = 唯一真源** ⇒ ADR / 契约文档 / runner / gate **一律引用它**，MUST NOT 各自另列。
+> ★ **语义仍留在 S-1~S-6**（本清单只承载「名字 + 提供义务」⇒ MUST NOT 把语义复制进来 ⇒ 避免第二份语义）。
+
+```json
+{
+  "node_keys": [
+    "tohost_probe_data_proxy",
+    "pc",
+    "mem_sig",
+    "mem_sig_updates",
+    "reg_1", "reg_2", "reg_3", "reg_4", "reg_5", "reg_6", "reg_7", "reg_8", "reg_9",
+    "reg_10", "reg_11", "reg_12", "reg_13", "reg_14", "reg_15", "reg_16", "reg_17",
+    "reg_18", "reg_19", "reg_20", "reg_21", "reg_22", "reg_23", "reg_24", "reg_25",
+    "reg_26", "reg_27", "reg_28", "reg_29", "reg_30", "reg_31"
+  ],
+  "observation_ids": ["tohost", "regs", "memsig", "cycles", "pchash"],
+  "contexts": {
+    "parity": {
+      "sides": ["sim", "vl"],
+      "providers": { "sim": "manifest", "vl": "manifest" }
+    },
+    "h3": {
+      "sides": ["open_core", "preloaded"],
+      "providers": { "open_core": "manifest", "preloaded": "identity" }
+    }
+  },
+  "notes": [
+    "node_keys = 进 manifest / 按节点解析的契约名（★ 闸②比的就是这一集合）",
+    "observation_ids = 报告层 5 观测量（★ 派生量，★ NOT 进 manifest）",
+    "★ 逻辑契约名 pc 统一（T15 = A · 2026-11-07）：两侧节点名不同（预载核 pc / 开放核 cpu.open_pc），逻辑名唯一 ⇒ runner 的 pc/open_pc fallback 删除",
+    "★ 解析 = 「逻辑契约名 → 节点」，绑定来源按语境声明（★ contexts）⇒ ★ parity（同一设计 × 两后端）两侧用 manifest；★ h3（开放核 vs 预载核）开放核用 manifest、预载核用 identity（★ 其节点名 == 逻辑名）⇒ ★ 两侧语义一致，差异仅在绑定来源",
+    "★ identity provider 的退役判据 = 使用计数 = 0（★ 报告可见）"
+  ]
+}
+```
+
+★ **闸②的比法**：★ **按语境**取该语境的 `node_keys` 集合 ⇒ `manifest` provider 侧的 manifest 键集 == `node_keys` ⇒ diff ⇒ `ERROR(2)` + `contract_keyset_mismatch`；★ 该语境 `providers` 中声明为 `manifest` 的侧**缺 manifest** ⇒ `ERROR(2)` + `manifest_missing`；★ 声明为 `identity` 的侧**不走闸②**（★ 其绑定由 `node_keys` 精确匹配给出）⇒ ★ **义务按语境声明 ⇒ 不会把「结构上产不出 manifest 的一侧」误判为缺失** ⇒ 门禁恒红。
+**归属**：ADR-094（实现）· A2b（判定）· 本契约（治理）。
 
 ---
 
