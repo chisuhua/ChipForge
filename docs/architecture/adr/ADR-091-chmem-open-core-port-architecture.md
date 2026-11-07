@@ -606,6 +606,8 @@ module top (
 
 ## Related
 
+- ★ **ADR-094**（CH_MEM 开放核的**层次化装配契约与端口纪律**）—— ★ **装配与登记**部分的**唯一权威**（G-1r r.1~r.16）⇒ ★ 本 ADR 的 §D5.1.3 只留索引，★ 规则全文以 ADR-094 为准（★ 避免同一规则两处全文 ⇒ 必然漂移）
+- ★ **架构主题文档**：[`docs/architecture/hierarchical-plugin-architecture.md`](../hierarchical-plugin-architecture.md) —— ★ **层次化 Plugin 主题的导航入口**（★ §0 全景表 + 按意图阅读路径 + 权威分布表）⇒ ★ 读者**从该入口出发**可定位本 ADR / ADR-094 / 门禁契约 / 实施面 / 上游全部文档
 - **ADR-088 v1.4 §10**（目标态与三段迁移路径）—— 本 ADR 是 §10 阶段 C 的**先行准备**，但**不**替代阶段 C 的 5 条硬前置
 - **ADR-089 v1.4**（双后端差分 parity 门禁）—— 观测量集与 H-3 等价性自检的判据来源
 - **ADR-083 v1.2**（Plugin-style 单一 source of truth）—— ★ §4.1「拒绝双副本」是 H-3 的由来；★★ **v1.2 已完成表述纠偏**（§1.2 架构图 `ch_stream` 归类 + §4.2 拒绝范围收窄）⇒ ★ 本 ADR D3a 的直接依据
