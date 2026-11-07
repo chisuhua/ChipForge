@@ -216,6 +216,8 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 - **理由**：D4 决策已否（2026-06-08）；ch_stream 强握手语义对单周期同步场景过度；`PipeBuilder::build()` + `Payload<T>` 已验证可替代
 - **替代**：`cf::plugin::Payload<T>` + `PipeNode`
 
+> ★ **适用范围注记（2026-11-07 · ADR-094 v0.1 附带）**：★ 上面「CppHDL 的 `ch_stream<T>` **采用**为 IP 之间 / 核 ↔ 从设备的接口连接方式」**保持不变**；★ **层 2 单元装配域**（层 2 单元接口 = 逐字段标量端口，**MUST NOT** 用 `ch_stream` 作连接机制）由 **ADR-094 D-5** 管辖 ⇒ ★ **管辖域不重叠**，本条**不被推翻**。
+
 > ★★ **v1.2 收窄（2026-10-28，architect 主持）**：本条**拒绝的是 CppTLM 的 `chstream_module` / `stream_adapter` 组件范式**（原标题已含「CppTLM」限定，此处显式化）。
 >
 > - ★ **CppHDL 的 `ch_stream<T>`（`bundle/stream_bundle.h`）不在本条拒绝范围** ⇒ ★ **采用**为 **IP 之间 / 核 ↔ 从设备**的接口连接方式（ADR-092 §D4 / ADR-091 增补 §D-J）
