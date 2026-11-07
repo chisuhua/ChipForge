@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 状态 | ✅ Accepted v1.0 (2026-09-16, Phase 6c M5 落地) → ✅ Accepted v2.0 (2026-09-28, Phase 6d/wave5 mfc-cpu-pipeline-multi-cycle-fsm 扩展算术多周期豁免) |
-| 来源 | Phase 6c W0 审计 + Oracle 报告；v2.0 扩展触发：mfc-cpu-pipeline-multi-cycle-fsm (v0.10.0 PoC-1 硬指标 RV32M 100% PASS) |
+> ★ **附注（2026-11-07 · ADR-094 配套）**：★ 本 ADR §1.2 引用的「`ch_state_machine` **不能在 CppHDL simulator 内推进状态机**」为**过时陈述** ⇒ ★ 根因 = 它依据的是**旧 `current_state()` 访问器**（恒返回 entry），★ 而上游 **ADR-050** 已把它**改名 `entry_state()`** 并明写「它从不返回运行时状态；运行时请用 `current_state_uint()` / `is_in()`」（★ `CppHDL/include/chlib/state_machine.h:395-403`）；★ ★ 且**硬件侧状态确实推进**（★ `build()` 执行 `state_reg->next = next_state;` ⇒ `state_reg` 是真实 `ch_reg` ⇒ 解释器每拍按 next 逻辑推进 ⇒ ★ `state_machine.h:453-491`）；★ ★★ **实测（2026-11-07）**：ChipForge CH_MEM binary 的 `[fsm]` 标签 **6 case / 52 assertions 全绿**，★ 覆盖 **PTW 5 状态跨拍推进**（IDLE→L0_WAIT→L1_WAIT→DONE→IDLE，断言 `result_ppn == 0x12345`）+ **L1 refill FSM**（hit / miss_refill / refill_race），★ 日志明确 `using interpreter` ⇒ ⇒ ★ **建议在本 ADR 的下一次修订中正式订正该句**（★ 本轮**不**改其决策内容，★ 只登记事实与实测）。| 来源 | Phase 6c W0 审计 + Oracle 报告；v2.0 扩展触发：mfc-cpu-pipeline-multi-cycle-fsm (v0.10.0 PoC-1 硬指标 RV32M 100% PASS) |
 | 决策 | **v1.0**: 多周期协议引擎（MMU/PTW、Cache refill FSM、I/O 总线握手）豁免 D4 "无状态机" 禁令，但必须使用 `chlib::ch_state_machine` DSL 而非手写 `enum class + switch`。**v2.0**: 新增 **EX 阶段多周期算术单元**（RV32M MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU）豁免子类，强约束见 §2.1.1 |
 | 关联 ADR | ADR-025（无基业务 tick）、ADR-037（Plugin 作为设计范式）、ADR-040 v2.0（TLM→HDL 移植性约束修订）、ADR-082（Plugin::negotiate capability 协商） |
 
