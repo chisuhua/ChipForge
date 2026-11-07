@@ -2,6 +2,8 @@
 
 > **📌 实现状态快照 (2026-10-08)**
 >
+> ★ ★ **定性（★ 2026-11-08 治理修订 · 架构文档治理）**：★ **本段 = 实施态快照**（★ 「现在长什么样」），★ **不是目标态**（★ 「该长什么样」）⇒ ★ ⇒ ★ **目标态在本文档正文**（★ §架构总览 / §关键设计原则 / §工程目录结构）⇒ ★ **本段仅供读者快速定位当前进度，★ MUST NOT 被当作目标态引用**（★ 否则「现状即合理」⇒ 约束失效）⇒ ★ ★ **本段 dated 2026-10-08 ⇒ 已 1 个月未复核**（★ 具体进度以 [`roadmap-evolution.md`](./roadmap-evolution.md)（★ 架构演进 SSOT）+ [`.rddf/roadmap/`](../../.rddf/roadmap/) 为准 ⇒ ★ **本段不作为进度真源**）⇒ ★ **真相 = 目标态**的纪律见 [`hierarchical-plugin-architecture.md` §0.1](./hierarchical-plugin-architecture.md)（★ 该文件 §0.1 + M-8 是本仓**唯一**已制度化的「真相区 / 实施区」纪律样板 ⇒ ★ **本仓级纪律尚待治理决策** ⇒ 见 `.rddf/reviews/architecture-docs-governance-recommendations.md`）
+>
 > - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 6 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink / uint_t\<N\>）+ 89/89 框架测试 PASS + 432/432 ctest PASS（TLM binary）
 > - ✅ **Plugin-style 单一 source of truth 固化**（ADR-083, 2026-10-08）：业务 IP 不再分别维护 TLM 副本 + RTL 副本；同份代码经由**两个编译模式**产出不同仿真后端
 > - ✅ **CH_MEM elaboration 正道**（ADR-040 v2.0）：`cf::plugin::uint_t<N>` 在 `-DCF_PLUGIN_USE_CH_MEM` 下编译为 `ch::core::ch_uint<N>`；业务代码经由 `pb.elaborate(ctx)` 发射 lnode DAG
