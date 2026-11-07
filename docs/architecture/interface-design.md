@@ -206,6 +206,8 @@ public:
 
 ## RTL 组件接口（CppHDL）
 
+> ★ ★ **v1.16 订正注（2026-11-08 · ADR-091 §D3a.7 / ADR-094 r.11 / r.16）**：★ ★ **本节下方示范是 Phase 1 ~ 5 时代的 `__input(Bundle)` / `__output(Bundle)` 形态 ⇒ ★ 与现行目标态冲突** ⇒ ★ ★ **目标态 = 层 2 单元的接口 MUST 是「逐字段标量端口」**（★ `__io` 宏 + `ch_in` / `ch_out`；★ **MUST NOT** 用 bundle 成员跨层：★ bundle 成员是 `type_proxy`、**不是端口** ⇒ 被上游接口白名单排除；★ 且 `ch_in<ch_stream<…>>` 会退化成**整宽 blob 的单个 `type_input`** ⇒ 语义空壳）⇒ ★ ★ **正确示范见下方「层 2 单元接口（目标形态）」**（★ 取自已落地的 `ip/cpu/core/regfile_chmem.h`）⇒ ★ **决策权威** = ADR-091 v1.16 §D3a.7 + ADR-094 r.11 / r.16；★ **层次化 Plugin 的结构事实**见 [`hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)。
+
 ```cpp
 // ═══════════════════════════════════════════════════════════════
 // RTL 组件设计视角（以 L1 Cache 为例）
@@ -248,6 +250,47 @@ public:
     }
 };
 ```
+
+### ★ 层 2 单元接口（★ **目标形态** · 2026-11-08 补）
+
+> ★ ★ **目标态的层 2 单元接口 = 逐字段标量端口**（★ 权威 = ADR-091 v1.16 §D3a.7 + ADR-094 r.11 / r.16）⇒ ★ **示例取自已落地的唯一层 2 实例** `ip/cpu/core/regfile_chmem.h`（★ 7 个标量端口）⇒ ★ **对照上方旧示范**：★ 旧 = 4 个 **bundle** 端口；★ 新 = 7 个**标量**端口（★ 4 in + 2 out + 1 in 使能）⇒ ★ **代价 = 端口数变多**（★ 收益 = 端口真为端口 ⇒ 层次化 emitter 可正确建 module 边界 + 观测可按端口寻址）。
+
+```cpp
+// ★ 层 2 单元（`ch::Component`）—— ★ 逐字段标量端口形态
+class RegFileComponent : public ch::Component {
+ public:
+  using Addr = ch::core::ch_uint<5>;
+  using Data = ch::core::ch_uint<32>;
+
+  // ★ `__io` 宏（上游 `include/core/io.h`）⇒ 生成 `io_type` struct + `io_storage_` + `io()` accessor
+  // ★ ★ 成员顺序 = aggregate 初始化顺序 ⇒ `create_ports()` MUST 按同序传
+  __io(
+      // ── 读端口 A ──
+      ch::core::ch_in<Addr> rs1_addr;
+      ch::core::ch_out<Data> rs1_data;
+      // ── 读端口 B ──
+      ch::core::ch_in<Addr> rs2_addr;
+      ch::core::ch_out<Data> rs2_data;
+      // ── 写端口 ──
+      ch::core::ch_in<Addr> rd_addr;
+      ch::core::ch_in<Data> rd_data;
+      // ★ 写使能（★ 1-bit `ch_uint<1>` ⇒ 与桥接的 `Ports::rd_we` 同款 ⇒ 类型必须一致）
+      ch::core::ch_in<ch::core::ch_uint<1>> rd_we;
+  )
+
+  explicit RegFileComponent(ch::Component* parent = nullptr,
+                             const std::string& name = "regfile")
+      : ch::Component(parent, name) {}
+  // ★ ★ 本单元**不感知** `Payload`（★ 层 2 不依赖层 1）
+  //   ⇒ ★ 边界转换由**桥接 plugin**（`regfile_bridge_chmem.h`）承担
+  // ★ ★ MUST NOT 用 `ch_stream`（★ 越层：ADR-092 §D4 定 `ch_stream` = IP 间 / 核↔从设备接口）
+
+  // ★ ★ 完整实现另含 `create_ports()` override（★ 显式命名各端口 ⇒ ADR-091 G-1o：
+  //   顶层端口名 MUST NOT 与内部 ch_reg / ch_node 同名）⇒ ★ 照抄时勿漏
+};
+```
+
+> ★ **三个层次的接口形态（★ 勿混）**：★ **层 1 stage 间** = `Payload<T>` + `PipeNode`（无握手）· ★ **层 2 单元接口** = 逐字段标量端口（★ 本节）· ★ **IP 之间 / 核 ↔ 从设备** = `ch_stream<Bundle>`（★ ADR-092 §D4）⇒ ★ 权威 = ADR-091 v1.16 §D3a.7。
 
 ## SoC 组合层
 
