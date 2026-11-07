@@ -1,6 +1,6 @@
 # ADR-094 — CH_MEM 开放核的层次化装配契约与端口纪律
 
-> **Status**: 🚧 **Proposed v0.1（2026-11-07 · architect）** ⇒ ★ **决策已全部闭合并经 oracle → critic 四轮审（0 BLOCKER）**（★ 用户裁决 D-01~D-21）；★ **仅剩治理收口**（「关联 change 立项」+「AC 映射回填」）⇒ ★ **「ADR 完成的标志」第 4 条未满足 ⇒ 未转 Accepted**；★ ★ **不阻塞实施**（★ 实施者可据此开工；★ 但不得据此宣称「ADR 已 Accepted」）。
+> **Status**: 🚧 **Proposed v0.1（2026-11-07 · architect）** ⇒ ★ **决策已全部闭合并经 oracle → critic 四轮审（0 BLOCKER）**（★ 用户裁决 D-01~D-21；★ 审查轮次 = **critic 五轮 + oracle 两轮文本审**，0 BLOCKER）；★ **仅剩治理收口**（「关联 change 立项」+「AC 映射回填」）⇒ ★ **「ADR 完成的标志」第 4 条未满足 ⇒ 未转 Accepted**；★ ★ **不阻塞实施**（★ 实施者可据此开工；★ 但不得据此宣称「ADR 已 Accepted」）。
 > ★ **落笔边界**：本 ADR 只承载**规则**（装配 / 粒度 / 端口与命名 / 交付定位 / chlib 边界）。
 > ★ **推导与证据**（逐条 file:line、探针记录、选项推演、上游 ADR 逐条对照）⇒ `.rddf/reviews/ADR-094-decision-ledger.md` §3 / §6 / §7 · `.rddf/plans/backend-parity-open-core.md` §K34（**待 builder 落**）。
 > ★ **过程日志**（评审轮次 / finding 清单）⇒ `.rddf/reviews/ADR-094-hierarchical-assembly-contract-review.md`。
@@ -170,6 +170,7 @@
 ## Related
 
 - **ADR-091 v1.16**：两层范式 / G-1q / G-1o（扩面）/ §D3a.9 观测量载体；本 ADR 承接其**装配与端口纪律**。
+- ★ **架构主题文档**：[`docs/architecture/hierarchical-plugin-architecture.md`](../hierarchical-plugin-architecture.md) —— ★ **当前态快照 / 结构事实 / 下游需求 / 已知残留**（★ 决策在 ADR ⇒ 本文件只引用，不重述条款）
 - **ADR-092 §D4**：`ch_stream` 的层次区分（本 ADR 仅做**管辖边界澄清**，不推翻）。
 - **ADR-083 §4.2**：拒绝 **CppTLM** `ch_stream` 作 IP 间通信（本 ADR 保留其原意）。
 - **ADR-089 §D3**：判定与例外白名单（本 ADR 的多周期单元拍数差异须登记于此）。
