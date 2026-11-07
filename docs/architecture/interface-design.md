@@ -149,6 +149,11 @@ enum class ImplMode {
 //      **`cf::bundles::MemReq` / `MemResp`**（`bundles/mem_bundles.h`）
 //   ③ ★ **目标态的接口层**见 ADR-091 §D3a：★ **CppHDL 的 `ch_stream<CpuBusReq>`**
 //      （`ip/cpu/core/bus_iface_chmem.h`，真名 `CpuBusReq`/`CpuBusResp`）★ **不是** CppTLM 组件范式
+//      ★ ★ **v1.16 补注（2026-11-07 · ADR-094）**：★ `ch_stream` 是**契约形状**，★ **物理形态 =
+//      逐字段标量端口**（★ `ibus_port_chmem.h:21-30` 有论证：上游 `as_master_direction()` 本身
+//      就是逐字段 `make_output(payload,valid)` + `make_input(ready)`）⇒ ★ ★ **层 2 单元的接口
+//      MUST 是逐字段标量端口**（★ ADR-094 r.11 / r.16）⇒ ★ 层次化 Plugin 的结构事实见
+//      [`hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)
 class CpuTlmExample : public ChStreamModuleBase {
 public:
     CpuTlmExample(const std::string& name, EventQueue* eq)
