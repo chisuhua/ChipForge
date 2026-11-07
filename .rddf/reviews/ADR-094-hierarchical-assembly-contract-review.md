@@ -477,3 +477,64 @@
 |---|---|---|
 | ★ **版本落点** | ★ `roadmap-evolution.md` §4.5 + §8 两行已补（★ 标「待 objective 登记」）+ 主题文档 §3.6 记**建议** | ★ **planner 登记进 `objective-soc-cpu-v0110-launch.md`**（★ 该文件实测 grep「层次化」零命中） |
 | ★ **验证形态** | ★ §3.5 四维已立（★ ② 的机制锚 = 上游 `ch::hier_eq` 7 项闭合公共面） | ★ **ADR-094 侧补 V-28 / V-29 机制锚注**（★ 属 ADR-094 范围 ⇒ 无需另立 ADR）★ + **ADR-089 / 契约文档登记 ③ 的层次化适用面**（★ 登记前 §3.5 结论句保持 SHOULD） |
+
+---
+
+## 7l. ★ `docs/architecture/` 文档治理（2026-11-08 · oracle 诊断轮 + oracle 审稿轮 + critic 第 1 轮）
+
+> ★ 用户指令（2026-11-08）：★ 「architect **继续修订文档**，并**继续对 `docs/architecture` 下文档治理给出建议**」。
+
+### 7l.1 ★ oracle 治理诊断轮的核心结论
+
+| 项 | 结论 |
+|---|---|
+| ★ **三个最严重问题** | ① **17 份非 ADR 架构文档零全局索引** + ★ `arch-docs.json` **无执行脚本、无读者**（★ 治理机制建了但不可达）· ② ★ 第一真相文档 `overview.md` 头置 **1 个月 stale 的实施态快照**（★ 违反「真相=目标态」；★ 该纪律全仓**仅 1 份文档**制度化）· ③ ★ 索引完整性**零机检** |
+| ★ **分类法** | ★ 8 类（target / mixed / historical / index / ledger / plan / research / reference）· ★ **mixed 占比 7/18（39%）** ⇒ ★ 与「真相=目标态」口径冲突 ⇒ ★ 须二选一：**内部分区** 或 **逐出真相区** |
+| ★ **门禁清单** | ★ 6 项可机检（★ ADR 孤儿检查 / 索引条目路径存在性 / 元数据 lint / 统计派生 / 真相表漏收 / 真相区纪律 lint）· ★ ★ **关键词法做「真相表漏收」不可行**（★ 同词异义已实证）⇒ ★ 只能**显式标记法**或 WARN 级嫌疑清单 |
+| ★ **命名** | ★ `docs/architecture/` 顶层**已统一为纯主题风格**（★ 18 份零例外）· `adr/` **零例外**（★ `ADR-NNN-主题.md`）⇒ ★ **不引入日期前缀**（★ 日期前缀只在上游与其他目录） |
+
+### 7l.2 ★ ★ 诊断轮抓到的 **3 个公开数字错误**（★ architect 独立复算确认 oracle 全对 —— ★ 其中 2 个已进真相区正文 ⇒ **带错入库 = 公开错账**）
+
+| 错 | 实测 | 已修落点 |
+|---|---|---|
+| ★ 「11 份治理盲区」 | ★ **10 份**（★ `exclude_paths` 覆盖了 `tlm-coverage-parity-ledger.md`） | ★ 建议文档 §1/§4/§8 · `arch-docs.json` description · 主题文档 §7 ⑳ |
+| ★ 「§2.1 主表实测 40 行」 | ★ **41 行**（★ 且 `adr.md:90` 标题「40 条」**自身少 1**） | ★ 建议文档 §4 选项 3 · 主题文档 §7 ⑲ |
+| ★ 「元数据格式 4 套并存」 | ★ **6 套** | ★ 建议文档 §6 |
+
+★ ★ **oracle 另挖到两层更深的账实不符**（★ 已补进建议文档与残留 ⑲）：★ ① §2.3 标题「9 条」/ **实测 18 行** ⇒ ★ **adr.md 的统计与标题两处都不自洽**；★ ② §2.4 类别表有 **M 类（IP 架构）** 但 §3 详细记录**只有 A~L 十二节**（★ 无 M 节 · TOC 亦无）⇒ ★ **类别体系断链**。
+
+### 7l.3 ★ 落地（6 文件）
+
+| 文件 | 改动 |
+|---|---|
+| **★ 新建** `.rddf/reviews/architecture-docs-governance-recommendations.md` | ★ **治理建议文档**（★ 8 节）★ ★ 落 `.rddf/reviews/` 的理由 = **建议是「待决策材料」⇒ 不进真相区**（★ 物理隔离 ⇒ 不会被误读为已决） |
+| `docs/architecture/overview.md` | ★ 头部 stale 实施态快照 → **dated 定性横幅**（★ 「本段 = 实施态 · MUST NOT 被当作目标态引用」+ 指针） |
+| `docs/architecture/testing-and-dse.md` | ★ §「当前实际状态 (2026-06-17)」→ **dated 定性横幅** |
+| `docs/architecture/interface-design.md` | ★ §1.0「Phase 1 当前状态是 POD」→ **dated 定性横幅**（★ 明写「目标态以右列为准」） |
+| `.rddf/config/arch-docs.json` | ★ **删死路径** `ip/cpu/docs/adr`（★ 目录**实测不存在**）· ★ `description` 瘦身为一句指针（★ **不承载诊断结论** ⇒ 机器读 config 不做双重身份） |
+| `docs/architecture/hierarchical-plugin-architecture.md` | ★ §7 残留 18 → **20**（⑲ 统计口径脱节 · ⑳ `arch_paths` 治理盲区 —— ★ **治理决策项**）+ ★ §11 治理建议指针 |
+
+### 7l.4 ★ 审查结论
+
+| 轮 | 审查者 | 结论 | BLOCKER |
+|---|---|---|---|
+| oracle（诊断） | 材料轮 | ★ 3 个最严重问题 + 8 类分类法 + 6 项门禁 + 3 项待决策 | — |
+| oracle（审稿） | 文本级 | ★ **PASS-WITH-NOTES** | ★ **0** |
+| critic（第 1 轮 · 文档治理任务） | arch + plan + governance | ★ **APPROVE** · `mergeable: yes` | ★ **0** |
+
+★ **oracle 审稿轮**：★ 3 个公开数字错误（★ **全部已修**，★ architect 独立复算确认 oracle 全对）+ 选项表与 architect 倾向不自洽（★ 已补「扩 2 份」栏）+ 若干 SOFT 表述（★ 已修）。
+★ **critic 第 1 轮**：★ **1 SHOULD_FIX**（★ `arch-docs.json` 的 `description` 承载 600 字诊断 ⇒ **机器读 config 双重身份** ⇒ ★ 已瘦身为一句指针）+ **3 NIT**（★ 状态标签梯度对齐 · 「待 builder」补依赖备注 · ★ ★ **诚实承认本文件所在的 `hierarchical-plugin-architecture.md` §7 本身就是 mixed 内容实例** ⇒ 沿 ⑮~⑱ 既有先例）—— ★ 全部已修。
+★ ★ **critic 对 focus 1(c) 的明确回答（★ 记录在案）**：★ 「architect 倾向」**不会被误读成已决** —— ★ 三重防护：① 文档头声明「待决策材料 · 不是架构决策」② 三处「倾向」每处以「⇒ ★ **需你点头**」收尾 ③ 物理落 `.rddf/reviews/`。
+★ ★ **critic 对 focus 2(b) 的明确回答**：★ 横幅是**过渡处置、且被诚实标注为过渡**（★ §2.1 明写「横幅只防引用、不防首屏误导 ⇒ 首屏污染仍在 ⇒ 拆分仍待决策」）⇒ ★ **不构成「用注释掩盖结构问题」**（★ 掩盖的定义是不承认；★ 此处双重承认）。
+
+### 7l.5 ★ ★ 三个「待你点头」的治理决策（★ architect 倾向已附背书）
+
+| # | 决策 | ★ architect 倾向 | 依据 |
+|---|---|---|---|
+| **1** | ★ 建不建 `docs/architecture/README.md`（★ 目录级编目） | ★ **建**（★ 但 MUST 生成式 + frontmatter 派生 + 机检相等） | ★ 缺口真实（★ 17 份零全局索引）；★ 不建 ⇒ 治理机制继续「不可达」；★ **不建议更保守**（frontmatter 先行但 README 缓行 ⇒ frontmatter 收益减半） |
+| **2** | ★ `arch_paths` 扩不扩 | ★ **区分对待 = 扩 2 份**（★ `error-handling.md` + `background-and-goals.md` —— ★ **目标态**且仅缺 dated 注）⇒ ★ 历史态 / 映射态 3 份**不扩** | ★ 扩历史态文档 = 让 architect 去改历史文档 ⇒ 风险真实；★ 正确处置是 dated 注 + 整体重写归 backlog |
+| **3** | ★ `adr.md` §2.4 统计口径怎么收 | ★ **A（统一词表 + 派生 + 机检相等）**，★ 但**工程量此前被低估**（★ 41 行词表归一 + §2.3 标题 9→18 + §3 补 M 节 + 派生脚本）⇒ ★ **若求稳**：★ 选 **C**（★ **已半落地**）★ + 把另两处账实不符**另立残留** | ★ A 与 ADR-094 D-16「生成镜像 + 机检相等」哲学一致；★ C 已在 `adr.md:159` 做了注记 |
+
+### 7l.6 ★ 归 builder 的 2 项（★ architect 已提需求）
+
+① ★ **ADR 孤儿检查**进 `verify_adr.sh`（★ ★ **实测零误伤**：★ `adr/` **18/18** 在 §2 有行 · §2 全部 **42 个本地链接 0 broken**）② ★ **索引表条目路径存在性**（★ 残留 ⑩ 方案：`doc_link_check.sh` 检查 2 的 `PATH_CHECK_DOCS` 扩入主题文档 + `SCAN_PATHS` 补 `.rddf/`）。
