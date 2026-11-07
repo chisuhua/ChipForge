@@ -225,6 +225,7 @@ CI 门禁（adr-matrix §6 行 5 / 决策 1）： build() 内 dynamic_cast = 0
 | mmu-verilator 5/5 真 sv32 | `[mmu-verilator]` 3/3 plumbing → 5/5 真翻译 | ADR-082 + ADR-049（mmu-chmem Phase A-E）| — |
 | DMIPS/MHz ≥ 1.4 | Dhrystone 硬门禁（mfc Phase G）| ADR-082 | PoC-1 复测 |
 | ADR-082 negotiate 完整集成 | mfc Phase H archive（MUL/DIV FSM 化 + negotiate 组装）| ADR-082 | PoC-1/2/3 |
+| ★ **层次化 Plugin 装配**（root / 契约登记簿 / 两阶段迁移）★ **（2026-11-08 architect 补 · ★ 待 planner 登记进 `objective-soc-cpu-v0110-launch.md`）** | ★ **阶段 1**：同名节点普查通过（★ CH_MEM 全量 case 0 歧义）· 观测解析三态化（★ `kMissing` / `kAmbiguous` **响亮失败**，★ 不静默取首个匹配；★ 契约面见 `parity-gate-contract.md` **S-17**）· 框架地基（root / root-scope / 层 2 基类）落地 —— ★ **判据清单与批次映射 = 台账 §9.2**（★ 本行**不复制** V 编号 ⇒ 避免阶段归属引错）| ★ **ADR-094**（G-1r r.1~r.16）· ADR-091 v1.16 | ★ **—**（★ 装配契约侧判据，非硅验证） |
 
 **退出标准**（Go 条件，全满足）: `[riscv-tests]` 48/48 + `[mmu]` 53/53 0 退化 + Phase A 新增 6 测试全过（=59/59）+ `[cpu-l1-mmu-demo]` 7/7 + `[mmu-verilator]` 5/5 + `[cpu-integration]` 全绿 + DMIPS/MHz ≥ 1.4 + `run_chipforge_tests.sh --all` 全 PASS（详见 objective-soc-cpu-v0110-launch.md §9.2）。
 
@@ -363,6 +364,7 @@ FMAX ≥ 100 MHz
 | ★ **一致性证据（parity）** | — | — | — | — | — | ★ **双后端差分门禁**（ADR-089：同一模型 × CppHDL Simulator / Verilator 差分执行）—— ★ **MUST 先于 B3（TLM 模式删除）** | 同 v1.0.0 | 同 v1.0.0 |
 | **Cache** | L1Cache 256×1 | 同 Phase 6d | 4-way LRU | L1D 4-way (LRU) + ICache (PoC-3, ADR-072) | 同 v0.10.0 | 同 v0.10.0 | 4-way RRIP | 同 v1.2.0 |
 | **MMU** | sv32 PTW FSM (5 状态) | PADDR-first 真消费 | + JSON 配置驱动 | sv32 (v0.9.0 沉淀) | CH_MEM 真 sv32（mmu-chmem Phase A-E）| + S-mode satp | 同 v1.0.0 | 同 v1.0.0 |
+| ★ **层次化 Plugin 装配**（层 2 单元）★ **（2026-11-08 architect 补 · ★ 待 objective 登记）** | — | — | — | — | ★ **ADR-094 装配契约 + 阶段 1**（root / 登记簿 / 三态化）| ★ **阶段 2 + 首批成层单元**（ALU）| 同 v1.0.0 | 同 v1.0.0 |
 | **Cycle 精度** | CppHDL sim + Verilator | + cycle counter | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 | 持续完善 |
 | **多周期** | MMU/PTW + L1Cache refill FSM | MUL/DIV 多模板 (mfc supersede) | 持续完善 | MUL/DIV FSM 化（ad-hoc counter，真 radix-2 defer v0.11.0）| MUL/DIV FSM 化 + ADR-082 negotiate 完整集成（mfc Phase H archive）| 持续完善 | 持续完善 | 持续完善 |
 | **异常** | CtrlLink::throw_when stub | stub | 12/13/15 路由完整 + trap delivery | 持续完善 | 同 v0.10.0 | 持续完善 | 持续完善 | 持续完善 |
