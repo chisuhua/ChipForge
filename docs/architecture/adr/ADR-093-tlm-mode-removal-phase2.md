@@ -1,6 +1,7 @@
 # ADR-093 — TLM 模式移除契约（Phase-2：框架层单模化 + 门禁体系改版）
 
 > **Status**: 🚧 **Proposed（v0.1，2026-10-28，architect 主持；★ **待 G-1a/G-1b/G-3 达成后转 Accepted**）**
+> ★ **编号澄清（v1.16 附带，2026-11-07）**：本 ADR 的 **G-1a / G-1b / G-3** 是**本文 §D2 局部定义**的 Phase-2 启动门禁（MMU / Cache / 门禁改版），与 **ADR-091 §D5.1** 的 `G-1a`（端口 API 条件化）/ `G-1b`（禁 include `<ch.hpp>`）/ `G-3`（DSE 抽象）**仅撞名、不是同一条**。
 > **上游**: **ADR-092 v1.2**（TLM 参考实现的冻结与演进停止 —— ★ **Phase-1 已落地**）· **ADR-091 v1.4**（CH_MEM 开放核形态）· ADR-088 v1.4 §10（三段迁移路径）· ADR-083 v1.2 · ADR-040 v3.0
 > **下游**: `include/cf/plugin/uint_t.h` · `bundles/mem_bundles.h` · `tools/check_plugin_portability.sh` · `ip/**`（TLM 版业务文件）· `src/cf_plugin/bridge/` · `tools/cpu_sim/` · `tests/CMakeLists.txt`
 > **执行文件（待 planner 落）**: `.rddf/plans/`（★ 归 builder 起草）
