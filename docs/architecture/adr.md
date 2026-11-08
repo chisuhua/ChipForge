@@ -32,16 +32,16 @@
 - [3. 详细决策记录](#3-详细决策记录)
   - [A. 框架架构](#a-框架架构-3-条)
   - [B. CppTLM 模块/接口](#b-cpptlm-模块接口-5-条)
-  - [C. CppHDL 模块/接口](#c-cpphdl-模块接口-5-条)
+  - [C. CppHDL 模块/接口](#c-cpphdl-模块接口-6-条)
   - [D. 注册与发现](#d-注册与发现-3-条)
   - [E. 端口与信号](#e-端口与信号-3-条)
   - [F. Bundle 与协议](#f-bundle-与协议-4-条)
-  - [G. 声明式 Plugin 模型（Phase 1）](#g-声明式-plugin-模型phase-1-5-条)
+  - [G. 声明式 Plugin 模型（Phase 1）](#g-声明式-plugin-模型phase-1-7-条)
   - [H. 流水线抽象（Phase 1）](#h-流水线抽象phase-1-4-条)
   - [I. 验证框架（Phase 1）](#i-验证框架phase-1-3-条)
   - [J. 目录与组织](#j-目录与组织-3-条)
   - [K. 范式决策](#k-范式决策-1-条)
-  - [L. 可移植性约束](#l-可移植性约束-1-条)
+  - [L. 可移植性约束](#l-可移植性约束-2-条)
 - [4. 漂移检测规则](#4-漂移检测规则)
 - [5. 验证脚本说明](#5-验证脚本说明)
 - [6. 变更日志](#6-变更日志)
@@ -77,9 +77,11 @@
 
 ### 2.1 已实现决策（✅）— 41 条
 
+> ★ ★ **状态先行标注（2026-11-08 · architect）**：★ **ADR-001 的行状态已按 §3 记录改为「⚠️ 部分过时」**（★ §3 记「⚠️ 部分过时（2026-10-08）」而 §2.1 行原写 ✅ ⇒ ★ 表内自相矛盾）⇒ ★ ★ **但本节仍按「已实现决策」口径计数**（★ 标题数 **41** 未减 · §2.2「⚠️—1 条」未纳入 · §2.4 `⚠️` 合计=1 未变）⇒ ★ ★ **这三处计数与状态列的同步属 A3「单表化」范围**（★ 待治理决策 · 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` §4 选项 3）⇒ ★ ⇒ ★ **本轮只改状态、不改计数**（★ 避免再动那套已脱节的统计 ⇒ 见残留 ⑲）
+
 | ID | 标题 | 类别 | 当前状态 | 验证路径 |
 |----|------|------|----------|----------|
-| ADR-001 | 三层框架分工 | 架构 | ✅ | `CppTLM/` + `CppHDL/` + `ip/` 目录均存在 |
+| ADR-001 | 三层框架分工 | 架构 | ★ **⚠️ 部分过时**（★ §3 记录：2026-10-08 标注） | `CppTLM/` + `CppHDL/` + `ip/` 目录均存在 |
 | ADR-002 | CppTLM 事件驱动调度 | 架构 | ✅ | `core/event_queue.hh` |
 | ADR-003 | CppHDL LogicNode DAG + 多后端 | 架构 | ✅ | `core/lnode.h` + `codegen_verilog.h` + `simulator.h` |
 | ADR-004 | SimObject 类层次 | TLM | ✅ | `core/{sim_object,sim_module,tlm_module,chstream_module}.hh` |
@@ -112,7 +114,7 @@
 | ADR-038 | chstream_register 集中入口 | 目录 | ✅ | `chstream_register.hh` |
 | ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity；§10.5 payload key 模态约束 + §10.6 生产者/消费者顺序契约 于 2026-10-22 `chmem-mmu-keys-modality` 补齐；v2.0 2026-09-17 Phase 6c M5 落地)** | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | ✅ | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
-| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | ✅ | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册) |
+| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | ✅ | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册)　★ **dated 注（2026-11-08）**：★ **MMU 部分已被现实超越**（★ `ip/mmu/` 已实装 · `[mmu]` 测试家族存在 · `src/cf_plugin/bridge/mmu_bridge.h` 已落地）⇒ ★ 本 ADR 的**推迟语义仅对 FPU / Exception 仍成立** |
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | ✅ | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
 | ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令（v2.0 含算术多周期 FSM 子类） | Plugin | ✅ v1.0 Phase 6c M5 (2026-09-17) + ✅ v2.0 算术豁免 (2026-09-28, mfc-cpu-pipeline-multi-cycle-fsm 触发) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
@@ -156,9 +158,7 @@
 
 ### 2.4 统计
 
-> ★ **统计口径（2026-11-07 显式登记）**：★ 本表统计**截止 ADR-086**；★ **ADR-087 起的新 ADR（087/088/089/091/092/093/094）尚未纳入类别统计** ⇒ ★ **已登记 backlog**
->
-> ★ ★ **★ 口径登记（2026-11-08 · architect 实测）**：★ ① 本表按 **§3 的 A~M 类别**统计、**截止 ADR-086**；★ ② ★ **本表合计 48 ≠ §2.1~§2.3 三节标题合计 60**（★ 实测 41 + 1 + 18）⇒ ★ **差 12**；★ ③ ⇒ ★ **本表不得被引用为「全部 ADR 的分布」**（★ 根因 / 三选项 / 归属见 `.rddf/reviews/architecture-docs-governance-recommendations.md` **§4 选项 3**）（owner: architect；★ 触发条件 = 下一次注册表整理；★ 理由：逐条归类 + 验证路径核实需独立一轮，★ **在收口轮顺手改易引入新错账**）⇒ ★ **在此之前，本表不得被引用为「全部 ADR 的分布」**。
+> ★ ★ **★ 口径登记（2026-11-08 · architect 实测）**：★ ① 本表按 **§3 的 A~M 类别**统计、**截止 ADR-086**（★ **ADR-087 起的新 ADR 087/088/089/091/092/093/094 尚未纳入类别统计** ⇒ ★ 已登记 backlog）；★ ② ★ **本表合计 48 ≠ §2.1~§2.3 三节标题合计 60**（★ 实测 41 + 1 + 18）⇒ ★ **差 12**；★ ③ ⇒ ★ **本表不得被引用为「全部 ADR 的分布」**（★ 根因 / 三选项 / 归属见 `.rddf/reviews/architecture-docs-governance-recommendations.md` **§4 选项 3**）（owner: architect；★ 触发条件 = 下一次注册表整理；★ 理由：逐条归类 + 验证路径核实需独立一轮，★ **在收口轮顺手改易引入新错账**）⇒ ★ **在此之前，本表不得被引用为「全部 ADR 的分布」**。
 
 | 类别 | ✅ | ⚠️ | 🚧 | 合计 |
 |------|----|----|-----|------|
@@ -404,7 +404,7 @@ grep -q "HybridCacheWrapper" /workspace/project/CppTLM/include/chstream_register
 
 ---
 
-### C. CppHDL 模块/接口（5 条）
+### C. CppHDL 模块/接口（6 条）
 
 ---
 
@@ -1249,7 +1249,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 ---
 
-### K. 范式决策（2 条）
+### K. 范式决策（1 条）
 
 ---
 
@@ -1355,7 +1355,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 
 ---
 
-### L. 可移植性约束（1 条）
+### L. 可移植性约束（2 条）
 
 ---
 
