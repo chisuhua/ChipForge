@@ -39,13 +39,21 @@ depends_on: []
 
 ## Acceptance Criteria
 
-- [ ] `docs/architecture/parity-gate-contract.md` 存在，含 **S-1…S-16**，每条有「要求 / 验收方式 / 归属」
-- [ ] 契约里的**每条代码事实**都带 `path:line`，且可复核（不含量化猜测）
-- [ ] **零代码**：`git diff --stat` 不触及 `ip/**` `src/**` `tests/**` `tools/**`
-- [ ] §2.3 明确写出**两侧 reset 处理不同**这一真实分歧源 + `reset_mode = none` 的统一要求
-- [ ] §7 覆盖矩阵模板 + S-16 粘住机制（下游 tasks 必引 S 编号）成文
-- [ ] `ADR-089` D2 ② 的事实错误已更正，`verify_adr.sh` / `check_md_tables.py` 全绿
-- [ ] 开放项 §8（C-1 / C-2 待 architect；O-1~O-4 待 A2a 实测）**逐条列出**，不留隐性假设
+- [x] `docs/architecture/parity-gate-contract.md` 存在，含 **S-1…S-16**，每条有「要求 / 验收方式 / 归属」
+      —— ★ **2026-11-08 归档前核对**：★ 现状已扩到 **S-17**（ADR-094 D-3 登记簿）+ **S-17.1**（逻辑契约名清单）⇒ **超出本 AC 原范围但仍满足**
+- [x] 契约里的**每条代码事实**都带 `path:line`，且可复核（不含量化猜测）
+      —— ★ 实测：契约 **628 行**含 **23 处** `path:line` 引用
+- [x] **零代码**：`git diff --stat` 不触及 `ip/**` `src/**` `tests/**` `tools/**`
+- [x] §2.3 明确写出**两侧 reset 处理不同**这一真实分歧源
+      —— ★ ★ **字面订正（2026-11-08 · 归档前核对）**：★ 本条原写「+ `reset_mode = none` 的统一要求」，
+        ★ **该要求已被实测推翻**（★ C-2 裁决 = **ctor-init**：「生成的 Verilog 只在复位分支加载 init，跳过脉冲则 `pc` 从 0 起；
+        而 `Simulator::reset()` 只清零」⇒ 「两侧都 `reset_mode=none`」**不可行**）⇒ ★ **权威 = 契约 §5 C-2 行**
+        （`docs/architecture/parity-gate-contract.md:614`）⇒ ★ 本条按**已裁决口径**满足，不要求被推翻的字面
+- [x] §7 覆盖矩阵模板 + S-16 粘住机制（下游 tasks 必引 S 编号）成文
+- [x] `ADR-089` D2 ② 的事实错误已更正，`verify_adr.sh` / `check_md_tables.py` 全绿
+- [x] 开放项 §8（C-1 / C-2 待 architect；O-1~O-4 待 A2a 实测）**逐条列出**，不留隐性假设
+      —— ★ 现状：**C-1 / C-2 均已裁决**（C-1 = `ERROR(2)` + `determinism_mismatch` · C-2 = ctor-init）·
+        **O-1 / O-2 / O-4 / O-5 已闭合** · O-3（`memsig` 探针机制细节）随 A2a 已由 tasks 3.5 落地
 
 ## Impact
 
