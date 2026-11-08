@@ -1,5 +1,12 @@
 # 错误处理与异常管理
 
+
+> ★ ★ **订正块（2026-11-08 · ADR-095 §2.3「就地净化」· 用户已签认）**：★ 本文有三类**过时表述**，★ **以下为准**【★ 原文保留待批次重写】：
+> - ★ **`MemRespBundle` 是死名**（★ 本文 6 处）⇒ ★ **真名 = `cf::bundles::MemResp`**（★ `bundles/mem_bundles.h:59`）★ ⇒ ★ 且开放核 `ip/cpu/core/bus_iface_chmem.h:27` **明禁该名**
+> - ★ **`LOG_ERROR` / `LOG_WARN` / `LOG_DEBUG` 宏不存在**（★ CppLTM / CppHDL / `cf` 全无定义）⇒ ★ 实际 logger 在 `CppHDL/include/utils/logger.h`
+> - ★ **COMPARE 模式从未实现**（★ ADR-035 🚧）⇒ ★ 已被 **Sim↔Verilator parity**（ADR-089）取代 ⇒ ★ §4.3「COMPARE 模式下的异常验证」= **从未存在的形态**
+> - ★ **缺口**：★ 本文**无 CH_MEM 错误范式**（★ ADR-047 `Result` 范式 · PayloadStore fail-fast 全文缺席）
+
 ## 1. 设计目标
 
 建立统一的错误处理框架，确保 TLM 和 RTL 层面的异常行为一致，支持可观测性和调试。
