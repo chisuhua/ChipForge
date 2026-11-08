@@ -1,6 +1,6 @@
 # TLM 覆盖平价台账（TLM Coverage-Parity Ledger）
 
-> **格式权威**: [ADR-088 §4](../architecture/adr/ADR-088-tlm-backend-retirement.md)（三态 `covered` / `partial` / `not-covered` + 必填字段 + 口径注记）—— 本文件是它的**内容**。
+> **格式权威**: [ADR-088 §4](../adr/ADR-088-tlm-backend-retirement.md)（三态 `covered` / `partial` / `not-covered` + 必填字段 + 口径注记）—— 本文件是它的**内容**。
 > **基线 commit**: `d93f9a72ff349b4418db4a8a48c0bcda565c05e8`（计数随代码演进漂移；漂移由 `tools/check_coverage_parity_ledger.sh` 检出）
 > **生成 / 校验**: `tools/gen_coverage_parity_ledger.sh`（生成骨架 + 闭合校验）· `tools/check_coverage_parity_ledger.sh`（漂移 + 红线检测，CI warn 级）
 > **配套 change**: `chmem-tlm-coverage-parity-ledger`（交付内容）· 格式由 `chmem-tlm-backend-freeze`（已归档）交付。
@@ -735,7 +735,7 @@
 
 ## 7. B2 语义裁决对台账的落地标注（2026-10-24）
 
-> **权威**：[ADR-088 v1.1 §3](../architecture/adr/ADR-088-tlm-backend-retirement.md)（逐子系统语义裁决表，5 行正式表态）。本节记录裁决**如何改变本台账的条目态**（既有的族级继承被**条目级覆盖**，解决 §6 维护规则 5 提到的「族内异质性」问题）。
+> **权威**：[ADR-088 v1.1 §3](../adr/ADR-088-tlm-backend-retirement.md)（逐子系统语义裁决表，5 行正式表态）。本节记录裁决**如何改变本台账的条目态**（既有的族级继承被**条目级覆盖**，解决 §6 维护规则 5 提到的「族内异质性」问题）。
 
 | 裁决项（ADR-088 §3） | 影响的台账条目 | 态变化 | 覆盖后的差异说明 |
 |---|---|---|---|

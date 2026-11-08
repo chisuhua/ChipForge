@@ -42,7 +42,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 
 | 约束 | 事实 |
 |------|------|
-| 测试覆盖 | TLM binary 493 case vs CH_MEM binary 130 case；共有 30 ⇒ **TLM 独占 463**（闭合 463+30=493）。族分布实测：`[cpu]` 137 / `[cpu-integration]` 96 / `[framework]` 94 / `[mmu]` 59 / `[riscv-tests]` 48 / `[cache]` 25 / `[soc]` 20 等 —— **逐条三态标注见 [`tlm-coverage-parity-ledger.md`](../tlm-coverage-parity-ledger.md)**（v1.0 的 361 为早期估算，已按实测纠正） |
+| 测试覆盖 | TLM binary 493 case vs CH_MEM binary 130 case；共有 30 ⇒ **TLM 独占 463**（闭合 463+30=493）。族分布实测：`[cpu]` 137 / `[cpu-integration]` 96 / `[framework]` 94 / `[mmu]` 59 / `[riscv-tests]` 48 / `[cache]` 25 / `[soc]` 20 等 —— **逐条三态标注见 [`tlm-coverage-parity-ledger.md`](../archive/tlm-coverage-parity-ledger.md)**（v1.0 的 361 为早期估算，已按实测纠正） |
 | 性能硬门禁载体 | **Dhrystone DMIPS/MHz ≥1.4**（`tests/cpu/integration/test_dhrystone.cpp` 硬绑 `CpuFactory<uint32_t>`）与 **CoreMark/MHz ≥1.9**（PoC-6，被测对象 `ip/cpu/plugins/branch_predictor.h`）**100% 在 TLM** |
 | CI 盲区 | 测试**不进 CI**（Oracle 2026-10-06 决策：`.github/workflows/architecture-gates.yml` 只跑架构门禁脚本）⇒ 删 361 case 后**无自动回归发现机制** |
 | 链接依赖 | `chipforge_tests_chmem`（`tests/CMakeLists.txt:183`）与 `cpu_verilator_sim`（`tools/verilator_runner/CMakeLists.txt:47`）**仍链接 `libcpptlm_core.a`** ⇒ 删 TLM 代码 ≠ 立刻脱 CppTLM |
@@ -313,6 +313,6 @@ ADR-083（Accepted 2026-10-08）已定性：
 - `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B0–B3 编排 + 13 条验收）
 - `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G1/G2/G3 门禁）
 - [`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../tlm-retirement-b1-capacity-plan.md)（B1 承载力拆解 + 决策定案）
-- [`docs/architecture/tlm-coverage-parity-ledger.md`](../tlm-coverage-parity-ledger.md)（463 条覆盖平价台账，B0 姊妹提案交付）
+- [`docs/architecture/tlm-coverage-parity-ledger.md`](../archive/tlm-coverage-parity-ledger.md)（463 条覆盖平价台账，B0 姊妹提案交付）
 - `.rddf/improvements/chmem-tlm-backend-freeze.md`（B0 提案）· `.rddf/improvements/chmem-tlm-coverage-parity-ledger.md`（台账内容）
 - `openspec/changes/chmem-tlm-backend-freeze/`（本 change 的 proposal / design / plan / tasks）
