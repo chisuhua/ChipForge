@@ -19,23 +19,23 @@ depends_on:
 
 ## 1. ★ P1 — timings 采集（★ 只加字段 · ★ 不改判定）
 
-- [ ] **1.1** ★ **RED**：★ 实测当前 `build/parity/report.json` 的 `timings` = `{}`（★ **空占位**）⇒ ★ 判据 = 「跑完后 `timings` **非空** 且含 p50/p95」
-- [ ] **1.2** ★ **GREEN**：★ `tools/parity/parity_gate.py` 采集 per-case 墙钟时长（★ `time.monotonic()`）⇒ ★ 写入 `per_case[*]` 与 `timings`
-- [ ] **1.3** ★ `timings` 结构 = `{per_case, p50, p95, total, jobs}`（★ 与 plan §1.3 一致）
-- [ ] **1.4** ★ **零回归**：★ `--layer pr` ⇒ ★ **verdict 仍 = PASS · 退出码仍 = 0**（★ **判定逻辑一字未改**）★ **AC-4**
-- [ ] **1.5** ★ **MUST NOT 写死未实测的硬阈值**（★ S-15）⇒ ★ 只**采集** p95 ★ **AC-4**
-- [ ] **1.6** ★ 验证：★ `report.json` 的 `timings` 非空 + 含 p50/p95 + `per_case[*]` 含时长 ★ **AC-4**
+- [x] **1.1** ★ **RED**：★ 实测当前 `build/parity/report.json` 的 `timings` = `{}`（★ **空占位**）⇒ ★ 判据 = 「跑完后 `timings` **非空** 且含 p50/p95」
+- [x] **1.2** ★ **GREEN**：★ `tools/parity/parity_gate.py` 采集 per-case 墙钟时长（★ `time.monotonic()`）⇒ ★ 写入 `per_case[*]` 与 `timings`
+- [x] **1.3** ★ `timings` 结构 = `{per_case, count, p50, p95, total}`（★ 与 plan §1.3 一致；★ ★ `jobs` **不在** `timings` 内 ⇒ ★ 已在 report 顶层）
+- [x] **1.4** ★ **零回归**：★ `--layer pr` ⇒ ★ **verdict 仍 = PASS · 退出码仍 = 0**（★ **判定逻辑一字未改**）★ **AC-4**
+- [x] **1.5** ★ **MUST NOT 写死未实测的硬阈值**（★ S-15）⇒ ★ 只**采集** p95 ★ **AC-4**
+- [x] **1.6** ★ 验证：★ `report.json` 的 `timings` 非空 + 含 p50/p95 + `per_case[*]` 含时长 ★ **AC-4**
 
 ## 2. ★ P2 — 本机接线（★ 默认行为不变）
 
-- [ ] **2.1** ★ **RED**：★ `run_chipforge_tests.sh --help` 不含 `--parity`（★ 改动前基线）
-- [ ] **2.2** ★ **GREEN**：★ `tools/run_chipforge_tests.sh` 加 3 个 flag：★ `--parity`（★ 跑 PR 层）· ★ `--parity-layer <pr\|night\|all>`（★ 默认 `pr`）· ★ `--parity-self-test`（★ 单元级快车道）
-- [ ] **2.3** ★ ★ **默认不跑** ⇒ ★ 不加 flag 时**行为逐字节一致**（★ 既有 CI / 开发者调用零影响）★ **AC-1**
-- [ ] **2.4** ★ ★ **委托** `tools/parity/parity_gate.py`（★ **不重实现判定逻辑** ⇒ ★ S-1~S-17 契约不变）★ **AC-1**
-- [ ] **2.5** ★ 退出码映射：★ `PASS⇒0` / `FAIL⇒1` / `ERROR⇒2`（★ 与 `parity_gate.py:718` 一致）★ **AC-1**
-- [ ] **2.6** ★ ★ `--parity-self-test` **MUST NOT 依赖构建**（★ ⇒ ★ 排在 build 步骤**之前**）⇒ ★ **零构建依赖**★ **AC-5**
-- [ ] **2.7** ★ `--help` 同步更新（★ 含 3 个新 flag · ★ ★ 注意 `--help` 走 `sed -n '2,29p'` ⇒ ★ 改头部须同步行号范围）★ **AC-1** · **AC-5**
-- [ ] **2.8** ★ 验证：★ `--parity-self-test` ⇒ **16/16 PASS · EXIT=0** 且**不触发 build**；★ `--parity` ⇒ 8 case PASS · EXIT=0；★ `--parity --only <不存在>` ⇒ 退出码 **≠ 0**（★ fail-closed）★ **AC-1** · **AC-5**
+- [x] **2.1** ★ **RED**：★ `run_chipforge_tests.sh --help` 不含 `--parity`（★ 改动前基线）
+- [x] **2.2** ★ **GREEN**：★ `tools/run_chipforge_tests.sh` 加 3 个 flag：★ `--parity`（★ 跑 PR 层）· ★ `--parity-layer <pr\|night\|all>`（★ 默认 `pr`）· ★ `--parity-self-test`（★ 单元级快车道）
+- [x] **2.3** ★ ★ **默认不跑** ⇒ ★ 不加 flag 时**行为逐字节一致**（★ 既有 CI / 开发者调用零影响）★ **AC-1**
+- [x] **2.4** ★ ★ **委托** `tools/parity/parity_gate.py`（★ **不重实现判定逻辑** ⇒ ★ S-1~S-17 契约不变）★ **AC-1**
+- [x] **2.5** ★ 退出码映射：★ `PASS⇒0` / `FAIL⇒1` / `ERROR⇒2`（★ 与 `parity_gate.py:718` 一致）★ **AC-1**
+- [x] **2.6** ★ ★ `--parity-self-test` **MUST NOT 依赖构建**（★ ⇒ ★ 排在 build 步骤**之前**）⇒ ★ **零构建依赖**★ **AC-5**
+- [x] **2.7** ★ `--help` 同步更新（★ 含 3 个新 flag · ★ ★ 注意 `--help` 走 `sed -n '2,29p'` ⇒ ★ 改头部须同步行号范围）★ **AC-1** · **AC-5**
+- [x] **2.8** ★ 验证：★ `--parity-self-test` ⇒ **16/16 PASS · EXIT=0** 且**不触发 build**；★ `--parity` ⇒ 8 case PASS · EXIT=0；★ `--parity --only <不存在>` ⇒ 退出码 **≠ 0**（★ fail-closed）★ **AC-1** · **AC-5**
 
 ## 3. ★ P3 — CI build job（★ ADR-088 判据 7）
 

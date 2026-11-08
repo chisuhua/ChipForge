@@ -36,6 +36,9 @@
 #   tools/run_chipforge_tests.sh --exclude "[mmu]"     # 排除某 tag (~[mmu] 传给 Catch2)
 #   tools/run_chipforge_tests.sh --verbose             # 详细输出 (--success)
 #   tools/run_chipforge_tests.sh --all                 # ctest (TLM + CH_MEM + verilator smoke + gate)
+#   tools/run_chipforge_tests.sh --parity              # ★ A4: 只跑双后端差分 parity 门禁 (PR 层)
+#   tools/run_chipforge_tests.sh --parity-layer night  # ★ A4: 差分门禁跑夜间全量层
+#   tools/run_chipforge_tests.sh --parity-self-test     # ★ A4: 差分门禁单元级快车道 (零构建依赖)
 #
 # Verilator 后端完整测试 (Phase 6d.5 E8 + 6d P2):
 #   tools/run_chipforge_tests.sh --all                 # 推荐 (1 个 ctest + Verilator 两个 family)
@@ -72,6 +75,12 @@ TAG_REGEX=""
 TAG_EXCLUDE=""
 # ★ C1①：★ 默认**先 build**（增量）⇒ ★ --no-build 是逃生门
 SKIP_BUILD=""
+# ★ A4（change: backend-parity-ci）：★ 差分门禁接线
+#   ★ 默认**全部关闭** ⇒ ★ 不加 flag 时行为与改动前**逐字节一致**（★ AC-1③）
+RUN_PARITY=""
+RUN_PARITY_SELF_TEST=""
+PARITY_LAYER="pr"
+PARITY_GATE="${PROJECT_ROOT}/tools/parity/parity_gate.py"
 
 # ---- 参数解析 ----
 while [[ $# -gt 0 ]]; do
@@ -119,12 +128,45 @@ while [[ $# -gt 0 ]]; do
             INCLUDE_ALL=1
             shift
             ;;
+        # ★ A4（change: backend-parity-ci）：★ 差分门禁接线（ADR-088 §5.2 判据 4/7）
+        --parity)
+            RUN_PARITY=1
+            shift
+            ;;
+        --parity-layer)
+            if [[ -z "$2" ]]; then
+                echo "ERROR: --parity-layer requires one of: pr | night | all"
+                exit 1
+            fi
+            case "$2" in
+                pr|night|all)
+                    PARITY_LAYER="$2"
+                    ;;
+                *)
+                    echo "ERROR: --parity-layer must be one of: pr | night | all (got: $2)"
+                    exit 1
+                    ;;
+            esac
+            shift 2
+            ;;
+        --parity-self-test)
+            RUN_PARITY_SELF_TEST=1
+            shift
+            ;;
         --verbose|-v)
             VERBOSE="--success"
             shift
             ;;
         --help|-h)
-            sed -n '2,29p' "$0"
+            # ★ A4：★ 用法段的行号会随本文件头部变动 ⇒ ★ **动态定位**「# 退出码:」段的首行
+            #   ⇒ ★ 以后新增 flag 不必再改这里的行号（★ 原为硬编码 `2,29p` ⇒ ★ 只显示到第 29 行
+            #   ⇒ ★ ★ 用法段（29~38 行）**根本没显示** ⇒ ★ 本次一并修正）。
+            _help_end=$(grep -n '^# 退出码:' "$0" | head -1 | cut -d: -f1)
+            if [[ -z "$_help_end" ]]; then
+                sed -n '2,60p' "$0"
+            else
+                sed -n "2,$((_help_end - 1))p" "$0"
+            fi
             exit 0
             ;;
         *)
@@ -134,6 +176,16 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# ---- 0. ★ A4：单元级快车道（★ **零构建依赖** ⇒ ★ MUST 在 build **之前**）----
+# ★ 契约 S-15 的「单元级快车道」= 门禁比对器自身的鉴别力自检（--self-test）：
+#   ★ 纯函数（不碰文件、不跑进程）⇒ ★ 不需要任何构建产物 ⇒ ★ PR 级秒级反馈。
+if [[ -n "$RUN_PARITY_SELF_TEST" ]]; then
+    echo "[run_chipforge_tests] ★ A4: parity 单元级快车道 (--self-test) ..."
+    cd "$PROJECT_ROOT"
+    python3 "$PARITY_GATE" --self-test
+    exit $?
+fi
 
 # ---- 1. build（★ C1①：★ **默认执行**；★ 编译失败即退出 ⇒ 不跑旧产物）----
 if [[ -n "$SKIP_BUILD" ]]; then
@@ -175,6 +227,27 @@ if [[ -n "$INCLUDE_ALL" ]]; then
     CTEST_FLAGS=()
     [[ -n "$VERBOSE" ]] && CTEST_FLAGS+=("--output-on-failure")
     ctest "${CTEST_FLAGS[@]}"
+    exit $?
+fi
+
+# ---- 3c. ★ A4：双后端差分 parity 门禁（★ 独立入口 ⇒ 跑完即退出，不继续跑 Catch2）----
+# ★ 退出码语义与 parity_gate.py 一致：★ PASS⇒0 · FAIL⇒1 · ERROR⇒2（★ AC-1④）
+if [[ -n "$RUN_PARITY" ]]; then
+    # ★ ★ fail-closed：★ 产物缺失 ⇒ **报错退出**（★ **MUST NOT** 静默 SKIP ——
+    #   ★ 「产物不存在 ⇒ SKIP」正是 ADR-088 判据 4/6 退化为「本机成立」的病根）
+    _missing=""
+    for _runner in parity_sim_runner cpu_verilator_sim; do
+        [[ -x "$BUILD_DIR/bin/$_runner" ]] || _missing="$_missing $_runner"
+    done
+    if [[ -n "$_missing" ]]; then
+        echo "ERROR: ★ parity 门禁所需的 runner 不存在：$_missing"
+        echo "  ⇒ ★ 门禁**无法执行** ⇒ ★ 判定为失败（★ fail-closed，★ MUST NOT 静默 SKIP）"
+        echo "  ⇒ ★ 请先构建：cmake --build build --target parity_sim_runner cpu_verilator_sim"
+        exit 2
+    fi
+    echo "[run_chipforge_tests] ★ A4: 双后端差分 parity 门禁 (layer=$PARITY_LAYER) ..."
+    cd "$PROJECT_ROOT"
+    python3 "$PARITY_GATE" --layer "$PARITY_LAYER"
     exit $?
 fi
 
