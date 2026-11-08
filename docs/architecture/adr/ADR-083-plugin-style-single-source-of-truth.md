@@ -117,7 +117,7 @@ CppHDL 在 CH_MEM 模式下为 Plugin-style 提供：
 
 ### 2.3 CppTLM 角色调整为 legacy
 
-**CppTLM 仓库仍作为外部依赖**（`extern/CppTLM` 符号链接）保留：
+**CppTLM 仓库仍作为外部依赖**（★ **2026-11-08 路径订正**：★ `extern/CppTLM` 符号链接**已不存在**（★ `extern/` 目录实测无）⇒ ★ 实际位置 = **仓库根 `CppTLM/`**）保留：
 
 - 已实现的 L1Cache/MMU/CPU Bridge 适配层（`src/cf_plugin/bridge/`）继续依赖 CppTLM 接口
 - 任何外部 CppTLM-based 系统集成仍经由 Bridge
@@ -192,7 +192,7 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
                               |
 +-----------------------------v-----------------------------+
 |   CppTLM (legacy 仿真内核, 仅 Bridge 适配层依赖)          |
-|   extern/CppTLM 符号链接保留                               |
+|   CppTLM 符号链接保留（★ 2026-11-08 订正：★ 原记 `extern/CppTLM` ⇒ ★ `extern/` 已不存在 ⇒ ★ 实为仓库根 `CppTLM/`） |
 |   src/cf_plugin/bridge/{l1_cache_bridge,mmu_bridge}.cpp    |
 +-------------------------------------------------------------+
 ```
