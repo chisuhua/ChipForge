@@ -109,19 +109,29 @@ depends_on:
 
 ## Acceptance Criteria
 
+> ★ **完成状态（2026-11-08 · builder）**：AC-109c / 110 / 111 / 112 / 113 / 114 / 115a / 115b / 119 / 120 **全部执行完毕**，
+> 证据见 `evidence/`，执行记录与偏差见 `tasks.md`。
+> ★ 三处**判据字面**与实测不一致（已在 tasks.md 逐条登记，供 planner/architect 修订）：
+> ① 词表移除 `PASS` / `是 POD`（Q1 裁决）⇒ AC-110③ / AC-119② 点名的 3 类真实样本中 2 类
+>    （`roadmap-evolution.md` 图例 · 目标态前提句）在收窄后**不含任何词表词**，以真实文档上实际触发的 5 类豁免替代；
+> ② 门禁① 范围限定顶层（Q2 裁决）⇒ AC-110④ 的「顶层或 `adr/`」中 `adr/` 部分不再扫描；
+> ③ AC-114③「其余批由单 commit 可 revert 结构性保证」被实测修正为**时点性质**（中间点单独 revert 早期批，
+>    后续依赖它的 commit 必然断链）。
+
+
 > ★ ★ **本段 = AC 权威**（★ `rdd-verifier` 从此段提取）⇒ ★ ★ **段头必须用 `## Acceptance Criteria`**。
 > ★ ★ **AC-115a 规则**：★ 每条 AC 显式带 `覆盖 V:` 标签；★ **无孤儿 AC**（★ 每条至少盖 1 个 V）；★ 本 change 声明的 V 均被覆盖。
 
-- [ ] **AC-109c** ★ **`overview.md` 正文深度净化 + `interface-design.md` 正文残留**（★ 本轮不动 ⇒ 本 change 执行）⇒ ★ 判据：★ ① `overview.md` 的 8 处（含 `:255-261` 的「当前状态（Phase 6c/6d, 2026-10-08)」段 · `:190` · `:193` · `:210-212` · `:313` · `:382` · `extern/` 目录树）**全无实施态断言**；★ ② `interface-design.md:305`（★ `ImplMode` 已废弃）的实施态措辞**已改形态定性**；★ ③ ★ **兜底 = 门禁① 词表对顶层全文扫描 0 命中**（★ 含语法上下文豁免逐条登记）⇒ ★ **防止枚举不完备时误判通过**；★ ④ **须单独过审查**（★ 属内容决策 ⇒ 不与机械改动混批）。★ **覆盖 V: V-108**
-- [ ] **AC-110** ★ **落地门禁①（顶层纯净 lint）**：★ 新建 `tools/check_arch_truth.sh` ⇒ ★ 判据：★ ① 词表**冻结在脚本内**（★ 单一真源 · ★ 禁开放词表）；★ ② **语法上下文豁免**按 §「4 类语法位置」实现（★ **禁按路径豁免**）；★ ③ **fixture 单测**：★ 4 类豁免各有 1 个 fixture（★ **必过**）+ ★ 3 个真实样本（★ `adr.md` 状态列 · `roadmap-evolution.md` 图例 · 目标态前提句）**不误报**；★ ④ 顶层或 `adr/` 命中实施态语汇 ⇒ **报红**；★ ⑤ `mixed/` `archive/` 同类文本 ⇒ **豁免**。★ **覆盖 V: V-103**
-- [ ] **AC-111** ★ **落地门禁②**（★ `doc_link_check.sh` 的 `PATH_CHECK_DOCS` 扩入 `docs/architecture/` ⇒ 含子目录）⇒ ★ 判据：★ ① 覆盖范围含 `docs/architecture/`；★ ② **≥16 处历史死/错引用入检**（★ 含 `src/cf_plugin/tests/` 11 处 + `extern/CppTLM` 剩余 2 处）⇒ ★ **须同时修或显式登记豁免**（★ 否则落闸即爆）。★ **覆盖 V: V-104**
-- [ ] **AC-112** ★ **落地门禁③**（★ `verify_adr.sh` 加 ADR 孤儿检查：`adr/` ↔ `adr.md` 双向）⇒ ★ 判据：★ ① `adr/` 每份在 `adr.md` §2 有行；★ ② `adr.md` 每行本地链接存在；★ ③ ★ **报错信息含可执行指引**（★ 「新增 ADR 请在 `adr.md` §2 加行」+ 同步责任人 = architect）⇒ ★ **只检不引导 ⇒ 门禁会持续制造孤儿 ⇒ 逼人加 allowlist**（★ 须避免）；★ ④ 实测零误伤 ⇒ 无 baseline 负担。★ **覆盖 V: V-105**
-- [ ] **AC-113** ★ **落地门禁④**（★ 顶层文档引用 `mixed/` / `archive/` ⇒ MUST 标明「★ **非权威 · 仅作背景**」）⇒ ★ 判据：★ ① 顶层引用子目录处**均带非权威标注**；★ ② 门禁① 或人工核销二选一（★ 判据写死）。★ **覆盖 V: V-101, V-103**
-- [ ] **AC-114** ★ **回滚验证**：★ **首批**（★ `code-framework-mapping.md` 等 3 节点环批）与**最大批**两批实测 `git revert` ⇒ ★ 判据：★ ① revert 后**引用与 `arch_paths` 全部复原**；★ ② ★ **revert 后三个检查全绿**（★ `doc_link_check.sh` 0 broken · `verify_adr.sh` 0 FAILED · `arch_paths` liveness 无死条目）；★ ③ 其余批由「单 commit 可 revert」结构性保证。★ **覆盖 V: V-110**
-- [ ] **AC-115a** ★ ★ **AC ↔ V 静态标签规则**（★ 跨 change）⇒ ★ 判据：★ ① **本 change + 姊妹 change 的每条 AC 都带 `覆盖 V:` 标签**；★ ② **无孤儿 AC**（★ 每条至少盖 1 个 V）；★ ③ 每个被声明的 V 至少被 1 条 AC 覆盖。★ **覆盖 V: 全部（★ 本条自豁免于并集计算）**
-- [ ] **AC-115b** ★ ★ **AC ↔ V 并集校验**（★ 跨 change · ★ **只在本 change 的最后一条 task 执行**）⇒ ★ 判据：★ ① 脚本（★ `tools/check_ac_v_coverage.py`）判定 **两个 change 的 AC 覆盖 V 并集 == V-101~V-110 全集**；★ ② **无孤儿 V**（★ 每个 V 至少被 1 条 AC 覆盖）；★ ③ **无重复分配**（★ 同一 V 被两条 AC 覆盖须为**显式允许**的交叉（如 V-104 被 AC-104/105/106/111 覆盖）⇒ ★ 脚本须区分「交叉覆盖」与「重复分配」）。★ **覆盖 V: 全部（★ 本条自豁免）**
-- [ ] **AC-119** ★ ★ **门禁① 的误伤收敛证据**（★ 本 change 特有）⇒ ★ 判据：★ ① `evidence/` 含 **4 类豁免 fixture** 的运行输出；★ ② 含 **3 类真实样本**（★ `adr.md` 状态列 · `roadmap-evolution.md` 图例 · 目标态前提句）的**不误报**输出；★ ③ 含 **1 个真阳性**（★ 顶层某处植入实施态语汇 ⇒ 报红）的输出。★ **覆盖 V: V-103**
-- [ ] **AC-120** ★ ★ **既有 change 的 AC 段头统一**（★ 本 change 特有）⇒ ★ 判据：★ ① 10 个有 `tasks.md` 的 change 中，★ **9 个有 Acceptance 段的全部改用 `## Acceptance Criteria`**（★ 现状 **7 个用 `## Acceptance`** ⇒ **verifier 提取为空**）；★ ② `mmu-chmem-pipeline-integration` 的 `proposal.md` **补 AC 段**（★ 现状无）；★ ③ **改后逐个跑一遍 AC 提取** ⇒ **提取非空**。★ **覆盖 V: V-104**
+- [x] **AC-109c** ★ **`overview.md` 正文深度净化 + `interface-design.md` 正文残留**（★ 本轮不动 ⇒ 本 change 执行）⇒ ★ 判据：★ ① `overview.md` 的 8 处（含 `:255-261` 的「当前状态（Phase 6c/6d, 2026-10-08)」段 · `:190` · `:193` · `:210-212` · `:313` · `:382` · `extern/` 目录树）**全无实施态断言**；★ ② `interface-design.md:305`（★ `ImplMode` 已废弃）的实施态措辞**已改形态定性**；★ ③ ★ **兜底 = 门禁① 词表对顶层全文扫描 0 命中**（★ 含语法上下文豁免逐条登记）⇒ ★ **防止枚举不完备时误判通过**；★ ④ **须单独过审查**（★ 属内容决策 ⇒ 不与机械改动混批）。★ **覆盖 V: V-108**
+- [x] **AC-110** ★ **落地门禁①（顶层纯净 lint）**：★ 新建 `tools/check_arch_truth.sh` ⇒ ★ 判据：★ ① 词表**冻结在脚本内**（★ 单一真源 · ★ 禁开放词表）；★ ② **语法上下文豁免**按 §「4 类语法位置」实现（★ **禁按路径豁免**）；★ ③ **fixture 单测**：★ 4 类豁免各有 1 个 fixture（★ **必过**）+ ★ 3 个真实样本（★ `adr.md` 状态列 · `roadmap-evolution.md` 图例 · 目标态前提句）**不误报**；★ ④ 顶层或 `adr/` 命中实施态语汇 ⇒ **报红**；★ ⑤ `mixed/` `archive/` 同类文本 ⇒ **豁免**。★ **覆盖 V: V-103**
+- [x] **AC-111** ★ **落地门禁②**（★ `doc_link_check.sh` 的 `PATH_CHECK_DOCS` 扩入 `docs/architecture/` ⇒ 含子目录）⇒ ★ 判据：★ ① 覆盖范围含 `docs/architecture/`；★ ② **≥16 处历史死/错引用入检**（★ 含 `src/cf_plugin/tests/` 11 处 + `extern/CppTLM` 剩余 2 处）⇒ ★ **须同时修或显式登记豁免**（★ 否则落闸即爆）。★ **覆盖 V: V-104**
+- [x] **AC-112** ★ **落地门禁③**（★ `verify_adr.sh` 加 ADR 孤儿检查：`adr/` ↔ `adr.md` 双向）⇒ ★ 判据：★ ① `adr/` 每份在 `adr.md` §2 有行；★ ② `adr.md` 每行本地链接存在；★ ③ ★ **报错信息含可执行指引**（★ 「新增 ADR 请在 `adr.md` §2 加行」+ 同步责任人 = architect）⇒ ★ **只检不引导 ⇒ 门禁会持续制造孤儿 ⇒ 逼人加 allowlist**（★ 须避免）；★ ④ 实测零误伤 ⇒ 无 baseline 负担。★ **覆盖 V: V-105**
+- [x] **AC-113** ★ **落地门禁④**（★ 顶层文档引用 `mixed/` / `archive/` ⇒ MUST 标明「★ **非权威 · 仅作背景**」）⇒ ★ 判据：★ ① 顶层引用子目录处**均带非权威标注**；★ ② 门禁① 或人工核销二选一（★ 判据写死）。★ **覆盖 V: V-101, V-103**
+- [x] **AC-114** ★ **回滚验证**：★ **首批**（★ `code-framework-mapping.md` 等 3 节点环批）与**最大批**两批实测 `git revert` ⇒ ★ 判据：★ ① revert 后**引用与 `arch_paths` 全部复原**；★ ② ★ **revert 后三个检查全绿**（★ `doc_link_check.sh` 0 broken · `verify_adr.sh` 0 FAILED · `arch_paths` liveness 无死条目）；★ ③ 其余批由「单 commit 可 revert」结构性保证。★ **覆盖 V: V-110**
+- [x] **AC-115a** ★ ★ **AC ↔ V 静态标签规则**（★ 跨 change）⇒ ★ 判据：★ ① **本 change + 姊妹 change 的每条 AC 都带 `覆盖 V:` 标签**；★ ② **无孤儿 AC**（★ 每条至少盖 1 个 V）；★ ③ 每个被声明的 V 至少被 1 条 AC 覆盖。★ **覆盖 V: 全部（★ 本条自豁免于并集计算）**
+- [x] **AC-115b** ★ ★ **AC ↔ V 并集校验**（★ 跨 change · ★ **只在本 change 的最后一条 task 执行**）⇒ ★ 判据：★ ① 脚本（★ `tools/check_ac_v_coverage.py`）判定 **两个 change 的 AC 覆盖 V 并集 == V-101~V-110 全集**；★ ② **无孤儿 V**（★ 每个 V 至少被 1 条 AC 覆盖）；★ ③ **无重复分配**（★ 同一 V 被两条 AC 覆盖须为**显式允许**的交叉（如 V-104 被 AC-104/105/106/111 覆盖）⇒ ★ 脚本须区分「交叉覆盖」与「重复分配」）。★ **覆盖 V: 全部（★ 本条自豁免）**
+- [x] **AC-119** ★ ★ **门禁① 的误伤收敛证据**（★ 本 change 特有）⇒ ★ 判据：★ ① `evidence/` 含 **4 类豁免 fixture** 的运行输出；★ ② 含 **3 类真实样本**（★ `adr.md` 状态列 · `roadmap-evolution.md` 图例 · 目标态前提句）的**不误报**输出；★ ③ 含 **1 个真阳性**（★ 顶层某处植入实施态语汇 ⇒ 报红）的输出。★ **覆盖 V: V-103**
+- [x] **AC-120** ★ ★ **既有 change 的 AC 段头统一**（★ 本 change 特有）⇒ ★ 判据：★ ① 10 个有 `tasks.md` 的 change 中，★ **9 个有 Acceptance 段的全部改用 `## Acceptance Criteria`**（★ 现状 **7 个用 `## Acceptance`** ⇒ **verifier 提取为空**）；★ ② `mmu-chmem-pipeline-integration` 的 `proposal.md` **补 AC 段**（★ 现状无）；★ ③ **改后逐个跑一遍 AC 提取** ⇒ **提取非空**。★ **覆盖 V: V-104**
 
 > ★ ★ **本 change 的 V 覆盖**：★ **V-101, V-103, V-104, V-105, V-108, V-110**（★ 6 个）★ + **AC-115a/115b** 的**跨 change**并集校验。
 > ★ ★ **★ 拆批的必然结果**：★ 本 change 与姊妹 change 的 AC 集合**各自是 V 全集的真子集** ⇒ ★ **单 change 内不可能通过并集校验** ⇒ ★ 这是「拆 2 个 change」的**代价**，★ 已用 `depends_on: [architecture-truth-boundary]` + **AC-115b 只挂本 change** 显式消解（★ 否则姊妹 change 单独 archive 时会永久卡在 P3）。
