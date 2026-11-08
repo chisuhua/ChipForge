@@ -16,6 +16,12 @@
 2. 若构成扩张 ⇒ 触及该文件的**每个** commit 的 message（subject + body）MUST 含 `ADR-089`
 3. 任一 commit 不含 ⇒ **RED**（exit 1）⇒ 列出违规 commit + 其 message 首行
 
+★ ★ **判定的已知边界（诚实登记 · 不可当强防伪用）**：
+  ★ 本判定是 **substring 匹配** ⇒ 「**提到** ADR-089」即算「**引用** ADR-089」⇒ ★ message 写成
+    「故意不引 ADR-089」也会通过（★ 2026-11-08 实测踩到过）。
+  ★ ⇒ 本机检是**辅助闸**（拦住「完全没提裁决编号」的绝大多数情况），**不是**「architect 已审」的证明
+  ⇒ ★ 契约 S-12 的**权威判据仍是 architect 逐条签认**（★ 人工）⇒ ★ 机检 MUST NOT 被当成签认的替代。
+
 ★ 为什么按「diff 触及」而非「PR body」：★ 判据在契约里写的是 **commit message**；
   ★ 且 squash 合并会丢失中间 commit ⇒ 逐 commit 判定更保守（更早拦截）。
 """

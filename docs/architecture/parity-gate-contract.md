@@ -338,6 +338,7 @@ case 在 cycle cap 处被截断（两侧 `done=false`）时，`tohost`（两侧�
   | CI | `.github/workflows/architecture-gates.yml` 的 `Check parity exception provenance` step（★ **阻塞级** · PR 触发 · `fetch-depth: 0` 以取完整历史） |
   | 判定口径 | ★ **例外条目 id 集合变大** = 扩张 ⇒ ★ 只改 `sunset` / `mechanism` **不构成扩张** ⇒ 不误报 |
   | 判定粒度 | ★ 触及该文件的**每个单亲 commit**（★ **跳过 merge commit** —— PR 事件下 HEAD 是 GitHub 生成的 merge commit，其 message 不含 ADR-089 ⇒ 会假阳性） |
+  | ★ **已知边界** | ★ 本判定是 **substring 匹配** ⇒ 「**提到** ADR-089」即算「**引用**」⇒ 「故意不引 ADR-089」也会通过（★ 2026-11-08 实测踩到）⇒ ★ **本机检是辅助闸**，★ **MUST NOT** 被当成「architect 已审」的证明 ⇒ ★ 权威判据仍是 **architect 逐条签认**（人工） |
 - 真实例外条目数 **> 10**（`N = 10`）⇒ 报告顶部 **强制提示 architect 复审**；★ **MUST NOT** 以「超过 N ⇒ 退出码非 0」作护栏（会逼出假登记）。
 - `sunset` 已过期 ⇒ 该条目**自动失效** ⇒ 门禁 FAIL，并标注「升级为真 bug 类」。
 

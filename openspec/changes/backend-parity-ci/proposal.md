@@ -79,11 +79,23 @@ depends_on:
 
 > ★ ★ **本段 = AC 权威**（★ `rdd-verifier` 从此段提取：★ `rdd-verifier/SKILL.md:148`）⇒ ★ **段头用 `## Acceptance Criteria`**（★ 正则只认 `验收标准|Acceptance Criteria`：★ 同文件 `:153`）。
 
-- [ ] **AC-1** ★ **差分门禁接线到 `tools/run_chipforge_tests.sh`**（★ 子项①）⇒ ★ 判据：★ ① 支持 `--parity`（★ 跑 PR 层）与 `--parity-layer pr\|night\|all`；★ ② **默认不跑**（★ 不加 flag 时行为与改动前**逐字节一致**）；★ ③ 委托 `tools/parity/parity_gate.py`（★ **不重实现判定逻辑** ⇒ ★ S 契约不变）；★ ④ 门禁 **PASS ⇒ 退出码 0** · ★ **FAIL ⇒ 1** · ★ **ERROR ⇒ 2**（★ 与 `parity_gate.py:718` 的退出码映射一致）；★ ⑤ `--help` 列出新 flag。★ **覆盖 S-1~S-17**
-- [ ] **AC-2** ★ **CI 具备 build 能力**（★ 子项② · ★ ADR-088 判据 7）⇒ ★ 判据：★ ① CI 有 **cmake configure + build** 步骤（★ 检出 CppTLM/CppHDL 到既有路径）；★ ② 构建出 `parity_sim_runner` 与 `cpu_verilator_sim`（★ **两个 runner 都要**）；★ ③ **build job 有 `timeout-minutes` 上限**；★ ④ Verilator 可用；★ ⑤ **实测**：★ CI 上从零 build 到门禁可跑**全流程通**。★ **覆盖 ADR-088 §5.2 判据 7**
-- [ ] **AC-3** ★ **门禁结论在 CI 中被执行且结果被回读**（★ 子项①+② 的**完成形式** · ★ ADR-088 判据 4）⇒ ★ 判据：★ ① CI 中 parity 门禁 **被实际执行**（★ **非 SKIP** ⇒ ★ 产物存在性检查**不得**短路）；★ ② **verdict 被回读**（★ `report.json` 的 `verdict` + `error_kind` ⇒ ★ **机器可读** ⇒ ★ 上传为 artifact）；★ ③ **PR 事件可见**（★ 结论以 step 结论 + artifact 两种形式呈现）；★ ④ **判据 4 的完成形式逐字满足**（★ `ADR-088:148`「差分门禁在 CI 中被执行且结果被回读」）。★ **覆盖 ADR-088 §5.2 判据 4**
-- [ ] **AC-4** ★ **分层 corpus 的时长数据采集 + 分层表入库**（★ 子项③）⇒ ★ 判据：★ ① `parity_gate.py` 的 `timings` 字段**从空占位 `{}` 变为实测填充**（★ **per-case 时长** + ★ **p50/p95**）；★ ② 清单的 `layer` 列与 `--layer` 的选集**机检相等**（★ S-15「分层集合 ⊆ S-13 清单」）；★ ③ 实测 p95 **写进报告**（★ S-15「A4 MUST 先把实测 p95 写进报告 timings，再据此定阈值」）；★ ④ ★ **MUST NOT 写死未实测的硬阈值**（★ S-15）。★ **覆盖 S-15**
-- [ ] **AC-5** ★ **单元级快车道接线**（★ 子项④）⇒ ★ 判据：★ ① `tools/run_chipforge_tests.sh` 可触发 `parity_gate.py --self-test`（★ **零构建依赖**）；★ ② 实测 **16/16 PASS**（★ 与本 change 开工前的基线一致）；★ ③ **PR 级可跑**（★ 不需 cmake configure/build）；★ ④ 退出码语义与 AC-1 一致。★ **覆盖 ADR-089 D2（判别力自检）**
+- [x] ★ **归档前核对（2026-11-08）**：★ 5 条 AC 全未勾（tasks 36/36 已全勾）⇒ ★ 逐条核对**实际落地**后补勾：
+  ★ 依据 = `ci-first-run-evidence.md`（CI run **42473424285** · 13 步全 success · artifact `parity-report-pr`）
+  + `tools/run_chipforge_tests.sh` 的实测接线点（★ 行号见各条）。
+- [x] **AC-1** ★ **差分门禁接线到 `tools/run_chipforge_tests.sh`**（★ 子项①）⇒ ★ 判据：★ ① 支持 `--parity`（★ 跑 PR 层）与 `--parity-layer pr\|night\|all`；★ ② **默认不跑**（★ 不加 flag 时行为与改动前**逐字节一致**）；★ ③ 委托 `tools/parity/parity_gate.py`（★ **不重实现判定逻辑** ⇒ ★ S 契约不变）；★ ④ 门禁 **PASS ⇒ 退出码 0** · ★ **FAIL ⇒ 1** · ★ **ERROR ⇒ 2**（★ 与 `parity_gate.py:718` 的退出码映射一致）；★ ⑤ `--help` 列出新 flag。★ **覆盖 S-1~S-17**
+- [x] **AC-2** ★ **CI 具备 build 能力**（★ 子项② · ★ ADR-088 判据 7）⇒ ★ 判据：★ ① CI 有 **cmake configure + build** 步骤（★ 检出 CppTLM/CppHDL 到既有路径）；★ ② 构建出 `parity_sim_runner` 与 `cpu_verilator_sim`（★ **两个 runner 都要**）；★ ③ **build job 有 `timeout-minutes` 上限**；★ ④ Verilator 可用；★ ⑤ **实测**：★ CI 上从零 build 到门禁可跑**全流程通**。★ **覆盖 ADR-088 §5.2 判据 7**
+- [x] **AC-3** ★ **门禁结论在 CI 中被执行且结果被回读**（★ 子项①+② 的**完成形式** · ★ ADR-088 判据 4）⇒ ★ 判据：★ ① CI 中 parity 门禁 **被实际执行**（★ **非 SKIP** ⇒ ★ 产物存在性检查**不得**短路）；★ ② **verdict 被回读**（★ `report.json` 的 `verdict` + `error_kind` ⇒ ★ **机器可读** ⇒ ★ 上传为 artifact）；★ ③ **PR 事件可见**（★ 结论以 step 结论 + artifact 两种形式呈现）；★ ④ **判据 4 的完成形式逐字满足**（★ `ADR-088:148`「差分门禁在 CI 中被执行且结果被回读」）。★ **覆盖 ADR-088 §5.2 判据 4**
+- [x] **AC-4** ★ **分层 corpus 的时长数据采集 + 分层表入库**（★ 子项③）⇒ ★ 判据：★ ① `parity_gate.py` 的 `timings` 字段**从空占位 `{}` 变为实测填充**（★ **per-case 时长** + ★ **p50/p95**）；★ ② 清单的 `layer` 列与 `--layer` 的选集**机检相等**（★ S-15「分层集合 ⊆ S-13 清单」）；★ ③ 实测 p95 **写进报告**（★ S-15「A4 MUST 先把实测 p95 写进报告 timings，再据此定阈值」）；★ ④ ★ **MUST NOT 写死未实测的硬阈值**（★ S-15）。★ **覆盖 S-15**
+- [x] **AC-5** ★ **单元级快车道接线**（★ 子项④）⇒ ★ 判据：★ ① `tools/run_chipforge_tests.sh` 可触发 `parity_gate.py --self-test`（★ **零构建依赖**）；★ ② 实测 **16/16 PASS**（★ 与本 change 开工前的基线一致）；★ ③ **PR 级可跑**（★ 不需 cmake configure/build）；★ ④ 退出码语义与 AC-1 一致。★ **覆盖 ADR-089 D2（判别力自检）**
+
+  ★ ★ **逐条核对依据（2026-11-08 · 归档前）**：
+  | AC | 落地证据 |
+  |---|---|
+  | AC-1 | `tools/run_chipforge_tests.sh` ★ `--parity`（:132）· `--parity-layer`（:136，★ pr/night/all 三值校验）· `--parity-self-test`（:152）★ 三 flag 齐；★ 退出码语义 PASS⇒0 / FAIL⇒1 / ERROR⇒2（:234） |
+  | AC-2 | CI run **42473424285** step 7~10 全 ✓：configure → **Build deps** → **Build parity runners** → Verify runners |
+  | AC-3 | 同 run step 11~13 全 ✓：`Run parity gate`（★ 实际执行非 SKIP）→ `Read back verdict` → `Upload parity report`；★ artifact `parity-report-pr` 回读 `verdict=PASS` |
+  | AC-4 | `parity_gate.py:737` 报告含 `timings`（:769 `_summarize_timings` ⇒ per_case / p50 / p95 / total / jobs）；★ 分层表落 `ci-first-run-evidence.md`（★ `count=8` · `p95=30.851s`） |
+  | AC-5 | `run_chipforge_tests.sh:184` `--parity-self-test` 入口；★ `parity_gate.py --self-test` **16/16** · 0.04s · 零构建依赖 |
 
 > ★ ★ **本 change 与 G-A4 完成判据的对应**（★ `objective-backend-parity-and-single-model.md:142`）：
 > ★ 「① 门禁在 CI 中被执行且结果被回读」⇒ **AC-3** · ★ 「② 分层 corpus 的时长与分层表入库」⇒ **AC-4** · ★ 「③ 单元级快车道在 PR 级可跑」⇒ **AC-5** · ★ 另 **AC-1 + AC-2** 是前两者的**实现前提**。
