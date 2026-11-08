@@ -84,3 +84,59 @@ python3 tools/parity/parity_report.py --report build/parity/report-night.json   
 ```bash
 python3 tools/parity/parity_replay.py --work-dir build/parity --out build/parity/report-replay.json
 ```
+
+---
+
+## 5. ★ 当前 HEAD 复跑证据（2026-11-08 · G-A3 签认的锚）
+
+> ★ **为什么需要这一节**：★ §1~§4 的 A3 首跑绑定 commit **`95be8d1`**；
+> ★ 但首跑之后**门禁改了 6 次**（`556af67` 分层语义 / `3a97443` 超时 / `75cce61` `--cpu-config`
+> / `d002473` timings / `9b36f5c` read_back / `c10041a` 语料校验）⇒ ★ **用旧跑批签 G-A3 不成立**
+> ⇒ ★ 本节是**当前 HEAD** 的复跑证据。
+
+### 5.1 复跑命令与结果
+
+```bash
+python3 tools/parity/parity_gate.py --layer night --jobs 4 --report build/parity/report-night-head.json
+```
+
+| 字段 | 值 |
+|---|---|
+| `verdict` | **PASS** |
+| `error_kind` | `null` |
+| `layer` | `night` |
+| `commit` | **`8c94f5a2b7ee`**（★ 当前 HEAD） |
+| `per_case` | **52 / 52 PASS** |
+| ★ `partial_cases` | **4** —— `branchbench_m0/m1/m2/m3`（★ cap 20000 截断 ⇒ `tohost` / `cycles` **vacuous**） |
+| ★ `exceptions_applied` | **`[]`** ⇒ ★ **真实例外 0 条** ⇒ ★ **既存后端分歧清单 = 空** |
+| `warnings` | `[]` |
+| `determinism` | `node_count = 2437` · `names_hash = 0ceb2fb11ea8016f` |
+| `timings` | `count = 52` · `p50 = 66.99` · `p95 = 1764.745` · `total = 10295.644` |
+| `reset_mode` | `sim:ctor-init / vl:reset-pulse-1`（★ C-2 裁决落地） |
+
+### 5.2 ★ 关键结论：**门禁语义零漂移**
+
+| 项 | A3 首跑（`95be8d1`） | 当前 HEAD（`8c94f5a`） | 结论 |
+|---|---|---|---|
+| `determinism.node_count` | 2437 | **2437** | ★ 逐位相同 |
+| `determinism.names_hash` | `0ceb2fb11ea8016f` | **`0ceb2fb11ea8016f`** | ★ 逐位相同 |
+| 结论 | — | — | ★ ★ 中间 6 次门禁改动（分层语义 / 超时 / 配置面 / 时长采集 / 回读 / 语料校验）**未改变判定语义** |
+
+### 5.3 ★ 判别力证据（★ G-A3 的 fail-closed 与变异自检两条）
+
+| 判据 | 实测 | 证据落点 |
+|---|---|---|
+| **fail-closed ≥5 例** | **6/6** | `openspec/changes/backend-parity-harness/tasks.md` §2b |
+| **变异自检 ≥2 例** | ≥2 | 契约 §7 **S-6**（`memsig` 数据取反 `a55f52c5`→`8fcc53ba`）· **S-9a**（实跑 `branchbench_m0` 20k）· **S-10**（负向 N1~N5 均 `rc=2`） |
+| 判定层鉴别力 | `--self-test` **16/16** | `python3 tools/parity/parity_gate.py --self-test` |
+| ★ 白名单校验 | exit 0（★ 真实例外 **0** 条 + 常驻合成例外 `synthetic-self-test`） | `load_exceptions()` 内嵌校验 |
+
+### 5.4 ★ 措辞纪律（★ 防止「弱判据」被当「强判据」传递）
+
+★ ★ **MUST NOT** 把本节表述为「**52/52 全绿**」⇒ ★ 正确的表述是
+「**48/48 强判据 + 4/4 partial（20k 前缀，`tohost`/`cycles` vacuous）**」
+⇒ ★ 理由：branchbench 的 `tohost` / `cycles` 在 cap 截断下**两侧恒等** ⇒ **无判别力**
+⇒ ★ 若写成「52/52 全绿」⇒ 会**误传**给 ADR-088 §5.2 判据 6（删 TLM 的硬判据）⇒ ★ 那是**公开错账**。
+
+★ **G-A3 签认落点**（★ architect 2026-11-08）：`.rddf/roadmap/objectives/objective-backend-parity-and-single-model.md` 的 G-A3 行
+（★ 单点签认）· ★ `strategy.md` 的阶段 A 门禁行（★ 47 → 48 修正 + 证据指针）· ★ `feat-backend-parity-gate.md` 的 G-A3 checkbox（★ builder 勾）。

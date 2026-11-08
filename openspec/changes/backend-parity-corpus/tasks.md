@@ -74,5 +74,15 @@ depends_on:
 ## 5. 关联（★ 非本 change scope）
 
 - [ ] 5.1 ★ **BP 增量 3 的量收益跑批**：1.2 → 1.1 三件套未落地 → 1.0 的 D10 未签 ⇒ **被架构签批卡住**
+      ★ ★ **deferred（2026-11-08 · 客观事实登记）**：★ BP 已按 **2026-10-19 用户决策 S3** defer 到 **v1.0.0 窗口**
+      （★ 证据 = `objective-soc-cpu-v0110-launch.md` §11 跟踪台账 + `feat-bp-btb-gshare.md` 的 defer 记录）
+      ⇒ ★ 本条**不可能**在本 change 内完成 ⇒ ★ **本 change 的归档随之 deferred 到 BP 增量 3 落地**（★ v1.0.0 窗口）
+      ⇒ ★ ★ **本 change 的其余 24 项全部完成且已验收**（★ `exceptions_applied = []` ⇒ 真实例外 0 ⇒ 分歧清单 = 空）
+      ⇒ ★ **MUST NOT** 为凑归档而勾选本条
       ⇒ 按 R5 兜底「放弃合并、分开跑」处理；★ 双产物接口已就位（门禁的 `cycles` + branchbench 条目）
-- [ ] 5.2 ★ S-12 的「commit message 引 `ADR-089`」机检 ⇒ 归 A4
+- [x] 5.2 ★ S-12 的「commit message 引 `ADR-089`」机检 ⇒ **已实现（2026-11-08 · 契约 v1.4 登记的欠账）**
+      ★ 落点 = `tools/parity/check_exception_provenance.py`（★ `--self-test` **5/5** · 含负向对照「扩张 + 无 ADR-089 ⇒ RED」
+      + **merge commit 跳过**用例）· CI = `architecture-gates.yml` 的 `Check parity exception provenance` step（★ 阻塞级 · PR 触发）
+      ★ 契约 `parity-gate-contract.md` 升 **v1.9** + §S-12 覆盖范围表由「不在覆盖内」改为「现已覆盖」+ §7 矩阵 S-12 行同步
+      ★ ★ **已知边界（如实登记）**：★ 判定是 **substring 匹配** ⇒ 「**提到** ADR-089」即算「**引用**」
+      ⇒ ★ 本机检是**辅助闸**，★ **MUST NOT** 当成「architect 已审」的证明 ⇒ 权威判据仍是 architect 逐条签认

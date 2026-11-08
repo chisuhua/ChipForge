@@ -44,7 +44,18 @@ phase_refs: [phase-4, phase-5]
     deps 无缓存（每次 run 约 10 min）⇒ O-A4-2。见 `ci-first-run-evidence.md`
   ★ 原条目：进 `tools/run_chipforge_tests.sh` + ★ **CI 具备 build 能力**（= ADR-088 §5.2 判据 4/7 落点）+ 分层 corpus（PR 快子集 + 夜间全量）+ ★ **单元级快车道**（不依赖 TLM 存活的本地快环）+ ★ **Verilog 构建产物按 config 缓存**
 - [x] ★ **P2 配置面穿透**（支撑项，非阶段 A 本体）—— ✅ **2026-10-27 完成**：门禁 + 两个 runner 支持 `--cpu-config`（**同一份配置喂两侧**，与配置类 flag 互斥）；报告新增顶层 `cpu_config` 字段；契约 **v1.7**。★★ **复跑证据：全量 52/52 PASS**，determinism 指纹 `2437 / 0ceb2fb11ea8016f` 与 A3 首跑**逐位相同** ⇒ 门禁在引入配置面后语义零漂移。★ 遗留（**已修**）：`--timeout-s` 曾是全局单一超时（branchbench 单档满核即需 ~2222 s，余量仅 1.6× ⇒ 争抢即假红）⇒ 已修为 per-case 推导（契约 v1.8，`--self-test` 16/16）
-- [ ] ★ **阶段 A 门禁 G-A3 通过** ⇒ ★ 这是 **ADR-088 §5.2 删除判据 6** 的唯一来源 ⇒ ⇒ **未通过 ⇒ 不得删任何 TLM-only case**
+- [x] ★ **阶段 A 门禁 G-A3 通过** ⇒ ★ 这是 **ADR-088 §5.2 删除判据 6** 的唯一来源 ⇒ ⇒ **未通过 ⇒ 不得删任何 TLM-only case**
+      ✅ ★ **architect 已签认（2026-11-08）** —— ★ 判据逐条：
+      ① **两侧交集 48 ELF 全部 PASS**（★ **48/48 强判据**）
+      ② **branchbench 4 档 = partial**（★ **4/4 partial**，★ cap 20000 截断 ⇒ `tohost` / `cycles` **vacuous** ⇒ 无判别力
+         ⇒ ★ **MUST NOT** 表述为「52/52 全绿」⇒ ★ 正确表述 = 「**48/48 强 + 4/4 partial（20k 前缀）**」）
+      ③ **既存后端分歧清单 = 空**（★ `exceptions_applied = []` ⇒ 真实例外 **0** 条 ⇒ 「architect 逐条签认『有意例外』」= **无对象**）
+      ④ **fail-closed ≥5 例** ⇒ 实测 **6/6**（`backend-parity-harness/tasks.md` §2b）
+      ⑤ **变异自检 ≥2 例** ⇒ 契约 §7 **S-6**（`memsig` 数据取反 `a55f52c5`→`8fcc53ba`）· **S-9a**（实跑 `branchbench_m0` 20k）· **S-10**（负向 N1~N5 均 `rc=2`）
+      ⑥ ★ ★ **锚 = 当前 HEAD `8c94f5a` 的复跑**（★ **不是** A3 首跑的旧 commit `95be8d1` —— ★ 首跑后门禁改了 **6 次**
+         ⇒ ★ **用旧跑批签不成立**）⇒ ★ 证据 = `openspec/changes/backend-parity-corpus/first-run-evidence.md` **§5**
+      ★ ★ **determinism 指纹 `node_count=2437` / `names_hash=0ceb2fb11ea8016f` 与 A3 首跑逐位相同** ⇒ ★ 门禁语义**零漂移**
+      ★ **签认落点**（单点）：`objective-backend-parity-and-single-model.md` 的 G-A3 行 + `strategy.md` 阶段 A 门禁行（★ 47 → 48 修正）
 
 ## 观测量集（ADR-089 D2）
 

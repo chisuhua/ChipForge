@@ -45,7 +45,11 @@ A2a 只证明了「两侧采得到、且采出来一样」。但**判定本身**
 - [x] 真实 case 端到端跑通（`rv32ui-p-add` ⇒ PASS + 报告落盘）
 - [x] PR 层（8 case）全量跑通
 - [x] 语料集合断言生效（清单缺 ⇒ ERROR；harness 多 ⇒ WARNING）
-- [ ] 夜间层全量（51 case）跑通 ⇒ **属 A3**（首跑 + 分歧清单）
+- [x] 夜间层全量（★ **52 case**，★ 数字订正：A3 补了 `rv32ui-p-simple` ⇒ 51 → 52）跑通 ⇒ **属 A3**（首跑 + 分歧清单）
+      ★ ✅ **2026-11-08 当前 HEAD `8c94f5a` 复跑**：`verdict=PASS` · `per_case` **52/52 PASS** · `partial_cases` = 4
+      （branchbench cap 20000 ⇒ `tohost`/`cycles` vacuous）· ★ `exceptions_applied = []`（★ **真实例外 0 ⇒ 分歧清单 = 空**）
+      · `determinism` = `node_count 2437` / `names_hash 0ceb2fb11ea8016f`（★ 与 A3 首跑**逐位相同** ⇒ 门禁语义零漂移）
+      ⇒ ★ 证据 = `openspec/changes/backend-parity-corpus/first-run-evidence.md` **§5**
 
 ## Impact
 

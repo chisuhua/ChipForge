@@ -608,7 +608,7 @@ branchbench_m0	branchbench	build/branchbench_m0.elf	night
 | ★ S-9a | A3 | `judge()` 的 completion 分支（两侧截断 ⇒ vacuous；不一致 ⇒ FAIL；缺失 ⇒ ERROR） | `--self-test` 4 例 + **实跑 branchbench_m0 20k 拍**（`partial=True` + 5 观测逐位相等） | ✅ |
 | S-10 | A2b | `main()` 三态返回；VL parity 路径 TIMEOUT → 2 | 负向 N1~N5（均 rc=2）；branchbench 两侧 rc=2 | ✅ |
 | S-11 | A2b | `load_exceptions()`（未知/容差字段拒收 · 5+3 字段 · `issue_url` · `justification` · 过期失效 · 合成例外必存在） | 负向 N1/N2/N3 + `--self-test`（过期 / 作用域 / 豁免） | ✅ |
-| S-12 | A2b | `load_exceptions()` 规模软限（>10 ⇒ WARNING，不阻断） | 过期 → FAIL（self-test） | ⚠️ 规模护栏 ✅；**commit message 引 `ADR-089` 的机检未实现** ⇒ A4 |
+| S-12 | A2b | `load_exceptions()` 规模软限（>10 ⇒ WARNING，不阻断） | 过期 → FAIL（self-test） | ✅ 规模护栏；✅ **commit message 引 `ADR-089` 的机检已实现**（★ 2026-11-08：`tools/parity/check_exception_provenance.py` · self-test 5/5 · CI 阻塞 step；★ 详见 §S-12 覆盖范围表） ⇒ A4 |
 | S-13 | A2b（种子）/ A3（扩充 ✅） | `tests/cpu/parity/corpus.txt`（**52 case** + `layer` + 可选 `max_cycles`）+ `check_corpus_against_harnesses()`（方向性判定）+ `check_corpus_files_exist()`（pre-flight） | 负向 N4/N5；★ **两侧 kCases 48 == 48 零漂移**（两侧方向都干净） | ✅ |
 | S-14 | A2b（P2 扩 ✅） | `build/parity/report.json`（S-14 全字段 + 逐 case `determinism` + ★ 顶层 `cpu_config`） | 结构校验（顶层 / per_case / 观测量键齐备）；★ `cpu_config` 为空串 = 走各 runner 默认 | ✅ |
 | S-15 | A2b + A3（P2/v1.8 扩 ✅） | `--layer pr\|night\|all` + 清单 `layer` 列 + **per-case cap**（第 5 列 / 按 `kind` 默认）+ **per-case 超时**（`--timeout-s 0` ⇒ 按 cap 推导 `max(300, cap/9.1*3)`）+ `--jobs` 并行 + ★ `--cpu-config`（**同一份配置喂两侧**，否则比的是两种配置） | PR 层 8 case 实测 **6.5 min**（`jobs=4`）；★ 缓存条款已按实测更正；★ `--cpu-config` 与配置类 flag 互斥（静默覆盖 = 假绿通道）；★ 超时推导 elf=1000s / branchbench=6666s（`--self-test` 3 例钉住） | ✅ |

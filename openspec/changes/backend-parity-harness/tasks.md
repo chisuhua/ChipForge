@@ -51,5 +51,10 @@ depends_on:
 - [x] 3.2 真实 case 端到端：`rv32ui-p-add` ⇒ PASS + 报告落盘
 - [x] 3.3 PR 层（8 case）全量跑通 —— ★ **实测 8/8 PASS**，`verdict=PASS`，报告 `build/parity/report-pr.json`
 - [x] 3.4 ★ **契约 S-15 的缓存条款更正**（实测：Verilog 按 ELF 而非按 config 变化 ⇒ 跨 ELF 缓存不成立）⇒ 契约 v1.4 已改「每 corpus 一次编译」+ 重算时长预算（PR ≈10 min / 夜间 ≈1 h）+ 开放项 O-5 ⇒ ★ **待 architect 确认**
-- [ ] 3.5 夜间层全量（51 case）⇒ **归 A3**
+- [x] 3.5 夜间层全量（★ **52 case**，★ 数字订正：A3 补了 `rv32ui-p-simple` ⇒ 51 → 52）⇒ **归 A3**
+      ★ ✅ **2026-11-08 当前 HEAD `8c94f5a` 复跑完成**：`verdict=PASS` · `per_case` **52/52 PASS** ·
+      `partial_cases` = 4（branchbench，cap 20000 ⇒ `tohost`/`cycles` vacuous）· `exceptions_applied = []`（★ 真实例外 0）
+      · `determinism` = `node_count 2437` / `names_hash 0ceb2fb11ea8016f`（★ 与 A3 首跑**逐位相同** ⇒ 门禁语义零漂移）
+      · `timings` count=52 · p50=66.99 · p95=1764.745 · total=10295.644
+      ⇒ ★ 证据 = `openspec/changes/backend-parity-corpus/first-run-evidence.md` **§5**
 - [x] 3.6 「S ⇒ 实现/测试」覆盖矩阵交付 —— 已填实到契约 **§7**（16 条全落点；S-12 的「commit message 机检」如实标 ⚠️ 待 A4）
