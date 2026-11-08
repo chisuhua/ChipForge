@@ -2,7 +2,7 @@
 
 | 字段 | 值 |
 |------|-----|
-| 版本号 | 1.15 |
+| 版本号 | 1.16 |
 | 创建日期 | 2026-06-07 |
 | 状态 | Active |
 | 源文档 | [`code-framework-mapping.md`](./code-framework-mapping.md) + [`declarative-hybrid-framework.md`](./declarative-hybrid-framework.md) |
@@ -153,7 +153,7 @@
 | ADR-092 | **TLM 参考实现的冻结与演进停止**（Phase-1：32 个 TLM-only 文件**冻结保留**为设计参考 + 冻结门禁从「禁新增函数」升级为「**禁任何修改 + 强制标记**」+ ★ 检测面误判修正 + ★ 覆盖缺口改按 **family 分类**而非 case 数 + Phase-2 准入门禁 3 条） | 架构治理 | ✅ **Accepted v1.0**（2026-10-28；★ 用户裁决「TLM 代码先不删，标注演进停止，保留作 CH_MEM 版与开放核的设计参考」；★ **零回归**——686 case 保留 + Check 7 **不真空 PASS** + 参考语义**以可执行规格保留**（ADR-088 硬前置③）；★ 框架层单模化**推迟到 ADR-093**（Phase-2）；★ `ch_stream` 层次区分：**IP 间用 `ch_stream`**、**核内 stage 间保留 `Payload<T>`**） | [`adr/ADR-092-tlm-reference-freeze.md`](./adr/ADR-092-tlm-reference-freeze.md) |
 | ADR-093 | **TLM 模式移除契约**（Phase-2：框架层单模化（`uint_t` 别名化 ⇒ 57 文件零改动）+ bundle 单模化 + 门禁体系改版（防真空 PASS + 变异自检）+ TLM 代码删除 + 二 binary 合并） | 架构治理 | 🚧 **Proposed v0.1**（2026-10-28；★ **待 G-1a/G-1b/G-3 达成后转 Accepted**；★ **启动条件 = MMU + Cache 两个子系统实装**（外部依赖）⇒ Phase-1 冻结应长期维持；★ **D-I 分类表把 Phase-2 阻塞收敛为 2 个外部 change**（`chmem-ptw-walk` + `verilator-l1cache-e2e-coverage`）⇒ ★★ **Phase-2 的实质不是「补测试」而是「等两个子系统实装**；★ 量级 6~10 人日 ⇒ **与开放核（ADR-091）不可并行**） | [`adr/ADR-093-tlm-mode-removal-phase2.md`](./adr/ADR-093-tlm-mode-removal-phase2.md) |
 | ADR-094 | **CH_MEM 开放核的层次化装配契约与端口纪律**（层 2 单元如何被装配 / 如何成层 / 如何暴露接口与观测：**G-1r** 装配契约 r.1~r.16 + 粒度原则 + **顶层端口归 root** 与**契约登记簿**（契约身份与 ctx 节点名解耦）+ 交付定位（层次化**不作** parity 门禁输入）+ `chlib`/`ch_stream` 边界 + 两阶段迁移） | 验证基建 | 🚧 **Proposed v0.1**（2026-11-07；★ 转正前置 = **治理收口**（立项 + AC 回填），★ 非审查本身；★ 依据 = 上游 ADR-058~062 **全部 Accepted** 且实现已归档；★ 用户裁决 D-01「(b) 顶层端口归 root + 契约登记簿」· D-02「两阶段迁移」· D-04「批次 1/2/3 采纳」· D-05「`ch_state_machine` 经实测可在解释器下推进 ⇒ 不一刀切禁用」· D-06「ADR-091 不拆」· **D-07「root 由 `PipeBuilder` 持有；root 名常量 = `cpu`；对外契约；与 emitter root 同一对象」** · **D-08「登记点 = 自动登记 + 受控例外；manifest = 框架在 `elaborate()` 收尾产出、每侧各生成、字段 `{node_id, raw_name, has_driver, source}`；S-17 自阶段 2 生效」** · **D-09「T3 长期架构修订：期望键集注入 + typed 失败 + `error_kind` 单一真源（S-10）+ 契约清单（S-17.1）」** · **D-10「T15：逻辑契约名统一为 `pc` ⇒ runner fallback 作废」** · **D-11「T4：阶段 1 前置同名普查（不通过 ⇒ fail-closed）+ `observation_ambiguous`」** · **D-12「T5：root-scope 全局不细分 + r.14 归属守卫前移（扁平路径也跑）」** · **D-13「T6：绑定提供者模型（`manifest`/`identity`，两侧语义一致）+ 义务按语境声明」** · **D-14「T7：V-35/V-36 迁移期判据 + 抓取器自检 + 阶段 2 后退役」** · **D-15「T8：provider 槽位按 ctx 单一（结构上装不出双轨）+ 安装期自检 + 通用总则 GN-1」** · **D-16「T9：2 个 change（边界 = 交付批次边界）+ AC 权威在 `tasks.md`（ADR 侧为生成镜像 + 机检相等）」** · **D-17「T13：首批成层 = ALU · regfile 观测面显式化 · `build()` 幂等语义精化 + `built_` 成功收尾置 · 门禁 5 条 + 层 2 基类编译期校验（r.16）」**；★ 契约登记簿契约本体落 `parity-gate-contract.md` **S-17**；★ Verification **V-27~V-43**） | [`adr/ADR-094-chmem-hierarchical-assembly-contract.md`](./adr/ADR-094-chmem-hierarchical-assembly-contract.md) |
-| ADR-095 | ★ **`docs/architecture/` 真相源边界与目录治理**（★ 顶层 = 真相源架构 + 架构决策导航入口；★ 其余按 `mixed/`（混合态 · 可净化）/ `archive/`（归档 · 只读）/ `plugin-research/` 分流；★ **三机制**（晋升 / 下沉 / 归档）；★ **`arch_paths` 与目录耦合 ⇒ 职责物理隔离**（★ 顶层 + `adr/` + `mixed/` = architect 可写；★ 归档 = owner）；★ 4 项新门禁（顶层纯净 lint / 链接扩围 / ADR 孤儿 / 引用完整性）；★ 迁移按引用数升序分批）| 文档治理 | 🚧 **Proposed v0.1** | — |
+| ADR-095 | ★ **`docs/architecture/` 真相源边界与目录治理**（★ 顶层 = 真相源架构 + 架构决策导航入口；★ 其余按 `mixed/`（混合态 · 可净化）/ `archive/`（归档 · 只读）/ `plugin-research/` 分流；★ **三机制**（晋升 / 下沉 / 归档）；★ **`arch_paths` 与目录耦合 ⇒ 职责物理隔离**（★ 顶层 + `adr/` + `mixed/` = architect 可写；★ 归档 = owner）；★ 4 项新门禁（顶层纯净 lint / 链接扩围 / ADR 孤儿 / 引用完整性）；★ 迁移按引用数升序分批）| 文档治理 | ✅ **Accepted v1.0**（★ 2026-11-08 用户签认「批准」：★ 顶层 = 真相源架构 + 架构决策导航入口；★ `mixed/` / `archive/` 三分 + 三机制；★ `arch_paths` 目录化；★ **角色边界变更（+6 份可写）已签认生效**）⇒ ★ **迁移执行待 planner 立项** | — |
 
 > ADR-045 引入的 3 已知风险（HazardPlugin scoreboard 生命周期、canonical 注册序约束、stall 期间下游重复执行）在 v0.1.3 TDD 兜底外，真实程序验证由 Phase 1.5 Wave 1 (`riscv-tests-rv32ui`) 客观揭示，Wave 2 (`cpu-pipeline-fix-rv32ui-N`) 修/接受。详见 `.rddf/roadmap/archive/phase-1.5-stall-and-validate.md` §11。
 
@@ -1562,6 +1562,7 @@ Summary:
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-06-07 | 1.0 | 初始版本：39 条 ADR，24 已实现 + 15 Phase 1 提案 |
+| 2026-11-08 | 1.16 | ★ **ADR-095 转正**（✅ Accepted v1.0 · ★ 用户签认「批准」· ★ 角色边界变更 +6 份可写已生效）· ★ 审稿报告落 `.rddf/reviews/ADR-095-architecture-truth-boundary-and-dir-governance-review.md` |
 | 2026-11-08 | 1.15 | ★ **新增 ADR-095**（`docs/architecture/` 真相源边界与目录治理）⇒ ★ 顶层收敛为「真相源架构 + 架构决策导航入口」；★ 混合态下沉 `mixed/`、归档入 `archive/`；★ `arch_paths` 改按目录表达职责 |
 | | | 配套 `tools/verify_adr.sh` 同步发布 |
 | | | 与 `code-framework-mapping.md` v2.0 / `declarative-hybrid-framework.md` v2.0 对齐 |
