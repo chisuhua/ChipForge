@@ -30,7 +30,29 @@
 
 ### 2.2 `Parity Gate`（PR 路径 · run **42498002503**）
 
-★ 见 §4（★ 首次 `pull_request` 触发的完整执行）。
+✅ ★★ **SUCCESS —— 13 步全 success**（★ 首次 `pull_request` 触发的完整执行）
+
+| step | 结果 |
+|---|---|
+| 5 Install Verilator (apt, fallback to source build) | ✅ ★ **apt 优先的修法生效**（★ 不再按发行版字符串分流） |
+| 6 Unit-level fast lane (`parity_gate --self-test`) | ✅ |
+| 7 Configure (cmake) | ✅ |
+| 8 **Build CppTLM/CppHDL deps (ExternalProject)** | ✅ ★ **deps 先构建的修法在 PR 路径上同样生效**（★ 首次 run 就是死在这里） |
+| 9 Build parity runners | ✅ |
+| 10 Verify runners exist (GN-1 — 不得 SKIP) | ✅ |
+| 11 **Run parity gate (判据 4)** | ✅ ★ 门禁**实际执行**（非 SKIP） |
+| 12 **Read back verdict** | ✅ |
+| 13 **Upload parity report** | ✅ |
+
+★ **artifact 回读**（`parity-report-pr`）：
+
+```
+verdict = PASS · layer = pr · commit = 02af28d56a9c
+timings = count 8 · p50 34.386 · p95 46.708 · total 271.764
+```
+
+★ ★ **意义**：★ 此前所有 parity 门禁证据都来自 `workflow_dispatch`（本地触发）⇒ ★ **PR 路径**
+  （★ 也就是团队协作时**实际会走的**那条路）此前**零证据** ⇒ ★ 现在**两条路径都有实测**。
 
 ### 2.3 `Documentation Health Check`（run **42498005538**）
 
@@ -76,7 +98,7 @@ riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -o /tmp/add.elf tests
 
 ## 4. `Parity Gate` 的 PR 路径（★ 首次）
 
-★ 见 §5 的实测结论。
+★ **结论 = SUCCESS**，详见 §2.2（★ 13 步全 success + artifact `verdict=PASS`）。
 
 ---
 
@@ -85,7 +107,7 @@ riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -o /tmp/add.elf tests
 | # | 项 | 状态 |
 |---|---|---|
 | 1 | ★ `Architecture Compliance Gates` 的 PR 路径 | ✅ **已验证全绿**（16 步，含 2 个新 step） |
-| 2 | ★ `Parity Gate` 的 PR 路径 | ★ 见 §4 |
+| 2 | ★ `Parity Gate` 的 PR 路径 | ✅ **已验证 SUCCESS**（★ 13 步全 success · artifact `verdict=PASS` · p95 46.708s） |
 | 3 | ★ `toolchain-sanity` 的 3 处缺陷 | ✅ **已修**（§3）⇒ ★ 需第 2 次 run 确认 |
 | 4 | ★ `Documentation Health Check` | ★ **pre-existing** ⇒ 归 backlog |
 | 5 | ★ 夜间层（night）在 CI 不可跑 | ★ **开放项 O-A4-1**（`branchbench_elfs` 需 `riscv32-unknown-elf-g++`，★ CI 只提供 riscv64）⇒ 三选一：CI 装 riscv32 / branchbench ELF 改 vendored / 夜间层改本地 runner |
