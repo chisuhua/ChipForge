@@ -74,7 +74,8 @@
 
 - [x] **5.1** ★ **交接给 L4**：★ L4 的 `chmem-hierarchical-assembly` **①-C**（AC-13 / tasks 4.1）MUST 消费本 change 的三态化 ⇒ ★ 本 change 归档后 ⇒ L4 的 `depends_on` 即满足
       ★ ✅ 边界已划（★ 2026-11-08）：★ L4 的 AC-13 / tasks 4.1 改为「消费」+ `depends_on` 已加 ⇒ ★ **MUST NOT** 重复实现
-- [ ] **5.2** ★ **归档**：`openspec archive parity-observation-ambiguity-fail-closed --skip-specs`（★ `.openspec.yaml` 已声明 `skip_specs: true`）
+- [x] **5.2** ★ **归档**：`openspec archive parity-observation-ambiguity-fail-closed --skip-specs`（★ `.openspec.yaml` 已声明 `skip_specs: true`）
+      ★ ✅ **2026-11-09 已归档** ⇒ `openspec/changes/archive/2026-11-09-parity-observation-ambiguity-fail-closed/`
 - [x] **5.3** ★ **AC 逐条勾选 + 证据落 `evidence/`**
       ★ ✅ 6 条 AC 全部勾选 + 依据写进 proposal · 证据 = `evidence/v25-ambiguity-evidence.txt`
 
