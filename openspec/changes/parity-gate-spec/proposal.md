@@ -37,7 +37,7 @@ depends_on: []
 
 ★ 不改任何代码、不新增 corpus、不落白名单文件（那些是 A2a/A2b/A3 的交付物）。
 
-## Acceptance
+## Acceptance Criteria
 
 - [ ] `docs/architecture/parity-gate-contract.md` 存在，含 **S-1…S-16**，每条有「要求 / 验收方式 / 归属」
 - [ ] 契约里的**每条代码事实**都带 `path:line`，且可复核（不含量化猜测）

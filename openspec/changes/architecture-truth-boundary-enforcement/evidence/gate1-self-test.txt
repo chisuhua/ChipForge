@@ -1,0 +1,15 @@
+$ bash tools/check_arch_truth.sh --self-test
+
+[PASS] a_frontmatter.md                   (findings=0/0 rules=['a-frontmatter'])
+[PASS] b_status_cell.md                   (findings=0/0 rules=['b-status-cell'])
+[PASS] c_html_comment.md                  (findings=0/0 rules=['c-html-comment'])
+[PASS] d_dated_banner.md                  (findings=0/0 rules=['d-dated-banner'])
+[PASS] e_fence.md                         (findings=0/0 rules=['e-fence'])
+[PASS] f_table_header.md                  (findings=0/0 rules=['f-table-header'])
+[PASS] g_dated_log_row.md                 (findings=0/0 rules=['g-dated-log-row'])
+[PASS] h_self_declared_nontarget.md       (findings=1/1 rules=['h-self-declared-nontarget'])
+[PASS] z_true_positive.md                 (findings=5/5 rules=-)
+[PASS] i_subdir_ref_unmarked.md           (subdir_refs=2/2)
+[PASS] j_subdir_ref_marked.md             (subdir_refs=0/0)
+
+self-test: 9/9 passed

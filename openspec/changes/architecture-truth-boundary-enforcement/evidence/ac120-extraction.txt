@@ -1,0 +1,20 @@
+=== AC 提取复核（契约：rdd-verifier SKILL.md §Step 1）===
+段头正则: ^##\s+(?:验收标准|Acceptance Criteria)\s*$
+
+[OK   ] architecture-truth-boundary                    AC=11
+[OK   ] architecture-truth-boundary-enforcement        AC=10
+[OK   ] backend-parity-ci                              AC=5
+[OK   ] backend-parity-corpus                          AC=9
+[OK   ] backend-parity-harness                         AC=5
+[OK   ] backend-parity-observability                   AC=6
+[OK   ] backend-parity-open-core                       AC=11
+[OK   ] chmem-bp-btb-gshare                            AC=36
+[OK   ] mmu-chmem-phase-b-c-launch                     AC=5
+[OK   ] mmu-chmem-pipeline-integration                 AC=12
+[OK   ] parity-gate-spec                               AC=7
+[OK   ] parity-observation-ambiguity-fail-closed       AC=6
+[OK   ] phase-1.5-wave-4                               AC=10
+[OK   ] vexii-riscv-parity-poc                         AC=10
+
+合计 14 个 change · 非空 14 · 空 0
+空的: 无 ✓

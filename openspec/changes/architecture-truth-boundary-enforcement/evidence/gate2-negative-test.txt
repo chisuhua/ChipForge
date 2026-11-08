@@ -1,0 +1,8 @@
+$ printf '<bogus ref>' > docs/architecture/__neg_test.md && bash tools/doc_link_check.sh
+
+BROKEN_PATH	docs/architecture/__neg_test.md:2	`tools/definitely_not_exist_xyz.sh`
+Total broken: 1
+
+$ rm docs/architecture/__neg_test.md && bash tools/doc_link_check.sh
+[18:16:13] ✅ All markdown cross-references valid (0 broken)
+[18:16:13] ✅ All backtick path references valid (0 broken)

@@ -39,7 +39,7 @@ A2a 只证明了「两侧采得到、且采出来一样」。但**判定本身**
 | 白名单 | `tests/cpu/parity/exceptions.json`（**只有常驻合成例外** ⇒ 真实例外数为 0） | ✅ **已落** |
 | 报告 | `build/parity/report.json`（契约 S-14 字段） | ✅ **已落** |
 
-## Acceptance
+## Acceptance Criteria
 
 - [x] `--self-test` 鉴别力自检 **9/9 PASS**（全等 PASS / 不等 FAIL / 缺失 ERROR / 确定性不符 ERROR / 例外豁免 / 过期失效 / 作用域不匹配）
 - [x] 真实 case 端到端跑通（`rv32ui-p-add` ⇒ PASS + 报告落盘）

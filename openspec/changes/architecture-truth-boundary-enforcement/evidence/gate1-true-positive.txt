@@ -1,0 +1,6 @@
+RED  z_true_positive.md:5  [当前实现]  - 当前实现：Layer-2 单元已落地 2 个。
+RED  z_true_positive.md:5  [已落地]  - 当前实现：Layer-2 单元已落地 2 个。
+RED  z_true_positive.md:6  [已完成]  - 测试门禁已完成接线，CI 回读已实现。
+RED  z_true_positive.md:6  [已实现]  - 测试门禁已完成接线，CI 回读已实现。
+RED  z_true_positive.md:7  [Phase 6d 完成]  - Phase 6d 完成。
+合计 5 处（期望 5）

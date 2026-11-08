@@ -46,7 +46,7 @@ A2b 交付了**判定器**，但判定器从未在**真实语料**上跑过全�
 | ★ 分层语义修正 | `--layer night` = 全量（此前只选 `night` 层 ⇒ 漏 8 条） | ✅ **已落** |
 | ★ 分析工具 | `parity_report.py`（报告 → 分歧清单 + 分类建议）· `parity_replay.py`（重放判定） | ✅ **已落** |
 
-## Acceptance
+## Acceptance Criteria
 
 - [x] 两侧 `kCases` 集合相等（48 == 48，交集 48，**零漂移**）
 - [x] 清单扩到 52 case（48 ELF + 4 branchbench），PR 层 8 条

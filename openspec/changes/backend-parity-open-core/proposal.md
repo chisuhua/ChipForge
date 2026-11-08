@@ -85,7 +85,7 @@ plan: .rddf/plans/backend-parity-open-core.md
 | TLM 代码（54 文件） | ★ ADR-092 Phase-1：**冻结保留**为设计参考 |
 | GShare | ★ 已按 ADR-088 §5.3.3 C-3 结案为「本期不做」 |
 
-## Acceptance
+## Acceptance Criteria
 
 - [ ] **AC-1** ★ **G-1 端口契约**：端口进网表**顶层端口列表**；★ ctx null ⇒ **fail-closed**；★ 内部驱动的 `ch_in` **不进**顶层
 - [ ] **AC-2** ★ **G-5a 后端注入**：`create_simulator(backend)` ⇒ `active_backend_name()` 正确；★ `nullptr` ⇒ 现行为不变

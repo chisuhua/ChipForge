@@ -106,7 +106,9 @@ Phase 1.5 stage doc §"Wave 4" 规划 (见 `.rddf/roadmap/archive/phase-1.5-stal
   - 2-3 个 ADR (CSR layout + exception delivery + mispredict recovery)
   - `openspec/changes/phase-2-baremetal-kickoff/` (后续 change 入口)
 
-## Acceptance (待 wave3 后细化)
+## Acceptance Criteria
+
+> ★ 待 wave3 归档后细化（段头 MUST 用规范形式 `## Acceptance Criteria`，否则 verifier 提取为空）。
 
 - [ ] 4 个子 change 全部 archive
 - [ ] CSR 寄存器读写正确 (新测试 PASS)

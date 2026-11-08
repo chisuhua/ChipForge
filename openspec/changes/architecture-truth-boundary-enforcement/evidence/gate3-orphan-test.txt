@@ -1,0 +1,15 @@
+$ echo '# ADR-999' > docs/architecture/adr/ADR-999-orphan-test.md && bash tools/verify_adr.sh
+
+ORPHAN_FILE	ADR-999-orphan-test.md	adr.md 的决策主表无 ADR-999 行
+新增 ADR 请在 `docs/architecture/adr.md` §2 的决策主表加一行
+  ADR 文件与注册表 MUST 同一个 PR 内落地。
+同步责任人 = architect（ADR 由 architect 签批）。
+❌ ORPHANS           : 1  (adr/ <-> adr.md 不一致)
+
+$ # 方向二：adr.md 加一条死链
+ORPHAN_LINK	adr.md:1591	./adr/ADR-999-not-exist.md
+❌ ORPHANS           : 1  (adr/ <-> adr.md 不一致)
+
+$ # 恢复后
+❌ ORPHANS           : 0  (adr/ <-> adr.md 不一致)
+✓ All ✅ ADRs pass verification

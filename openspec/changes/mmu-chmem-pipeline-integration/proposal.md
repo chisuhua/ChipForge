@@ -202,6 +202,25 @@ oracle_date: 2026-10-07
 
 ---
 
+## Acceptance Criteria
+
+> ★ 2026-11-08 补（change `architecture-truth-boundary-enforcement` 的 AC-120②）：本 change 原**无** AC 段
+> ⇒ `rdd-verifier` 从 `proposal.md` 提取为空。段头改用规范形式（`^##\s+Acceptance Criteria\s*$`），
+> bullet 逐条对应 §1~§11 的交付项（编号为本段内部编号，§ 编号指本文件章节）。
+
+- [ ] **AC-1** CH_MEM MMU/PTW pipeline 集成（§1）：IBus / DBus 消费 `pl::MMU_VADDR` / `pl::PADDR_VALID`；`MmuExceptionHandler` 输出 `mmufault_clear` 到 `HazardPlugin` `stall_ctrl`；`HazardPlugin` 实装 `mark_mmufault` / `clear_mmufault` + `CtrlLink::halt_when`
+- [ ] **AC-2** Bare 路径 byte-identical 保护（§1 · Oracle D2-A）：`[chmem]` 与 `[verilator]` 的 bare 用例无额外 latency、无观测量差异
+- [ ] **AC-3** `MMUPlugin.cpp:109` 的 `|| satp_ppn_ == 0` 析取项已删除，Bare shortcut 严格化（§2 · D4-A）
+- [ ] **AC-4** 新增 `ip/mmu/plugins/MMUPlugin_chmem.h`（§2 · D1-B）：单级 8 项直接映射 ch_mem TLB + 复用 `PtWalkFsmPlugin`（0 修改）+ 发射 `PADDR` / `PADDR_VALID` / `PTW_ACTIVE`
+- [ ] **AC-5** `csr_write_satp` 双 bug 修复（§3 · D5-TLM）：删除 `mmu.h:99-100` 派生 getter/setter 与 `:103` 重复成员；`mmu.cpp:37` 的 48-bit mask 不再把 Sv32 MODE bit31 含进 PPN
+- [ ] **AC-6** Verilator `TEST_CASE 6 mmu_sv32_translation_verilator_e2e_flipped` 通过（§4）：`TOHOST=1` + cycle ≤ sv32 baseline × 1.5 + `EXCEPTION_CODE` 正确传播
+- [ ] **AC-7** `[cpu-l1-mmu-demo]` 真 sv32 翻转（§5）：新增 `TEST_CASE 7 cpu_l1_mmu_demo_sv32_translation_flipped`，该 family 7/7 PASS
+- [ ] **AC-8** Spec delta 已落（§7）：`verilator-mmu-bare-plumbing` 与 `cpu-l1-mmu-demo` 各新增对应 Requirement + 移除 workaround 标注
+- [ ] **AC-9** Architecture gate 全绿（§8）：`verify_adr.sh` / `verify_plugin_decision.sh` / `check_plugin_portability.sh` / `doc_link_check.sh` 均 0 失败
+- [ ] **AC-10** Regression 全量（§9）：`[mmu-verilator] 3/3` · `[mmu] 59/59` · `[cpu-l1-mmu-demo] 7/7`，其余 FAIL 均属 `tools/baseline_known_failures.txt`
+- [ ] **AC-11** Archive 前置（§10）：本段 AC 全勾选 + `openspec validate` 0 error + `AGENTS.md` workaround 标记移除 + CHANGELOG v0.11.0 条目
+- [ ] **AC-12** D1 收窄 scope 在 archive 时同步进 `spec.md`（§11）
+
 ## Tasks (drafted, 详见 [tasks.md](tasks.md))
 
 > **状态**: ✅ tasks.md 已起草 (2026-10-08,基于 Oracle-locked 决议 + research §4)。

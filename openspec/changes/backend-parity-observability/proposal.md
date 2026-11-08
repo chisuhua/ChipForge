@@ -37,7 +37,7 @@ depends_on:
 | **inc-2** | Verilator 侧同样导出 `regs` / `pchash`（改 `sim_main.cpp` + `--json`），并加 `--reset-pulse=0`（默认不变） | ⏳ |
 | **inc-3** | ③ `memsig`：DUT 侧只读探针（`mem_sig` / `mem_sig_updates`）+ 两侧读取 + 自校验 | ⏳ |
 
-## Acceptance
+## Acceptance Criteria
 
 - [x] Simulator 侧 CLI 可跑单个 ELF 并输出 5 项中的 4 项（`memsig` 显式 pending）
 - [x] 同一 ELF 两侧 `cycles` 一致（`rv32ui-p-add`：**478 / 478**）

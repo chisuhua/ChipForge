@@ -95,16 +95,16 @@ std::optional<std::uint32_t> resolve_node_id(ch::core::context& ctx,
 ★ ① ★ planner 权限内**只有 `proposal.md` 可写**（★ `tasks.md` / `design.md` 属 builder）★ ② ★ 判据独立可验收（★ V-25 变异对照）★ ③ ★ **不追加**到已归档 change（★ openspec 惯例：已归档 change 不再改动）★ ④ ★ 归属清晰（★ 改的是它的文件，★ 但缺陷由 ADR-091 v1.15 的 **V-25** 引入 ⇒ ★ 归 V-25 的落地更准确）。
 ⇒ ★ ★ **归档顺序**：★ `backend-parity-observability` **已归档** ⇒ ★ 本 change **无顺序约束**；★ 但 frontmatter 仍登记 `depends_on`（★ 表达「改的是它的文件」）。
 
-## Acceptance
+## Acceptance Criteria
 
-| # | 判据 | 形态 |
-|---|---|---|
-| ★ **A-1** | ★ ★ **变异对照（V-25 承重判据）**：★ 把某个内部 `ch_reg` 改名撞上契约名（★ 如 `open_reg_1` → `reg_1`）⇒ ★ runner MUST **exit 2**（★ **非** 0 / 非 1）⇒ ★ 且错误信息 MUST 含**歧义契约名** | ★ **RED 判据** |
-| ★ **A-2** | ★ **前置体检**：★ 先跑既有 corpus ⇒ ★ MUST 确认**当前零歧义**（★ ⇒ 若已存在歧义 ⇒ 说明**已有假绿通道在跑** ⇒ 优先修） | ★ **体检项**（★ 产出记录进 plan §K34） |
-| ★ **A-3** | ★ **既有门禁零退化**：★ `python3 tools/parity/parity_gate.py --self-test` ⇒ PASS | ★ 回归 |
-| ★ **A-4** | ★ **既有 corpus 零退化**：★ 两侧 5 项观测量 + 确定性判据逐位相等（★ 与 `backend-parity-observability` 的既有基线一致） | ★ 回归 |
-| ★ **A-5** | ★ ★ **协议一致性**：★ runner 的 exit 2 ⇒ `parity_gate.py` MUST 判为 **ERROR**（★ `error_kind=observation_ambiguous:<name>`）⇒ ★ **MUST NOT** 降级为 FAIL 或跳过 | ★ 协议断言 |
-| ★ **A-6** | ★ **正反两面都有**：★ 观测名**缺失** ⇒ 仍 MUST 是既有的「missing observation」⇒ exit 2（★ **MUST NOT** 被新路径吞掉） | ★ 回归 |
+
+- [ ] ★ **A-1** ★ ★ **变异对照（V-25 承重判据）**：★ 把某个内部 `ch_reg` 改名撞上契约名（★ 如 `open_reg_1` → `reg_1`）⇒ ★ runner MUST **exit 2**（★ **非** 0 / 非 1）⇒ ★ 且错误信息 MUST 含**歧义契约名**
+- [ ] ★ **A-2** ★ **前置体检**：★ 先跑既有 corpus ⇒ ★ MUST 确认**当前零歧义**（★ ⇒ 若已存在歧义 ⇒ 说明**已有假绿通道在跑** ⇒ 优先修）
+- [ ] ★ **A-3** ★ **既有门禁零退化**：★ `python3 tools/parity/parity_gate.py --self-test` ⇒ PASS
+- [ ] ★ **A-4** ★ **既有 corpus 零退化**：★ 两侧 5 项观测量 + 确定性判据逐位相等（★ 与 `backend-parity-observability` 的既有基线一致）
+- [ ] ★ **A-5** ★ ★ **协议一致性**：★ runner 的 exit 2 ⇒ `parity_gate.py` MUST 判为 **ERROR**（★ `error_kind=observation_ambiguous:<name>`）⇒ ★ **MUST NOT** 降级为 FAIL 或跳过
+- [ ] ★ **A-6** ★ **正反两面都有**：★ 观测名**缺失** ⇒ 仍 MUST 是既有的「missing observation」⇒ exit 2（★ **MUST NOT** 被新路径吞掉）
+
 
 ★ ★★ **判据口径**：★ 本 change 是**门禁自身的加固**⇒ ★ 它的判据**本身就是**「门禁在坏输入上必须红」⇒ ★ A-1 是**唯一承重判据**（★ A-2~A-6 均为回归/协议断言）。
 
