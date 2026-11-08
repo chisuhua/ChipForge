@@ -51,7 +51,7 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 
 ### B1 承载力拆解（2026-10-24 实测盘点）
 
-规划输入：[`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/tlm-retirement-b1-capacity-plan.md)
+规划输入：[`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/archive/tlm-retirement-b1-capacity-plan.md)
 （CH_MEM 工厂 9 处注册 vs TLM 19 处 ⇒ **10 处注册差距**；分三类：**接线缺失** 3 项 / **实现缺失** 4 项 / **架构决策** 4 项；6 个待 architect 决策问题见该文件 §5）
 
 ### phase-4（v0.11.0 窗口）— B0 冻结 + 安全子集清理（零删除风险）
@@ -97,7 +97,7 @@ Oracle 2026-10-06 决策：**测试不进 CI**（`.github/workflows/architecture
 - [ ] **B1**：L1Cache CH_MEM 本体 + `enable_cache=true` 解禁 —— change **`chmem-l1cache-body`**（D3 定案改名；连带台账 `[cache]` 25 条 + `[MMUCacheIntegration]` 4 条；plan 迁入 `.rddf/plans/chmem-l1cache-body.md`；**方案 A** = 先只支持 Bare，不被 ⑤ 阻塞）
 - [ ] **B1**：DBus / LSU CH_MEM 通路 —— change `chmem-dbus-lsu`（**v2 重写**：CH_MEM 宽度语义**早已存在**于 `dmem_chmem.h:104-160` ⇒ 实质是**抽取重构 + 总线仲裁层**；Cache 接线归本 change 独占；plan 迁入 `.rddf/plans/chmem-dbus-lsu.md`）
 - [ ] **B1**：`ip/{mmu,cpu}/tlm/` 目录名治理（B0 剩余项；双模共享文件迁 `core/`）—— 小规模独立 change
-- [ ] **B1 决策定案**：6 个决策问题已由 architect 定案 ✅（2026-10-24）—— 详见 [`tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/tlm-retirement-b1-capacity-plan.md) §5（含 change 立项清单 + 顺序）
+- [ ] **B1 决策定案**：6 个决策问题已由 architect 定案 ✅（2026-10-24）—— 详见 [`tlm-retirement-b1-capacity-plan.md`](../../../docs/architecture/archive/tlm-retirement-b1-capacity-plan.md) §5（含 change 立项清单 + 顺序）
 - [ ] **B1**：CH_MEM 侧 LSU 全宽度 + MMU PTW walk FSM + MMU exception handler 注册 + BP CH_MEM 版 全部落地
 - [x] **B2**：ADR-088 §语义裁决表 5 个子系统逐条表态，M 扩展 cycle 裁决明确 ✅ **已完成**（2026-10-24，architect 主持，ADR-088 升 **v1.1 Accepted**）：M 扩展 = CH_MEM 组合式为规范（功能+cycle）· CSR = CH_MEM 为规范 · MMU PTW = 现在不接线（回退 vaddr = 已知临时降级，归 `chmem-ptw-walk`）· BP = CH_MEM-only 且必须做（不适用「不做」出口）· MMU exception handler = 必须注册。附带裁决：**ADR-080 范围重定义**（→ 后端间对拍）
 - [ ] **B3 前置（v1.4 追加）**：★ **双后端差分 parity 门禁已上线且全绿**（ADR-089 V-1~V-6）—— ⇒ ★ **未通过 ⇒ 不得删任何 TLM-only case**（删掉 463 个 case 后「没有任何自动机制能发现语义退化」⇒ 差分门禁是唯一替代证据；ADR-088 §5.2 判据 6）

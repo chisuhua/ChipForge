@@ -243,7 +243,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 | 项 | 证据 / 结论 |
 |---|---|
 | `auto_insert_stage_regs()` 调用面 | 全仓（排除 `build/`）**0 命中** ⇒ ADR-040 §v2.0 新增 4 提及的「自动 stage 间 `ch_reg` 插入」API **存在但未启用** ⇒ CH_MEM 流水线当前**无 stage 寄存器**（§3 各裁决的形态前提） |
-| CH_MEM 工厂接口形态 | `cpu_factory_chmem.h:96-110` 签名 = **散装 `std::optional` 参数**（`enable_mmu` / `mmu_mode` / `enable_cache`），**不接受 `CPUConfig`**（注释自述「不读 cfg, 不引 CpuConfig 依赖 (NG1, NG2, NG3 显式声明)」）⇒ 「CH_MEM 是否接受 `isa`」这一问题的**前提不成立**：CH_MEM 工厂**根本没有 config 入口**（ISA 契约覆盖面归 B1 决策，见 [`tlm-retirement-b1-capacity-plan.md`](../tlm-retirement-b1-capacity-plan.md)） |
+| CH_MEM 工厂接口形态 | `cpu_factory_chmem.h:96-110` 签名 = **散装 `std::optional` 参数**（`enable_mmu` / `mmu_mode` / `enable_cache`），**不接受 `CPUConfig`**（注释自述「不读 cfg, 不引 CpuConfig 依赖 (NG1, NG2, NG3 显式声明)」）⇒ 「CH_MEM 是否接受 `isa`」这一问题的**前提不成立**：CH_MEM 工厂**根本没有 config 入口**（ISA 契约覆盖面归 B1 决策，见 [`tlm-retirement-b1-capacity-plan.md`](../archive/tlm-retirement-b1-capacity-plan.md)） |
 | CH_MEM 工厂 MMU 现状 | `enable_mmu=true` 为 **plumbing-only no-op**（`cpu_factory_chmem.h:86` 自述「**不会**注册任何 MMU plugin」「NO translation occurs」）⇒ CH_MEM 侧 MMU 目前是**单元级存在**（`[mmu-chmem-basic]` 直接构造 `MMUPluginChmem`，**不走工厂**），**流水线级未接线** ⇒ 缺口范围大于「PTW 未注册」 |
 | `enable_cache=true` | **fail-fast throw**（`cpu_factory_chmem.h:88-92`，不静默退化）⇒ CH_MEM 侧 L1Cache 完全缺失，且行为已显式化（owner = `verilator-l1cache-e2e-coverage`） |
 | CSR stub 依赖面 | `tests/` 对 `RiscvCsrPlugin` / `arch/riscv/csr.h` 仅 2 处命中（`test_cpu_factory.cpp:74` 注释 / `:87` 计数断言），**无行为依赖** ⇒ §3 CSR 行裁决成立 |
@@ -312,7 +312,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 - ADR-040 v3.0（TLM→HDL 移植性约束）· ADR-083（Plugin-style 单一 source of truth）· ADR-046（FSM 豁免）· ADR-087（ISA 声明真实性）
 - `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B0–B3 编排 + 13 条验收）
 - `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G1/G2/G3 门禁）
-- [`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../tlm-retirement-b1-capacity-plan.md)（B1 承载力拆解 + 决策定案）
+- [`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../archive/tlm-retirement-b1-capacity-plan.md)（B1 承载力拆解 + 决策定案）
 - [`docs/architecture/tlm-coverage-parity-ledger.md`](../archive/tlm-coverage-parity-ledger.md)（463 条覆盖平价台账，B0 姊妹提案交付）
 - `.rddf/improvements/chmem-tlm-backend-freeze.md`（B0 提案）· `.rddf/improvements/chmem-tlm-coverage-parity-ledger.md`（台账内容）
 - `openspec/changes/chmem-tlm-backend-freeze/`（本 change 的 proposal / design / plan / tasks）
