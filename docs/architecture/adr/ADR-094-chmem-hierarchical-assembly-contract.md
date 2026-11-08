@@ -147,7 +147,7 @@
 
 - [ ] **V-27** 层次化发射成功；`warnings` **⊆ 归属空洞类别**，且 **0 条 undriven-bubble**；若宣称「交付接口干净」⇒ **0 个 `Synthesized`**。★ 变异：删一条实例连接 ⇒ RED。
 - [ ] **V-27b** `port_provenance` 精确匹配（顶层 input=`Bubbled` · 顶层 output=`InlineFolded` · clock/reset=`ClockReset` · 单元自身=`Self`）。
-- [ ] **V-28** 层次化 vs 扁平**逐拍等价**；★ **前置断言 module 数 ≥ 2**（否则全 inline 下两产物相同 = 恒绿）。★ 变异：反转一个端口 / 删一条连接 ⇒ RED。
+- [ ] **V-28** 层次化 vs 扁平**逐拍等价**；★ ★ **机制锚（★ 2026-11-08 补记 · architect）**：★ 上游 `ch::hier_eq`（★ `CppHDL/include/hierarchy_equivalence.h`）—— ★ namespace `ch::hier_eq` · ★ **7 项闭合公共面**（`DrivenInput` / `Observation` / `ProductSet` / `Result` / `emit` / `compare` / `make_observation`）· ★ **fail-closed**（★ 错误前缀如 `observation-not-visible` / `empty-observations` / `emit-failed`）⇒ ★ **V-28 / V-29 的实现 MUST 以该 helper 为机制锚**（★ **MUST NOT** 自建等价比对器；★ ★ **逃生阀（★ 补记）**：★ 若 helper 的闭合公共面**未覆盖**某个必要场景 ⇒ ★ **回上游扩展该 helper**，★ **MUST NOT** 在本仓自建等价比对器）★ ★ **判别力边界（★ 上游明写）**：★ 该 helper **MUST NOT** 替代双后端 parity（★ ★ 上游原话：★ 「与既有双后端 parity 是**互补**关系」+「★ **MUST NOT** 被读成『做了它就够了』」⇒ ★ 它只覆盖单后端「层次化 vs 扁平」等价 ⇒ 抓「变换算错」；★ 两产物同源 ⇒ **抓不到「共享发射底座算错」**）⇒ ★ **前置断言 module 数 ≥ 2**（否则全 inline 下两产物相同 = 恒绿）。★ 变异：反转一个端口 / 删一条连接 ⇒ RED。
 - [ ] **V-29** `GranularityScope(ForceInline)` 下产物与扁平**逐字节一致**（同一 ctx、同一 elaborate，**不重新 build**）。
 - [ ] **V-30** `ch_device<RegFileComponent>` 独立复用 + `ch_device<Wrapper>`（Wrapper 内 `ch_layer`，覆盖父路径命名）。
 - [ ] **V-31** 负向三变体：① 漏 `add_child` ⇒ FATAL ② **ctor 传 `nullptr` + 事后 `add_child`** ⇒ RED ③ 登记但不 `build` ⇒ FATAL。
