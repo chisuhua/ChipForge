@@ -180,10 +180,38 @@ depends_on:
 - [x] C1.4 ★ **baseline-aware 运行器**：`tools/run_catch2_with_baseline.sh` + `tools/baseline_known_failures.txt`（★ 按 binary 分节 + 每条附根因/owner/收敛期限）⇒ ★ **「全量回归通过」信号恢复**（★ 原先 ctest entry **恒红** ⇒ 信号从来不存在）
 - [x] C1.5 ★ **ctest build fixture**：`cf_build_all` ⇒ ★ 编译失败 ⇒ 依赖测试 **Not Run** ⇒ ctest 整体 FAIL ⇒ ★ **fail-closed**（★ 实测：注入编译错误 ⇒ `0% tests passed, 2 tests failed`）
 - [x] C1.6 ★ **实测知识沉淀**：plan §K18（★ 含「Catch2 XML reporter 会破坏依赖 `std::cerr` 捕获的测试」等 4 条可迁结论）
-- [ ] ★ **L1** `cmake --build <dir>`（all）触发 ExternalProject re-configure ⇒ 找不到编译器 ⇒ 失败（★ 既存环境脆性）⇒ 独立 change
-- [ ] ★ **L2** `test_cpu_factory_isa_xlen.cpp` 的 3 个 case **依赖 reporter 实现**（★ XML 下失败）⇒ 脆弱测试 ⇒ 独立 change
+- [x] ★ **C1.7** ★ ★ **第 4 个「旧产物顶替」通道（★ 2026-11-08 变异对照实测抓到 · V-25 实施期）**：★ `parity` 门禁侧
+      ★ runner exit 2（★ 歧义 / TIMEOUT / 崩溃）时**不写** JSON ⇒ ★ work-dir 里留着**上次成功运行**的报告
+      ⇒ ★ gate 读到**陈旧数据** ⇒ ★ **观测侧是错的、门禁却绿**（★ 与 C1-③ 同机制、★ 不同载体：ctest 的 binary vs 门禁的 JSON 报告）
+      ⇒ ★ **已修**：`run_simulator` / `run_verilator` 在跑之前**删除**目标 JSON（★ 「没有新报告」⇒ 不会读陈旧数据）
+      ⇒ ★ 证据 = `openspec/changes/archive/2026-11-09-parity-observation-ambiguity-fail-closed/evidence/v25-ambiguity-evidence.txt` §4
+- [x] ★ **L1** ★ **根因已铁证锁定（2026-11-08 实测）** ⇒ ★ **独立 change `ci-deps-install-dependency`**
+      ★ ★ **实测纠正**：★ 原描述「触发 ExternalProject re-configure ⇒ 找不到编译器」**不准确** ⇒ ★ 真实根因是
+      ★ **deps 段落从未给 ChipForge 的 target 建立任何依赖边** ⇒ ★ `make` 并行 ⇒ ChipForge 先跑 ⇒
+      ★ 依赖头文件（`ch.hpp`）/ 库（`libcpptlm_core.a`）**尚未安装** ⇒ 编译失败 ⇒ make 提前终止 ⇒ install 没机会跑
+      ★ 铁证：`gmake[2]: *** No rule to make target '_deps/install/lib/libcpptlm_core.a', needed by 'bin/cpu_verilator_sim'.  Stop.`
+      ★ 读生成的 Makefile 确认：`all → cpptlm_external.dir/all → {build, install}` ⇒ ★ **install 在 all 链里** ⇒ ★ 是**竞态**不是「没调度」
+      ★ ★ **附带发现（声明与实现不符）**：★ `CMakeLists.txt:201` 注释写「占位让 add_dependencies 通过」
+      ★ 但**全仓 grep 无任何 `add_dependencies(... chipforge_deps_skip ...)`** ⇒ ★ 那句注释描述的是**从未实现**的意图
+      ★ ★ **旁证**：★ CI 首次 run `42472260469` 失败于**同一根因** ⇒ ★ 当时在 workflow 层绕过（根因仍在）
+- [x] ★ **L2** ★ **根因已铁证锁定（2026-11-08 实测）** ⇒ ★ **独立 change `isa-xlen-warn-capture-decoupling`**
+      ★ 复现：★ 默认 reporter ⇒ `All tests passed (20 assertions in 9 test cases)` EXIT=0；★ XML reporter ⇒ **EXIT=3**
+      ★ 3 个失败断言 = `:60` / `:68` / `:96`（★ 与原描述「3 个 case」完全吻合）⇒ 三者断言内容相同：
+      `REQUIRE(cap.str().find("[declared-reserved]") != npos)` ⇒ ★ XML 展开值 = **`npos`** ⇒ ★ **`cap.str()` 是空的**
+      ★ 根因：★ 测试用 `CerrCapture`（`std::cerr.rdbuf(buf_.rdbuf())`）捕获 ⇒ ★ **Catch2 的 XML reporter 在用例开始前
+      就接管了 `std::cerr`** ⇒ ★ 生产 warn 写进了 XML 的 buffer ⇒ ★ `cap.str()` 空
+      ★ ⇒ ★ **本质**：★ 观测手段（接管全局流）与被测行为耦合 ⇒ ★ **正解 = 依赖注入**（warn 输出目标可注入）
+      ★ ⇒ 测试注入 `std::ostringstream` ⇒ 与 reporter **彻底无关** ⇒ 脆弱性**根除**（不是绕开）
 - [ ] ★ **L3** CI 不构建项目、不跑测试 ⇒ ★ C1 的 build fixture 只在本地 ctest 生效 ⇒ 归 **A4 `backend-parity-ci`**
-- [ ] ★ **L4** `[mmu-verilator]` 的 `mmu_bare_plumbing_tohost1_baseline_5_elf` 是**顺序敏感 flake**（★ 单跑 3/3 PASS ⇒ ★ 全量跑 FAIL，`tohost == 0`）⇒ ★ 根因**未最终定位** ⇒ ★ 已登记进 baseline 清单（★ 附「根因未定位」标注）⇒ 独立 change（owner: ip/mmu）
+      ★ ★ **2026-11-08 复核：★ 「归 A4」这条**已失效**（★ A4 于 2026-11-09 归档 · 36/36）⇒ ★ **本条掉在两个 change 之间**
+      ★ ⇒ ★ 且 **A4 只做到了「CI 能构建 parity runner」（★ `parity-gate.yml`）**，★ **没做到「CI 跑全量测试」**
+      ⇒ ★ **C1.5 的 build fixture（★ 编译失败 ⇒ 依赖测试 Not Run ⇒ 整体 FAIL）**的价值**只在 CI 跑 ctest 时才兑现**
+      ⇒ ★ **处置**：★ 需**architect 决策**（★ 推翻 Oracle 2026-10-06「测试不进 CI」的决策）★ 归 builder 自决 ⇒ 登记为待裁决
+- [ ] ★ **L4** `[mmu-verilator]` 的 `mmu_bare_plumbing_tohost1_baseline_5_elf` 是**顺序敏感 flake**（★ 单跑 3/3 PASS ⇒ ★ 全量跑 FAIL，`tohost == 0`）⇒ ★ 根因
+      ★ ★ **2026-11-08 复现尝试：本地**未复现** ⇒ ★ 单跑 `All tests passed (20 assertions in 1 test case)`；
+      ★ 全量 `[mmu-verilator]` ⇒ `All tests passed (26 assertions in 3 test cases)` ⇒ ★ **两侧都绿**
+      ★ ⇒ ★ 疑似与 A3 时修掉的「**Verilator 产物串扰**」有关（★ 本地已隔离 work-dir ⇒ 不复现）
+      ★ ⇒ ★ **需要能在原环境复现**（★ CI 或原机器）才能定位 ⇒ ★ 登记为**待复现**（★ 不得凭推测写根因）**未最终定位** ⇒ ★ 已登记进 baseline 清单（★ 附「根因未定位」标注）⇒ 独立 change（owner: ip/mmu）
 
 ## 3.6 ★ C2 — 存量 G-1a~G-1k 的**逐条变异对照复核**（★ 2026-10-28）
 
