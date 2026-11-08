@@ -40,6 +40,11 @@ phase_refs: [phase-4, phase-5]
   · ✅ ④ 分层时长采集（`timings` 从空占位 → count=8 · p50=27.2s · p95=37.0s）
   · ✅ ⑤ 单元级快车道（`--self-test` 16/16 · 0.04s · 零构建依赖）
   ⇒ ★ ★ **判据 4 / 7 的完成形式均已满足**：门禁在 CI 中被执行（step 11）且结果被回读（step 12/13 artifact）
+  ★ ★ **2026-11-08 补：CI 的 `pull_request` 路径也已实测**（★ 此前**所有** CI 证据都来自 `workflow_dispatch`
+    ⇒ ★ PR 路径（★ 团队协作时实际会走的那条）**零证据**）⇒ ★ run **42498002503**（`pull_request`）：
+    **13 步全 success** · artifact `parity-report-pr` 回读 `verdict=PASS` · `p50 34.386` / `p95 46.708` / `total 271.764`
+    ⇒ ★ 两条路径（`workflow_dispatch` + `pull_request`）**都有实测** ⇒ ★ 「CI 能跑」不再是推断
+    ⇒ ★ 证据 = `.rddf/reviews/ci-path-verification.md`
   ★ 残留（如实登记，不阻断）：夜间层在 CI 不可跑（`branchbench_elfs` 需 riscv32 工具链）⇒ 开放项 O-A4-1；
     deps 无缓存（每次 run 约 10 min）⇒ O-A4-2。见 `ci-first-run-evidence.md`
   ★ 原条目：进 `tools/run_chipforge_tests.sh` + ★ **CI 具备 build 能力**（= ADR-088 §5.2 判据 4/7 落点）+ 分层 corpus（PR 快子集 + 夜间全量）+ ★ **单元级快车道**（不依赖 TLM 存活的本地快环）+ ★ **Verilog 构建产物按 config 缓存**
