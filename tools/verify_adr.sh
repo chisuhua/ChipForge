@@ -812,6 +812,88 @@ verify_adr_048() {
 }
 
 # ----------------------------------------------------------------------------
+# 门禁③ ADR 孤儿检查（ADR-095 §2.5③ · change architecture-truth-boundary-enforcement AC-112）
+#
+#   双向：① `docs/architecture/adr/` 每份 ADR 在 `adr.md` 的决策主表有行
+#         ② `adr.md` 里指向 `adr/*.md` 的本地链接都存在
+#
+#   ★ 为什么必须给**可执行指引**：只报错不引导 ⇒ 门禁持续制造孤儿 ⇒ 逼人加 allowlist
+#     ⇒ 门禁退化为形式。ADR-095 已把「新增 ADR MUST 同步 adr.md」定为治理规则，
+#     报错信息 MUST 把该规则和责任人直接说出来。
+# ----------------------------------------------------------------------------
+ORPHANS=0
+check_adr_orphans() {
+  local out rc
+  out=$(python3 - "$CHIPFORGE_ROOT" <<'PY'
+import os
+import re
+import sys
+
+root = sys.argv[1]
+adr_dir = os.path.join(root, "docs", "architecture", "adr")
+doc = os.path.join(root, "docs", "architecture", "adr.md")
+
+if not os.path.isdir(adr_dir) or not os.path.isfile(doc):
+    print(f"ERROR: 找不到 {adr_dir} 或 {doc}")
+    sys.exit(2)
+
+lines = open(doc, encoding="utf-8").read().splitlines()
+
+# ① adr/ 每份必须在 adr.md 有表格行
+missing = []
+for fn in sorted(os.listdir(adr_dir)):
+    if not fn.endswith(".md"):
+        continue
+    m = re.match(r"(ADR-\d+)", fn)
+    if not m:
+        missing.append((fn, "文件名缺 ADR-NNN 前缀"))
+        continue
+    aid = m.group(1)
+    row = re.compile(r"^\|\s*\**\s*" + re.escape(aid) + r"\s*\**\s*\|")
+    if not any(row.match(l) for l in lines):
+        missing.append((fn, f"adr.md 的决策主表无 {aid} 行"))
+
+# ② adr.md 的本地 adr/ 链接必须存在
+broken = []
+for i, l in enumerate(lines, 1):
+    for m in re.finditer(r"\]\(([^)\s]*adr/[^)\s]+\.md)", l):
+        tgt = os.path.normpath(os.path.join(os.path.dirname(doc), m.group(1)))
+        if not os.path.isfile(tgt):
+            broken.append((i, m.group(1)))
+
+if not missing and not broken:
+    sys.exit(0)
+
+print("================================================================")
+print("ADR 孤儿检查（adr/ <-> adr.md 双向）")
+print("================================================================")
+for fn, why in missing:
+    print(f"ORPHAN_FILE\t{fn}\t{why}")
+for lineno, link in broken:
+    print(f"ORPHAN_LINK\tadr.md:{lineno}\t{link}")
+print("")
+print("新增 ADR 请在 `docs/architecture/adr.md` §2 的决策主表加一行")
+print("  （ID / 标题 / 类别 / 状态 / 验证路径）——")
+print("  ADR 文件与注册表 MUST 同一个 PR 内落地。")
+print("同步责任人 = architect（ADR 由 architect 签批）。")
+sys.exit(1)
+PY
+)
+  rc=$?
+  if [[ $rc -eq 2 ]]; then
+    echo "$out"
+    ORPHANS=1
+    FAILED=$((FAILED + 1))
+    return
+  fi
+  if [[ $rc -ne 0 ]]; then
+    echo "$out"
+    ORPHANS=1
+    FAILED=$((FAILED + 1))
+  fi
+}
+
+# ----------------------------------------------------------------------------
 # 主循环
 # ----------------------------------------------------------------------------
 main() {
@@ -884,6 +966,9 @@ main() {
   verify_adr_039
   verify_adr_048
 
+  # 门禁③：ADR 孤儿检查（adr/ <-> adr.md 双向）
+  check_adr_orphans
+
   # 汇总
   echo ""
   echo "================================================================"
@@ -893,6 +978,7 @@ main() {
   echo -e "${C_BLUE}🚧 EXPECTED_MISSING : $EXPECTED_MISSING${C_RESET}  (Phase 1 提案，符合预期)"
   echo -e "${C_YELLOW}⚠️  STALE             : $STALE${C_RESET}  (建议更新文档)"
   echo -e "${C_RED}❌ FAILED            : $FAILED${C_RESET}  (Critical 漂移)"
+  echo -e "${C_RED}❌ ORPHANS           : $ORPHANS${C_RESET}  (adr/ <-> adr.md 不一致)"
   echo ""
 
   # 详细报告（仅 FAILED 或 STALE）
