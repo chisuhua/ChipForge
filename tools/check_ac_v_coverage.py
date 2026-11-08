@@ -26,14 +26,31 @@ import os
 import re
 import sys
 
-# ★ 被校验的 change（拆批的两份 —— 这是「并集」的边界）
+# ★ 被校验的 change（★ 每个 change 的 AC 段 = 一个「并集」的边界）
 CHANGES = (
     "architecture-truth-boundary",
     "architecture-truth-boundary-enforcement",
+    # ★ 2026-11-08 扩到 L4 两个 change（ADR-094 的 18 个 V ⇒ V-27~V-43 含 V-27b）
+    "chmem-hierarchical-assembly",
+    "chmem-hierarchical-unit-landing",
 )
 
-# ★ V 全集（AC-115b① 的判据基准）
-V_UNIVERSE = tuple(f"V-{n}" for n in range(101, 111))
+# ★ V 全集（AC-115b① 的判据基准）—— L1 的 V-101~V-110 + L4 的 V-27~V-43（含 V-27b）
+def _l4_v_universe():
+    out = []
+    for n in range(27, 44):
+        out.append(f"V-{n}")
+        if n == 27:
+            out.append("V-27b")     # ★ V-27b 紧随 V-27
+    return tuple(out)
+
+
+def _v_sort_key(v):
+    return (int(re.match(r"\d+", v[2:]).group()), v)
+
+
+V_UNIVERSE = tuple(sorted([f"V-{n}" for n in range(101, 111)] + list(_l4_v_universe()),
+                           key=_v_sort_key))
 
 # ★ 允许「交叉覆盖」的 V ⇒ 理由（不在表内的 V 被多条 AC 覆盖即判违规）
 CROSS_ALLOWED = {
@@ -44,25 +61,42 @@ CROSS_ALLOWED = {
     "V-107": "迁移工具的机械改写与人工复核（内部链接）分别可验",
     "V-109": "迁移分批执行与归档/索引的最终位置是不同时点的判据",
     "V-110": "可回滚性由「每批单 commit」与「实测 revert」两条独立证据支撑",
+    # ★ ★ L4（ADR-094）—— ★ 键 = 「V|侧面」（★ 侧面为空 ⇒ 该 V 无侧面标记）
+    # ★ ★ 判定口径：**同一 V 的同一侧面**被多条 AC 覆盖才算「未授权重复分配」；
+    #   ★ 不同侧面（框架侧 / 落地侧 / 回归侧）⇒ **合法**（★ 同一 V 的两侧验证）
+    "V-30|落地侧": "V-30 含「ch_device 独立复用」与「Wrapper 父路径命名」两个场景 ⇒ 成层 / 独立复用 / Wrapper 命名 三条 AC",
+    "V-31|框架侧": "V-31 的「负向三变体」外，AC-1（root 与 emitter 同一对象）/ AC-2（create_child 路径）/ AC-7（r.6 负向断言）各是独立判据点",
+    "V-32|落地侧": "V-32 含「端口名逐字不同」与「ch_in 均有 driver」两个断言 ⇒ 加「成本登记」第三条",
+    "V-34|框架侧": "V-34 的「2 TU 链接探针」与 AC-1 的「root 与 emitter 同一对象」是两个判据点",
+    "V-35|框架侧": "基线**捕获**（①-C 出口，AC-15）与**比对 + 退役**（①-D 验收，AC-18）是两个时点",
+    "V-36|框架侧": "基线**捕获**（①-C 出口，AC-15）与**比对 + 退役**（①-D 验收，AC-18）是两个时点",
+    "V-39|框架侧": "「三态化」（AC-13）与「同名普查」（AC-14）是两个判据点",
+    "V-40|框架侧": "①-A′ 前置适配（AC-9）/ ①-D 同批切换（AC-16）/ ①-D 三条同批改动（AC-17）是三个判据点",
+    "V-41|框架侧": "「槽位单例」（①-A，AC-6）与「安装期自检」（①-B，AC-11）是两个判据点",
 }
 
 HDR_RE = re.compile(r"^##\s+(?:验收标准|Acceptance Criteria)\s*$")
 BULLET_RE = re.compile(r"^-\s+(?:\[[ xX]\]\s+)?\*\*(AC-[0-9A-Za-z]+)\*\*(.*)$")
 # `覆盖 V:` 之后到「（」/「）」/「。」为止的那一段才是标签本体
 TAG_RE = re.compile(r"覆盖\s*V\s*[:：]\s*([^（()）。\n]*)")
-V_RE = re.compile(r"V-\d+")
+V_RE = re.compile(r"V-\d+b?")
 SELF_EXEMPT_HINT = "自豁免"
+# ★ ★ 「侧面」标记（ADR-094 v0.2）：★ 同一 V 可被两个 change 各覆盖一次（框架侧 / 落地侧 / 回归侧）
+#   ⇒ 机检「无重复」MUST 按「**同一 V 的同一侧面**」判定 ⇒ ★ NOT 按 V 计数
+ASPECT_RE = re.compile(r"(框架侧|落地侧|回归侧)")
+ASPECT_NONE = ""
 
 
 class AC:
-    __slots__ = ("change", "ac_id", "v_ids", "self_exempt", "line")
+    __slots__ = ("change", "ac_id", "v_ids", "self_exempt", "line", "aspect")
 
-    def __init__(self, change, ac_id, v_ids, self_exempt, line):
+    def __init__(self, change, ac_id, v_ids, self_exempt, line, aspect=ASPECT_NONE):
         self.change = change
         self.ac_id = ac_id
         self.v_ids = v_ids
         self.self_exempt = self_exempt
         self.line = line
+        self.aspect = aspect
 
 
 def parse_change(proposal_path, change):
@@ -88,13 +122,21 @@ def parse_change(proposal_path, change):
             continue
         seg = tm.group(1).strip()
         self_exempt = SELF_EXEMPT_HINT in rest
-        v_ids = sorted(set(V_RE.findall(seg)), key=lambda s: int(s[2:]))
-        out.append(AC(change, ac_id, v_ids, self_exempt, n + 1))
+        # ★ V-27b 这类带字母后缀的 V ⇒ 排序键取「数字部分」
+        v_ids = sorted(set(V_RE.findall(seg)),
+                       key=lambda s: (int(re.match(r"\d+", s[2:]).group()), s))
+        am = ASPECT_RE.search(seg)
+        aspect = am.group(1) if am else ASPECT_NONE
+        out.append(AC(change, ac_id, v_ids, self_exempt, n + 1, aspect))
     return out
 
 
-def evaluate(acs):
-    """纯函数：给定 AC 列表 ⇒ (errors, coverage)。供 --self-test 直接复用。"""
+def evaluate(acs, v_universe=None):
+    """纯函数：给定 AC 列表 ⇒ (errors, coverage)。供 --self-test 直接复用。
+
+    ★ `v_universe` 可注入（★ self-test 用小全集，★ 免得被真实全集的孤儿淹没）。
+    """
+    v_universe = tuple(v_universe) if v_universe is not None else V_UNIVERSE
     errors = []
     coverage = {}
 
@@ -107,18 +149,28 @@ def evaluate(acs):
         for v in a.v_ids:
             coverage.setdefault(v, []).append(a)
 
-    for v in V_UNIVERSE:
+    for v in v_universe:
         if v not in coverage:
             errors.append(("orphan-v", None, f"{v} 未被任何 AC 覆盖（并集不完整）"))
 
     for v, owners in coverage.items():
-        if v not in V_UNIVERSE:
-            errors.append(("unknown-v", owners[0], f"{v} 不在 V-101~V-110 全集内"))
+        if v not in v_universe:
+            errors.append(("unknown-v", owners[0], f"{v} 不在 V 全集内"))
             continue
-        if len(owners) > 1 and v not in CROSS_ALLOWED:
-            ids = ", ".join(f"{o.change}:{o.ac_id}" for o in owners)
-            errors.append(("duplicate-assignment", owners[0],
-                           f"{v} 被 {len(owners)} 条 AC 覆盖（{ids}）但不在交叉白名单"))
+        # ★ ★ 按「同一 V 的同一侧面」分组 ⇒ 不同侧面（框架侧 / 落地侧 / 回归侧）**合法**
+        by_aspect = {}
+        for o in owners:
+            by_aspect.setdefault(o.aspect, []).append(o)
+        for aspect, group in by_aspect.items():
+            if len(group) <= 1:
+                continue
+            key = f"{v}|{aspect}" if aspect else v
+            if key in CROSS_ALLOWED:
+                continue
+            ids = ", ".join(f"{o.change}:{o.ac_id}" for o in group)
+            errors.append(("duplicate-assignment", group[0],
+                           f"{v} 的侧面「{aspect or '未标注'}」被 {len(group)} 条 AC 覆盖"
+                           f"（{ids}）但不在交叉白名单（键 {key}）"))
     return errors, coverage
 
 
@@ -155,9 +207,11 @@ def print_report(acs, errors, coverage):
 
 def self_test():
     """判别力自检：三类违规各构造一个用例 + 一个全绿用例。"""
-    def mk(ac_id, v_ids, self_exempt=False, change="c"):
-        return AC(change, ac_id, list(v_ids), self_exempt, 0)
+    def mk(ac_id, v_ids, self_exempt=False, change="c", aspect=ASPECT_NONE):
+        return AC(change, ac_id, list(v_ids), self_exempt, 0, aspect)
 
+    # ★ self-test 用**小全集**（★ 否则真实全集的孤儿会淹没判别力断言）
+    mini = tuple(f"V-{n}" for n in range(101, 111))
     cases = []
 
     # ① 全绿：10 个 V 各一条
@@ -179,9 +233,19 @@ def self_test():
     # ⑥ self-exempt 的 AC 不参与计数
     cases.append(("self-exempt", full + [mk("AC-115b", [], self_exempt=True)], 0))
 
+    # ⑦ ★ 侧面感知（ADR-094 v0.2）：同一 V 的**不同侧面** ⇒ **合法**（0 错误）
+    cases.append(("★ 不同侧面合法",
+                  full + [mk("AC-S1", ["V-110"], aspect="框架侧"),
+                          mk("AC-S2", ["V-110"], aspect="落地侧")], 0))
+
+    # ⑧ ★ 同一 V 的**同一侧面**被多条 AC 覆盖 ⇒ **违规**（且不在白名单 ⇒ 用 V-109）
+    cases.append(("★ 同侧面重复违规",
+                  full + [mk("AC-D1", ["V-109"], aspect="框架侧"),
+                          mk("AC-D2", ["V-109"], aspect="框架侧")], 1))
+
     failed = 0
     for name, acs, want_errors in cases:
-        errors, _ = evaluate(acs)
+        errors, _ = evaluate(acs, mini)
         ok = (len(errors) > 0) == (want_errors > 0) if want_errors == 0 else len(errors) > 0
         # 精确期望：want_errors=0 ⇒ 必须零错误；>0 ⇒ 必须有错误
         ok = (len(errors) == 0) if want_errors == 0 else (len(errors) > 0)
