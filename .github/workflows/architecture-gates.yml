@@ -86,7 +86,7 @@ jobs:
 
   architecture-gates:
     runs-on: ubuntu-latest
-    name: Architecture Compliance Gates (4 scripts)
+    name: Architecture Compliance Gates (ADR / D4 / Portability / Truth purity / Exception provenance / Doc Links)
 
     env:
       # CHIPFORGE_ROOT 覆盖脚本默认值 (本地 dev 路径) 为 CI workspace 路径
@@ -97,6 +97,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # ★ fetch-depth 0：S-12 provenance 机检需要 base..HEAD 的**完整 commit 历史**
+          #   （要逐个 commit 判定 message 是否引 ADR-089）⇒ depth=1 会让 git log 截断
+          fetch-depth: 0
 
       - name: Checkout CppTLM (for verify_adr.sh framework path validation)
         uses: actions/checkout@v4
@@ -153,6 +157,24 @@ jobs:
           echo "=== Running check_coverage_parity_ledger.sh ==="
           bash tools/check_coverage_parity_ledger.sh
         continue-on-error: true
+
+      # ★ S-12 白名单**扩张**的 provenance 机检（契约 `parity-gate-contract.md` §S-12）
+      #   ★ 契约 v1.4 曾诚实标注「『commit message 引裁决编号』的机检**不在覆盖内**（需 git hook 级检查）
+      #     ⇒ 登记为 A4 的待办，★ **MUST NOT 假装已覆盖**」⇒ ★ 2026-11-08 补上（ADR-089 D3 裁决）
+      #   ★ 判据：例外条目 id 集合变大（= 扩张）⇒ 触及该文件的**每个单亲 commit** 的 message MUST 引 ADR-089
+      - name: Check parity exception provenance (S-12, ADR-089 D3 expansion gate)
+        id: verify_exception_provenance
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          echo "=== Running check_exception_provenance.py ==="
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then
+            echo "SKIP: PR base sha 不可得"
+            exit 0
+          fi
+          python3 tools/parity/check_exception_provenance.py --range "$BASE...HEAD"
+        continue-on-error: false
 
       # ADR-088 §5.2 判据 4「CI 有可回归的自动测试」: CI **不跑 ctest** =>
       # 仅加 ctest entry 不满足该判据 => 必须有 CI 门禁步骤实跑测量脚本做基线漂移检测.

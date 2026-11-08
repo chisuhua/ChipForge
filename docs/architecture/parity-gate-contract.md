@@ -1,6 +1,6 @@
 # Parity 门禁实现契约（A1 · S-1…S-16）
 
-> **Status**: ✅ **v1.8（2026-10-27，builder；v1.8 = S-15 per-case 超时**推导** —— 修「全局单一超时 ⇒ branchbench 假红」）**
+> **Status**: ✅ **v1.9（2026-11-08，builder；v1.8 = S-15 per-case 超时**推导** —— 修「全局单一超时 ⇒ branchbench 假红」；★ **v1.9 = S-12 白名单扩张 provenance 机检补上** —— ★ 契约 v1.4 曾诚实标注「『commit message 引裁决编号』的机检**不在覆盖内** ⇒ 登记为 A4 的待办，★ MUST NOT 假装已覆盖」⇒ ★ 本版补上）**
 > **上游**: `ADR-089` v1.2（契约本体：D2 观测量 / D3 对齐 / D4 corpus）· `ADR-088` v1.4 §10（目标态与三段路径）
 > **下游**: `A2a backend-parity-observability` · `A2b backend-parity-harness` · `A3 backend-parity-corpus` · `A4 backend-parity-ci`
 > **粘住机制**: 本文件以 **S-编号** 为唯一引用单元 ⇒ ★ **下游每个 change 的 `tasks.md` 每条 MUST 引 ≥1 个 S 编号**；`G-A2` MUST 含「S ⇒ 实现/测试」覆盖矩阵（§7）
@@ -330,7 +330,14 @@ case 在 cycle cap 处被截断（两侧 `done=false`）时，`tohost`（两侧�
 **要求**
 - 白名单**扩张** MUST 经 **architect 审**（`ADR-089` D3，2026-10-26 用户裁决）；实施者**不得**自行新增条目。
 - 门禁 MUST 校验：含白名单变更的 commit message 引 `ADR-089`（机检）。
-  ★ **v1.4 覆盖范围（诚实标注）**：规模护栏 / 过期失效 / 扩张权（architect 审）**在本契约覆盖内**；**「commit message 引裁决编号」的机检不在覆盖内**（需 git hook 级检查）⇒ 登记为 A4 的待办，★ **MUST NOT 假装已覆盖**。
+  ★ ★ **v1.9 覆盖范围（★ 2026-11-08 更新 · 欠账已补）**：规模护栏 / 过期失效 / 扩张权（architect 审）**在本契约覆盖内**；
+  ★ ★ **「commit message 引裁决编号」的机检 ⇒ 现已覆盖**：
+  | 项 | 落点 |
+  |---|---|
+  | 实现 | `tools/parity/check_exception_provenance.py`（★ `--self-test` **5/5** · 含负向对照「扩张 + message 无 ADR-089 ⇒ **RED**」+ **merge commit 跳过**用例） |
+  | CI | `.github/workflows/architecture-gates.yml` 的 `Check parity exception provenance` step（★ **阻塞级** · PR 触发 · `fetch-depth: 0` 以取完整历史） |
+  | 判定口径 | ★ **例外条目 id 集合变大** = 扩张 ⇒ ★ 只改 `sunset` / `mechanism` **不构成扩张** ⇒ 不误报 |
+  | 判定粒度 | ★ 触及该文件的**每个单亲 commit**（★ **跳过 merge commit** —— PR 事件下 HEAD 是 GitHub 生成的 merge commit，其 message 不含 ADR-089 ⇒ 会假阳性） |
 - 真实例外条目数 **> 10**（`N = 10`）⇒ 报告顶部 **强制提示 architect 复审**；★ **MUST NOT** 以「超过 N ⇒ 退出码非 0」作护栏（会逼出假登记）。
 - `sunset` 已过期 ⇒ 该条目**自动失效** ⇒ 门禁 FAIL，并标注「升级为真 bug 类」。
 

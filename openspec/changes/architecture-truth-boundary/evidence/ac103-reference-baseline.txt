@@ -1,0 +1,123 @@
+================================================================================================
+AC-103 引用基线清单 —— 5 批迁移的逐批「迁移前 / 迁移后」断链对照表
+================================================================================================
+
+★ 生成方式（★ 可复现）
+  ① `git worktree add --detach <parent-commit>` 逐批重放 5 批迁移的**父 commit**与**该 commit**
+  ② 在每个 worktree 里跑**今天的** `tools/doc_link_check.sh`（★ 检查口径固定）
+     + **当时的** `tools/doc_link_check_ignore.txt`（★ 豁免清单随 commit 走 ⇒ worktree 里天然是当时的）
+  ③ 解析 `BROKEN_PATH` 行 ⇒ 按「被引用的目标路径」分组
+
+★ 为什么用「今天的脚本 + 当时的 ignore」：★ 迁移当时 `doc_link_check.sh` 的 `PATH_CHECK_DOCS`
+  **不含 `docs/architecture/`**（门禁②扩围是后续 commit `d4f2918` 才做的）⇒ ★ 用当时的脚本
+  **根本看不到**架构文档区的断链 ⇒ ⇒ 必须用今天的口径去看当时的文档状态。
+★ ignore 清单**不**用今天的版本：★ 今天的豁免是为**当前**文档状态写的 ⇒ 套到历史状态上
+  会掩盖历史断链 ⇒ 反而失真。
+
+★ 每批的移动份数：批1=6 · 批2=1 · 批3=1 · 批4=1 · 批5=1（★ 合计 10 份）
+★ 本清单补齐了 AC-103 的原始要求「★ 时机 = 每批移动『之前』执行」：
+  ★ 迁移**已经发生**，当时的基线**无法回溯生成** ⇒ ★ 本清单是**等价补证**（★ 由 git 历史重放得出）
+  ⇒ ★ 它给出的不是「当时的记录」，而是「**用同一口径重放到当时**」的**实测结果** ⇒ 判据成立。
+
+------------------------------------------------------------------------------------------------
+§1  移动映射（旧路径 → 新路径）
+------------------------------------------------------------------------------------------------
+  批1（00e239a）
+      docs/architecture/performance-guide.md
+        → docs/architecture/archive/performance-guide.md
+      docs/architecture/code-framework-mapping.md
+        → docs/architecture/mixed/code-framework-mapping.md
+      docs/architecture/declarative-hybrid-framework.md
+        → docs/architecture/mixed/declarative-hybrid-framework.md
+      docs/architecture/plugin-framework.md
+        → docs/architecture/mixed/plugin-framework.md
+      docs/architecture/tech-selection.md
+        → docs/architecture/mixed/tech-selection.md
+      docs/architecture/testing-and-dse.md
+        → docs/architecture/mixed/testing-and-dse.md
+  批2（2c649d7）
+      docs/architecture/tlm-coverage-parity-ledger.md
+        → docs/architecture/archive/tlm-coverage-parity-ledger.md
+  批3（b6be804）
+      docs/architecture/tlm-retirement-b1-capacity-plan.md
+        → docs/architecture/archive/tlm-retirement-b1-capacity-plan.md
+  批4（3a2ee8d）
+      docs/architecture/m4-dse-cpufactory-real-pr-description.md
+        → docs/architecture/archive/m4-dse-cpufactory-real-pr-description.md
+  批5（f4361ab）
+      docs/architecture/ip-catalog.md
+        → ip/ip-catalog.md
+
+§2  逐批断链计数
+------------------------------------------------------------------------------------------------
+  ★ 两套口径：**条目数** = 每个「引用点 × 目标」的断链行数（门禁报告的口径）
+              **目标数** = 去重后的「被引用目标路径」个数
+  批   commit     迁移前   迁移后   净增   引入(条目/目标)   修复(条目/目标)   累计峰值
+  1    00e239a       84       91     +7        7 /   4           0 /   0          91
+  2    2c649d7       91       98     +7        7 /   1           0 /   0          98
+  3    b6be804       98      100     +2        2 /   1           0 /   0         100
+  4    3a2ee8d      100      100     +0        0 /   0           0 /   0         100
+  5    f4361ab      100       95     -5        0 /   0           5 /   2         100
+
+  ★ 起点（批 1 迁移前）= **84** 条 · 峰值 = **100** 条 ⇒ 迁移期间净增 **+16** 条
+  ⇒ ★ 迁移**确实引入过新断链**（不是零风险）⇒ 这正是 AC-104「改写全部引用」必须**逐条核销**的原因；
+  ⇒ ★ 批 5 已回收 5 条，★ 其余由后续 commit `d4f2918`（门禁②扩围 + 修 42 处）清零。
+§3  逐批明细（★ 该批引入 / 该批修复）
+------------------------------------------------------------------------------------------------
+
+### 批 1（00e239a）—— 移动 6 份
+  迁移前断链 84 · 迁移后 91
+  ▸ 本批**引入**的断链（4 个目标）：
+      `docs/architecture/code-framework-mapping.md`  ★★ **迁移导致** ⇒ 新路径 = `docs/architecture/mixed/code-framework-mapping.md`
+          ← docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md:243
+          ← docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md:245
+          ← docs/architecture/hierarchical-plugin-architecture.md:69
+      `docs/architecture/declarative-hybrid-framework.md`  ★★ **迁移导致** ⇒ 新路径 = `docs/architecture/mixed/declarative-hybrid-framework.md`
+          ← docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md:245
+      `docs/architecture/plugin-framework.md`  ★★ **迁移导致** ⇒ 新路径 = `docs/architecture/mixed/plugin-framework.md`
+          ← docs/architecture/hierarchical-plugin-architecture.md:68
+          ← docs/architecture/m4-dse-cpufactory-real-pr-description.md:228
+      `docs/architecture/tech-selection.md`  ★★ **迁移导致** ⇒ 新路径 = `docs/architecture/mixed/tech-selection.md`
+          ← docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md:242
+
+### 批 2（2c649d7）—— 移动 1 份
+  迁移前断链 91 · 迁移后 98
+  ▸ 本批**引入**的断链（1 个目标）：
+      `docs/architecture/tlm-coverage-parity-ledger.md`  ★★ **迁移导致** ⇒ 新路径 = `docs/architecture/archive/tlm-coverage-parity-ledger.md`
+          ← docs/architecture/adr/ADR-088-tlm-backend-retirement.md:316
+          ← docs/architecture/adr/ADR-089-backend-parity-differential-gate.md:18
+          ← docs/architecture/adr/ADR-089-backend-parity-differential-gate.md:258
+          ← …另 4 处
+
+### 批 3（b6be804）—— 移动 1 份
+  迁移前断链 98 · 迁移后 100
+  ▸ 本批**引入**的断链（1 个目标）：
+      `docs/architecture/tlm-retirement-b1-capacity-plan.md`  ★★ **迁移导致** ⇒ 新路径 = `docs/architecture/archive/tlm-retirement-b1-capacity-plan.md`
+          ← docs/architecture/adr/ADR-088-tlm-backend-retirement.md:315
+          ← docs/architecture/adr/ADR-089-backend-parity-differential-gate.md:259
+
+### 批 4（3a2ee8d）—— 移动 1 份
+  迁移前断链 100 · 迁移后 100
+  ★ 本批**未引入也未修复**断链（净 0）
+
+### 批 5（f4361ab）—— 移动 1 份
+  迁移前断链 100 · 迁移后 95
+  ▸ 本批**修复**的断链（2 个目标）：
+      `docs/architecture.md`
+          ← docs/architecture/ip-catalog.md:22
+          ← docs/architecture/ip-catalog.md:28
+      `ip/ip-catalog.md`
+          ← docs/architecture/adr/ADR-095-architecture-truth-boundary-and-dir-governance.md:66
+          ← docs/architecture/adr/ADR-095-architecture-truth-boundary-and-dir-governance.md:83
+          ← …另 1 处
+
+------------------------------------------------------------------------------------------------
+§4  结论
+------------------------------------------------------------------------------------------------
+  ① ★ **AC-103 的判据成立**：「导出全部真断链的『原路径 → 新路径』对照表」——
+     ★ §1 给出 10 份文件的**完整旧→新映射**；★ §3 逐条标出**哪条断链由哪次移动造成**
+     ⇒ ★ **「原有断链」与「迁移新增断链」已被区分**（★ 这正是 AC-103 的原始目的）。
+  ② ★ 迁移**不是零风险**的：★ 5 批共引入断链，峰值达 100 ⇒ ★ 这就是 AC-104「改写全部引用」
+     必须**逐条核销**的原因（★ 不是形式主义）。
+  ③ ★ 最终态：★ `bash tools/doc_link_check.sh` ⇒ **0 broken** ⇒ ★ 迁移 + 后续引用改写后**净结果为零**。
+
