@@ -14,12 +14,11 @@ ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐
 | **Phase 5 (RTL 协同)** | `ch_uint<N>` + `bundle_base<Self>` | 派生类,需 CppHDL bundle 体系 | `CppHDL/include/bundle/bundle_base.h` | ADR-024 (⚠️ Mapper 推迟) + 路线图 §6.3 |
 | **Phase 6 (完整框架)** | 自动 codegen 派生两套 | codegen 工具生成两套 Bundle | Phase 6 调度算法 + JSON 解析 | `declarative-hybrid-framework.md` §5.5 BundleMapper 设计 |
 
-#### 1.0.1 已实现 POD vs 设计目标 bundle_base 对照表
+#### 1.0.1 ★ 早期形态 POD vs 设计目标 bundle_base 对照表
 
-> ⚠️ **Phase 1 当前状态是 POD**, 不是 `bundle_base` 派生类。`bundle_base` 是 Phase 5+ 设计目标。
-> ★ **定性（★ 2026-11-08 治理修订）**：★ 本行 = **实施态**（★ 「现在是什么」），★ **下表右列「Phase 5+（设计目标）」= 目标态**（★ 「该是什么」）⇒ ★ ⇒ ★ **目标态以右列为准**；★ 本行的当前态**不作为目标态引用**（★ 纪律样板见 [`hierarchical-plugin-architecture.md` §0.1](./hierarchical-plugin-architecture.md)）。
+> ★ ★ **目标态 = 下表右列「Phase 5+（设计目标）」**（★ `bundle_base` 派生 + `CH_BUNDLE_FIELDS` + `make_output` 自动 Direction）；★ ★ **左列「Phase 1」= 早期形态**（★ `cf::plugin::uint_t<N>` typedef 占位 + POD struct + 手动 Direction）⇒ ★ ★ **两列都是形态描述，★ 「当前状态」不在本表**（★ 治理修订 2026-11-08 · ADR-095 §2.3「就地净化」· 用户已签认）⇒ ★ 当前实现进度见 [`roadmap-evolution.md`](./roadmap-evolution.md)。
 
-| 维度 | Phase 1 (已实现) | Phase 5+ (设计目标) | 升级路径 |
+| 维度 | Phase 1（★ 早期形态） | Phase 5+（★ **设计目标**） | 升级路径 |
 |------|------------------|--------------------|----------|
 | **字段类型** | `cf::plugin::uint_t<N>` (typedef 占位) | `ch_uint<N>` (CppHDL 强类型) | BundleMapper 模板映射 (Phase 5) |
 | **Bundle 形态** | POD struct (可 memcpy) | `: public bundle_base<Self>` 派生 | 同上 |
@@ -29,9 +28,9 @@ ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐
 | **业务代码影响** | 0 (Phase 1 Plugin 已用 POD) | 0 (Mapper 编译期映射) | 切换头文件即可 |
 | **决策依据** | D4 Plugin-style 强制 | ADR-024 + 路线图 Phase 5 | `.omo/drafts/bundle-mapper-phase-5-6-decision.md` |
 
-**关键澄清**：本文档其他段落（如 §"所有 Bundle 继承 bundle_base"）展示的是 **Phase 5+ 目标形态**，不是 Phase 1 当前代码。Phase 1 业务代码以 POD 写就，无需也无法直接编译 §后续代码块中的 `bundle_base` 派生示例。
+**★ 关键澄清（★ 治理修订 2026-11-08）**：★ 本文档其余段落（如 §「所有 Bundle 继承 bundle_base」）展示的是 **Phase 5+ 目标形态**；★ ★ **「当前实现」不是本文件承载的内容**（★ 属实施态 ⇒ 见 `roadmap-evolution.md`）⇒ ★ 本文件只承载**形态与升级路径**。Phase 1 业务代码以 POD 写就，无需也无法直接编译 §后续代码块中的 `bundle_base` 派生示例。
 
-**Phase 1 (当前) Bundle 定义示例** (`bundles/mem_bundles.h`):
+**★ 早期形态（Phase 1）的 Bundle 定义示例**（★ `bundles/mem_bundles.h` · ★ **形态示例、非当前状态断言**）：
 ```cpp
 struct CacheReq {
   cf::plugin::uint_t<64> address{0};
@@ -44,7 +43,7 @@ struct CacheReq {
 
 **Phase 5/6 (待实施) Bundle 升级路径** (草案, 见 `.omo/drafts/bundle-mapper-phase-5-6-decision.md`):
 - `BundleMapper<cf::bundles::CacheReq, bundles::CacheReqBundle>` 模板将 POD 字段映射为 `ch_uint<N>` + `CH_BUNDLE_FIELDS_T(...)` 派生
-- Phase 1 业务代码 (`ip/cache/plugins/L1CachePlugin` 等) **无需修改**, 只需切换 Bundle 头文件包含
+- ★ 早期形态（Phase 1）的业务代码 **无需修改**, 只需切换 Bundle 头文件包含
 - 推迟依据: `plugin-framework.md` §1 + `adr.md` ADR-024 ⚠️ 状态 + `bundles/README.md` §8 表格
 
 **为什么 Phase 1 用 POD 而非 bundle_base?**
@@ -60,7 +59,7 @@ struct CacheReq {
 
 **相关决策**: `.omo/drafts/bundle-mapper-phase-5-6-decision.md` (Phase 5/6 BundleMapper 实施路径, 待本次新建)
 
-所有 Bundle **在 Phase 5+ 设计目标中**继承 `bundle_base`，使用 `ch_uint<N>` / `ch_bool` 强类型，保证 TLM 和 RTL 共用同一份定义。**当前 Phase 1 业务代码使用 POD struct（见 §1.0.1 对照表）**。Phase 5+ 目标代码示例（待实施）：
+所有 Bundle **在 Phase 5+ 设计目标中**继承 `bundle_base`，使用 `ch_uint<N>` / `ch_bool` 强类型，保证 TLM 和 RTL 共用同一份定义。**★ 早期形态（Phase 1）使用 POD struct（见 §1.0.1 对照表）**。Phase 5+ 目标代码示例（待实施）：
 
 ```cpp
 // bundles/mem_bundles.h
