@@ -41,10 +41,17 @@ depends_on:
 
 - [x] Simulator 侧 CLI 可跑单个 ELF 并输出 5 项中的 4 项（`memsig` 显式 pending）
 - [x] 同一 ELF 两侧 `cycles` 一致（`rv32ui-p-add`：**478 / 478**）
-- [ ] 同一 ELF 两侧 `regs` / `pchash` 一致（待 inc-2）
-- [ ] `memsig` 两侧可采且有自校验（待 inc-3）
-- [ ] 缺任一观测量 ⇒ 退出码 2（已实现 `memsig` 的 fail-closed；其余同构）
-- [ ] 抽样 ≥3 个 ELF（含 1 个 rv32um）产出**两侧 JSON 证据**
+- [x] 同一 ELF 两侧 `regs` / `pchash` 一致
+      —— ★ 依据 **tasks 2.5**（同 ELF 双侧 `regs` / `pchash` 相等 —— **3/3 ELF 逐位相等**：`rv32ui-p-add` / `rv32um-p-mul` / `rv32ui-p-simple`）
+        + tasks 1.6（② `regs` 采集）+ tasks 1.8（⑤ `pchash` 采集）+ tasks 2.3（Verilator 侧 `--json` 字段同名同义）
+- [x] `memsig` 两侧可采且有自校验
+      —— ★ 依据 **tasks 3.5**（两侧 `memsig` 相等 —— **5/5 corpus**：3 ELF + branchbench m0/m2，`memsig` / `mem_sig_updates` 逐位相等）
+        + tasks 3.3（变异对照：① `store_wdata` 取反 ⇒ `memsig` 必变 `a55f52c5`→`8fcc53ba` ② 强制 `sig_upd` 恒 0 ⇒ 两侧必判「假一致」⇒ RED）
+- [x] 缺任一观测量 ⇒ 退出码 2
+      —— ★ 依据 **tasks 1.10**（③ `memsig` 未实现 ⇒ **默认 fail-closed（exit 2）**，`--allow-incomplete` 才放行并标 `null`）+ tasks 1.11（报告片段 JSON 含 `determinism` / `observations` / `done`）
+- [x] 抽样 ≥3 个 ELF（含 1 个 rv32um）产出**两侧 JSON 证据**
+      —— ★ 依据 **tasks 4.1**（已完成且**扩到 5 个 corpus**：3 ELF + branchbench m0/m2，5 项观测量 + 确定性判据两侧逐位相等）
+        ⇒ ★ 产物 = `build/parity/{case}.sim.json` / `{case}.vl.json`（★ 构建产物，非版本控制内；可由 `parity_gate.py` 重新生成）
 
 ## Impact
 
