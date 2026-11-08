@@ -1,6 +1,6 @@
 {
   "schema_version": "arch-docs-v1",
-  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除。★ 诊断与待决策项见 `.rddf/reviews/architecture-docs-governance-recommendations.md`（★ §4 选项 2 = arch_paths 覆盖范围）。",
+  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除。★ 2026-11-08：★ **ADR-095 签认后补登 6 份**（★ 执行用户签认的角色边界变更 ⇒ 非越权）；★ 诊断与待决策项见 `.rddf/reviews/architecture-docs-governance-recommendations.md`。",
   "arch_paths": [
     "docs/architecture/adr",
     "docs/architecture/adr.md",
@@ -11,7 +11,13 @@
     "docs/architecture/roadmap-evolution.md",
     "ip/mmu/docs/adr",
     "ip/cache/docs/adr",
-    "docs/architecture/hierarchical-plugin-architecture.md"
+    "docs/architecture/hierarchical-plugin-architecture.md",
+    "docs/architecture/error-handling.md",
+    "docs/architecture/background-and-goals.md",
+    "docs/architecture/plugin-framework.md",
+    "docs/architecture/declarative-hybrid-framework.md",
+    "docs/architecture/code-framework-mapping.md",
+    "docs/architecture/tech-selection.md"
   ],
   "exclude_paths": [
     "docs/architecture/tlm-coverage-parity-ledger.md",
