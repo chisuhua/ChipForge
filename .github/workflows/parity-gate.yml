@@ -70,28 +70,28 @@ jobs:
           repository: ${{ env.CPPHDL_REPO }}
           path: ${{ github.workspace }}/CppHDL
 
-      # ★ AC-2④：★ Verilator 可用（★ 复用 architecture-gates.yml:50-63 的安装路径）
-      - name: Detect distribution
-        id: distro
+      # ★ AC-2④：★ Verilator 可用
+      #   ★ ★ 2026-11-08 首次 run 实测修正：原实现按发行版**精确匹配**分流
+      #     （`VERSION_ID == '24.04'` / `== '22.04'`）⇒ runner 上两个分支**都被跳过**
+      #     ⇒ Verilator 未安装、后续构建缺工具（且 SKIP 不报错 = 静默失效）。
+      #     改为「先 apt 装，版本不够再源码构建」，不依赖发行版字符串。
+      - name: Install Verilator (apt, fallback to source build)
         run: |
-          DISTRO_VERSION=$(lsb_release -rs 2>/dev/null || grep -oP 'VERSION_ID="\K[^"]+' /etc/os-release)
-          echo "VERSION_ID=$DISTRO_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Install Verilator (Ubuntu 24.04 noble)
-        if: steps.distro.outputs.VERSION_ID == '24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y verilator
-          verilator --version | head -1
-
-      - name: Build Verilator from source (Ubuntu 22.04 jammy)
-        if: steps.distro.outputs.VERSION_ID == '22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git cmake make flex bison g++
-          git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
-          cd /tmp/verilator && cmake -B build && cmake --build build -j$(nproc) && sudo make install
-          verilator --version | head -1
+          set -euo pipefail
+          . /etc/os-release
+          echo "distro: ${PRETTY_NAME:-unknown} (VERSION_ID=${VERSION_ID:-unknown})"
+          sudo apt-get update -qq
+          if sudo apt-get install -y verilator && verilator --version; then
+            echo "verilator installed from apt"
+          else
+            echo "apt verilator unavailable ⇒ building v5.020 from source"
+            sudo apt-get install -y git cmake make flex bison g++ help2man perl
+            git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
+            cmake -S /tmp/verilator -B /tmp/verilator/build
+            cmake --build /tmp/verilator/build -j"$(nproc)"
+            sudo cmake --install /tmp/verilator/build
+            verilator --version
+          fi
 
       # ★ ★ 单元级快车道（S-15）：★ **零构建依赖** ⇒ ★ 排在 build 之前
       #   ⇒ ★ build 挂掉也能先拿到「比对器自身判别力」的信号
@@ -105,6 +105,19 @@ jobs:
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
+      # ★ ★ 2026-11-08 首次 run 实测修正：**deps 必须先构建**。
+      #   原实现只 build 两个 runner ⇒ 报
+      #     `No rule to make target '_deps/install/lib/libcpptlm_core.a'`
+      #     `fatal error: ch.hpp: No such file or directory`
+      #   原因：CppTLM/CppHDL 的 ExternalProject 只挂在默认 `all` 链上，
+      #   并不是 runner target 的依赖 ⇒ 必须显式先 build 它们的 ExternalProject 目标。
+      - name: Build CppTLM/CppHDL deps (ExternalProject)
+        run: |
+          echo "=== building deps: cpptlm_external cpphdl_external ==="
+          cmake --build build --target cpptlm_external cpphdl_external -j"$(nproc)"
+          echo "--- installed deps ---"
+          ls -1 build/_deps/install/lib 2>/dev/null | head -10
+
       # ★ AC-2②：★ 只 build 两个 runner target（★ 不 build 686 个 TLM case ⇒ 省时长）
       #   ★ 夜间层额外需要 branchbench 的 4 个 ELF（CMake 构建产物，见 corpus.txt 头注）
       - name: Build parity runners (判据 7)
@@ -114,7 +127,7 @@ jobs:
             TARGETS="$TARGETS branchbench_elfs"
           fi
           echo "=== building targets: $TARGETS ==="
-          cmake --build build --target $TARGETS -j$(nproc)
+          cmake --build build --target $TARGETS -j"$(nproc)"
 
       # ★ AC-2② 验证：★ 两个 runner 都必须存在（★ 缺失 ⇒ 响亮失败，不 SKIP）
       - name: Verify runners exist (GN-1 — 不得 SKIP)
