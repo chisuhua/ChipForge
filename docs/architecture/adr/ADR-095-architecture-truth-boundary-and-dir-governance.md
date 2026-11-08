@@ -1,6 +1,6 @@
 # ADR-095 — `docs/architecture/` 真相源边界与目录治理
 
-- **Status**: ✅ **Accepted v1.0**（2026-11-08 · architect；★ ★ **用户签认「批准」** ⇒ 决策已定）
+- **Status**: ✅ **Accepted v1.1**（2026-11-08 · architect；★ v1.0 = 用户签认「批准」；★ **v1.1 = 门禁①④ 判据按实施实测修订** —— 词表收窄 / 范围限顶层 / 8 类语法豁免，三项均经用户当场裁决，实测依据见 §2.5.1）
 - **签认记录**: ★ **2026-11-08 · 用户签认「批准」** ⇒ ★ ① 本 ADR 的决策（★ 顶层结构 · 三机制 · `arch_paths` 目录化 · 4 项门禁）**已定**；★ ② ★ **角色边界变更（★ architect 新增可写 6 份）已签认生效**（★ 见 §2.4）
 - **Date**: 2026-11-08
 - **Author**: architect
@@ -8,7 +8,7 @@
 - **关联 change**: ★ **尚未立项**（★ 目录重构属**实施面** ⇒ 归 **planner 立项 / builder 执行**）⇒ ★ 登记 backlog：★ `.rddf/reviews/architecture-docs-governance-recommendations.md` §9.1 **A1 / A2 / G7**（★ 本 ADR 是那三项的**决策层**）★ ⇒ ★ **立项后回填**（★ 立项时须把 §5 的 V-101~V-110 拆成该 change 的 AC）
 - **AC 映射**: ★ **尚未立项** ⇒ ★ AC 权威（change 的 `tasks.md`）暂缺 ⇒ ★ 立项后回填（★ 本 ADR 的 §5 Verification 段即草案 ⇒ ★ **§5 即立项时 AC 的来源**）
 - **决策台账**: `.rddf/reviews/architecture-docs-governance-recommendations.md`（★ §1~§8 诊断 · **§9 治理路线图**）
-- **审稿记录**: `.rddf/reviews/ADR-095-architecture-truth-boundary-and-dir-governance-review.md`（★ 本 ADR 的 oracle + critic 审稿记录与逐条处置）
+- **审稿记录**: `.rddf/reviews/ADR-095-architecture-truth-boundary-and-dir-governance-review.md`（★ v1.0 的 oracle + critic 审稿记录；★ **v1.1 判定修订的 oracle 结论与处置见该文件 §v1.1**）
 
 ---
 
@@ -88,7 +88,7 @@ docs/architecture/
 
 | 机制 | 规则 | ★ 机检 |
 |---|---|---|
-| ★ **晋升（promotion）** | ★ 一份文档进顶层，MUST 是**纯 target**：★ ① 无实施态时点语汇（「已落地」「当前状态」「当前实际状态」「Phase N 进行中」…）★ ② 无 dated 实施态快照段 ★ ③ 无历史残留表述（★ 如「旧版写的…」） | ★ **顶层纯净 lint**（★ §2.4 门禁 ①） |
+| ★ **晋升（promotion）** | ★ 一份文档进顶层，MUST 是**纯 target**：★ ① 无实施态时点语汇（「已落地」「当前状态」「当前实际状态」「Phase N 进行中」…）★ ② 无 dated 实施态快照段 ★ ③ 无历史残留表述（★ 如「旧版写的…」） | ★ **顶层纯净 lint**（★ §2.5 门禁 ①） |
 | ★ **下沉（demotion）** | ★ 顶层文档一旦混入实施态 ⇒ **立即下沉**到 `mixed/`（★ 不得就地打横幅糊弄）⇒ ★ ★ **注**：★ 「就地加 dated 横幅」是**过渡处置**、**不是终态**（★ 横幅只防「引用」、★ 不防「首屏误导」） | ★ 同上 lint（★ 命中即红） |
 | ★ **归档（archive）** | ★ `mixed/` 中的文档 ★ **被取代 / 失效 / 历史完成**（★ 台账 · 已定案计划 · PR 描述）⇒ 进 `archive/`（★ **只读** ⇒ 不再维护）⇒ ★ `archive/` 内**允许**保留实施态与过时内容（★ 那正是它的性质） | ★ `archive/` **豁免** lint |
 
@@ -112,10 +112,60 @@ docs/architecture/
 
 | # | 判据 | 落点 | ★ 误伤控制 |
 |---|---|---|---|
-| ① | ★ **顶层纯净 lint**：顶层 + `adr/` 的文档禁含实施态时点语汇 | 新 lint（★ 或并入 `doc_link_check.sh` 检查 3） | ★ ★ **词表 MUST 冻结进脚本**（★ 单一真源 · ★ 禁开放词表）★ + ★ **语法上下文豁免**（★ 状态列 / 图例行 / frontmatter / dated 横幅内**不检**）⇒ ★ ★ **否则 Day-1 必误伤**（★ `adr.md` 状态列词汇 · `roadmap-evolution.md` §0 图例「进行中」· 目标态的既成事实前提句） |
-| ② | ★ **链接检查扩围**：`doc_link_check.sh` 检查 2 的 `PATH_CHECK_DOCS` 扩入 `docs/architecture/`（★ 含子目录）⇒ ★ 把 ≥16 处死/错引用收进门禁 | `doc_link_check.sh` | ★ 脚本注释明说全量 `docs/` 噪声过高 ⇒ ★ **只扩 `docs/architecture/`**（★ 18+ 份）⇒ 跑顺后再评估 |
-| ③ | ★ **ADR 孤儿检查**：`adr/` ↔ `adr.md` 双向 | `verify_adr.sh` | ★ **实测零误伤**（★ 18/18 有行 · 42 链接 0 broken） |
-| ④ | ★ **顶层 ↔ 子目录引用完整性**：顶层文档引用 `mixed/` `archive/` 时 MUST 标明「★ 非权威 · 仅作背景」 | 新 lint（★ 可与 ① 合并） | ★ 低 |
+| ① | ★ **顶层纯净 lint**：★ **`docs/architecture/*.md` 顶层**（★ **非递归**）的文档禁含实施态时点语汇。★ **`adr/` 不在范围**（v1.1 修订，理由见 §2.5.1） | ★ `tools/check_arch_truth.sh`（入口）/ `tools/check_arch_truth.py`（判据本体）· CI = `architecture-gates.yml` 的 `Check architecture truth purity` step（阻塞级） | ★ ★ **词表 MUST 冻结进脚本**（★ 单一真源 · ★ 禁开放词表）★ + ★ **8 类语法上下文豁免**（★ §2.5.1 表）★ + ★ **禁按路径豁免** ⇒ ★ ★ **否则 Day-1 必误伤**（★ 实测：原始词表 201 处命中，真正的实施态断言 < 10） |
+| ② | ★ **链接检查扩围**：`doc_link_check.sh` 检查 2 的 `PATH_CHECK_DOCS` 扩入 `docs/architecture/`（★ 含子目录）⇒ ★ 把历史死/错引用收进门禁（★ 实测落闸 **100 处**） | `doc_link_check.sh` | ★ 脚本注释明说全量 `docs/` 噪声过高 ⇒ ★ **只扩 `docs/architecture/`**（★ 18+ 份）⇒ 跑顺后再评估 |
+| ③ | ★ **ADR 孤儿检查**：`adr/` ↔ `adr.md` 双向 | `verify_adr.sh` | ★ **实测零误伤**（★ 19/19 有行 · 42 链接 0 broken） |
+| ④ | ★ **顶层 ↔ 子目录引用完整性**：顶层文档引用 `mixed/` `archive/` 下的**文件**时 MUST 标明「★ 非权威 · 仅作背景」 | ★ 已**并入 ①**（`tools/check_arch_truth.py` 的第二段检查 · 同一入口） | ★ 只认 `.md` **文件**引用，**不认**「仅命名目录」（★ 分区表里的 `mixed/` 不要求标注）⇒ 实测补标 10 处后 0 命中 |
+
+#### 2.5.1 ★ 门禁①④ 的判据细则（v1.1 · 实施实测修订）
+
+> ★ **为什么必须在 ADR 里写清**：本 ADR 的判据是**前瞻判据**（§5），但门禁① 的「词表 + 豁免」
+> 不写清就不可判定 —— 实施期实测发现原始判据会大面积误伤，三项冲突由用户当场裁决。
+> ★ 本节记**决策**（范围 / 判据形态 / 豁免类别），不记实施步骤（步骤在 change 的 `tasks.md`）。
+
+**（a）扫描范围 = 顶层，`adr/` 移出**
+
+| 范围 | 结论 | 实测依据 |
+|---|---|---|
+| `docs/architecture/*.md`（顶层，非递归） | **纳入** | 顶层 = 真相源，禁「现在长什么样」 |
+| `docs/architecture/adr/` | ★ **移出**（v1.1） | 经**全部语法豁免**后仍剩 **76 处**，逐条核查**全是 ADR 历史本体**：决策时点 before-state（ADR-087:17「当前实现 = RV32IM」）· 交付位置（ADR-040:118）· 残留清单（ADR-091:502）⇒ 清零须改写 19 份 Accepted ADR 正文，与 §2.7「决策本体一字不动」冲突 |
+| `mixed/` `archive/` `plugin-research/` | 不纳入 | 非真相源 |
+
+★ `adr/` 的治理由**门禁③（孤儿检查）** + 各 ADR 的 `Status` 头承担，不需要语汇 lint。
+
+**（b）词表（冻结在脚本内 · 变更须走 PR + 审查）**
+
+★ 6 词 + 1 正则：`当前实际状态` · `当前状态` · `当前实现` · `已落地` · `已完成` · `已实现` · `Phase N 完成`（`Phase\s*\d+[a-z]?(\.\d+)?\s*完成`）
+
+★ v1.1 **移除两词**（原始词表共 8 项）：
+
+| 移除项 | 理由（实测） |
+|---|---|
+| `PASS` | 它是**门禁自身的 verdict 取值**（`0 = PASS` · `verdict`(PASS\|FAIL\|ERROR)）+ 里程碑表的测试结果 ⇒ 实测贡献 **89/201** 命中，**零**实施态语义 |
+| `是 POD` | POD 是**类型表示属性**（设计不变量，如「`Payload<T>` 在 TLM 模式是 POD」），且子串会命中**否定句**（ADR-092:51「`ch_uint` 在 TLM 编译下**不是 POD**」）⇒ 语义相反 |
+
+**（c）8 类语法上下文豁免（★ 禁按路径豁免 ⇒ 豁免 MUST 由语法位置判定）**
+
+> ★ **顺序约束**：豁免判定 MUST 在**代码围栏 / HTML 注释守卫之后** ⇒ 代码块与注释内的 `# 标题` **不构成节**（否则代码示例里的一句 `# 非目标态` 就能静默关掉整节检查）。
+
+| # | 语法位置 | 判据（可机检） |
+|---|---|---|
+| (a) | frontmatter | **仅**文件第 1 行是 `---` 且 20 行内闭合。★ **任意 `---` 不算**（实测：把水平分隔线当开关会把 **104 处**真实命中误判豁免 = 假绿） |
+| (b) | 表格状态单元格 | **承载命中词的那个 cell** 以 ✅ / 🚧 / ⚠️ / ⏳ 开头（★ 该 cell 整体视为状态标记，即使其后还带说明文字 —— `adr.md` 注册表必需的合法形态） |
+| (c) | HTML 注释块 | 行在 `<!--` 与 `-->` 之间 |
+| (d) | dated 横幅 | 行以 `> **` 开头且同一行含 `YYYY-MM-DD` |
+| (e) | 代码围栏 | ``` / `~~~` 之间 |
+| (f) | 表头行 | 该行的**下一行**是 `|---|` 分隔行（列名不是状态断言） |
+| (g) | 日期日志行 | 表格**首单元格**是裸 `YYYY-MM-DD`（变更日志记录历史时点） |
+| (h) | 自标注「非目标态」的节 | 标题**同时含「非目标态」与 `YYYY-MM-DD`** ⇒ 该节至**同级或更高级**标题前不检。★ 依据 = ADR-094 **M-8 的精神**（dated + 显式标注）；★ **注意**：M-8 字面只允许实施态出现在指针表「只给位置不展开」，`hierarchical-plugin-architecture.md` §1 的展开式快照是**用户 2026-11-08 裁决的例外**（非 M-8 直接导出）。★ **生命周期**：该类节继承 §2.3 的**过渡处置**地位（**非终态**）—— 日期只提供可见 aging，**不豁免**「过期即下沉 `mixed/`」的纪律 ⇒ **MUST NOT** 就地打节标糊弄 |
+
+**（d）判别力证据（★ 前瞻判据 MUST 可证伪）**
+
+| 项 | 证据 |
+|---|---|
+| 豁免规则各有 fixture | `tools/fixtures/arch_truth/` 11 份 · `--self-test` **11/11**（8 类豁免 + 围栏假标题 + 无日期不豁免 + 1 真阳性） |
+| 真实文档不误伤 | 顶层 9 份 ⇒ **0 命中**；实际触发豁免 50 处（`b-status-cell` 36 · `e-fence` 8 · `g-dated-log-row` 3 · `h-self-declared-nontarget` 2 · `f-table-header` 1） |
+| 真阳性仍被抓 | 植入实施态语汇的 fixture ⇒ **5 处逐条报红** |
 
 ### 2.7 ★ 与既有决策的关系（★ 原 §2.6「迁移执行」已按 ADR 契约（★ 实施步骤 MUST NOT 进 ADR 正文）移出 ⇒ 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` **§10**）
 
@@ -163,7 +213,7 @@ docs/architecture/
 | 风险 | 缓解 |
 |---|---|
 | ★ **迁移中断 ⇒ 仓库处于「半搬」状态** | ★ ★ `arch_paths` 更新与移动**同批** ⇒ ��� 无「路径变了但可写范围没变」的空窗；★ 每批可 revert |
-| ★ **lint 误伤**（★ 如目标态描述里合法出现「已落地」） | ★ lint 只查**顶层 + `adr/`**（★ `mixed/` `archive/` 豁免）★ 且**首轮 WARN 级**、跑稳再升阻塞 |
+| ★ **lint 误伤**（★ 如目标态描述里合法出现「已落地」） | ★ lint 只查**顶层**（★ `adr/` `mixed/` `archive/` 豁免）★ + **8 类语法上下文豁免**（§2.5.1(c)）；★ 已**直接为 CI 阻塞级**（★ 判别力证据充分，无需 WARN 过渡：原始 201 处命中已逐条归因，顶层 0 命中）阻塞 |
 | ★ **核心顶层文档 Day-1 误伤**（★ `adr.md` 状态列词汇 · `roadmap-evolution.md` §0 图例「进行中」· 目标态的既成事实前提句 ⇒ ★ 三类均会被词面 grep 命中） | ★ 门禁 ① 配「★ **冻结词表 + 语法上下文豁免**」（★ **不得**用「按路径豁免」⇒ 那会把这两份最核心的顶层文档整份豁出）⇒ ★ 首轮 WARN 级 |
 | ★ **`adr.md` 自身的源文档指针指向将下沉的文档**（★ 头部的「源文档」字段 + 维护规则 + 漂移处理流程三处 ⇒ 迁移后必断）⇒ ★ 且与门禁 ④「顶层引用 `mixed/` 须标明非权威」产生**语义张力**（★ 「以源文档为准」vs「标为非权威」） | ★ 处置 = **§10 M3** 的三条改写（★ 指针改 `./mixed/...` + 标「非权威 · 历史派生源」+ 维护规则与漂移流程措辞软化）★ + 长期：★ 仍被依赖的决策段**收编进 `adr/`** ⇒ 源文档指针退役 |
 | ★ **根级文档（`AGENTS.md` / `.cursorrules`）以全路径链顶层文档** ⇒ 移动后根级断链 ⇒ ★ 且根级**不在门禁 ① 覆盖范围** | ★ 列入 **§10 M3** 同步清单（★ `AGENTS.md` 的关键文档源表 + `.cursorrules`） |
@@ -178,7 +228,7 @@ docs/architecture/
 
 - [ ] **V-101** `docs/architecture/` 顶层**只含**真相源架构文档 + `adr.md` + `adr/`（★ **逐份清单核对** ⇒ 无 mixed / 台账 / 计划 / PR 描述 / 虚构文档）⇒ ★ 变异：把 `mixed/` 任一份复制到顶层 ⇒ **MUST RED**
 - [ ] **V-102** `mixed/` 与 `archive/` **存在且各含预期份数**（★ 5 / 4）⇒ ★ 变异：把 `mixed/` 一份移到顶层 ⇒ MUST RED
-- [ ] **V-103** ★ **顶层纯净 lint 生效**：★ 顶层 + `adr/` 任一文档含实施态时点语汇 ⇒ **MUST 报红**；★ `mixed/` `archive/` 同类文本 ⇒ **MUST 豁免**（★ 变异：把 `mixed/plugin-framework.md` 的过时段粘进 `overview.md` ⇒ MUST RED）
+- [ ] **V-103** ★ **顶层纯净 lint 生效**：★ **顶层**（`docs/architecture/*.md`，**非递归**；★ v1.1 起 `adr/` 不在范围 —— 见 §2.5.1(a)）任一文档含实施态时点语汇 ⇒ **MUST 报红**；★ `mixed/` `archive/` 同类文本 ⇒ **MUST 豁免**（★ 变异：把 `mixed/plugin-framework.md` 的过时段粘进 `overview.md` ⇒ MUST RED）
 - [ ] **V-104** ★ **链接完整性**：★ `bash tools/doc_link_check.sh` **0 broken**；★ 且检查 2 的覆盖范围**含 `docs/architecture/`**（★ 变异：把某引用改成不存在的路径 ⇒ MUST RED）
 - [ ] **V-105** ★ **ADR 孤儿检查生效**：★ `adr/` 每份在 `adr.md` §2 有行；★ `adr.md` 每行本地链接存在 ⇒ ★ 变异：删 `adr.md` 里一行 ⇒ MUST RED
 - [ ] **V-106** ★ **`arch_paths` 与目录一致**：★ `arch_paths` = ★ **顶层 9 份 + `adr/` + `mixed/` + `ip/mmu/docs/adr` + `ip/cache/docs/adr`**（★ IP 级 ADR 目录**保留** ⇒ ★ 见 §2.4）；★ `exclude_paths` 含 `archive/`（★ `plugin-research/` 已在）；★ **无死路径**：★ 每条 `arch_paths` 项**实际存在**；★ ★ 且每条 `exclude_paths` 项**实际存在**（★ 移动后旧条目会成死项）⇒ ★ 变异：加一条不存在的路径 ⇒ MUST RED
