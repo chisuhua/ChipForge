@@ -1,0 +1,17 @@
+# ★ 本 change **不修改任何 spec**（★ 纯治理加固：★ 新建门禁脚本 + 扩围既有脚本 + 净化顶层文档措辞）
+# ★ ⇒ 归档时 `openspec archive <change> --skip-specs` 合规
+# ★ ★ 依据：★ ADR-095（✅ Accepted v1.0）§2.5「门禁 ①~④」+ §2.3「三机制（晋升 / 下沉 / 归档）」
+# ★   的判据是 **Verification 条目**（★ V-101~V-110）★ 而非 spec capability 的 Requirement
+# ★ ⇒ ★ 因此**无** spec delta 可写
+# ★ ★ 另：★ 本文件**不改** spec-level 行为（★ 只加门禁脚本 + 改文档措辞）
+# ★   ⇒ ★ 判据从「ADR 文字」升级为「可执行门禁」★ 而 spec 描述的是**系统行为**
+# ★ ★ 前置：★ `architecture-truth-boundary` MUST 先完成（★ 门禁① 在迁移前落地必然报红）
+
+schema: spec-driven
+created: 2026-11-08
+goal: 落地 ADR-095 §2.5 的 4 道门禁（顶层纯净 lint / 链接完整性扩围 / ADR 孤儿检查 / 子目录引用非权威标注），并净化顶层残留
+affected_areas:
+  - docs/architecture
+  - tools
+  - openspec/changes
+skip_specs: true
