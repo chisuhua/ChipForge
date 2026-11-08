@@ -154,21 +154,16 @@ def scan_file(path):
                 exemptions.append(Exemption(lineno, "a-frontmatter", word))
             continue
 
-        # ---- 节的开合（先于命中判定：声明该节为「非目标态」的标题行本身也要豁免）----
-        hm = HEADING_RE.match(s)
-        if hm:
-            level = len(hm.group(1))
-            if nontarget_level and level <= nontarget_level:
-                nontarget_level = 0
-            if NON_TARGET_MARKER in s:
-                nontarget_level = level
-
-        # ---- 代码围栏 ----
+        # ---- 代码围栏（★ 围栏内的一切都不是 markdown 结构，必须先于标题解析）----
         if s.startswith("```") or s.startswith("~~~"):
             in_fence = not in_fence
             continue
+        if in_fence:
+            for _col, word in _find_hits(s):
+                exemptions.append(Exemption(lineno, "e-fence", word))
+            continue
 
-        # ---- HTML 注释块 ----
+        # ---- HTML 注释块（同上：注释里的 `# xxx` 不是标题）----
         if in_comment:
             for _col, word in _find_hits(s):
                 exemptions.append(Exemption(lineno, "c-html-comment", word))
@@ -179,20 +174,34 @@ def scan_file(path):
             in_comment = True
             continue
 
+        # ---- 节的开合（★ 仅在围栏/注释之外解析标题）----
+        #   ★ ★ oracle 2026-11-08 指出的 BLOCKER：原实现把标题检测放在围栏守卫**之前**
+        #     ⇒ 代码示例/注释里出现 `# 非目标态` 就会**静默开豁免**（其下正文免检到下一个同级标题）
+        #     且节内围栏里的 `# xxx` 会**提前关闭**豁免（假红）。两条都是假绿/假红通道。
+        he = HEADING_RE.match(s)
+        if he:
+            level = len(he.group(1))
+            if nontarget_level and level <= nontarget_level:
+                nontarget_level = 0
+            # ★ 豁免 (h) 收紧：标题 MUST 同时含日期（与 ADR-094 M-8 的「dated 快照」对齐）
+            #   ⇒ 把滥用门槛从「一个魔法词」抬到「魔法词 + 可见 aging（过期节一眼可辨）」
+            if NON_TARGET_MARKER in s and DATE_RE.search(s):
+                nontarget_level = level
+
         hits = _find_hits(s)
         if not hits:
             continue
 
         # ---- 豁免判定（顺序即优先级）----
-        if in_fence:
-            exemptions.append(Exemption(lineno, "e-fence", hits[0][1]))
-            continue
         if nontarget_level:
             # ★ 文档自标注该节为「非目标态」⇒ 它自己声明了这是实施态区
             exemptions.append(Exemption(lineno, "h-self-declared-nontarget", hits[0][1]))
             continue
         if s.startswith("|"):
             nxt = lines[idx + 1].strip() if idx + 1 < len(lines) else ""
+            # ★ 表头判据：**该行的下一行**是 `|---|` 分隔行（标准 markdown 表头）
+            #   ★ 不扩到「两行表头」：那会误豁免「连续两表」的第 2 张表的首个数据行；
+            #     且多行表头属**不规范写法**，此时报红是 fail-loud（可见、可改），不是假绿。
             if TABLE_SEP_RE.match(nxt):
                 exemptions.append(Exemption(lineno, "f-table-header", hits[0][1]))
                 continue
@@ -282,6 +291,9 @@ FIXTURES = (
     ("f_table_header.md", 0, "f-table-header"),
     ("g_dated_log_row.md", 0, "g-dated-log-row"),
     ("h_self_declared_nontarget.md", 1, "h-self-declared-nontarget"),
+    # ★ v1.1 收紧后的回归 fixture（oracle 2026-11-08 报的 BLOCKER + 两项建议）：
+    ("k_fence_fake_heading.md", 2, None),          # 围栏里的「# 非目标态」不得开豁免
+    ("m_nontarget_no_date.md", 1, "h-self-declared-nontarget"),  # 无日期不豁免 · 有日期才豁免
     ("z_true_positive.md", 5, None),
 )
 

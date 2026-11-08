@@ -149,6 +149,8 @@ jobs:
         run: |
           set -o pipefail
           echo "=== 差分门禁 layer=$PARITY_LAYER ==="
+          # ★ 2026-11-08 首次 run 实测：build/parity/ 尚不存在 ⇒ tee 先失败（No such file or directory）
+          mkdir -p build/parity
           python3 tools/parity/parity_gate.py --layer "$PARITY_LAYER" 2>&1 | tee build/parity/stdout.log
           echo "gate_exit=$?" >> $GITHUB_OUTPUT
 

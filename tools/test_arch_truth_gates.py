@@ -32,6 +32,7 @@ def _load(name, rel):
 
 gate = _load("_arch_truth_under_test", "check_arch_truth.py")
 acv = _load("_ac_v_under_test", "check_ac_v_coverage.py")
+pgage = _load("_parity_gate_under_test", os.path.join("parity", "parity_gate.py"))
 
 FIX = _HERE / "fixtures" / "arch_truth"
 
@@ -98,6 +99,18 @@ class TestScanFile(unittest.TestCase):
         f, e = gate.scan_file(str(FIX / "f_table_header.md"))
         self.assertEqual(len(f), 0)
         self.assertIn("f-table-header", {x.rule for x in e})
+
+    def test_fence_fake_heading_does_not_open_exemption(self):
+        """★ oracle 2026-11-08 报的 BLOCKER：围栏里的 `# 非目标态` 曾会静默开豁免。"""
+        f, e = gate.scan_file(str(FIX / "k_fence_fake_heading.md"))
+        self.assertEqual(len(f), 2, [x.text for x in f])
+        self.assertNotIn("h-self-declared-nontarget", {x.rule for x in e})
+
+    def test_nontarget_requires_date(self):
+        """豁免 (h) 收紧：标题含「非目标态」但**无日期** ⇒ 不豁免；带日期 ⇒ 豁免。"""
+        f, e = gate.scan_file(str(FIX / "m_nontarget_no_date.md"))
+        self.assertEqual(len(f), 1, [x.text for x in f])
+        self.assertIn("h-self-declared-nontarget", {x.rule for x in e})
 
 
 class TestSubdirRefs(unittest.TestCase):
@@ -168,6 +181,32 @@ class TestAcVCoverage(unittest.TestCase):
         acs = acv.parse_change(str(tmp), "c")
         self.assertEqual(acs[0].v_ids, [])
         self.assertTrue(acs[0].self_exempt)
+
+
+class TestCorpusScoping(unittest.TestCase):
+    """★ v1.6：存在性校验按「本次实际要跑的集合」判定。
+
+    实测背景：CI 首次 run 时 `--layer pr` 因 **night 专属**的 branchbench ELF 缺失而 ERROR，
+    而 branchbench 的构建需要 CI 上不可得的 riscv32 工具链 ⇒ PR 层被 night 前置拖红。
+    """
+
+    @staticmethod
+    def _case(name, rel, layer):
+        return {"name": name, "kind": "elf", "relpath": rel, "layer": layer}
+
+    def test_missing_out_of_layer_is_warning_only(self):
+        pr = self._case("ok", "CMakeLists.txt", "pr")
+        night_missing = self._case("bb", "build/__nope__.elf", "night")
+        missing, warnings = pgage.check_corpus_files_exist([pr], [pr, night_missing])
+        self.assertEqual(missing, [])
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("__nope__", warnings[0])
+
+    def test_missing_selected_is_error(self):
+        pr_missing = self._case("bad", "build/__nope__.elf", "pr")
+        missing, warnings = pgage.check_corpus_files_exist([pr_missing], [pr_missing])
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(warnings, [])
 
 
 if __name__ == "__main__":

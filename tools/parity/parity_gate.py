@@ -111,18 +111,30 @@ def parse_corpus(path):
     return cases, errors
 
 
-def check_corpus_files_exist(cases):
-    """pre-flight：清单引用的 ELF MUST 存在 ⇒ 否则 `ERROR`（fail-closed）。
+def check_corpus_files_exist(selected, all_cases):
+    """pre-flight：**被选中**的 case 的 ELF MUST 存在 ⇒ 否则 `ERROR`（fail-closed）。
 
-    ★ branchbench 的 4 个 ELF 是 **CMake 构建产物**（target `branchbench_elfs`）
-      ⇒ 不在版本控制内 ⇒ 首次跑批前 MUST 先 `cmake --build build`。
+    ★ ★ v1.6（2026-11-08 首次 CI run 实测修正）：原实现校验**清单全量**文件存在
+      ⇒ `--layer pr` 也会因 **night 层专属**的 4 个 branchbench ELF 缺失而 ERROR。
+      而 branchbench 那 4 个 ELF 是 CMake 产物（target `branchbench_elfs`）且构建需要
+      `riscv32-unknown-elf-g++`（**本地私有工具链，CI 上不可得**）
+      ⇒ PR 层被 night 层的前置拖红 = 与 S-15「PR 层是快子集」的语义矛盾。
+      ★ 修正：**选中项**缺失 ⇒ ERROR；**未选中项**缺失 ⇒ WARNING（不改变 verdict）。
+        夜间层选中全部 ⇒ 行为与修正前完全一致。
     """
-    missing = []
-    for c in cases:
+    missing, warnings = [], []
+    for c in selected:
         rel = c["relpath"]
         if not os.path.isfile(os.path.join(REPO_ROOT, rel)):
             missing.append(f"{c['name']} -> {rel}")
-    return missing
+    selected_names = {c["name"] for c in selected}
+    for c in all_cases:
+        if c["name"] in selected_names:
+            continue
+        rel = c["relpath"]
+        if not os.path.isfile(os.path.join(REPO_ROOT, rel)):
+            warnings.append(f"{c['name']} -> {rel}（layer={c['layer']}，本次未选中）")
+    return missing, warnings
 
 
 def check_corpus_against_harnesses(cases):
@@ -591,30 +603,13 @@ def main(argv=None):
         print(f"verdict=ERROR error_kind=input_invalid", file=sys.stderr)
         return 2
 
-    # pre-flight：语料文件存在性（fail-closed）
-    missing_files = check_corpus_files_exist(cases)
-    if missing_files:
-        for m in missing_files:
-            print(f"ERROR: corpus file not found: {m}", file=sys.stderr)
-        print("verdict=ERROR error_kind=corpus_missing_files", file=sys.stderr)
-        return 2
-
-    # S-13：两侧执行集合断言
-    if not opts.skip_harness_check:
-        problems, harness_warnings = check_corpus_against_harnesses(cases)
-        exc_warnings.extend(harness_warnings)
-        if problems:
-            for p in problems:
-                print(f"ERROR: {p}", file=sys.stderr)
-            print("verdict=ERROR error_kind=corpus_mismatch", file=sys.stderr)
-            return 2
-
-    # ★ 分层语义（契约 S-15）：
+    # ★ 分层选集（契约 S-15）—— 放到存在性校验**之前**：
+    #   存在性必须按「本次实际要跑的集合」判定，否则 PR 层会被 night 层的前置拖红。
     #   pr   = PR 级**快子集**（只跑 layer=pr 的 case）
-    #   night= 夜间**全量**（★ 跑**全部** case —— 契约 S-15「夜间层 = 52 case 全部覆盖」）
-    #   all  = 同 night（保留显式别名）
-    # ★ v1.5 实测修正：原实现 `--layer night` 只选 layer=night ⇒ **漏掉 PR 层的 8 个**
-    #   ⇒ 夜间层比 PR 层还小 ⇒ **语义反了**（首跑实测：报告只有 44 case 而非 52）。
+    #   night= 夜间**全量**（★ 跑**全部** case —— S-15「夜间层 = 52 case 全部覆盖」）
+    #   all  = 同 night（显式别名）
+    # ★ v1.5 实测修正：原实现 `--layer night` 只选 layer=night ⇒ 漏掉 PR 层的 8 个
+    #   ⇒ 夜间层比 PR 层还小 ⇒ 语义反了（首跑实测：报告只有 44 case 而非 52）。
     if opts.layer == "pr":
         selected = [c for c in cases if c["layer"] == "pr"]
     else:
@@ -625,6 +620,26 @@ def main(argv=None):
     if not selected:
         print("ERROR: empty corpus selection", file=sys.stderr)
         return 2
+
+    # pre-flight：语料文件存在性（选中项 fail-closed · 未选中项仅 WARNING）
+    missing_files, missing_warnings = check_corpus_files_exist(selected, cases)
+    if missing_files:
+        for m in missing_files:
+            print(f"ERROR: corpus file not found: {m}", file=sys.stderr)
+        print("verdict=ERROR error_kind=corpus_missing_files", file=sys.stderr)
+        return 2
+    for w in missing_warnings:
+        print(f"WARNING: corpus file not found: {w}", file=sys.stderr)
+
+    # S-13：两侧执行集合断言
+    if not opts.skip_harness_check:
+        problems, harness_warnings = check_corpus_against_harnesses(cases)
+        exc_warnings.extend(harness_warnings)
+        if problems:
+            for p in problems:
+                print(f"ERROR: {p}", file=sys.stderr)
+            print("verdict=ERROR error_kind=corpus_mismatch", file=sys.stderr)
+            return 2
 
     per_case = []
     verdict = "PASS"
