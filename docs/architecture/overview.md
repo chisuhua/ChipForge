@@ -71,7 +71,7 @@
 +----------------------------v-----------------------------------+
 |                CppTLM (legacy 仿真内核)                         |
 |  ----------------------------------------------------------------|
-|  extern/CppTLM 符号链接保留                                     |
+|  CppTLM 符号链接保留（★ 2026-11-08 订正：★ 原记 `extern/CppTLM` ⇒ ★ `extern/` 已不存在 ⇒ ★ 实为仓库根 `CppTLM/`） |
 |  src/cf_plugin/bridge/{l1_cache,mmu,...}_bridge.cpp 适配层依赖  |
 |  业务 IP 不使用 CppTLM 组件范式                                |
 |  (Module/Port/ModuleFactory/ChStreamModuleBase/StreamAdapter)  |
