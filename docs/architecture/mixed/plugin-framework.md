@@ -153,7 +153,7 @@ Phase 0 锁定 5 个最小可行组件（`PluginBase` / `Payload<T>` / `PipeNode
 
 **头文件**：`include/cf/plugin/plugin_base.h`
 
-**测试**：`src/cf_plugin/tests/test_plugin_lifecycle.cpp`（7 个测试用例）
+**测试**：`tests/framework/test_plugin_lifecycle.cpp`（7 个测试用例）
 
 **典型用法**：
 
@@ -217,7 +217,7 @@ struct MyPlugin : cf::plugin::PluginBase {
 
 **头文件**：`include/cf/plugin/payload.h`
 
-**测试**：`src/cf_plugin/tests/test_payload.cpp`（8 个测试用例）
+**测试**：`tests/framework/test_payload.cpp`（8 个测试用例）
 
 **典型用法**：
 
@@ -315,7 +315,7 @@ state                       │
 
 **头文件**：`include/cf/plugin/pipe_node.h`
 
-**测试**：`src/cf_plugin/tests/test_pipe_node.cpp`（14 个测试用例）
+**测试**：`tests/framework/test_pipe_node.cpp`（14 个测试用例）
 
 ### 2.4 PipeBuilder + Phase
 
@@ -385,7 +385,7 @@ enum class Phase {
 
 **头文件**：`include/cf/plugin/pipe_builder.h`
 
-**测试**：`src/cf_plugin/tests/test_pipe_builder.cpp`（11 个测试用例）
+**测试**：`tests/framework/test_pipe_builder.cpp`（11 个测试用例）
 
 **典型用法**：
 
@@ -453,7 +453,7 @@ ctrl.halt_when([&] { return node.is_blocked(); })
 
 **头文件**：`include/cf/plugin/ctrl_link.h`
 
-**测试**：`src/cf_plugin/tests/test_ctrl_link.cpp`（11 个测试用例）
+**测试**：`tests/framework/test_ctrl_link.cpp`（11 个测试用例）
 
 ### 2.6 uint_t<N> / bool_t
 

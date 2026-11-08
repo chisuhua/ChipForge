@@ -225,7 +225,7 @@ docs(performance): M4-DSE honest performance baseline (576 configs, ipc=0.0 know
 - `results/pareto.json` (空集, degenerate)
 - `docs/architecture/adr.md` (+3 ADR)
 - `docs/architecture/adr/ADR-042-plugin-deferral.md` (renamed from ADR-040)
-- `docs/architecture/plugin-framework.md` (TODO cleanup)
+- `docs/architecture/mixed/plugin-framework.md` (TODO cleanup)
 - `docs/lessons/m1-m5-cpu-implementation.md` (ADR ref)
 - `ip/cpu/docs/status.md` (ADR ref)
 - `tools/README.md` (ADR ref)

@@ -239,10 +239,10 @@ CH_MEM 文件**必须**包含 `ch_*` 引用（`ch_uint`/`ch_reg`/`ch_mem`/`ch_bo
 | `docs/architecture/overview.md` | §"架构总览" ASCII 图改为 Plugin-style 单一层 + CppHDL 后端三选项；删除"CppTLM 组件层"/"CppHDL 组件层"双层描述；§"ch_stream 接口" 改为 "PayloadStore 是 IP 间通信"；§"工程目录结构" 删除 `ip/*/tlm/` + `ip/*/rtl/` 描述 |
 | `AGENTS.md` | §1 顶部简介改为 "本项目用 Plugin-style 设计硬件 IP，CppHDL 提供 elaboration + Verilog + Verilator 设施"；§"## 代码组织 > ip/{name}/ 标准结构" 修订 tlm/ vs rtl/ 描述 |
 | `docs/architecture/background-and-goals.md` | §1 项目简介 + §3 CppTLM 框架特性 + §5 CppHDL 框架特性 全部修订 |
-| `docs/architecture/tech-selection.md` | §2 CppTLM 选型 + §3 CppHDL 选型 合并为 "CppHDL 设施选型"（CppTLM 段降到"外部依赖，bridge 适配层用"） |
-| `docs/architecture/code-framework-mapping.md` | §1 总图 + §4 项目层映射 修订为"Plugin-style 是项目层；CppHDL 是设施层；CppTLM 是 legacy" |
+| `docs/architecture/mixed/tech-selection.md` | §2 CppTLM 选型 + §3 CppHDL 选型 合并为 "CppHDL 设施选型"（CppTLM 段降到"外部依赖，bridge 适配层用"） |
+| `docs/architecture/mixed/code-framework-mapping.md` | §1 总图 + §4 项目层映射 修订为"Plugin-style 是项目层；CppHDL 是设施层；CppTLM 是 legacy" |
 | `docs/architecture/adr.md` | 注册 ADR-083 |
-| ★ **v1.2（2026-10-28）表述纠偏** | `AGENTS.md` §1 顶部简介（「业务 IP 不使用 ch_stream / Module / Port / ModuleFactory」⇒ ★ **收窄为「不使用 CppTLM 的 `Module`/`Port`/`ModuleFactory`/`chstream_module`/`stream_adapter` 组件范式」**，并显式声明 **CppHDL 的 `ch_stream<T>` 可用**）· `docs/architecture/overview.md` §架构总览 · `docs/architecture/code-framework-mapping.md`（19 处）· `docs/architecture/interface-design.md`（13 处）· `docs/architecture/declarative-hybrid-framework.md`（25 处）· `docs/GLOSSARY.md`（6 处）· ★ **`MemReqBundle` 悬空引用修正**（代码里实际是 `cf::bundles::MemReq`；出现在 10 文档 + 4 份 `ip/cpu/configs/*.json`）⇒ **落点 = ADR-092 §D7 + ADR-091 增补 §D-J** |
+| ★ **v1.2（2026-10-28）表述纠偏** | `AGENTS.md` §1 顶部简介（「业务 IP 不使用 ch_stream / Module / Port / ModuleFactory」⇒ ★ **收窄为「不使用 CppTLM 的 `Module`/`Port`/`ModuleFactory`/`chstream_module`/`stream_adapter` 组件范式」**，并显式声明 **CppHDL 的 `ch_stream<T>` 可用**）· `docs/architecture/overview.md` §架构总览 · `docs/architecture/mixed/code-framework-mapping.md`（19 处）· `docs/architecture/interface-design.md`（13 处）· `docs/architecture/mixed/declarative-hybrid-framework.md`（25 处）· `docs/GLOSSARY.md`（6 处）· ★ **`MemReqBundle` 悬空引用修正**（代码里实际是 `cf::bundles::MemReq`；出现在 10 文档 + 4 份 `ip/cpu/configs/*.json`）⇒ **落点 = ADR-092 §D7 + ADR-091 增补 §D-J** |
 
 ### 5.2 代码无需修改
 

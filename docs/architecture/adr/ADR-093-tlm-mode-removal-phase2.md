@@ -187,5 +187,5 @@ using bool_t = ch::core::ch_bool;
 - **ADR-083 v1.2**（`ch_stream` 归类纠偏）· **ADR-040 v3.0**（Phase-2 升 v4.0 的对象）
 - **ADR-085 / ADR-086**（MMU PTW / L0-L1 TLB 架构）—— ★ G-1a 的实现依据
 - `.rddf/plans/chmem-bp-btb-gshare-increments.md` · `ip/cpu/docs/bp-btb-gshare-design-brief.md` —— TLM 参考语义
-- `docs/architecture/tlm-coverage-parity-ledger.md` —— ★ **阶段 B 才更新**（本 ADR 不改）
+- `docs/architecture/archive/tlm-coverage-parity-ledger.md` —— ★ **阶段 B 才更新**（本 ADR 不改）
 - `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md` —— 本 ADR 是其阶段 B/C 的技术前提

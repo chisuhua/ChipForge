@@ -144,7 +144,7 @@ class PluginException : public std::runtime_error {
 - `docs/architecture/plugin-framework.md:402-418` — CtrlLink OR 合并规范
 - `docs/methodology/plugin-style-design-methodology-v1.md:118-123` — D4 pb.run 现状
 - `ip/cpu/docs/dse_architecture_v2_design_research.md:219-225` — DSE 原语期望
-- `openspec/changes/plugin-framework-stall/` — 本 change 完整 artifacts
+- `openspec/changes/archive/2026-09-15-plugin-framework-stall/` — 本 change 完整 artifacts
 
 ## 5. Change Log (变更历史)
 

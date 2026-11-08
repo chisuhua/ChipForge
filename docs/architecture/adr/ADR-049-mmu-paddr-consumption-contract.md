@@ -3,7 +3,7 @@
 > **Status**: ✅ Accepted (v0.8.0, 2026-09-25)
 > **类别**: Plugin / IP 架构 / 数据通路
 > **关联 ADR**: ADR-040 v2.0 (TLM→HDL 移植性) · ADR-044 (VIPT) · ADR-045 (CtrlLink Stall Loop) · ADR-048 (Plugin 注册规范序)
-> **关联变更**: `openspec/changes/mmu-paddr-consume-and-real-memory/`
+> **关联变更**: `openspec/changes/archive/2026-09-26-mmu-paddr-consume-and-real-memory/`
 
 ---
 
@@ -188,14 +188,14 @@ MMUPlugin(SvMode mode, std::vector<TLBConfig> levels_cfg, PTWConfig ptw_cfg,
 
 **目的**: 将 `MMUPlugin` 构造参数从 C++ 硬编码迁移到 JSON 配置驱动, 消除 `CpuFactory::register_early_plugins()` 中 TLB 几何硬编码。该 capability 体现"配置驱动装配"的 D4 范式 (ADR-040 v2.0 §3)。
 
-**详细草案**: `openspec/changes/mmu-config-json-driven/adr-049-followup-section.md` (commit `19d5107`)。完整 §1-§7 内容（决策概述 / 配置优先级链 / 字段命名约束 / 实施位置 / 错误范式 / 兼容性边界 / 关联文档）见该草案。
+**详细草案**: `openspec/changes/archive/2026-10-08-mmu-config-json-driven/adr-049-followup-section.md` (commit `19d5107`)。完整 §1-§7 内容（决策概述 / 配置优先级链 / 字段命名约束 / 实施位置 / 错误范式 / 兼容性边界 / 关联文档）见该草案。
 
 #### 8 项集成 checklist (本 ADR-049 实装 owner)
 
 1. 创建 `ADR-049-mmu-paddr-consumption-contract.md` 时, 在文件末尾追加 `## 后续项 — JSON 配置驱动` 章节（已完成, 见上）。
 2. ✅ 已复制 `adr-049-followup-section.md` §1-§7 内容到本 ADR-049 §后续项 (上方)。
 3. ✅ 已调整 §关联文档引用从 commit hash 改为本 ADR-049 自己的引用。
-4. **P1#3 tasks.md §2.1 增加 checkbox**: "ADR-049 §后续项 已含 JSON 配置驱动段落 (引用 `openspec/changes/mmu-config-json-driven/adr-049-followup-section.md`)" — **本 ADR 已完成**
+4. **P1#3 tasks.md §2.1 增加 checkbox**: "ADR-049 §后续项 已含 JSON 配置驱动段落 (引用 `openspec/changes/archive/2026-10-08-mmu-config-json-driven/adr-049-followup-section.md`)" — **本 ADR 已完成**
 5. **P1#3 archive 验证**: `grep -l "JSON 配置驱动" docs/architecture/adr/ADR-049-mmu-paddr-consumption-contract.md` 必须 1 命中 — **本 ADR 已满足**
 6. **通知 P1#6 owner** (`mmu-config-json-driven` 实装 agent): 本 ADR-049 §后续项 已就绪, 实装时可参考 §关联文档引用
 7. **ADR-049 §后续项 内容版本控制**: 与 `adr-049-followup-section.md` 草案同步, 任意修订需双向更新

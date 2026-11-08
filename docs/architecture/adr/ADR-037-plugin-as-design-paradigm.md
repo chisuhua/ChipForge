@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 状态 | ✅ v2.0 Accepted (Phase 6c M5 落地, 2026-09-17) — v1.0 由 Phase 0 草案升级 |
-| 来源 | v1.0: `.omo/drafts/decision-plugin-framework-2026-06-08.md` (gitignored 草稿, D1-D9 决策)<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告 (`openspec/changes/plugin-elaboration-substrate/proposal.md`) |
+| 来源 | v1.0: `.omo/drafts/decision-plugin-framework-2026-06-08.md` (gitignored 草稿, D1-D9 决策)<br>v2.0: Phase 6c W0 审计 + Oracle 重构报告 (`openspec/changes/archive/2026-09-17-plugin-elaboration-substrate/proposal.md`) |
 | 关联 ADR | ADR-025 (Plugin 基类无 tick)、ADR-040 v2.0 (TLM→HDL 移植性, CH_MEM 是新正道)、ADR-046 (多周期 FSM 豁免) |
 | 详细全文 | [`docs/architecture/adr.md` §ADR-037](../adr.md) |
 

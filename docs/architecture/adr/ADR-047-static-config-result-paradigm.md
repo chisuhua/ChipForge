@@ -3,7 +3,7 @@
 > **Status**: ✅ Accepted (v0.6.0, 2026-09-22)
 > **类别**: Plugin / 错误传播
 > **关联 ADR**: ADR-026 (at_stage) · ADR-031 (CtrlLink) · ADR-032 (PipeBuilder) · ADR-040 v3.0 (移植性) · ADR-046 (FSM 豁免)
-> **关联变更**: `openspec/changes/v06-static-config-result/`
+> **关联变更**: `openspec/changes/archive/2026-09-22-v06-static-config-result/`
 > **Metis 修订**: 12 API → **10 API** (移除 `node_of_logic_stage`/`get_ctrl_link`，避免 ~185 处业务 plugin 连锁影响)
 
 ---
@@ -19,7 +19,7 @@ ChipForge v0.5.0 (Phase 6d 收官) 的 cf::plugin 框架静态配置 API 全部 
 | `include/cf/plugin/pipe_builder.h` | 8 | `std::invalid_argument` |
 | `include/cf/plugin/pipe_builder.h` | 3 | `PluginException` |
 | `include/cf/plugin/payload.h` | 6 | `std::runtime_error` (CH_MEM fail-fast) |
-| `include/cpu/cpu_factory.h` | 2 | `std::invalid_argument` |
+| `ip/cpu/cpu_factory.h` | 2 | `std::invalid_argument` |
 
 ### 缺口
 
@@ -143,7 +143,7 @@ ChipForge v0.5.0 (Phase 6d 收官) 的 cf::plugin 框架静态配置 API 全部 
 
 ## 关联文档
 
-- **变更工作区**: `openspec/changes/v06-static-config-result/`
+- **变更工作区**: `openspec/changes/archive/2026-09-22-v06-static-config-result/`
 - **ADR-026 (at_stage)**: 补丁——"`at_stage()` 返回 `Result<void>`"
 - **ADR-031 (CtrlLink)**: 补丁——"`register_ctrl_link()` / `get_ctrl_link()` 返回 `Result`"（后者 Metis H1 不迁移）
 - **ADR-032 (PipeBuilder)**: 补丁——整段扩充 Result 范式决策

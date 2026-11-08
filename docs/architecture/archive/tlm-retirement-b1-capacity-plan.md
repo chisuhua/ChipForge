@@ -1,6 +1,6 @@
 # TLM 退役 B1 承载力拆解（TLM Retirement — B1 Capacity Plan）
 
-> **来源**: ADR-088（冻结契约 + 语义裁决锚）· `docs/architecture/tlm-coverage-parity-ledger.md`（463 条覆盖台账，§5 已给 11 项 B1 待办）· 本文件的**实测盘点**（2026-10-24，HEAD `84ab102`）
+> **来源**: ADR-088（冻结契约 + 语义裁决锚）· `docs/architecture/archive/tlm-coverage-parity-ledger.md`（463 条覆盖台账，§5 已给 11 项 B1 待办）· 本文件的**实测盘点**（2026-10-24，HEAD `84ab102`）
 > **性质**: ~~规划输入~~ → **已定案**（2026-10-24，architect 主持）：§5 = B1 决策定案 + change 立项清单，可据此逐项立项实施。
 > **配套**: ADR-088 v1.1（§3 五行语义表态 + §5.2 BP 专项前置）· ADR-087 v1.1（§D4 护栏切换）
 > **对应路线图**: `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B1 段）· `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G2 门禁）

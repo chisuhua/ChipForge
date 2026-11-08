@@ -11,7 +11,8 @@
 # 范围:
 #   - [检查 1] markdown 链接: 扫描 docs/, ip/, src/cf_plugin/ + 根级文档
 #                (AGENTS.md / README.md / CONTRIBUTING.md)
-#   - [检查 2] 反引号路径: **仅**根级文档 (AGENTS.md / README.md / CONTRIBUTING.md)
+#   - [检查 2] 反引号路径: 根级文档 (AGENTS.md / README.md / CONTRIBUTING.md)
+#                + docs/architecture/（含子目录）★ 2026-11-08 扩围（ADR-095 §2.5②）
 #                —— docs/ 下架构文档含大量历史/规划态路径引用, 全量扫描噪声过高, 故不纳入
 #   - 跳过: .omo/ (gitignored, 非用户面向), build/ (构建产物), .git/, 各种 cache 目录
 #   - 类型: markdown 相对路径 (.md) + 反引号包裹的仓库相对路径 (带已知扩展名或目录)
@@ -52,8 +53,16 @@ SCAN_PATHS=(
   "${ROOT_DOCS[@]}"
 )
 
-# 检查 2 (反引号路径) 的适用范围 —— 仅根级文档
+# 检查 2 (反引号路径) 的适用范围 —— 根级文档 + docs/architecture/（含子目录）
+# ★ 门禁②（ADR-095 §2.5② · change architecture-truth-boundary-enforcement AC-111）：
+#   反引号路径检查原仅覆盖根级 3 份；扩入 docs/architecture/ 后，架构文档里
+#   「`src/cf_plugin/tests/xxx`」这类历史死引用会被收进门禁。
+#   ★ 只扩 docs/architecture/（不含其它 docs/ 子目录）—— 脚本注释已说明全量 docs/
+#     噪声过高；先跑顺这一块，再评估是否继续扩大。
 PATH_CHECK_DOCS=("${ROOT_DOCS[@]}")
+while IFS= read -r _arch_doc; do
+  [[ -n "$_arch_doc" ]] && PATH_CHECK_DOCS+=("$_arch_doc")
+done < <(find docs/architecture -name '*.md' -type f 2>/dev/null | sort)
 
 # 检查 2 的忽略清单: 每行一个路径 (允许"故意不存在"的引用), # 开头为注释
 PATH_IGNORE_FILE="tools/doc_link_check_ignore.txt"
@@ -213,7 +222,12 @@ for path in docs:
         if not is_dir and not cand.endswith(EXTS):
             continue
         target = cand.rstrip('/')
-        if target in ignored:
+        # ★ 忽略清单支持**目录前缀**：清单里写 `src/cf_plugin/tests/` 时，
+        #   其下任何文件（如 `src/cf_plugin/tests/test_payload.cpp`）都算被忽略。
+        #   ★ 实测（2026-11-08）：原实现只做**精确相等**匹配 ⇒ 清单里的目录条目对
+        #     子路径**从未生效**（`src/cf_plugin/tests/` 的 5 个文件一直报红）。
+        if target in ignored or any(
+                target.startswith(entry + '/') for entry in ignored if entry):
             continue
         if not os.path.exists(target):
             broken_count += 1

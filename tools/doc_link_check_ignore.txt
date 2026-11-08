@@ -10,3 +10,56 @@
 # src/cf_plugin/tests/ —— 已删除 (CHANGE-005 empty-directory-cleanup)
 # AGENTS.md §8 以「已删除」的方式陈述该目录, 故允许其不存在
 src/cf_plugin/tests/
+
+# ============================================================================
+# ★ 2026-11-08 扩围到 docs/architecture/（ADR-095 §2.5② · AC-111）后登记的豁免
+#
+# 判据：这些引用**指向路径在历史上确实不存在/已删除**，且出现在
+#   - `adr/` 的**决策记录**里（记录决策当时的代码形态，改路径=篡改决策依据）
+#   - `archive/` `mixed/` 的**历史文档**里（冻结/待净化，不追改）
+# ⇒ 属于「故意不存在」的合法引用，登记豁免。
+#
+# ★ 已**机械修复**的不在此列（共 42 处）：L1-A 迁移的 6 份文档新位置、
+#   `src/cf_plugin/tests/` → `tests/framework/`、`tests/mmu/` → `tests/cpu/`、
+#   8 个已归档 openspec change 的日期前缀路径（见 change
+#   `architecture-truth-boundary-enforcement` 的 tasks.md）。
+#
+# ---- A. 已删除的实现路径（ADR 记录的是决策当时的形态）----
+include/core/
+include/chipforge/
+include/cpu/pipeline/rv32i_regfile.h
+include/bundle/stream_bundle.h
+bundles/impl_mode.h
+bundles/cache_bundles.h
+ip/cpu/plugins/reg_file.cpp
+ip/cpu/plugins/fpu.h
+ip/cpu/plugins/exception.h
+ip/cpu/cpu_factory.cpp
+ip/cpu/core/README.md
+ip/cpu-open/
+ip/cache/rtl/l1_cache_rtl.h
+ip/cache/plugins/l1_cache_tlm.h
+ip/cache/bundles/cache_bundles.h
+src/core/verilator_backend.cpp
+src/codegen_verilog.cpp
+src/cf_plugin/bridge/L1CacheTLMBridge.h
+src/cf_plugin/bridge/L1CacheTLMBridgeAdapter.h
+tests/dual_backend_fixture.h
+tests/test_verilator_stream_e2e.cpp
+tests/test_plugin_minimal.cpp
+tests/framework/test_plugin_elaborate_hello_poc.cpp
+soc/riscv_virt.json
+.github/workflows/ci.yml
+.rddf/state/tlm-frozen-exclude.txt
+
+# ---- B. 明文规划但从未创建（ADR-092 的「TLM 冻结参考」，实际未落文档）----
+docs/architecture/tlm-frozen-reference.md
+
+# ---- C. 已迁移的历史位置（旧 roadmap / 旧 spec）----
+docs/roadmap/
+.rddf/roadmap/archive/phase-6-declarative.md
+.rddf/roadmap/archive/phase-0-plugin-scaffolding.md
+openspec/specs/mem-read-timing/spec.md
+
+# ---- D. 提案性目录（从未创建）----
+docs/arch-truth/

@@ -3,7 +3,7 @@
 > **Status**: ✅ Accepted (v0.7.0, 2026-09-24)
 > **类别**: Plugin / 顺序断言
 > **关联 ADR**: ADR-040 v2.0（移植性） · ADR-045（CtrlLink Stall Loop） · ADR-037（Plugin 作为设计范式）
-> **关联变更**: `openspec/changes/cpu-pipeline-canonical-ordering-assert/`
+> **关联变更**: `openspec/changes/archive/2026-09-24-cpu-pipeline-canonical-ordering-assert/`
 
 ---
 
@@ -139,7 +139,7 @@ D1=A 被选中因为：最小侵入、compile-time 断言不可行（`inline int
 > - 时序上 P1#3 铺好 PADDR 真消费 + `MMUConfig` 构造参数注入点是 JSON 化的天然落点
 > - 与 P1#5 (`cpu-pipeline-multi-cycle`) 并行可行（互不阻塞）
 
-**MMU 配置 JSON 驱动** (`openspec/changes/mmu-config-json-driven/`):
+**MMU 配置 JSON 驱动** (`openspec/changes/archive/2026-10-08-mmu-config-json-driven/`):
 - 当前 `register_early_plugins()` 中硬编码 TLB 几何（`{"L0", 8, 8, 1, 1, "LRU"}` 等）和 `SvMode` 枚举映射
 - `ip/mmu/configs/params_schema.json` 已存在，但未被 `CPUConfig` / MMU 注册点反化
 - **目标**: P1#3 `mmu-paddr-consume-and-real-memory` archive 后启动独立 change `mmu-config-json-driven`，从 `soc/*.json` 读取 TLB 层级大小、替换策略、`SvMode`
@@ -149,13 +149,13 @@ D1=A 被选中因为：最小侵入、compile-time 断言不可行（`inline int
 - **关联文档**: 
   - 决策记录: `docs/architecture/roadmap-evolution.md §2.4`
   - 战略同步: `.rddf/roadmap/strategy.md §3/§4/§5/§6`
-  - Proposal: `openspec/changes/mmu-config-json-driven/proposal.md`
+  - Proposal: `openspec/changes/archive/2026-10-08-mmu-config-json-driven/proposal.md`
 
 ---
 
 ## 关联文档
 
-- **变更工作区**: `openspec/changes/cpu-pipeline-canonical-ordering-assert/`
+- **变更工作区**: `openspec/changes/archive/2026-09-24-cpu-pipeline-canonical-ordering-assert/`
 - **ADR-040 v2.0**: TLM→HDL 移植性约束（三级约束模型 + array_store 抽象）
 - **ADR-045**: Plugin CtrlLink 消费契约 + PipeBuilder::run() Stall Loop
 - **策略**: `.rddf/roadmap/strategy.md` §6.1 P0#1 条目

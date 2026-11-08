@@ -133,7 +133,7 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 
 **问题**：若按「补齐 478 个 TLM-only case」执行 ⇒ 需迁移**大量在 CH_MEM 上不存在的功能**。
 
-⇒ ★ **D-I-1 裁决：改用 family 级分类清单**，落点 = ★ **ADR-088 阶段 B 台账**（`docs/architecture/tlm-coverage-parity-ledger.md`）⇒ **不新造机制**。
+⇒ ★ **D-I-1 裁决：改用 family 级分类清单**，落点 = ★ **ADR-088 阶段 B 台账**（`docs/architecture/archive/tlm-coverage-parity-ledger.md`）⇒ **不新造机制**。
 
 | TLM-only family（实测 32 个标签） | 分类 | 理由 |
 |---|---|---|
@@ -320,7 +320,7 @@ ip/cpu/configs/cpu_config_chmem_json.h    ← P2 刚落地的 CH_MEM 配置解�
 - **ADR-083 v1.2**（表述纠偏）—— ★ `ch_stream` 归类 + `MemReqBundle` 悬空引用（配套文档）
 - **ADR-040 v3.0**（TLM→HDL 移植性约束）—— Phase-2 的 v4.0 改版对象
 - **ADR-085 / ADR-086**（MMU PTW / L0-L1 TLB 架构）—— ★ D3「真缺口」（MMU 语义面）的实装依据
-- `docs/architecture/tlm-coverage-parity-ledger.md` —— ★ **D-I 的落点**（ADR-088 阶段 B 台账）
+- `docs/architecture/archive/tlm-coverage-parity-ledger.md` —— ★ **D-I 的落点**（ADR-088 阶段 B 台账）
 - `tools/check_tlm_freeze.sh` —— ★ **D1 的升级对象**
 - `.rddf/state/tlm-shared-files.txt`（9 个双模共享）· `.rddf/state/tlm-freeze-base.txt` · `.rddf/state/tlm-freeze-allowlist.txt`
 - 上游：`/workspace/project/CppHDL/include/bundle/stream_bundle.h`（`ch_stream`）· `/workspace/project/CppTLM/include/core/chstream_module.hh`（★ CppTLM 的 `chstream_*`，**与 `ch_stream` 是不同物**）

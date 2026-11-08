@@ -15,7 +15,7 @@
 |---|---|---|
 | vendored ELF 47（`tests/cpu/test_cpu_chmem_vendored_elf.cpp`） | **仅 CppHDL Simulator**（`create_simulator()`） | 只判 `tohost == 1` |
 | Verilator 48 ELF（`tools/verilator_runner/cpu_verilator_sim.cpp`） | **仅 Verilator**（`to_verilog` → Verilator 编译 → 联合仿真） | 只判 `tohost == 1` |
-| 覆盖平价台账（463 条，`docs/architecture/tlm-coverage-parity-ledger.md`） | **不跑任何仿真** | 数「有没有对应 case 名」 |
+| 覆盖平价台账（463 条，`docs/architecture/archive/tlm-coverage-parity-ledger.md`） | **不跑任何仿真** | 数「有没有对应 case 名」 |
 | `[mem-drift]` 锚（`tests/cpu/test_cpu_chmem_mem_read_drift.cpp`） | Simulator | ★ **唯一的跨后端断言** —— 但只钉了 `ch_mem::aread` 一个机制的 0-cycle 对齐 |
 
 ⇒ ★ **两个后端跑的是不同 corpus、不同 oracle，从不互比** ⇒ 一个「两边都 `tohost == 1` 但内部状态不同」的模型**今天完全不可见**。
@@ -255,8 +255,8 @@
 - `docs/architecture/adr/ADR-088-tlm-backend-retirement.md`（TLM 退役治理锚；本 ADR 是其 B3 前置契约）
 - `docs/architecture/adr/ADR-083-plugin-style-single-source-of-truth.md`（单源真相；本 ADR 把「一致性」的度量方式定死）
 - `docs/architecture/adr/ADR-040-tlm-hdl-portability-constraints.md`（CH_MEM 正道 + 移植性约束；§10.5/§10.6 的漂移族在阶段 C 整族消失）
-- `docs/architecture/tlm-coverage-parity-ledger.md`（台账；★ 阶段 B 起重新定性为覆盖边界规格）
-- `docs/architecture/tlm-retirement-b1-capacity-plan.md`（B1 承载力盘点）
+- `docs/architecture/archive/tlm-coverage-parity-ledger.md`（台账；★ 阶段 B 起重新定性为覆盖边界规格）
+- `docs/architecture/archive/tlm-retirement-b1-capacity-plan.md`（B1 承载力盘点）
 - `ip/cpu/docs/bp-btb-gshare-design-brief.md`（BP 规格 v2.3；§3.1 / §7 D10 是「TLM 参考语义抽成规格」的样板）
 - `.rddf/roadmap/features/feat-backend-parity-gate.md`（阶段 A，★ planner 落）
 - `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（阶段 B/C，★ planner 落）

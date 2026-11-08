@@ -610,8 +610,8 @@ W9 (M5): Harness 迁移 + ADR 收口
 | `ip/cpu/plugins/reg_file_chmem.h` | 130 | RegFile CH_MEM PoC 骨架 |
 | `ip/cpu/arch/riscv/int_alu_chmem.h` | 130 | IntAlu CH_MEM PoC 骨架 |
 | `docs/audit/cppHDL-maturity-audit.md` | 197 | W0 审计报告 |
-| `openspec/changes/plugin-elaboration-substrate/proposal.md` | 220 | Phase 6c 设计 |
-| `openspec/changes/plugin-elaboration-substrate/tasks.md` | 200 | Phase 6c 任务 |
+| `openspec/changes/archive/2026-09-17-plugin-elaboration-substrate/proposal.md` | 220 | Phase 6c 设计 |
+| `openspec/changes/archive/2026-09-17-plugin-elaboration-substrate/tasks.md` | 200 | Phase 6c 任务 |
 | `CHANGELOG.md` (v0.3.x 段) | 50 | Phase 6c 启动标记 |
 | `docs/architecture/adr/ADR-046-multi-cycle-fsm-exemption.md` | 220 | 新增 ADR-046 |
 

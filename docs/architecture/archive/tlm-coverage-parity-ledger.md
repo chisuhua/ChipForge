@@ -46,7 +46,7 @@
 | 2.14 | `rv32um` | 8 | `covered` | `tests/cpu/test_cpu_verilator_sim.cpp` 的 8 个 rv32um ELF（严格 `tohost==1` 判据） | M 扩展指令级行为已覆盖；差异为 cycle 不同构（TLM radix-2 DIV=33c vs CH_MEM 组合 1 拍）。 |
 | 2.15 | `MultiLevelTLB` | 8 | `partial` | （无对应实现）`ip/mmu/plugins/MMUPlugin_chmem.h` 用 8 项全相联 TLB，无多级结构 | 多级 TLB 结构在 CH_MEM 侧不存在 ⇒ 差异为「结构缺失」。 |
 | 2.16 | `TLBUnit` | 8 | `partial` | （无对应实现） | TLB 单元级行为在 CH_MEM 侧无独立单元（并入 MMUPluginChmem 内部 TLB）⇒ 差异为「单元边界不同」。 |
-| 2.17 | `PTWUnit` | 6 | `partial` | `tests/mmu/test_mmu_ptw_fsm_chmem.cpp`（PTW FSM 存在但**未注册进 CH_MEM 流水线**） | PTW 语义在 CH_MEM 侧有 FSM 实现但未接线 ⇒ 差异为「实现存在、链路缺失」。 |
+| 2.17 | `PTWUnit` | 6 | `partial` | `tests/cpu/test_mmu_ptw_fsm_chmem.cpp`（PTW FSM 存在但**未注册进 CH_MEM 流水线**） | PTW 语义在 CH_MEM 侧有 FSM 实现但未接线 ⇒ 差异为「实现存在、链路缺失」。 |
 | 2.18 | `TLBFactoryTest` | 6 | `partial` | （无对应实现） | TLB 工厂在 CH_MEM 侧不存在（TLB 内联于 MMUPluginChmem）⇒ 差异为「工厂抽象缺失」。 |
 | 2.19 | `cpu-l1-mmu-demo` | 6 | `partial` | `tests/cpu/test_cpu_chmem_vendored_elf.cpp`（端到端等价物） | demo 级流水线在 CH_MEM 侧有 ELF 级等价物，但 3/5/7-stage 组合与 MMU 断言不全。 |
 | 2.20 | `negotiate` | 5 | `partial` | `tests/framework/test_negotiate.cpp`（CH_MEM 共有 1 条） | negotiate 生命周期在 CH_MEM 侧只有 1 条共有 case，TLM 侧 5 条更细（capability 协商矩阵）⇒ 差异为「覆盖深度不足」。 |
@@ -63,12 +63,12 @@
 | 2.31 | `cycle-parity` | 3 | `not-covered` | （无）CH_MEM 侧无 radix-2 FSM ⇒ 无可比的 cycle 序列 | cycle parity 断言的前提是两侧同构多周期实现；CH_MEM 组合化后**判据本身失效**（非 pass/fail）。 |
 | 2.32 | `bare-shortcut` | 3 | `partial` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp` | Bare 短路判定在 CH_MEM 侧有 plumbing 级覆盖，语义级未验证。 |
 | 2.33 | `shadow-bug` | 3 | `partial` | （无对应实现） | satp shadow 类缺陷的回归锚在 CH_MEM 侧缺失（无 PTW ⇒ 无 satp 写路径）。 |
-| 2.34 | `ptw` | 3 | `partial` | `tests/mmu/test_mmu_ptw_fsm_chmem.cpp` | 同 `[PTWUnit]`。 |
+| 2.34 | `ptw` | 3 | `partial` | `tests/cpu/test_mmu_ptw_fsm_chmem.cpp` | 同 `[PTWUnit]`。 |
 | 2.35 | `real-memory` | 3 | `partial` | `tests/mmu/test_mmu_bare_plumbing_verilator.cpp`（plumbing only，**translation semantics NOT verified**） | 真实内存页表 walk 在 CH_MEM 侧未验证（仅 plumbing）⇒ 差异为「语义未验证」。 |
 | 2.36 | `base-addr` | 2 | `partial` | `tests/cpu/test_cpu_memory_model_chmem.cpp` | 宿主内存基址语义在 CH_MEM 侧有等价内存模型，但断言细节不同。 |
 | 2.37 | `cpu-sim` | 2 | `not-covered` | （无）`tools/cpu_sim` 是 TLM 专用 CLI（CH_MEM 走 `tools/verilator_runner`） | CLI 工具面本身是 TLM 专属（`pb->run()` 直仿）⇒ 随 TLM 退役整体迁移到 verilator_runner（B3），不属「覆盖缺口」。 |
 | 2.38 | `write_half` | 2 | `partial` | `tests/cpu/test_dmem_chmem_sv32.cpp` | 半字写语义在 CH_MEM 侧有 dmem 等价物，断言细节不同。 |
-| 2.39 | `PTW` | 2 | `partial` | `tests/mmu/test_mmu_ptw_fsm_chmem.cpp` | 同 `[PTWUnit]`：未注册 ⇒ 行为未生效。 |
+| 2.39 | `PTW` | 2 | `partial` | `tests/cpu/test_mmu_ptw_fsm_chmem.cpp` | 同 `[PTWUnit]`：未注册 ⇒ 行为未生效。 |
 | 2.40 | `performance` | 1 | `not-covered` | （无） | 性能类断言在 CH_MEM 组合通路上无意义（无流水线统计）⇒ 不可映射。 |
 | 2.41 | `probe` | 1 | `partial` | （无 CH_MEM 对应物） | 探针类小用例，CH_MEM 侧无等价物。 |
 | 2.42 | `multi-section` | 1 | `partial` | （同上） | 同 `[elf-loader]`。 |

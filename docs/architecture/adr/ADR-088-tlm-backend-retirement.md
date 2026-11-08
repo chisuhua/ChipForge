@@ -312,7 +312,7 @@ ADR-083（Accepted 2026-10-08）已定性：
 - ADR-040 v3.0（TLM→HDL 移植性约束）· ADR-083（Plugin-style 单一 source of truth）· ADR-046（FSM 豁免）· ADR-087（ISA 声明真实性）
 - `.rddf/roadmap/features/feat-tlm-backend-retirement.md`（B0–B3 编排 + 13 条验收）
 - `.rddf/roadmap/objectives/objective-ip-cpu-tlm-backend-retirement.md`（G1/G2/G3 门禁）
-- [`docs/architecture/tlm-retirement-b1-capacity-plan.md`](../archive/tlm-retirement-b1-capacity-plan.md)（B1 承载力拆解 + 决策定案）
-- [`docs/architecture/tlm-coverage-parity-ledger.md`](../archive/tlm-coverage-parity-ledger.md)（463 条覆盖平价台账，B0 姊妹提案交付）
+- [`docs/architecture/archive/tlm-retirement-b1-capacity-plan.md`](../archive/tlm-retirement-b1-capacity-plan.md)（B1 承载力拆解 + 决策定案）
+- [`docs/architecture/archive/tlm-coverage-parity-ledger.md`](../archive/tlm-coverage-parity-ledger.md)（463 条覆盖平价台账，B0 姊妹提案交付）
 - `.rddf/improvements/chmem-tlm-backend-freeze.md`（B0 提案）· `.rddf/improvements/chmem-tlm-coverage-parity-ledger.md`（台账内容）
-- `openspec/changes/chmem-tlm-backend-freeze/`（本 change 的 proposal / design / plan / tasks）
+- `openspec/changes/archive/2026-10-24-chmem-tlm-backend-freeze/`（本 change 的 proposal / design / plan / tasks）
