@@ -28,7 +28,7 @@
 | **LATE** | `DBusPlugin`, `RegFilePlugin` | 2 |
 | **Total** | | **11** |
 
-**注意**: `RetirePlugin` 在 OpenSpec spec 中列为第 11 个 plugin，但 `ip/cpu/plugins/` 暂无此 class 文件 (commit `6ecd264` BLOCKED 标记)。按 [ADR-042](../architecture/adr/ADR-042-plugin-deferral.md) 推迟到 Phase 5+。当前实际注册 11 plugins (不含 Retire)。
+**注意**: `RetirePlugin` 在 OpenSpec spec 中列为第 11 个 plugin，但 `ip/cpu/plugins/` 暂无此 class 文件 (commit `6ecd264` BLOCKED 标记)。按 [ADR-042](../adr/ADR-042-plugin-deferral.md) 推迟到 Phase 5+。当前实际注册 11 plugins (不含 Retire)。
 
 ### 2. M4.14 — BranchPredictor Template Convergence (2 commits)
 
@@ -248,11 +248,11 @@ docs(performance): M4-DSE honest performance baseline (576 configs, ipc=0.0 know
 
 - OpenSpec change: `m4-dse-cpufactory-real` (本地归档)
 - OpenSpec spec: `cpu-cpufactory-real` (本地 spec)
-- ADR-042: [Plugin 推迟决策](../architecture/adr/ADR-042-plugin-deferral.md)
-- ADR-037: [Plugin 作为设计范式](../architecture/adr.md#k-范式决策)
-- ADR-043: [CI 强制架构门禁](../architecture/adr.md#j-目录与组织)
-- Baseline: [M4-DSE Honest Performance Baseline](../performance/m4-cpufactory-real-baseline.md)
-- IP Status: [ip/cpu/docs/status.md](../../ip/cpu/docs/status.md)
+- ADR-042: [Plugin 推迟决策](../adr/ADR-042-plugin-deferral.md)
+- ADR-037: [Plugin 作为设计范式](../adr.md#k-范式决策)
+- ADR-043: [CI 强制架构门禁](../adr.md#j-目录与组织)
+- Baseline: [M4-DSE Honest Performance Baseline](../../performance/m4-cpufactory-real-baseline.md)
+- IP Status: [ip/cpu/docs/status.md](../../../ip/cpu/docs/status.md)
 
 ---
 
