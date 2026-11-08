@@ -99,6 +99,25 @@ class AC:
         self.aspect = aspect
 
 
+def resolve_proposal_path(root, change):
+    """★ 定位 change 的 proposal.md —— ★ 已归档的 change 回退到 `archive/*-<name>/`。
+
+    ★ 归档后 change 会从 `openspec/changes/<name>/` 移到
+    `openspec/changes/archive/<YYYY-MM-DD>-<name>/` ⇒ ★ 若不回退，机检会直接崩
+    （★ 实测：归档 6 个 change 后 `check_ac_v_coverage.py` 报「找不到 proposal.md」）。
+    """
+    live = os.path.join(root, "openspec", "changes", change, "proposal.md")
+    if os.path.isfile(live):
+        return live
+    archive_dir = os.path.join(root, "openspec", "changes", "archive")
+    if os.path.isdir(archive_dir):
+        # ★ 多个候选时取**最新**（目录名带日期前缀 ⇒ 字典序最大 = 最新）
+        cands = sorted(d for d in os.listdir(archive_dir) if d.endswith("-" + change))
+        if cands:
+            return os.path.join(archive_dir, cands[-1], "proposal.md")
+    return live
+
+
 def parse_change(proposal_path, change):
     """从 proposal.md 的 AC 段提取 [(AC, ...)]。"""
     with open(proposal_path, encoding="utf-8", errors="replace") as fh:
@@ -269,7 +288,8 @@ def main(argv=None):
     root = os.path.abspath(opts.root)
     acs = []
     for change in CHANGES:
-        path = os.path.join(root, "openspec", "changes", change, "proposal.md")
+        # ★ 已归档的 change 回退到 `archive/*-<name>/`（★ 归档后机检不得崩）
+        path = resolve_proposal_path(root, change)
         if not os.path.isfile(path):
             print(f"ERROR: 找不到 {path}", file=sys.stderr)
             return 2

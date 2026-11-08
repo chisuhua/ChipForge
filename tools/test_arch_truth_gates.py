@@ -166,6 +166,42 @@ class TestTopLevelLayout(unittest.TestCase):
         self.assertEqual(problems[0][0], "unexpected-file")
 
 
+class TestAcVCoverageArchiveFallback(unittest.TestCase):
+    """★ 归档后机检不得崩（★ 实测：归档 6 个 change 后 `check_ac_v_coverage.py` 直接报「找不到 proposal.md」）。"""
+
+    def test_live_path_preferred(self):
+        import tempfile
+        root = tempfile.mkdtemp(prefix="acv-live-")
+        d = os.path.join(root, "openspec", "changes", "c1")
+        os.makedirs(d)
+        with open(os.path.join(d, "proposal.md"), "w") as fh:
+            fh.write("## Acceptance Criteria\n")
+        self.assertEqual(acv.resolve_proposal_path(root, "c1"),
+                         os.path.join(d, "proposal.md"))
+
+    def test_archived_path_fallback(self):
+        import tempfile
+        root = tempfile.mkdtemp(prefix="acv-arc-")
+        d = os.path.join(root, "openspec", "changes", "archive", "2026-11-09-c1")
+        os.makedirs(d)
+        with open(os.path.join(d, "proposal.md"), "w") as fh:
+            fh.write("## Acceptance Criteria\n")
+        self.assertEqual(acv.resolve_proposal_path(root, "c1"),
+                         os.path.join(d, "proposal.md"))
+
+    def test_archived_picks_latest(self):
+        import tempfile
+        root = tempfile.mkdtemp(prefix="acv-arc2-")
+        arch = os.path.join(root, "openspec", "changes", "archive")
+        for stamp in ("2026-01-01-c1", "2026-11-09-c1"):
+            d = os.path.join(arch, stamp)
+            os.makedirs(d)
+            with open(os.path.join(d, "proposal.md"), "w") as fh:
+                fh.write("## Acceptance Criteria\n")
+        got = acv.resolve_proposal_path(root, "c1")
+        self.assertIn("2026-11-09-c1", got)
+
+
 class TestAcVCoverage(unittest.TestCase):
     @staticmethod
     def _mk(ac_id, v_ids, self_exempt=False, aspect=acv.ASPECT_NONE):
