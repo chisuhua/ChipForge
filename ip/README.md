@@ -7,14 +7,11 @@
 
 | IP | 状态 | 实施预计 |
 |----|------|----------|
-| cpu | 🟡 设计中 (实装中) | Phase 1.4+ |
-| cache | 🟡 TLM 实现中 (Phase 1.3, L1 unified) | Phase 1.4+ L2 |
-| mmu | 🟡 骨架阶段 (mmu-ip-skeleton, 2026-06-29) | mmu-tlb-ptw-impl+ |
-| memory | 🔴 规划中 (0 LOC) | Phase 2+ |
-| interconnect | 🔴 规划中 (0 LOC) | Phase 2+ |
-| peripheral | 🔴 规划中 (0 LOC) | Phase 3+ |
-| tilecore | 🟡 初始设计 (有 docs/architecture.md) | Phase 5+ |
-| tilecopy | 🟡 初始设计 (有 docs/architecture.md) | Phase 5+ |
+| ★ **见 [`ip/ip-catalog.md`](ip-catalog.md)** | ★ **单一维护点** | ★ 状态权威在该文件 |
+
+> ★ ★ **单一维护点声明（2026-11-08 · ADR-095 / change `architecture-truth-boundary`）**：
+> ★ **IP 状态与目录的权威 = [`ip/ip-catalog.md`](ip-catalog.md)** ⇒ ★ 本文件**不保留副本**（★ 原状态表已移除，避免双维护漂移）。
+> ★ 本文件只做「IP 库入口 + 统一目录结构说明」；★ 要查状态 / 全目录 ⇒ 去 `ip/ip-catalog.md`。
 
 ## 概述
 本目录包含 ChipForge 平台的所有硬件 IP 核心，每个 IP 遵循统一的目录结构和接口规范。
