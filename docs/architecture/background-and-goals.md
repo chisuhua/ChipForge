@@ -5,6 +5,12 @@
 
 ---
 
+
+> ★ ★ **订正块（2026-11-08 · ADR-095 §2.3「就地净化」· 用户已签认）**：★ 本文有三处**过时表述**，★ **以下为准**【★ 原文保留待批次重写】：
+> - ★ **语言版本**：★ 原文「主要语言 **C++17**（业务）/ **C++20**（测试 target）」⇒ ★ **实际 = C++23 全 target**（★ v0.6 ADR-047 升级 · ★ 与 `AGENTS.md` §8 同口径）
+> - ★ **`extern/CppTLM` 路径**：★ 原文「`extern/CppTLM` 符号链接」⇒ ★ **`extern/` 已不存在**（★ 实测）⇒ ★ 实际位置 = **仓库根 `CppTLM/`**
+> - ★ **Bundle 类型系统**：★ 原文「与 CppTLM **共享同一套**基于 `ch_uint<N>` + `bundle_base<Self>` 的类型系统」⇒ ★ **过度陈述**：★ 本仓 `bundles/` 用 **`cf::plugin::uint_t<N>`**（★ TLM 下 = **POD**；★ CH_MEM 下 = `ch::core::ch_uint<N>`）⇒ ★ `ch_uint` + `bundle_base` 是 **Phase 5+ 目标形态**（★ 见 `interface-design.md` §1.0）
+
 ## 1.1 项目目标
 
 构建一个用 **Plugin-style**（D4 决策，ADR-083）设计硬件 IP、用 **CppHDL** 作硬件后端的 RISC-V 虚拟验证平台：
