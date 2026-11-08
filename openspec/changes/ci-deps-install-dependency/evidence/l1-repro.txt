@@ -1,0 +1,63 @@
+================================================================================
+L1 证据 —— deps 安装与 ChipForge target 的依赖边（两个独立机制）
+================================================================================
+
+★ change: ci-deps-install-dependency（★ 来源 = backend-parity-open-core §3.5 的 L1）
+
+────────────────────────────────────────────────────────────────────────────────
+§1 机制 A 复现（★ 干净目录 ⇒ 竞态）
+────────────────────────────────────────────────────────────────────────────────
+  cmake -S . -B /tmp/opencode/l1-fix -DCMAKE_BUILD_TYPE=Debug
+  cmake --build /tmp/opencode/l1-fix -j$(nproc)
+
+  ★ 修复前的日志（★ 关键三行）：
+    [ 9%] Built target cpptlm_external-build
+    .../cpu_verilator_sim.cpp:29:10: fatal error: ch.hpp: No such file or directory
+    gmake[2]: *** No rule to make target '_deps/install/lib/libcpptlm_core.a',
+              needed by 'bin/cpu_verilator_sim'.  Stop.
+    gmake: *** [Makefile:101: all] Error 2
+
+  ★ 根因（★ 读生成的 Makefile 确认，非推测）：
+    all: CMakeFiles/cpptlm_external.dir/all
+    CMakeFiles/cpptlm_external.dir/all: CMakeFiles/cpptlm_external-build.dir/all
+    CMakeFiles/cpptlm_external.dir/all: CMakeFiles/cpptlm_external-install.dir/all
+  ⇒ install **确实在 all 链里** ⇒ ★ 是**并行 + 无依赖边**（★ 不是「没被调度」）
+  ⇒ 读根 CMakeLists.txt ⇒ deps 段落**从未**给 ChipForge 的 target 任何依赖边
+  ⇒ ★ 附带：注释「占位让 add_dependencies 通过」描述的是**从未实现**的意图（★ 全仓无任何
+    add_dependencies(... chipforge_deps_skip ...)）
+
+────────────────────────────────────────────────────────────────────────────────
+§2 机制 B 复现（★ 本机 build/ 命中）
+────────────────────────────────────────────────────────────────────────────────
+  ★ 触发：删 build/_deps/*/build/CMakeCache.txt（⇒ 触发子构建 re-configure）
+  ★ 父项目 build/CMakeCache.txt：CMAKE_CXX_COMPILER:STRING=/workspace/main/opt/bin/g++-14
+    （★ STRING 类型 ⇒ 用户**显式指定**过 ⇒ 不在 PATH）
+  ★ 日志：
+    -- The CXX compiler identification is unknown
+    CMake Error at CMakeLists.txt:21 (project):
+      The CMAKE_CXX_COMPILER:
+        /usr/bin/g++-14
+      is not a full path to an existing compiler tool.
+  ⇒ 子构建**不继承**父项目的编译器指定 ⇒ 重新探测 ⇒ ★ 探到 PATH 里的 /usr/bin/g++-14（★ **不存在**）
+
+────────────────────────────────────────────────────────────────────────────────
+§3 修复后的验证
+────────────────────────────────────────────────────────────────────────────────
+  ★ 机制 A：★ 干净目录 /tmp/opencode/l1-fix 构建 ⇒ deps 装好后**进入 ChipForge 自身 target 编译**
+    ⇒ ★ 依赖边生效（★ 否则此刻会因缺 ch.hpp 失败）⇒ ★ chipforge_tests 建成（83%）
+  ★ 机制 B（AC-2b）：★ 子构建 CMakeCache 的 CMAKE_CXX_COMPILER **等于**父项目：
+      父项目 /workspace/main/opt/bin/g++-14
+      cpptlm /workspace/main/opt/bin/g++-14   ✔
+      cpphdl /workspace/main/opt/bin/g++-14   ✔
+  ★ AC-2（依赖边机检）：★ Makefile2 中每个 ChipForge target 的 .dir/all 含
+    CMakeFiles/chipforge_deps_install.dir/all ⇒ ★ 5/5 命中
+
+────────────────────────────────────────────────────────────────────────────────
+§4 ★ 干净目录构建**顺带暴露**的另一个问题（★ 与 L1 无关 ⇒ 登记为 C1.10）
+────────────────────────────────────────────────────────────────────────────────
+  ★ chipforge_tests_chmem 编译失败：
+    tests/framework/test_multi_cycle_fsm.cpp:60 ⇒ 'chlib::ch_state_machine' has no member 'is_built'
+    include/cf/plugin/multi_cycle_fsm.h:47 ⇒ looser exception specification on overriding virtual function
+  ⇒ ★ 上游 CppHDL 的 API 漂移（★ `is_built()` 已被移除）
+  ⇒ ★ 本地 build/bin/chipforge_tests_chmem 是 **Oct 30 的旧 binary** ⇒ ★ 当前源码**编译不过**
+  ⇒ ★ 已登记为 **C1.10**（★ 需独立处置）

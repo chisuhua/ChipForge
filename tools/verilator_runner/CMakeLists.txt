@@ -65,3 +65,10 @@ endif()
 # add_subdirectory(tools/verilator_runner), so add_test() in this file would
 # be silently ignored (no CTestTestfile.cmake generated). Tests/CMakeLists.txt
 # has the active enable_testing() context, so it owns the registration.
+
+# ★ deps 依赖边（★ L1 · change `ci-deps-install-dependency`）★ 详见根 CMakeLists.txt 的
+#   「deps 聚合目标」段 ⇒ ★ 等 CppTLM/CppHDL **安装**完成 ⇒ 依赖头文件/库在编译期就位
+#   （★ 否则 `cmake --build` 并行 ⇒ 本 target 与 deps-install 无序 ⇒ 竞态失败）
+if(TARGET chipforge_deps_install)
+    add_dependencies(cpu_verilator_sim chipforge_deps_install)
+endif()

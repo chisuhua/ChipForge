@@ -196,7 +196,14 @@ struct CPUConfig {
 // ----------------------------------------------------------------------------
 namespace detail {
 
-inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen) {
+// ★ ★ `warn_sink`（★ 2026-11-08 · change `isa-xlen-warn-capture-decoupling`）：
+// ★ 「declared-reserved warn 走 cerr」这条语义（ADR-087 §D1/D2 design D2）**必须可测**，
+// ★ 但测试若用「接管 `std::cerr` 的 rdbuf」来捕获 ⇒ ★ **依赖 reporter 的实现细节**
+//   （★ 实测：Catch2 的 XML reporter 在用例开始前就接管 `std::cerr` ⇒ 捕获到空 ⇒ 3 个用例失败）
+// ★ ⇒ 依赖注入：★ 默认 `nullptr` ⇒ **生产行为逐字不变**（仍写 `std::cerr`）；
+// ★ 测试注入 `std::ostringstream` ⇒ ★ 与 reporter **彻底无关** ⇒ 脆弱性根除。
+inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen,
+                              std::ostream* warn_sink = nullptr) {
   const std::string& isa = config.isa;
   if (isa == "rv32i" || isa == "rv32im") {
     if (config.xlen != 32) {
@@ -213,10 +220,12 @@ inline void validate_isa_xlen(const CPUConfig& config, unsigned kernel_xlen) {
     return;
   }
   if (isa == "rv32imac" || isa == "rv64i" || isa == "rv64gc") {
-    std::cerr << "[declared-reserved] isa=\"" << isa
-              << "\" 未实现（预案 v1.x），配置被接受但不参与 dispatch（ADR-087 "
-                 "§D1）"
-              << std::endl;
+    // ★ 输出目标可注入（★ 默认 = std::cerr ⇒ 生产行为不变）
+    std::ostream& warn_out = warn_sink ? *warn_sink : std::cerr;
+    warn_out << "[declared-reserved] isa=\"" << isa
+             << "\" 未实现（预案 v1.x），配置被接受但不参与 dispatch（ADR-087 "
+                "§D1）"
+             << std::endl;
     if (kernel_xlen != config.xlen) {
       throw std::invalid_argument(
           "CpuFactory: xlen=" + std::to_string(config.xlen) +
@@ -371,12 +380,16 @@ class CpuFactory {
   // 主入口: 接受 CPUConfig, 返回完整 PipeBuilder
   // cpu-pipeline-stubs-replace commit E: 可选 mem 参数 — 非空时注入 IBusPlugin/DBusPlugin
   // 真实访存 (取指/读写 PicolibcHostMemory). null (默认) 维持 stub 行为, 零回归.
+  // ★ ★ `warn_sink`（★ 2026-11-08 · change `isa-xlen-warn-capture-decoupling`）：
+  // ★ 可选的 warn 输出目标 ⇒ ★ 默认 `nullptr` ⇒ **向后兼容**（★ 现有 124 处调用点**一处不改**）
+  // ★ 用途：★ 让测试不依赖「接管全局 `std::cerr`」⇒ ★ 与 reporter 实现无关（★ 脆弱性根除）
   static std::unique_ptr<cf::plugin::PipeBuilder> build_cpu(
       const CPUConfig& config,
-      cf::cpu::PicolibcHostMemory* mem = nullptr) {
+      cf::cpu::PicolibcHostMemory* mem = nullptr,
+      std::ostream* warn_sink = nullptr) {
     // ADR-048: reset canonical ordering counters at each build_cpu entry
     cf::cpu::detail::reset_canonical_counters();
-    cf::cpu::detail::validate_isa_xlen(config, sizeof(T) * 8);  // ADR-087 §D1/D2
+    cf::cpu::detail::validate_isa_xlen(config, sizeof(T) * 8, warn_sink);  // ADR-087 §D1/D2
     auto pb = std::make_unique<cf::plugin::PipeBuilder>();
 
     // cpu-pipeline-stubs-replace commit B: StageLinkPlugin 必须在 register_early_plugins 之前注册,

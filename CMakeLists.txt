@@ -130,6 +130,16 @@ else()
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            # ★ ★ 编译器**必须显式传给子构建**（★ 2026-11-08 实测 · L1 机制 B）：
+            #   ExternalProject 的子构建有**独立的 cache** ⇒ ★ **不继承**父项目的
+            #   `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER` ⇒ ★ 重新探测 ⇒ ★ 若父项目用的是
+            #   **显式绝对路径**（★ 如 `/workspace/main/opt/bin/g++-14`，★ 该路径不在 PATH）
+            #   而 PATH 里的同名工具**不存在**（★ 如 `/usr/bin/g++-14`）⇒
+            #   ⇒ ★ 子构建 configure 失败：「is not a full path to an existing compiler tool」
+            #   ⇒ ★ **父项目能 build、子构建不能** ⇒ ★ 新鲜 clone 的目录必踩。
+            #   ⇒ 显式传入 ⇒ 子构建用**同一个**编译器 ⇒ 不依赖 PATH 探测。
+            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
             -DBUILD_TESTS=OFF
             -DBUILD_EXAMPLES=OFF
             -DBUILD_DOCS=OFF
@@ -149,6 +159,9 @@ else()
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            # ★ 同上：把编译器显式传给子构建（★ L1 机制 B）
+            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
             -DCPPHDL_BUILD_TESTS=OFF
             -DCPPHDL_BUILD_EXAMPLES=OFF
             -DCH_JIT_ENABLE=OFF
@@ -198,13 +211,37 @@ else()
         ExternalProject_Add_StepTargets(cpptlm_external build install)
         ExternalProject_Add_StepTargets(cpphdl_external build install)
     else()
-        # 已 install,创建空目标,占位让 add_dependencies 通过
+        # ★ 已 install ⇒ 创建一个**占位目标**，让下方的「deps 依赖边」有统一的目标可依赖
+        #   （★ 2026-11-08 实测修正：★ 原注释写「占位让 add_dependencies 通过」，但当时**全仓并无任何**
+        #   `add_dependencies(... chipforge_deps_skip ...)` ⇒ ★ 那句注释描述的是**从未实现**的意图
+        #   ⇒ ★ 现由文件末尾的「deps 依赖边」段真正接上 ⇒ ★ 注释与实现终于相符）
         if(NOT TARGET chipforge_deps_skip)
             add_custom_target(chipforge_deps_skip ALL
                 COMMAND ${CMAKE_COMMAND} -E echo "CppTLM/CppHDL install cached at ${_deps_install_dir}, skipping rebuild. Pass -DCHIPFORGE_REBUILD_DEPS=ON to override."
             )
         endif()
     endif()
+
+if(TARGET cpptlm_external-install)
+    # ★ 首次构建：等 deps 的 install 完成 ⇒ 头文件与库在 ChipForge 编译期就位
+    set(_cf_deps_install_targets cpptlm_external-install cpphdl_external-install)
+elseif(TARGET chipforge_deps_skip)
+    # ★ deps 已装好：等占位目标（★ 与上面的依赖边语义对齐）
+    set(_cf_deps_install_targets chipforge_deps_skip)
+else()
+    set(_cf_deps_install_targets "")
+endif()
+
+if(_cf_deps_install_targets)
+    # ★ ★ 定义一个**聚合目标** ⇒ ★ 各子目录的 CMakeLists.txt 依赖它
+#   ★ ★ **位置要求**：★ MUST 在**所有 `add_subdirectory()` 之前**定义 ⇒ ★ 否则子目录执行时
+#     它还不存在 ⇒ ★ 子目录的 `if(TARGET chipforge_deps_install)` 为 FALSE ⇒ ★ 依赖边静默不生效
+    #   （★ 2026-11-08 实测纠正：★ 依赖边**不能**在这里统一加 ⇒ ★ `if(TARGET <子目录 target>)`
+    #   在父目录**返回 FALSE**（target 作用域限制）⇒ ★ 上一版实现**一个都没加上**且 configure
+    #   **静默通过** ⇒ ★ 又一个静默失效点 ⇒ ★ 依赖边 MUST 由**各子目录**建立）
+    add_custom_target(chipforge_deps_install DEPENDS ${_cf_deps_install_targets})
+    message(STATUS "[ChipForge] deps 聚合目标: chipforge_deps_install <- ${_cf_deps_install_targets}")
+endif()
 endif()
 
 # ════════════════════════════════════════════════════════════════════
@@ -283,3 +320,26 @@ message(STATUS "")
 
 # compile_commands.json (LSP / clangd 友好)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ★ deps 依赖边（L1 · change `ci-deps-install-dependency`）
+#
+# ★ **为什么必须在这里**（★ 2026-11-08 实测 · 铁证）：
+#   deps 的 build/install 步骤与 ChipForge 自身 target 之间**原本没有任何依赖边** ⇒
+#   `cmake --build <dir>`（all）时 make **并行**执行 ⇒ ChipForge 的 target 与
+#   `cpptlm_external-install` **无序** ⇒ ChipForge 先跑 ⇒ 而它的 include/link 指向
+#   `_deps/install`（★ 已安装态）⇒ 依赖头文件（`ch.hpp`）/ 库（`libcpptlm_core.a`）
+#   **尚未安装** ⇒ 编译失败 ⇒ make 在首个失败处停止 ⇒ **install 步骤没机会跑**。
+#
+#   实测（★ 新 build 目录 ⇒ 必然失败）：
+#     gmake[2]: *** No rule to make target '_deps/install/lib/libcpptlm_core.a',
+#               needed by 'bin/cpu_verilator_sim'.  Stop.
+#
+#   ★ 为什么以前不暴露：★ 已存在的 build 目录 deps 早装好 ⇒ `_rebuild_deps=FALSE`
+#   ⇒ 走 `chipforge_deps_skip` 分支 ⇒ 没有任何东西需要被安装 ⇒ 缺陷不可见。
+#   ★ **只有干净环境**（★ 新克隆 / CI runner / 新同事第一天）才会踩。
+#
+# ★ 本段**只增加 make 依赖边** ⇒ 不改 include/link 路径 · 不改 deps 的构建方式
+#   ⇒ 已有 build 目录的增量构建行为**逐字不变**。
+# ═══════════════════════════════════════════════════════════════════════════════
+

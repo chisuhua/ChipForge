@@ -1,0 +1,35 @@
+================================================================================
+L2 证据 —— 「declared-reserved warn 走 cerr」的断言与 reporter 解耦
+================================================================================
+
+★ change: isa-xlen-warn-capture-decoupling（★ 来源 = backend-parity-open-core §3.5 的 L2）
+
+────────────────────────────────────────────────────────────────────────────────
+§1 复现（★ 修复前）
+────────────────────────────────────────────────────────────────────────────────
+  ./build/bin/chipforge_tests "[isa-xlen]"
+    ⇒ All tests passed (20 assertions in 9 test cases)   EXIT=0
+  ./build/bin/chipforge_tests "[isa-xlen]" -r xml -o out.xml
+    ⇒ EXIT=3
+  ★ XML 里的 3 个失败断言（★ 与「3 个 case」完全吻合）：
+    <Expression success="false" type="REQUIRE" filename="tests/cpu/test_cpu_factory_isa_xlen.cpp" line="60">
+    <Expression success="false" type="REQUIRE" filename="tests/cpu/test_cpu_factory_isa_xlen.cpp" line="68">
+    <Expression success="false" type="REQUIRE" filename="tests/cpu/test_cpu_factory_isa_xlen.cpp" line="96">
+  ★ 三者断言内容相同：REQUIRE(cap.str().find("[declared-reserved]") != npos)
+  ★ 展开值 = 18446744073709551615 (0xffffffffffffffff) ⇒ ★ **就是 npos** ⇒ ★ cap.str() 为空
+
+────────────────────────────────────────────────────────────────────────────────
+§2 根因
+────────────────────────────────────────────────────────────────────────────────
+  ★ 测试用 CerrCapture（std::cerr.rdbuf(buf_.rdbuf())）捕获 ⇒ ★ Catch2 的 **XML reporter
+    在用例开始前就接管了 std::cerr** ⇒ ★ 生产的 warn 写进了 XML 的 buffer ⇒ ★ cap.str() 空
+  ★ ★ 本质：★ 观测手段（接管全局流）与被测行为耦合 ⇒ ★ **脆弱测试**
+
+────────────────────────────────────────────────────────────────────────────────
+§3 修复后的验证
+────────────────────────────────────────────────────────────────────────────────
+  ★ AC-1 XML reporter：★ EXIT=0（★ 修复前 EXIT=3）· XML 里 success=false 的断言数 = **0**
+  ★ AC-2 默认 reporter：★ All tests passed (20 assertions in 9 test cases)  EXIT=0
+  ★ AC-4 向后兼容：★ build_cpu 调用点计数 = **124**（未变）
+  ★ AC-5 不再触碰全局流：★ grep -v '^\s*//' ... | grep -c rdbuf ⇒ **0**
+  ★ AC-3 生产行为不变：★ 默认路径（warn_sink == nullptr）仍写 std::cerr ★ warn 文本一字未改

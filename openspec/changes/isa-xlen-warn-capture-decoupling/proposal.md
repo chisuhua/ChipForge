@@ -83,16 +83,22 @@ REQUIRE(cap.str().find("[declared-reserved]") != std::string::npos);
 
 ## Acceptance Criteria
 
-- [ ] **AC-1** ★ **XML reporter 下全绿**：★ `./build/bin/chipforge_tests "[isa-xlen]" -r xml -o out.xml`
+- [x] **AC-1** ★ **XML reporter 下全绿**：★ `./build/bin/chipforge_tests "[isa-xlen]" -r xml -o out.xml`
+      ★ ✅ **2026-11-08**：★ XML reporter 下 `[isa-xlen]` ⇒ **EXIT=0**（★ 修复前 EXIT=3）· XML 里 `success="false"` 的断言数 = **0** ⇒ 证据 = `evidence/l2-repro.txt` §3
       ⇒ **exit 0** ⇒ ★ XML 里 **0 个** `success="false"`
-- [ ] **AC-2** ★ **默认 reporter 下仍全绿**：★ `[isa-xlen]` ⇒ `All tests passed`（★ 20 assertions / 9 test cases）
-- [ ] **AC-3** ★ **生产行为逐字不变**：★ 默认路径（`warn_sink == nullptr`）的 warn 仍写 `std::cerr`
+- [x] **AC-2** ★ **默认 reporter 下仍全绿**：★ `[isa-xlen]` ⇒ `All tests passed`（★ 20 assertions / 9 test cases）
+      ★ ✅ **2026-11-08**：★ 默认 reporter ⇒ `All tests passed (20 assertions in 9 test cases)` EXIT=0
+- [x] **AC-3** ★ **生产行为逐字不变**：★ 默认路径（`warn_sink == nullptr`）的 warn 仍写 `std::cerr`
+      ★ ✅ **2026-11-08**：★ 不传 sink（`warn_sink == nullptr`）⇒ warn 仍写 `std::cerr` ★ **warn 文本一字未改**（★ 只改了输出目标的选择）
       ⇒ ★ 判据 = **不传 sink** 时 stdout/stderr 内容与改动前一致（★ 现有 warn 文本一字不改）
-- [ ] **AC-4** ★ **向后兼容**：★ **124** 处 `build_cpu` 调用点**一处不改**仍编译通过
+- [x] **AC-4** ★ **向后兼容**：★ **124** 处 `build_cpu` 调用点**一处不改**仍编译通过
+      ★ ✅ **2026-11-08**：★ `build_cpu` 调用点计数 = **124**（★ 未变）⇒ ★ 默认参数 ⇒ 向后兼容
       （★ 判据 = 全仓编译通过 + `grep` 计数不变）
-- [ ] **AC-5** ★ **脆弱性根除**：★ 测试**不再**触碰 `std::cerr` / `std::cout` 的 rdbuf
+- [x] **AC-5** ★ **脆弱性根除**：★ 测试**不再**触碰 `std::cerr` / `std::cout` 的 rdbuf
+      ★ ✅ **2026-11-08**：★ `grep -v '^\s*//' tests/cpu/test_cpu_factory_isa_xlen.cpp | grep -c rdbuf` ⇒ **0**（★ 代码里已无全局流捕获；★ 注释里提到 `rdbuf` 是解释性文字）
       ⇒ ★ `grep "rdbuf" tests/cpu/test_cpu_factory_isa_xlen.cpp` ⇒ **0 命中**
 - [ ] **AC-6** ★ **全量零退化**：★ `bash tools/run_chipforge_tests.sh` ⇒ baseline-aware **PASS**
+      ★ ⏳ **待验**：★ 全量 `bash tools/run_chipforge_tests.sh` 的 baseline-aware 结果 ⇒ ★ **受 C1.10 阻塞**（★ 本机 `chipforge_tests_chmem` 因上游 API 漂移**编译不过** ⇒ CH_MEM 侧只能跑旧 binary）⇒ ★ **本条待 C1.10 处置后补验**
       （★ 与既有基线逐位一致）
 
 ## Impact

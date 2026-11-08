@@ -180,6 +180,28 @@ depends_on:
 - [x] C1.4 ★ **baseline-aware 运行器**：`tools/run_catch2_with_baseline.sh` + `tools/baseline_known_failures.txt`（★ 按 binary 分节 + 每条附根因/owner/收敛期限）⇒ ★ **「全量回归通过」信号恢复**（★ 原先 ctest entry **恒红** ⇒ 信号从来不存在）
 - [x] C1.5 ★ **ctest build fixture**：`cf_build_all` ⇒ ★ 编译失败 ⇒ 依赖测试 **Not Run** ⇒ ctest 整体 FAIL ⇒ ★ **fail-closed**（★ 实测：注入编译错误 ⇒ `0% tests passed, 2 tests failed`）
 - [x] C1.6 ★ **实测知识沉淀**：plan §K18（★ 含「Catch2 XML reporter 会破坏依赖 `std::cerr` 捕获的测试」等 4 条可迁结论）
+- [x] ★ **C1.9** ★ ★ **第 6 个「旧产物顶替」通道：新鲜度判据**不覆盖外部 deps**（★ 2026-11-08 实测抓到）
+      ★ `run_chipforge_tests.sh --no-build` 的产物新鲜度 fail-closed 只查
+      ★ `include` / `ip` / `src` / `tests` / `bundles` / `CMakeLists.txt` ⇒ ★ **不含 CppTLM / CppHDL**
+      （★ 外部仓库，★ symlink ⇒ 不在本仓版本控制内）⇒ ★ **上游 API 漂移时发现不了**
+      ★ 实证：★ `include/cf/plugin/multi_cycle_fsm.h` include `<chlib/state_machine.h>`（★ 来自
+      ★ `build/_deps/install/include/cpp-hdl/`）⇒ ★ 上游把 `ch_state_machine::is_built()` 移除了
+      ⇒ ★ **当前源码编译不过**（★ `chipforge_tests_chmem` ⇒ `test_multi_cycle_fsm.cpp` 失败）
+      ⇒ ★ 而本地 `build/bin/chipforge_tests_chmem` 是 **Oct 30 的旧 binary** ⇒ ★ `--no-build` 会拿它跑测试
+      ⇒ ★ **旧 binary 冒充新代码** ⇒ ★ **假绿**
+      ⇒ ★ **已修**（★ 2026-11-08）：★ 新鲜度判据加入
+      ★ `build/_deps/install/include/cpp-hdl` + `.../cpp-tlm`（★ deps 的**安装态**头文件）
+      ⇒ ★ deps 重装 ⇒ 该目录 mtime 更新 ⇒ ★ 纳入后即被判「陈旧」⇒ ★ **强制重编**
+      ★ ★ 附带：★ 这也解释了为什么**干净目录构建**能暴露问题（★ 已有 build 目录用旧 binary 掩盖了它）
+
+- [ ] ★ **C1.10** ★ **上游 API 漂移导致的构建阻塞（★ 2026-11-08 实测 · 独立于 C1-①~⑥）**
+      ★ `chlib::ch_state_machine` **不再有** `is_built()` 成员 ⇒ ★ 两处编译失败：
+      ① `tests/framework/test_multi_cycle_fsm.cpp:60` ⇒ `has no member named 'is_built'`
+      ② `include/cf/plugin/multi_cycle_fsm.h:47` ⇒ `looser exception specification on overriding virtual function`
+      ★ ⇒ ★ **本地 `chipforge_tests_chmem` 无法重建**（★ 旧 binary 是 Oct 30 的）⇒ ★ CH_MEM 侧测试当前**跑的是旧代码**
+      ★ ⇒ ★ **需要处置**（★ 适配新上游 API / 回退上游 / 上游补回兼容成员）⇒ ★ **超出 C1 范畴**（★ C1 是「假绿通道排查」）
+      ⇒ ★ 登记为**独立待办**（★ 阻塞 CH_MEM 侧的一切新验证）
+
 - [x] ★ **C1.8** ★ ★ **第 5 个「旧产物顶替」通道：门禁失败时**不写报告** ⇒ 消费者读到残留的 PASS（★ 2026-11-08 实测抓到）
       ★ `parity_gate.py` 的 4 个 `return 2`（★ `input_invalid` / `empty_selection` / `corpus_missing_files` / `corpus_mismatch`）
       **全部在写 report 之前** ⇒ ★ 失败 ⇒ `report.json` **不更新**

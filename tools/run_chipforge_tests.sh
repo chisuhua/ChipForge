@@ -266,9 +266,18 @@ fi
 #   ★ TLM binary 自 ADR-091 S1 起编译失败 ⇒ 回归跑的是旧产物）。
 # ★ 判据：★ binary 的 mtime 必须**晚于全部编译输入**。
 if [[ -n "$SKIP_BUILD" ]]; then
+    # ★ ★ 2026-11-08 新增（C1-⑥ · 假绿通道）：★ 外部 deps 的**安装态头文件**也 MUST 纳入
+    #   新鲜度判据。★ 理由：★ `include/cf/plugin/multi_cycle_fsm.h` include
+    #   `<chlib/state_machine.h>` ⇒ ★ 来自 `build/_deps/install/include/cpp-hdl/`（★ deps 安装产物）
+    #   ⇒ ★ **上游 API 漂移**（★ 实测：`ch_state_machine::is_built()` 已消失 ⇒ chmem binary 编译不过）
+    #   只改 deps、不重编 ChipForge ⇒ ★ 原判据（★ 只查 include/ip/src/tests/bundles）**发现不了**
+    #   ⇒ ★ `--no-build` 会拿**与当前上游不兼容的旧 binary** 跑测试 ⇒ ★ **假绿**。
+    #   ⇒ ★ deps 重装 ⇒ 该目录 mtime 更新 ⇒ ★ 纳入后即被判「陈旧」⇒ ★ 强制重编。
     STALE_INPUTS=$(find "$PROJECT_ROOT/include" "$PROJECT_ROOT/ip" "$PROJECT_ROOT/src" \
                         "$PROJECT_ROOT/tests" "$PROJECT_ROOT/bundles" \
                         "$PROJECT_ROOT/CMakeLists.txt" \
+                        "$PROJECT_ROOT/build/_deps/install/include/cpp-hdl" \
+                        "$PROJECT_ROOT/build/_deps/install/include/cpp-tlm" \
                         -newer "$TEST_BINARY" -type f 2>/dev/null | head -20)
     if [[ -n "$STALE_INPUTS" ]]; then
         echo "ERROR: ★ 产物陈旧（★ C1 fail-closed）：★ 以下编译输入比 binary 更新："

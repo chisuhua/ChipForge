@@ -242,3 +242,10 @@ message(STATUS "  cf_plugin:        Phase 0 (5/5 P0 components) ✅ + M1 框架�
 # [x] M1.7 添加 ip/cpu/core/payload_common.h + 单元测试 (Phase 1.5)
 # [ ] 转换 INTERFACE → STATIC (如出现非模板 .cpp) — Phase 0 暂不需要
 # [ ] 启用 cpptlm_core 依赖 (Phase 1+ 业务代码需要)
+
+# ★ deps 依赖边（★ L1 · change `ci-deps-install-dependency`）★ 详见根 CMakeLists.txt 的
+#   「deps 聚合目标」段 ⇒ ★ 等 CppTLM/CppHDL **安装**完成 ⇒ 依赖头文件/库在编译期就位
+#   （★ 否则 `cmake --build` 并行 ⇒ 本 target 与 deps-install 无序 ⇒ 竞态失败）
+if(TARGET chipforge_deps_install)
+    add_dependencies(cpu_sim chipforge_deps_install)
+endif()
