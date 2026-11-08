@@ -168,41 +168,79 @@ class TestTopLevelLayout(unittest.TestCase):
 
 class TestAcVCoverage(unittest.TestCase):
     @staticmethod
-    def _mk(ac_id, v_ids, self_exempt=False):
-        return acv.AC("c", ac_id, list(v_ids), self_exempt, 0)
+    def _mk(ac_id, v_ids, self_exempt=False, aspect=acv.ASPECT_NONE):
+        return acv.AC("c", ac_id, list(v_ids), self_exempt, 0, aspect)
+
+    @staticmethod
+    def _mini():
+        """★ self-test 用**小全集**（★ 真实全集已扩到 28 个 ⇒ 会被孤儿淹没）。"""
+        return tuple(f"V-{n}" for n in range(101, 111))
 
     def _full(self):
         return [self._mk(f"AC-{i}", [f"V-{100 + i}"]) for i in range(1, 11)]
 
     def test_full_union_passes(self):
-        errors, cov = acv.evaluate(self._full())
+        errors, cov = acv.evaluate(self._full(), self._mini())
         self.assertEqual(errors, [])
         self.assertEqual(len(cov), 10)
 
     def test_missing_tag_detected(self):
         acs = self._full()[:-1] + [self._mk("AC-X", [])]
-        kinds = {k for k, _, _ in acv.evaluate(acs)[0]}
+        kinds = {k for k, _, _ in acv.evaluate(acs, self._mini())[0]}
         self.assertIn("no-v-tag", kinds)
 
     def test_orphan_v_detected(self):
-        kinds = {k for k, _, _ in acv.evaluate(self._full()[:-1])[0]}
+        kinds = {k for k, _, _ in acv.evaluate(self._full()[:-1], self._mini())[0]}
         self.assertIn("orphan-v", kinds)
 
     def test_duplicate_not_allowed(self):
         acs = self._full() + [self._mk("AC-Y", ["V-102"])]
-        kinds = {k for k, _, _ in acv.evaluate(acs)[0]}
+        kinds = {k for k, _, _ in acv.evaluate(acs, self._mini())[0]}
         self.assertIn("duplicate-assignment", kinds)
 
     def test_cross_allowed_passes(self):
         """V-104 在白名单里 ⇒ 重复覆盖不判违规。"""
         self.assertIn("V-104", acv.CROSS_ALLOWED)
-        errors, _ = acv.evaluate(self._full() + [self._mk("AC-Z", ["V-104"])])
+        errors, _ = acv.evaluate(self._full() + [self._mk("AC-Z", ["V-104"])], self._mini())
         self.assertEqual(errors, [])
 
     def test_self_exempt_ignored(self):
-        errors, cov = acv.evaluate(self._full() + [self._mk("AC-115b", [], True)])
+        errors, cov = acv.evaluate(self._full() + [self._mk("AC-115b", [], True)], self._mini())
         self.assertEqual(errors, [])
         self.assertEqual(len(cov), 10)
+
+    # ★ ★ ADR-094 v0.2：同一 V 可被两个 change 各覆盖一次（框架侧 / 落地侧 / 回归侧）
+    #   ⇒ 「无重复」MUST 按「同一 V 的同一侧面」判定 ⇒ NOT 按 V 计数
+    def test_same_v_different_aspect_is_legal(self):
+        """同一 V 的**不同侧面** ⇒ 合法（0 错误）。"""
+        errors, _ = acv.evaluate(
+            self._full() + [self._mk("AC-S1", ["V-110"], aspect="框架侧"),
+                            self._mk("AC-S2", ["V-110"], aspect="落地侧")],
+            self._mini())
+        self.assertEqual(errors, [])
+
+    def test_same_v_same_aspect_is_violation(self):
+        """同一 V 的**同一侧面**被多条 AC 覆盖 ⇒ 违规。"""
+        errors, _ = acv.evaluate(
+            self._full() + [self._mk("AC-D1", ["V-109"], aspect="框架侧"),
+                            self._mk("AC-D2", ["V-109"], aspect="框架侧")],
+            self._mini())
+        kinds = {k for k, _, _ in errors}
+        self.assertIn("duplicate-assignment", kinds)
+
+    def test_aspect_parsed_from_tag(self):
+        """`· 侧面: **落地侧**` ⇒ AC.aspect 被解析出来。"""
+        tmp = pathlib.Path("/tmp/opencode/l1b/ac_aspect_case.md")
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(
+            "## Acceptance Criteria\n\n"
+            "- [ ] **AC-901** 规则 ⇒ （覆盖 V: V-42, V-30 · 侧面: **落地侧**）\n",
+            encoding="utf-8",
+        )
+        acs = acv.parse_change(str(tmp), "c")
+        self.assertEqual(len(acs), 1)
+        self.assertEqual(acs[0].v_ids, ["V-30", "V-42"])
+        self.assertEqual(acs[0].aspect, "落地侧")
 
     def test_tag_parse_stops_at_paren(self):
         """`覆盖 V: 全部（… 自豁免 …）` 不应把正文里的 V-101/V-104 当成标签。"""
