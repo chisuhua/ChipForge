@@ -98,3 +98,48 @@
 | ★ **ADR-095 侧后续**（★ 立项后回填 AC 映射 + 关联 change） | ★ planner | ★ 随立项 |
 | ★ **治理建议 §9 的其余缺口**（★ B1~B7 / G1~G9 / A1 / A3 / C1~C3 / D2 / E） | ★ 各归属 | ★ 见 §9.1 |
 | ★ **ADR-094 的 V-28/V-29 机制锚注**（★ 已落）· ★ **ADR-089 层次化适用面登记**（★ D2） | ★ architect | ★ D2 待审 |
+
+---
+
+## 9. ★ 落地轮（2026-11-08 · 用户「继续执行后续任务」· oracle 审稿 + critic 第 1 轮）
+
+> ★ 用户指令：★ 「请继续执行后续任务：★ 迁移执行属实施面 ⇒ 需 planner 立项 change … ★ 立项时须做的一件事：把 V-101~V-110 拆成 AC … ★ 顶层 4 份净化 … ⇒ 随迁移批次，各需审查」。
+
+### 9.1 ★ 角色边界（★ 本轮的关键）
+
+| 任务 | 归属 | 本轮状态 |
+|---|---|---|
+| ★ 顶层 4 份净化 | architect（内容决策） | ★ ★ **全部完成**（★ 2 份本轮直接做 + 2 份在 `arch_paths` 补登后做） |
+| ★ V-101~V-110 → AC 拆分 | planner 立项时 | ★ ★ **交接件已完成**（★ 治理建议 **§11** · 17 条 AC） |
+| ★ 立项 openspec change | **planner** | ★ ⏳ **待切角色**（★ architect **禁止**创建 openspec change） |
+| ★ 迁移 M1~M6 + 门禁落地 | **builder** | ★ ⏳ 待立项后 |
+
+### 9.2 ★ 本轮修订（5 文件）
+
+| 文件 | 改动 |
+|---|---|
+| `docs/architecture/overview.md` | ★ 头部「📌 实现状态快照 (2026-10-08)」整段 → 「📌 本文件 = 目标架构（真相源）」：★ **纯进度行删除**（★ 7 条）· ★ **3 条规范性前提保留**（★ ADR-083 · ADR-040 v2.0 · ★ **两条 RTL 出口**）· ★ 进度指针 → `roadmap-evolution.md` / `.rddf/roadmap/` · ★ **范围诚实标注**（★ 正文深度残留 ⇒ AC-109c） |
+| `docs/architecture/interface-design.md` | ★ **6 处目标态化**：★ `:19` 当前态断言 → 「目标态 = 右列」+「左列 = 早期形态」· ★ `:17` 小节标题「已实现」→「早期形态」· ★ `:22` 表头 · ★ `:33` 示例段定性 · ★ `:31` 关键澄清 · ★ `:46` / `:62` 「当前 Phase 1 业务代码」→「早期形态」 |
+| `docs/architecture/background-and-goals.md` | ★ ★ **加「订正块」**（★ C++17 → **C++23 全 target** · ★ `extern/CppTLM` 错径 → **仓库根 `CppTLM/`** · ★ 「与 CppTLM 共享同一套 Bundle 类型系统」**过度陈述** → 本仓用 `cf::plugin::uint_t<N>`，`ch_uint` + `bundle_base` 是 Phase 5+ 目标形态） |
+| `docs/architecture/error-handling.md` | ★ ★ **加「订正块」**（★ `MemRespBundle` **死名** ×6 → `cf::bundles::MemResp` · ★ `LOG_ERROR/LOG_WARN/LOG_DEBUG` **无此宏** · ★ **COMPARE 模式从未实现** → 已被 parity 取代 · ★ 缺口 = 无 CH_MEM 错误范式） |
+| `.rddf/config/arch-docs.json` | ★ ★ **补登 6 份**（★ 执行用户签认的角色边界变更 ⇒ **非越权**）⇒ `arch_paths` **11 → 16 条** ⇒ ★ 消除「ADR 说已生效 / 机制说未生效」空窗 |
+| `.rddf/reviews/architecture-docs-governance-recommendations.md` | ★ **新增 §11**（17 条 AC + §11.0 悬空引用 + §11.1 边界 + §11.2 三个立项决策点 + §11.3 完成情况） |
+
+### 9.3 ★ 审查
+
+| 轮 | 审查者 | 结论 | BLOCKER | SHOULD_FIX |
+|---|---|---|---|---|
+| oracle | 文本级 | ★ **PASS-WITH-NOTES** | ★ **0** | ★ **8** + 7 NIT（★ 全修） |
+| critic（第 1 轮） | arch + plan + governance | ★ **APPROVE_WITH_CONDITIONS** · `mergeable: yes` | ★ **0** | ★ **4**（★ 全修）+ ★ 1 scope_exceeded（★ pre-existing） |
+
+★ **oracle 的 8 SHOULD_FIX 全修**：★ §11.1 的 A1/C1~C3 **误列修正** · ★ **AC-109 拆 3 条**（109 / 109b / 109c）· ★ **AC-115 补自豁免**（★ 否则「并集恒等 ⇒ 判据被自己架空」）· ★ §10 M2.5 注明「★ 每批移动**之前**执行」· ★ 「顶层 9 份」写死清单 · ★ AC-112 去数字（★ `adr/` 每份均有行）· ★ AC-102 关注度统一 ADR-095 §2.2 口径 · ★ `interface-design.md:62` 改形态定性。
+★ **critic 的 4 SHOULD_FIX 全修**：★ ① **AC-109b 行尾悬挂旧 AC-109 残段**（★ 携带**已被取代**的「移入 `mixed/`」处置 ⇒ 删）★ ② **AC-109c 枚举不完整**（★ 补 `:193` / `:210-212` / 灰区 / `interface-design.md:305` ⇒ ★ 并加**兜底判据**「门禁① 词表全文扫描 0 命中」）★ ③ `interface-design.md:305` 残留未登记（★ 已纳入 AC-109c 扩为「两份文件正文深度净化」）★ ④ `overview.md:5` 头部声明强于正文现实（★ 加范围诚实标注）。
+★ ★ **critic 的 scope_exceeded（pre-existing）已处置**：★ `arch-docs.json` 未含签认的 6 份 ⇒ ★ 「ADR 说已生效 / 机制说未生效」空窗 ⇒ ★ ★ **architect 选「补登配置 + 立刻净化」**（★ 补登 = **执行签认**、非越权）⇒ ★ 空窗关闭、★ AC-109b 由「待 M4」变「**已闭环**」。
+
+### 9.4 ★ 剩余（★ 明确的交接）
+
+| 项 | 归属 | 前置 |
+|---|---|---|
+| ★ **AC-109c**（`overview.md` 正文 8 处 + `interface-design.md:305`） | change 批次 | ★ 须单独过审查 |
+| ★ **AC-101~AC-108 / AC-110~AC-115**（目录重构 + 引用改写 + 门禁落地） | ★ **planner 立项 → builder 执行** | ★ **需你切 planner**（★ architect 禁止创建 openspec change） |
+| ★ 立项时的三个决策点 | ★ planner | ★ ★ change 名 `architecture-truth-boundary` · ★ **建议拆 2 个 change**（★ ①位置+引用 `/ ②门禁+净化`）· ★ AC 权威 = `tasks.md`（★ 确认项） |
