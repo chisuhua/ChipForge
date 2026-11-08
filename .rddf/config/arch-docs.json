@@ -1,30 +1,17 @@
 {
   "schema_version": "arch-docs-v1",
-  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除。★ 2026-11-08：★ **ADR-095 签认后补登 6 份**（★ 执行用户签认的角色边界变更 ⇒ 非越权）；★ 诊断与待决策项见 `.rddf/reviews/architecture-docs-governance-recommendations.md`。",
+  "description": "架构决策类文档的目录范围。architect 角色只可编辑 arch_paths 命中的文档；exclude_paths 显式排除（全前缀匹配）。★ 2026-11-08（ADR-095 §2.4 · change architecture-truth-boundary 的 AC-108）：★ **改按目录表达职责**（逐份文件 → 目录），治理成本从 O(n) 降到 O(1)；★ 本次迁移已完成（顶层 = 真相源 + adr/ · mixed/ 可净化 · archive/ 只读）。",
   "arch_paths": [
-    "docs/architecture/adr",
-    "docs/architecture/adr.md",
-    "docs/architecture/interface-design.md",
-    "docs/architecture/overview.md",
-    "docs/architecture/parity-gate-contract.md",
-    "docs/architecture/testing-and-dse.md",
-    "docs/architecture/roadmap-evolution.md",
+    "docs/architecture",
     "ip/mmu/docs/adr",
-    "ip/cache/docs/adr",
-    "docs/architecture/hierarchical-plugin-architecture.md",
-    "docs/architecture/error-handling.md",
-    "docs/architecture/background-and-goals.md",
-    "docs/architecture/plugin-framework.md",
-    "docs/architecture/declarative-hybrid-framework.md",
-    "docs/architecture/code-framework-mapping.md",
-    "docs/architecture/tech-selection.md"
+    "ip/cache/docs/adr"
   ],
   "exclude_paths": [
-    "docs/architecture/tlm-coverage-parity-ledger.md",
+    "docs/architecture/archive",
     "docs/architecture/plugin-research",
     "build",
     "3rdparty"
   ],
   "updated_at": "2026-11-08",
-  "updated_by": "architect"
+  "updated_by": "builder"
 }
