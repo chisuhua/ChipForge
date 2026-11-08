@@ -248,15 +248,71 @@ F 残留 ⑭ ──► D（★ 已闭合）
 |---|---|---|
 | **M1** | ★ 建 `README.md`（★ 目录级导航）+ 建 `mixed/` `archive/` 目录 | ★ 无 |
 | **M2** | ★ **批量移动**（★ 用 `git mv` 保留历史）⇒ ★ **按引用数升序**（★ `m4-dse`(0) → `performance-guide`(1) → `background-and-goals`(2) → `tech-selection`(4) → `tlm-plan`(4) → `testing-and-dse`(9) → `declarative-hybrid`(10) → `code-framework-mapping`(11) → `plugin-framework`(14) → `ip-catalog`(16) → `tlm-ledger`(22)）⇒ ★ **低风险批次先跑** | ★ `git mv` 保历史 ⇒ ★ 可单批回滚 |
-| **M2.5** | ★ ★ **导出「引用基线清单」**（★ 脚本导出**全部真断链**（★ markdown 链接形态）的「原路径 → 新路径」对照表，★ **随 change 存档**）⇒ ★ ★ **这是 V-107 的判据来源**（★ 无基线 ⇒ 「漏改一处」无处对照 ⇒ fail-closed 语义失效） | ★ 落 change 存档目录 |
+| **M2.5** | ★ ★ **导出「引用基线清单」**（★ 脚本导出**全部真断链**（★ markdown 链接形态）的「原路径 → 新路径」对照表，★ **随 change 存档**）⇒ ★ ★ **★ 时机：★ 每批移动「之前」执行**（★ ★ 否则「原有断链」与「迁移新增断链」混杂 ⇒ ★ V-107「漏改一处」判据失效）⇒ ★ ★ **这是 V-107 的判据来源**（★ 无基线 ⇒ 「漏改一处」无处对照 ⇒ fail-closed 语义失效） | ★ 落 change 存档目录 |
 | **M3** | ★ **同步改引用**（★ 脚本批量替换路径）⇒ ★ 每批后跑 `doc_link_check.sh` | ★ 机检可验 |
 | **M3.1** | ★ ★ **`adr.md` 的三处源文档指针**（★ 头部「源文档」字段 + 维护规则 5「以源文档……为准」+ 漂移处理流程「更新对应源文档」）⇒ ★ 改指 `./mixed/...` + 标「★ 非权威 · 历史派生源」+ 维护规则与漂移流程措辞**软化**（「历史派生源（现居 `mixed/`）」）⇒ ★ 长期：★ 仍被依赖的决策段**收编进 `adr/`** ⇒ 源文档指针退役 | ★ 与移动同批 |
 | **M3.2** | ★ **根级文档同步**（★ `AGENTS.md` 的「关键文档源」表 · ★ `.cursorrules`）⇒ ★ 二者以**全路径**链顶层文档（★ `overview.md` · `plugin-framework.md` · `roadmap-evolution.md`）⇒ ★ `plugin-framework.md` 下沉后根级断链 ⇒ ★ 且根级**不在门禁 ① 覆盖范围** ⇒ ★ 须手工核 | ★ 与移动同批 |
 | **M3.3** | ★ **`ip-catalog.md` 与 `ip/README.md` 互链**（★ 两份**功能上都是 IP 索引** ⇒ ★ 防「两处登记」）⇒ ★ 声明「★ **stub 归 `ip/README.md` · 全目录归 `ip/ip-catalog.md` · 单一维护点 = `ip/ip-catalog.md`**」 | ★ 与移动同批 |
-| **M4** | ★ 更新 `arch-docs.json`（★ `arch_paths` = ★ **顶层 9 份 + `adr/` + `mixed/` + `ip/mmu/docs/adr` + `ip/cache/docs/adr`**（★ IP 级 ADR 目录**保留** ⇒ ★ 见 ADR-095 §2.4）；★ `exclude_paths` += `archive/`（★ ★ `plugin-research/` **已在** `exclude_paths` ⇒ 该项为 no-op）★ 且 **删除旧条目** `tlm-coverage-parity-ledger.md`（★ 移动后成死项））⇒ ★ **与 M2 同批**（★ 否则中途 `arch_paths` 失效） | ★ 同批 ⇒ 无空窗 |
+| **M4** | ★ 更新 `arch-docs.json`（★ `arch_paths` = ★ **顶层 9 份**（★ 清单同 AC-102）★ **+ `adr/` + `mixed/` + `ip/mmu/docs/adr` + `ip/cache/docs/adr`**（★ IP 级 ADR 目录**保留** ⇒ ★ 见 ADR-095 §2.4）；★ `exclude_paths` += `archive/`（★ ★ `plugin-research/` **已在** `exclude_paths` ⇒ 该项为 no-op）★ 且 **删除旧条目** `tlm-coverage-parity-ledger.md`（★ 移动后成死项））⇒ ★ **与 M2 同批**（★ 否则中途 `arch_paths` 失效） | ★ 同批 ⇒ 无空窗 |
 | **M5** | ★ **净化顶层 4 份**：★ `overview.md`（拆 stale 快照）· `interface-design.md`（拆 Phase 1 当前态段）· `error-handling.md` + `background-and-goals.md`（修 C++17 / 死名）⇒ ★ **它们进顶层前 MUST 过晋升检验** | ★ 净化内容属**内容决策** ⇒ ★ 各需相应审查 |
 | **M6** | ★ 落地门禁 ①②③④ | ★ 见 §2.5 |
 
 ★ ★ **回滚路径**：★ 每批 = 一个 commit ⇒ ★ 验收失败 ⇒ **单批 `git revert`**（★ `git mv` 的历史可追溯）⇒ ★ **无不可逆操作**。
 
 ★ ★ **说明**：★ 本节是**实施步骤**（★ 归 builder）⇒ ★ 按 ADR 契约（★ 推导与证据、实施步骤 MUST NOT 进 ADR 正文）⇒ ★ **不在 ADR-095 正文** ⇒ ★ 落此处（★ 治理材料）★ ⇒ ★ 未来立项时归 change 的 `tasks.md`。
+
+---
+
+## 11. ★ ADR-095 V-101~V-110 → change AC 拆分映射表（★ planner 立项的直接输入）
+
+> ★ **本表 = 交接件**（★ planner 立项时把右列直接抄进 change 的 `tasks.md` 作为 AC 清单）★ ⇒ ★ **不建 openspec change**（★ architect 禁止创建 ⇒ 立项归 planner）。
+> ★ **拆分原则**：★ ADR 的 **V** = **验收判据**（★ verify 时逐条判定）★ **AC** = **实施任务**（★ tasks.md 的可勾选项）⇒ ★ 一个 V 可由多个 AC 保证 ⇒ ★ **AC 集合 MUST 覆盖 V 全集，且无孤儿、无重复**（★ 机检相等，★ 沿 ADR-094 D-16「生成镜像 + 机检相等」哲学）。
+
+| AC | 实施动作（★ tasks.md 的条目） | ★ 覆盖 V | 完成判据（★ 可机械核） |
+|---|---|---|---|
+| ★ **AC-101** | ★ 建 `docs/architecture/README.md`（★ 目录级导航：真相源清单 + 阅读路径 + 子目录说明，★ **不复制 `adr.md` 的注册表内容**）+ 建 `mixed/` `archive/` 目录 | V-101 V-102 | ★ 三个目录/文件存在；★ README 含顶层 9 份清单 |
+| ★ **AC-102** | ★ **批量移动 10 份文档**（★ 用 `git mv` 保留历史 · ★ 按**关注度升序**分批（★ 口径 = ADR-095 §2.2 的「仓外唯一 md 文件提及数」：★ `performance-guide`(2) → `m4-dse-*`(3) → `tlm-plan`(3) → `tech-selection`(3) → `testing-and-dse`(9) → `code-framework-mapping`(10) → `declarative-hybrid`(12) → `plugin-framework`(13) → `ip-catalog`(18) → `tlm-ledger`(22)）⇒ ★ **每批一个 commit** | V-102 V-109 | ★ **顶层 = 9 份 md**（★ 清单 = `README.md` · `adr.md` · `overview.md` · `interface-design.md` · `roadmap-evolution.md` · `parity-gate-contract.md` · `error-handling.md` · `background-and-goals.md` · `hierarchical-plugin-architecture.md`）★ + `adr/` 目录；★ `mixed/` **5** 份 · `archive/` **4** 份；★ `ip/ip-catalog.md` 存在且 `docs/architecture/` 内无残留 |
+| ★ **AC-103** | ★ **导出「引用基线清单」**（★ §10 M2.5 · ★ 脚本导出**全部真断链**（★ markdown 链接形态）的「原路径 → 新路径」对照表）⇒ ★ **随 change 存档** | V-107 | ★ 清单文件在 change 目录内；★ 含每条断链的旧/新路径 |
+| ★ **AC-104** | ★ **同步改引用**（★ 仓外 17 处 + `adr/` 5 处 + 留守顶层 9 处 + 根级 `AGENTS.md` / `.cursorrules`）⇒ ★ **逐条对基线核销** | V-104 V-107 | ★ **基线逐条核销完毕**（★ 无遗留）★ 且 `bash tools/doc_link_check.sh` **0 broken** |
+| ★ **AC-105** | ★ **`adr.md` 三处源文档指针改写**（★ §10 M3.1：★ 头部「源文档」字段 + 维护规则 5 + 漂移处理流程 ⇒ ★ 改指 `./mixed/...` + 标「★ 非权威 · 历史派生源」+ 措辞软化） | V-101 V-104 | ★ 三处均已改写；★ 顶部真相源文档**不指向 `mixed/` 作为权威** |
+| ★ **AC-106** | ★ **根级文档同步**（★ §10 M3.2：★ `AGENTS.md` 的「关键文档源」表 + ★ `.cursorrules`）⇒ ★ 二者以**全路径**链顶层文档 | V-104 | ★ 根级文档内**无指向已移动文档的失效路径** |
+| ★ **AC-107** | ★ **`ip-catalog.md` ↔ `ip/README.md` 互链**（★ §10 M3.3：★ 防「两处登记」⇒ ★ 声明「★ stub 归 `ip/README.md` · 全目录归 `ip/ip-catalog.md` · **单一维护点 = `ip/ip-catalog.md`**」） | V-109 | ★ 双向链存在；★ 单一维护点声明在位 |
+| ★ **AC-108** | ★ **更新 `.rddf/config/arch-docs.json`**（★ §10 M4：★ `arch_paths` = ★ **顶层 9 份**（★ 清单同 AC-102）★ **+ `adr/` + `mixed/` + `ip/mmu/docs/adr` + `ip/cache/docs/adr`**；★ `exclude_paths` += `archive/`（★ `plugin-research/` 已在）★ 且 **删除旧条目** `tlm-coverage-parity-ledger.md`） | V-106 | ★ 每条 `arch_paths` / `exclude_paths` 项**实际存在**（★ 无死条目） |
+| ★ **AC-109** | ★ ★ **净化顶层 2 份（★ 本轮已做 · 逐份过审查）**：★ ① `overview.md` 头部快照段 ⇒ ★ **纯进度行删除** + **3 条规范性前提保留**（★ ADR-083 单一 source of truth · ADR-040 v2.0 CH_MEM 正道 · 两条 RTL 出口）+ 进度指针 → `roadmap-evolution.md` / `.rddf/roadmap/`；★ ② `interface-design.md` §1.0 ⇒ ★ 「Phase 1 当前状态是 POD」断言**改写为「早期形态」定性** + 表头「已实现」→「早期形态」+ 示例段定性 | V-108 | ★ **本轮范围 = 头部 + §1.0**（★ 两份**该范围内无实施态断言**）；★ ★ **已闭环（★ 仅限该范围）**；★ ★ **正文深度残留另见 AC-109c** |
+| ★ **AC-109c** | ★ ★ **`overview.md` 正文深度净化（★ 待 change 批次 · ★ 本轮不动）**：★ ① `:255-261` 的「★ **当前状态（Phase 6c/6d, 2026-10-08）**」段（★ ★ **与本轮删掉的头部快照同款同日期** ⇒ ★ V-108 按字面执行**当前不满足**）★ ② `:190`「当前 Phase 1.3+ 已落地 2 个 L1Cache 验证配置」★ ③ `:313` 策略表「✅ Phase 1.4 落地」★ ④ `:382` 目录树「M4/M5 完成」★ ⑤ `:434-437` `extern/` 目录树（★ 与 `:69` 的订正矛盾）★ ⑥ `:193`「**当前已工作**的 SoC 配置示例」★ ⑦ `:210-212`「**关于 JSON 装配的现状说明**」小节（★ 标题即「现状」+ 内含「当前」×2）★ ⑧ ★ **`interface-design.md` 正文其余残留**（★ 本 AC **扩为「两份文件的正文深度净化」** · ★ 已知 `:305`「**当前推荐使用** JSON + ModuleFactory」+ 同节 `ImplMode` 示例 ⇒ ★ 与 `overview.md:88`「`ImplMode` 已废弃」矛盾）★ | V-108 | ★ **判据（双层）**：★ ① 上述 8 处**全无实施态断言**；★ ② ★ **兜底 = 门禁① 词表全文扫描 0 命中**（★ 含语法上下文豁免逐条登记）⇒ ★ **防止枚举不完备时误判通过**；★ ★ **须单独过审查** |
+| ★ **AC-109b** | ★ ★ **净化顶层另 2 份（★ 本轮已做 · 补登 `arch_paths` 后执行）**：★ ③ `error-handling.md` 修 **C++17→C++23**（★ `:20`）+ 死名 `MemRespBundle` → `cf::bundles::MemResp` + `LOG_ERROR/LOG_WARN` **无此宏**标注 + COMPARE 模式标「从未存在」；★ ④ `background-and-goals.md` 修 **C++17→C++23**（★ `:20`）+ `extern/CppTLM` 错径 + 「共享同一套 Bundle 类型系统」过度陈述 | V-108 | ★ 两份**各无实施态断言**；★ ★ **已闭环** |
+| ★ **AC-110** | ★ **落地门禁 ①（顶层纯净 lint）**：★ 词表**冻结进脚本**（★ 单一真源 · 禁开放词表）+ ★ **语法上下文豁免**（★ 状态列 / 图例行 / frontmatter / dated 横幅内不检）★ ⇒ ★ **不得**用「按路径豁免」 | V-103 | ★ 顶层 + `adr/` 命中实施态语汇 ⇒ **报红**；★ `mixed/` `archive/` 同类文本 ⇒ **豁免**；★ ★ **Day-1 误伤已收敛**（★ `adr.md` 状态列 / `roadmap-evolution.md` 图例「进行中」/ 目标态前提句 ⇒ 三类实证均不误报） |
+| ★ **AC-111** | ★ **落地门禁 ②**（★ `doc_link_check.sh` 检查 2 的 `PATH_CHECK_DOCS` 扩入 `docs/architecture/` ⇒ ★ 含子目录） | V-104 | ★ 覆盖范围含 `docs/architecture/`；★ ★ **≥16 处历史死/错引用入检**（★ 含 `src/cf_plugin/tests/` 11 处 + `extern/CppTLM` 剩余 2 处） |
+| ★ **AC-112** | ★ **落地门禁 ③**（★ `verify_adr.sh` 加 ADR 孤儿检查：`adr/` ↔ `adr.md` 双向） | V-105 | ★ **★ `adr/` 每份均有行**（★ 不记份数 ⇒ 避免快照数字腐化）+ §2 全部本地链接存在；★ ★ **实测零误伤** ⇒ 无 baseline 负担 |
+| ★ **AC-113** | ★ **落地门禁 ④**（★ 顶层文档引用 `mixed/` / `archive/` ⇒ MUST 标明「★ 非权威 · 仅作背景」） | V-101 V-103 | ★ 顶层引用子目录处**均带非权威标注** |
+| ★ **AC-114** | ★ **回滚验证**：★ **首批**（`m4-dse-*`）**与最大批**（`tlm-coverage-parity-ledger.md`）**两批实测 `git revert`** | V-110 | ★ 两批 revert 后**引用与 `arch_paths` 全部复原**；★ 其余批由「单 commit 可 revert」结构性保证 |
+| ★ **AC-115** | ★ **AC ↔ V 机检相等**：★ change 的 `tasks.md` AC 清单 == ADR-095 §5 的 V 清单（★ 无孤儿 · 无重复 · 无遗漏） | ★ **全部**（★ ★ **本条自豁免** ⇒ ★ **不参与覆盖并集计算** ⇒ ★ 否则并集恒等于 V 全集 ⇒ **判据被自己架空**） | ★ 机检对象 = ★ **AC-101~AC-114 的「覆盖 V」并集 == V-101~V-110 全集**（★ 本条自豁免 · ★ 沿 ADR-094 D-16 镜像哲学） |
+
+### 11.1 ★ 拆分后仍**不由本 change** 覆盖的事项（★ 避免 AC 越界）
+
+| 项 | 归属 | 说明 |
+|---|---|---|
+| ★ ADR-094 的 **V-28 / V-29 机制锚注** | ★ **已完成** | ★ 上一轮已落（★ ADR-094 §Verification） |
+| ★ ADR-089 的「层次化产物适用面」登记（★ D2） | ★ architect（★ 需审） | ★ **新决策** ⇒ ★ 不属本 change 的位置调整 |
+| ★ 层次化落点登记进 `objective-soc-cpu-v0110-launch.md`（★ E） | ★ planner | ★ 与本 change **独立**（★ 属层次化主题线） |
+| ★ 治理建议 §9 的 **B1~B7** / **G1~G9** / **A1** / **A3** | ★ 各归属 | ★ 本 change **只做目录与门禁面**；★ 内容面的过时/虚构修正**分别归 owner / 后续批次**（★ 其中 `error-handling.md` + `background-and-goals.md` 的修正**含在 AC-109b**，★ 因它们要进顶层 ⇒ 必须先净化）★ ★ **已覆盖项勿误列为不覆盖**：★ **A1**（建 README）= **AC-101** ✔ · ★ **C1**（ADR 孤儿检查）= **AC-112** ✔ · ★ **C3**（doc_link 扩围）= **AC-111** ✔ · ★ **C2**（索引条目路径存在性）= **AC-112 的判据**（★ §2 全部本地链接存在）✔；★ **G1 / G2 / G3 已闭合**（★ 见 §9.1） |
+| ★ `performance-guide.md` 的**虚构内容逐条修** | ★ owner | ★ 本 change 只**归档**（★ 不逐条修 ⇒ 逐条修 = 重写） |
+
+### 11.2 ★ 立项时须一并确认的三件事（★ planner 的决策点）
+
+| # | 待确认 | ★ architect 的输入 |
+|---|---|---|
+| 1 | ★ change 名 | ★ 建议 `architecture-truth-boundary`（★ 边界 = 交付批次边界，★ 沿 ADR-094 D-16 的口径） |
+| 2 | ★ **是否拆 2 个 change** | ★ 建议 **拆 2 个**：★ ① **位置调整 + 引用改写**（★ AC-101~AC-108 · ★ 纯机械 · 低风险）② **门禁落地 + 顶层净化**（★ AC-109~AC-115 · ★ 含内容决策 · 需各自审查）⇒ ★ 理由：★ ①可批量快跑、②需逐份审查 ⇒ ★ 合批会让内容审查与机械改动混在一批；★ ★ **候选 change 名**：★ ① `architecture-truth-boundary`（★ 位置 + 引用）· ② `architecture-truth-boundary-gates`（★ 门禁 + 净化） |
+| 3 | ★ **AC 权威归属（★ 确认项、非开放决策）** | ★ **change 的 `tasks.md`**（★ ADR-095 `:9` / `:177` 已定为 tasks.md ⇒ ★ 本项只需**确认**，★ 不需再决策） | ★ **change 的 `tasks.md`**（★ ADR-095 §5 = 生成镜像 · ★ 机检相等 ⇒ AC-115） |
+
+### 11.3 ★ 本轮（2026-11-08）已完成 vs 待 planner/builder
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| ★ **V-101~V-110 → AC 映射** | ✅ **已完成**（本 §11） | ★ 17 条 AC · ★ AC-115 自豁免 · ★ §11.0 悬空引用登记 · ★ §11.1 边界 · ★ §11.2 三个立项决策点 |
+| ★ **AC-109（净化 `overview.md` + `interface-design.md`）** | ✅ **已完成** | ★ `overview.md` 头部快照 → 目标架构前提 + 进度指针 · ★ `interface-design.md` 6 处目标态化 |
+| ★ **AC-109b（净化 `error-handling.md` + `background-and-goals.md`）** | ✅ **已完成** | ★ ★ **前置 = `arch_paths` 补登 6 份**（★ 执行用户签认的角色边界变更 ⇒ 非越权）⇒ ★ 两份各加「★ 订正块」（★ C++17 → C++23 · 死名 · `LOG_*` 无宏 · COMPARE 从未实现 · Bundle 过度陈述 · `extern/` 错径） |
+| ★ **`arch_paths` 补登 6 份** | ✅ **已完成** | ★ `.rddf/config/arch-docs.json` ⇒ `arch_paths` **11 → 16 条**（★ 消除「ADR 说已生效 / 机制说未生效」的空窗） |
+| ★ **AC-109c（`overview.md` 正文深度净化 8 处 + `interface-design.md` 正文残留）** | ⏳ **待 change 批次** | ★ 已知 8 处 + `interface-design.md:305`；★ **须单独过审查** |
+| ★ **AC-101~AC-108 / AC-110~AC-115（目录重构 + 引用改写 + 门禁落地）** | ⏳ **待 planner 立项 + builder 执行** | ★ 见 §10 M1~M6 |
