@@ -47,31 +47,52 @@ jobs:
           sudo apt-get install -y gcc-riscv64-unknown-elf
           riscv64-unknown-elf-gcc --version | head -1
 
-      # Verilator: noble apt 直接装; jammy 源码 build ≥5.020
-      - name: Install Verilator (Ubuntu 24.04 noble)
-        if: steps.distro.outputs.VERSION_ID == '24.04'
+      # ★ ★ Verilator 安装：apt 优先 + 源码兜底（★ **不再按发行版字符串分流**）
+      #   ★ 2026-11-08 实测修正（原实现按 `VERSION_ID == '24.04'` / `'22.04'` 精确匹配
+      #   ⇒ 发行版一变就**两个分支都 skip** ⇒ 静默无 Verilator ⇒ 后续 sanity 步骤莫名失败）
+      #   ⇒ 与 `parity-gate.yml` 的同名步骤**同款**修法（★ 两个 workflow 曾有同一个坑）。
+      - name: Install Verilator (apt, fallback to source build)
         run: |
-          sudo apt-get install -y verilator
-          verilator --version | head -1
-
-      - name: Build Verilator from source (Ubuntu 22.04 jammy)
-        if: steps.distro.outputs.VERSION_ID == '22.04'
-        run: |
-          sudo apt-get install -y git cmake make flex bison
-          git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
-          cd /tmp/verilator && cmake -B build && cmake --build build -j$(nproc) && sudo make install
-          verilator --version | head -1
+          set -euo pipefail
+          . /etc/os-release
+          echo "distro: ${PRETTY_NAME:-unknown} (VERSION_ID=${VERSION_ID:-unknown})"
+          sudo apt-get update -qq
+          if sudo apt-get install -y verilator && verilator --version; then
+            echo "verilator installed from apt"
+          else
+            echo "apt verilator unavailable ⇒ building v5.020 from source"
+            sudo apt-get install -y git cmake make flex bison g++ help2man perl
+            git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
+            cmake -S /tmp/verilator -B /tmp/verilator/build
+            cmake --build /tmp/verilator/build -j"$(nproc)"
+            sudo cmake --install /tmp/verilator/build
+            verilator --version
+          fi
 
       # yosys/iverilog 标 optional, 不阻塞 (Oracle descope)
       # Sanity 1: RISC-V 编译 trivial .S
+      # ★ ★ 2026-11-08 首次 PR 路径实测修正（原命令**从未成功过** ⇒ 该 workflow 此前从未在 PR 上跑过）：
+      #   ① 缺 `-T link_add.ld` ⇒ `add.S` 的 `tohost` 符号未定义 ⇒ 链接失败
+      #      （★ `add.S` 自己的头注释就写着两段式：`as` → `ld -T link_add.ld`）
+      #   ② 缺 `-nostartfiles` ⇒ Ubuntu 的 `gcc-riscv64-unknown-elf` **无 ilp32 multilib**
+      #      ⇒ 链接器去找不存在的 ilp32 `crt0.o` ⇒ `undefined reference`
+      #   ③ 缺 `-Wl,-e,_start` ⇒ `add.S` 自带 `_start`（`.global _start`）且不用 crt ⇒ 需显式入口
+      #   ★ 本地双侧实测：riscv64-unknown-elf-gcc 与 riscv32-unknown-elf-gcc 均链接通过
+      #     ⇒ ELF32 / RISC-V / Entry 0x80000000
       - name: Sanity — RISC-V cross-compile manual_elf/add.S
         run: |
-          riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib \
+          riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -nostartfiles \
+            -Wl,-e,_start -T tests/cpu/manual_elf/link_add.ld \
             -o /tmp/add.elf tests/cpu/manual_elf/add.S
           file /tmp/add.elf
+        # ★ 本 job 声明为「仅 warn-only, 不阻塞 PR」⇒ 失败 MUST NOT 让 PR 变红
+        continue-on-error: true
 
       # Sanity 2: Verilator lint 一个 minimal stub (Phase 6d.5 真正集成时改为真 .v)
       - name: Sanity — Verilator lint minimal stub
+        # ★ `if: always()`：★ Sanity 1 失败时本步仍要跑（★ 否则少一条独立信息）
+        if: always()
+        continue-on-error: true
         run: |
           printf 'module hello(input wire a, input wire b, output wire sum);\n  assign sum = a ^ b;\nendmodule\n' > /tmp/hello.v
           verilator --lint-only /tmp/hello.v
