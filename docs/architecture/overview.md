@@ -2,7 +2,7 @@
 
 > **📌 本文件 = 目标架构（真相源）**
 >
-> ★ ★ **治理修订（2026-11-08 · ADR-095 §2.3「就地净化」· ★ 用户已签认）**：★ ★ **本文件只描述目标架构**（★ 「该长什么样」）⇒ ★ ★ **实施进度（★ 「现在长什么样」）已移出本文件**（★ 原 2026-10-08 的进度清单段）⇒ ★ **进度查询**：★ [`roadmap-evolution.md`](./roadmap-evolution.md)（★ 架构演进 SSOT）+ [`.rddf/roadmap/`](../../.rddf/roadmap/)（★ phase / objective / feature 台账）⇒ ★ ⇒ ★ **本文件不承载进度**（★ 真相源 = 目标架构；★ 纪律样板 = ADR-095 §2.5 门禁 ①「顶层纯净 lint」）★ ★ **★ 范围诚实标注**：★ 本轮已净化**头部**；★ ★ **正文仍有深度残留**（★ §PayloadStore 节的「当前状态（Phase 6c/6d）」等 8 处）⇒ ★ **归 AC-109c（待 change 批次）** ⇒ ★ 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` **§11**。
+> ★ ★ **治理修订（2026-11-08 · ADR-095 §2.3「就地净化」· ★ 用户已签认）**：★ ★ **本文件只描述目标架构**（★ 「该长什么样」）⇒ ★ ★ **实施进度（★ 「现在长什么样」）已移出本文件**（★ 原 2026-10-08 的进度清单段）⇒ ★ **进度查询**：★ [`roadmap-evolution.md`](./roadmap-evolution.md)（★ 架构演进 SSOT）+ [`.rddf/roadmap/`](../../.rddf/roadmap/)（★ phase / objective / feature 台账）⇒ ★ ⇒ ★ **本文件不承载进度**（★ 真相源 = 目标架构；★ 纪律样板 = ADR-095 §2.5 门禁 ①「顶层纯净 lint」）★ ★ **★ 范围诚实标注**：★ 本轮已净化**头部**；★ ★ **正文仍有深度残留**（★ §PayloadStore 节的现状段等 8 处）⇒ ★ **归 AC-109c（待 change 批次）** ⇒ ★ 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` **§11**。
 >
 > ★ **以下为与目标架构直接相关的规范性前提**（★ 有 ADR 锚的架构约束，★ 非进度）：
 > - **Plugin-style 单一 source of truth**（ADR-083）：业务 IP 不再分别维护 TLM 副本 + RTL 副本；同份代码经由**两个编译模式**产出不同仿真后端
@@ -103,7 +103,7 @@ Plugin-style 不再使用 `ImplMode` enum（该 enum 在 doc-code-realignment 20
 | **CppHDL Simulator** | 周期精确直仿（C++ 仿真器，无需 EDA 工具） | `ch::core::Simulator::run(ctx, N)` |
 | **Verilog 生成** | 输出 `.v` 文件供外部综合/后端流程使用 | `ch::toVerilog(ctx) → file.v` |
 | **Verilator 联合仿真** | 周期精确 + 与 C++ 仿真器对比验证 | `verilator --cc file.v → linked library` + VerilatorBackend |
-| ★ **层次化 RTL 输出**（★ 交付路径 · 2026-11-08 补） | ★ 输出**单文件多 module**（★ 层 2 单元成独立 module ⇒ 可单独综合 / 单独交付）| ★ `ch::toVerilogHierarchical(out_path, root, options)`（★ 上游已落地；★ **默认未声明成层者 inline**（ADR-094 Options C）⇒ 产物与扁平一致）|
+| ★ **层次化 RTL 输出**（★ 交付路径 · 2026-11-08 补） | ★ 输出**单文件多 module**（★ 层 2 单元成独立 module ⇒ 可单独综合 / 单独交付）| ★ `ch::toVerilogHierarchical(out_path, root, options)`（★ 上游已提供；★ **默认未声明成层者 inline**（ADR-094 Options C）⇒ 产物与扁平一致）|
 
 业务代码不感知模式差异——同一份源码经由编译期条件展开绑定到不同类型后端。CI 通过两个独立 binary 验证双模式：
 
@@ -187,7 +187,7 @@ Level C（端到端测试）：JSON 配置驱动完整拓扑
 
 - 不包含业务逻辑，仅做 IP 实例化和连接
 - 不同产品形态只需新建一个 SoC JSON 配置文件
-- 当前 Phase 1.3+ 已落地 2 个 L1Cache 验证配置（`l1_cache_minimal.json` + `l1_cache_adapter_e2e.json`），作为新 SoC 配置的参考模板
+- SoC 配置的参考模板：`soc/l1_cache_minimal.json`（最小）+ `soc/l1_cache_adapter_e2e.json`（适配器端到端）
 - 完整的 RISC-V virt SoC 装配（CPU + 多级 Cache + 总线 + 内存 + 外设）推迟到 Phase 2+ 实施
 
 **当前已工作的 SoC 配置示例**（`soc/l1_cache_minimal.json`）：
@@ -252,13 +252,11 @@ chipforge/
 
 > **核心改动（ADR-083, 2026-10-08；★ v1.2 2026-10-28 补充层次区分）**：本节之前描述"ch_stream<Bundle> 接口即 ISA 无关层"——这是 Phase 1 早期假设。在 Plugin-style 架构下，★ **核内跨阶段**通信介质是 `cf::plugin::Payload<T>` + `PipeNode`；★ **IP 之间 / 核 ↔ 从设备**则采用 **CppHDL 的 `ch_stream<T>`**（ADR-092 §D4）⇒ ★ 「ISA 无关层」由 `Payload<T>` 承担，`ch_stream` 承担**接口契约**职责。
 
-**当前状态（Phase 6c/6d, 2026-10-08）**：
+**实现进度不属本文件**（★ ADR-095 §2.3①：顶层只放真相源 —— 「该长什么样」，不放「现在长什么样」）：
 
-- ✅ **业务 IP 跨阶段通信通过 `Payload<T>` + `PipeNode`**（TLM 模式 + CH_MEM 模式同一套 API）
-- ✅ CPU IP 实装：M4/M5 11 个 Plugin 套件（CpuFactory 注册 → `pb.at_stage(...)`），加上 DSE 576-config sweep
-- ✅ MMU IP 实装：MMUPlugin + RiscvMMUPlugin（`ip/mmu/tlm/`），CH_MEM 版待 mmu-chmem-pipeline-integration owner 闭合
-- ✅ L1Cache IP 实装：L1CachePlugin（TLM 完整 + CH_MEM refill_fsm stub）
-- ✅ Memory IP：PicolibcHostMemory（PoC 替代，待 MemoryPlugin 全面实装）
+- 各 IP 的实装状态 ⇒ [`ip/ip-catalog.md`](../../ip/ip-catalog.md) + 各 `ip/<name>/STATUS.md`
+- 阶段进度与交付点 ⇒ [`.rddf/roadmap/`](../../.rddf/roadmap/)
+- 架构演进与版本节点 ⇒ [`roadmap-evolution.md`](./roadmap-evolution.md)
 
 **设计原则**：
 

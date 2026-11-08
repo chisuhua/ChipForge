@@ -392,7 +392,7 @@ FMAX ≥ 100 MHz
 
 | 门禁 | 验证命令 | 引入版本 |
 |------|---------|---------|
-| `verify_adr.sh`（ADR ↔ 代码对齐，含已落地 ADR）| `bash tools/verify_adr.sh` | ✅ 已生效 (ADR-043) |
+| `verify_adr.sh`（ADR ↔ 代码对齐，含状态 ✅ 的 ADR）| `bash tools/verify_adr.sh` | ✅ 已生效 (ADR-043) |
 | `verify_plugin_decision.sh`（D4 决策 1-4：无 void tick / 无 enum class state / Bundle 字段用 uint_t / at_stage 闭包内禁早返）| `bash tools/verify_plugin_decision.sh` | ✅ 已生效 (D4) |
 | `check_plugin_portability.sh` Check 1-12（ADR-040 v2.0 双模约束）| `bash tools/check_plugin_portability.sh` | ✅ 已生效 (ADR-040 v2.0) |
 | C++23 编译标志强制（4 CMake 文件禁 cxx_std_17/20）| `check_plugin_portability.sh` Check 12 | v0.6 (ADR-047) |

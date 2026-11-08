@@ -73,13 +73,13 @@
 
 ## 2. 决策主表（快速总览）
 
-> **阅读方式**：从左到右依次为 ID、标题、类别、当前状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
+> **阅读方式**：从左到右依次为 ID、标题、类别、状态、关键验证路径。**最终列**为脚本中该 ADR 的标识符。
 
-### 2.1 已实现决策（✅）— 41 条
+### 2.1 状态 ✅ 的决策 — 41 条
 
-> ★ ★ **状态先行标注（2026-11-08 · architect）**：★ **ADR-001 的行状态已按 §3 记录改为「⚠️ 部分过时」**（★ §3 记「⚠️ 部分过时（2026-10-08）」而 §2.1 行原写 ✅ ⇒ ★ 表内自相矛盾）⇒ ★ ★ **但本节仍按「已实现决策」口径计数**（★ 标题数 **41** 未减 · §2.2「⚠️—1 条」未纳入 · §2.4 `⚠️` 合计=1 未变）⇒ ★ ★ **这三处计数与状态列的同步属 A3「单表化」范围**（★ 待治理决策 · 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` §4 选项 3）⇒ ★ ⇒ ★ **本轮只改状态、不改计数**（★ 避免再动那套已脱节的统计 ⇒ 见残留 ⑲）
+> ★ ★ **状态先行标注（2026-11-08 · architect）**：★ **ADR-001 的行状态已按 §3 记录改为「⚠️ 部分过时」**（★ §3 记「⚠️ 部分过时（2026-10-08）」而 §2.1 行原写 ✅ ⇒ ★ 表内自相矛盾）⇒ ★ ★ **但本节仍按「状态 ✅」口径计数**（★ 标题数 **41** 未减 · §2.2「⚠️—1 条」未纳入 · §2.4 `⚠️` 合计=1 未变）⇒ ★ ★ **这三处计数与状态列的同步属 A3「单表化」范围**（★ 待治理决策 · 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` §4 选项 3）⇒ ★ ⇒ ★ **本轮只改状态、不改计数**（★ 避免再动那套已脱节的统计 ⇒ 见残留 ⑲）
 
-| ID | 标题 | 类别 | 当前状态 | 验证路径 |
+| ID | 标题 | 类别 | 状态 | 验证路径 |
 |----|------|------|----------|----------|
 | ADR-001 | 三层框架分工 | 架构 | ★ **⚠️ 部分过时**（★ §3 记录：2026-10-08 标注） | `CppTLM/` + `CppHDL/` + `ip/` 目录均存在 |
 | ADR-002 | CppTLM 事件驱动调度 | 架构 | ✅ | `core/event_queue.hh` |
@@ -114,7 +114,7 @@
 | ADR-038 | chstream_register 集中入口 | 目录 | ✅ | `chstream_register.hh` |
 | ADR-040 | TLM→HDL 移植性约束（三级约束模型 + array_store 抽象） | 移植 | ✅ **v3.0 Accepted (2026-10-22, Phase 6d.5 Verilator 后端 + 跨后端 parity；§10.5 payload key 模态约束 + §10.6 生产者/消费者顺序契约 于 2026-10-22 `chmem-mmu-keys-modality` 补齐；v2.0 2026-09-17 Phase 6c M5 落地)** | [`adr/ADR-040-tlm-hdl-portability-constraints.md`](./adr/ADR-040-tlm-hdl-portability-constraints.md) |
 | ADR-041 | Bridge 适配层允许 tick | Plugin | ✅ | `src/cf_plugin/bridge/L1CacheTLMBridge.{h,cpp}` + [`adr/ADR-041-bridge-tick-pattern.md`](./adr/ADR-041-bridge-tick-pattern.md) |
-| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | ✅ | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册)　★ **dated 注（2026-11-08）**：★ **MMU 部分已被现实超越**（★ `ip/mmu/` 已实装 · `[mmu]` 测试家族存在 · `src/cf_plugin/bridge/mmu_bridge.h` 已落地）⇒ ★ 本 ADR 的**推迟语义仅对 FPU / Exception 仍成立** |
+| ADR-042 | Plugin 推迟 (FPU/MMU/Exception → Phase 5+) | Plugin | ✅ | [`adr/ADR-042-plugin-deferral.md`](./adr/ADR-042-plugin-deferral.md) (3 Plugin `.h` 占位 + Factory 不注册)　★ **dated 注（2026-11-08）**：★ **MMU 部分已被现实超越**（★ `ip/mmu/` 已实装 · `[mmu]` 测试家族存在 · `src/cf_plugin/bridge/mmu_bridge.h` 已提供）⇒ ★ 本 ADR 的**推迟语义仅对 FPU / Exception 仍成立** |
 | ADR-043 | CI 强制架构门禁 (3 验证脚本 + GitHub Actions) | 目录 | ✅ | `.github/workflows/architecture-gates.yml` (PR 阻塞 3 脚本) + `tools/{verify_adr,verify_plugin_decision,check_plugin_portability}.sh` |
 | ADR-046 | 多周期协议引擎豁免 D4 无状态机禁令（v2.0 含算术多周期 FSM 子类） | Plugin | ✅ v1.0 Phase 6c M5 (2026-09-17) + ✅ v2.0 算术豁免 (2026-09-28, mfc-cpu-pipeline-multi-cycle-fsm 触发) | [`adr/ADR-046-multi-cycle-fsm-exemption.md`](./adr/ADR-046-multi-cycle-fsm-exemption.md) |
 | ADR-047 | 静态配置期错误处理 Result 范式 (C++23 `std::expected<T, PluginError>`) | Plugin | ✅ v0.6.0 落地 (2026-09-22, Metis 修订 12→10 API) | [`adr/ADR-047-static-config-result-paradigm.md`](./adr/ADR-047-static-config-result-paradigm.md) |
@@ -795,7 +795,7 @@ test -e /workspace/project/CppHDL/include/bundle/stream_bundle.h
 ```
 
 **代码锚点**：
-- 已实现：`core/bundle/bundle_base.h`, `bundle/stream_bundle.h`
+- 提供：`core/bundle/bundle_base.h`, `bundle/stream_bundle.h`
 - 未实现：`core/bundle/bundle_mapper.h`（预期缺失）
 
 ##### 形态切换 (2026-06-12 增补)
@@ -808,7 +808,7 @@ Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/in
 | Phase 5 (RTL 协同) | `ch_uint<N>` + `bundle_base<Self>` | 推迟,待 Phase 5 启动 |
 | Phase 6 (完整框架) | 自动 codegen 派生两套 | 推迟,待 Phase 6 启动 |
 
-**当前 ⚠️ 状态本质**: "核心已实现 + Mapper 模板未实现" = Phase 1 实施完成, Phase 5/6 BundleMapper 推迟,符合 canonical phase 切分。
+**⚠️ 状态本质**: "核心部分提供 + Mapper 模板未提供" = Phase 1 范围收口, Phase 5/6 BundleMapper 推迟,符合 canonical phase 切分。
 
 ---
 
@@ -826,7 +826,7 @@ Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/in
 | 理由 | 调度由框架确定性决定，Plugin 不持有时序状态 |
 | 后果 | ✅ 已实现；`include/cf/plugin/plugin_base.h:48` 定义 `PluginBase`，仅提供 `name() / setup() / build()`，无 `tick()`。`PluginLoader`（ADR-017）是无关的 dlopen 加载器 |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.1
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.1
 
 **与 ADR-041 的关系**：D4（Plugin 基类无 tick）仅强制 `cf::plugin::PluginBase` 派生类。Bridge 适配层不继承 `PluginBase`，故不受 D4 强制，**可**实现 `tick()`。详见 [ADR-041](./adr/ADR-041-bridge-tick-pattern.md)。
 
@@ -852,7 +852,7 @@ grep -nE "^class PluginBase\b" /workspace/project/ChipForge/include/cf/plugin/pl
 | 理由 | Plugin 实现与物理流水线深度解耦，配置变更无需修改 Plugin 代码 |
 | 后果 | ✅ 已实现；`PipeBuilder::at_stage(stage_name, phase, cb)` 在 `include/cf/plugin/pipe_builder.h:68`，并自动创建 `PipeNode`（line 72-74） |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.2
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.2
 
 **验证命令**（必须通过）：
 ```bash
@@ -874,7 +874,7 @@ grep -nE "void\s+at_stage\s*\(" /workspace/project/ChipForge/include/cf/plugin/p
 | 理由 | 依赖检测（EARLY）→ 主体逻辑（NORMAL）→ 写回准备（LATE），三档足够典型需求 |
 | 后果 | ✅ 已实现；`enum class Phase` 在 `include/cf/plugin/pipe_builder.h:38` 定义，配合 `phase_name()`（line 44）输出可读名称 |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.2
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.2
 
 **验证命令**（必须通过）：
 ```bash
@@ -896,7 +896,7 @@ grep -nE "enum\s+class\s+Phase\s*\{[^}]*EARLY" /workspace/project/ChipForge/incl
 | 理由 | 允许 Plugin 在 `setup()` 阶段动态扩展物理流水线深度 |
 | 后果 | ✅ 最小实现已落地（`include/cf/plugin/pipe_builder.h:77`，`depth` 参数占位），父子关系记录在 `substage_parent_`；完整拓扑/调度集成推迟到 Phase 6 |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.3
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.3
 
 **验证命令**（必须通过 — 最小签名）：
 ```bash
@@ -1004,7 +1004,7 @@ grep -nE "void\s+declare_substage\s*\(" /workspace/project/ChipForge/include/cf/
 | 理由 | 三态握手（valid/ready/cancel）支持流水线正常、阻塞、取消三种场景 |
 | 后果 | ✅ 已实现；`class PipeNode` 在 `include/cf/plugin/pipe_node.h:29`，状态查询 API 完整，桥接到底层 `ch_stream` 握手语义 |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.4
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.4
 
 **验证命令**（必须通过）：
 ```bash
@@ -1036,7 +1036,7 @@ grep -nE "^class\s+CtrlLink\b" /workspace/project/ChipForge/include/cf/plugin/ct
 ```
 
 **代码锚点**：
-- `include/cf/plugin/ctrl_link.h:24`（`class CtrlLink` — 已实现）
+- `include/cf/plugin/ctrl_link.h:24`（`class CtrlLink` 定义）
 - `class StageLink` / `class DirectLink`（预期缺失，推迟到 Phase 6）
 
 ---
@@ -1051,7 +1051,7 @@ grep -nE "^class\s+CtrlLink\b" /workspace/project/ChipForge/include/cf/plugin/ct
 | 理由 | 单一入口，简化用户心智 |
 | 后果 | ✅ 脚手架已实现；`class PipeBuilder` 在 `include/cf/plugin/pipe_builder.h:53`，聚合 `register_plugin / at_stage / declare_substage / node_of_logic_stage`；`build()`/`tick()` 调度闭环待 Phase 6 完善 |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.2
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.2
 
 **与 ADR-041 的关系**：`PipeBuilder` 是业务 Plugin 的统一编译器入口（`pb.run()`），其内部**不**直接实现 `tick()`，而是委托给 `PluginBase` 派生类的 `at_stage()` 回调。Bridge 适配层（如 `L1CacheTLMBridge`）绕过 PipeBuilder，由 CppTLM EventQueue 直接调用其 `tick()`，并在 `tick()` body 末尾调用 `plugin_->pb.run()` 完成业务执行。详见 [ADR-041](./adr/ADR-041-bridge-tick-pattern.md)。
 
@@ -1075,7 +1075,7 @@ grep -nE "^class PipeBuilder\b" /workspace/project/ChipForge/include/cf/plugin/p
 | 理由 | 多 Plugin 独立声明同一条件，框架做 OR 合并 |
 | 后果 | ✅ CtrlLink 四种控制 API 已实现（见 `include/cf/plugin/ctrl_link.h:34/40/46/52`）；D6 共存方案保留 CppHDL chlib 现有 `stream_halt_when` / `stream_throw_when` 自由函数（位于 `chlib/stream.h:58,92`），新 Plugin 业务代码统一使用 `CtrlLink::*` 对象方法 |
 
-**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.5
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md)（★ **非权威 · 仅作背景**） §2.5
 
 **决策依据** (D6 共存方案):
 
@@ -1260,7 +1260,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 **决策者**: User + Prometheus + Phase 6c Oracle 重构
 **背景**: 
 - v1.0 (2026-06-08): `.omo/drafts/decision-plugin-framework-2026-06-08.md`（gitignored 草稿，不链接）
-- v2.0 (2026-09-16): Phase 6c W0 审计 + Oracle 重构报告（`openspec/changes/plugin-elaboration-substrate/proposal.md`）
+- v2.0 (2026-09-16): Phase 6c W0 审计 + Oracle 重构报告（`openspec/changes/archive/2026-09-17-plugin-elaboration-substrate/proposal.md`）
 **关联**: 重塑路线图（Phase 0/1/6 重新定位）; Phase 6c 兑现 D4 在 elaboration 语义下
 
 **v1.0 决策内容**:
@@ -1297,7 +1297,7 @@ grep -qE "REGISTER_CHSTREAM" /workspace/project/CppTLM/include/chstream_register
 **重新审视指引**: 见决策记录 §8（每季度或在 Phase 0/1/6 关键节点）
 
 **完整 Phase 6c 兑现证据**:
-- `openspec/changes/plugin-elaboration-substrate/` (proposal.md + tasks.md)
+- `openspec/changes/archive/2026-09-17-plugin-elaboration-substrate/` (proposal.md + tasks.md)
 - `docs/audit/cppHDL-maturity-audit.md` (W0 审计)
 - `include/cf/plugin/{uint_t,payload,pipe_builder,ctrl_link,storage}.h` (双模化)
 - `tests/framework/test_{cppHDL_hello_poc,plugin_elaborate_hello_poc}.cpp`
@@ -1405,7 +1405,7 @@ bash tools/check_plugin_portability.sh  # Check 4 ([WARN] array_store 优先)
 - `tools/check_plugin_portability.sh` — 4 项 Tier-1/Tier-2 检查
 
 **§2.1/§2.3 分类调整历史**:
-- 2026-06-12: v1.0 从 §2.1 (✅) 移至 §2.3 (🚧 Phase 1 提案)，因 `array_store` 已实现但迁移手册待 Phase 5
+- 2026-06-12: v1.0 从 §2.1 (✅) 移至 §2.3 (🚧 Phase 1 提案)，因 `array_store` 已提供但迁移手册待 Phase 5
 - **2026-09-17 (Phase 6c M5)**: v2.0 回到 §2.1 (✅) — CH_MEM 翻转 v1.0 禁令，M1-M5 9 commit 证明 elaboration 路径可用。TLM 标 deprecated，CH_MEM 是新正道。
 - **2026-09-22 (Phase 6d)**: v3.0 增量 — Check 9 (FSM 豁免白名单) 实装, `ch_state_machine` DSL 增强 (select-tree cycle-accurate).
 

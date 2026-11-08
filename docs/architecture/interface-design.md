@@ -16,7 +16,7 @@ ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐
 
 #### 1.0.1 ★ 早期形态 POD vs 设计目标 bundle_base 对照表
 
-> ★ ★ **目标态 = 下表右列「Phase 5+（设计目标）」**（★ `bundle_base` 派生 + `CH_BUNDLE_FIELDS` + `make_output` 自动 Direction）；★ ★ **左列「Phase 1」= 早期形态**（★ `cf::plugin::uint_t<N>` typedef 占位 + POD struct + 手动 Direction）⇒ ★ ★ **两列都是形态描述，★ 「当前状态」不在本表**（★ 治理修订 2026-11-08 · ADR-095 §2.3「就地净化」· 用户已签认）⇒ ★ 当前实现进度见 [`roadmap-evolution.md`](./roadmap-evolution.md)。
+> ★ ★ **目标态 = 下表右列「Phase 5+（设计目标）」**（★ `bundle_base` 派生 + `CH_BUNDLE_FIELDS` + `make_output` 自动 Direction）；★ ★ **左列「Phase 1」= 早期形态**（★ `cf::plugin::uint_t<N>` typedef 占位 + POD struct + 手动 Direction）⇒ ★ ★ **两列都是形态描述，★ 「现状」不在本表**（★ 治理修订 2026-11-08 · ADR-095 §2.3「就地净化」· 用户已签认）⇒ ★ 实现进度见 [`roadmap-evolution.md`](./roadmap-evolution.md)。
 
 | 维度 | Phase 1（★ 早期形态） | Phase 5+（★ **设计目标**） | 升级路径 |
 |------|------------------|--------------------|----------|
@@ -28,9 +28,9 @@ ChipForge 项目的 Bundle 字段类型分**三阶段**演进,与路线图对齐
 | **业务代码影响** | 0 (Phase 1 Plugin 已用 POD) | 0 (Mapper 编译期映射) | 切换头文件即可 |
 | **决策依据** | D4 Plugin-style 强制 | ADR-024 + 路线图 Phase 5 | `.omo/drafts/bundle-mapper-phase-5-6-decision.md` |
 
-**★ 关键澄清（★ 治理修订 2026-11-08）**：★ 本文档其余段落（如 §「所有 Bundle 继承 bundle_base」）展示的是 **Phase 5+ 目标形态**；★ ★ **「当前实现」不是本文件承载的内容**（★ 属实施态 ⇒ 见 `roadmap-evolution.md`）⇒ ★ 本文件只承载**形态与升级路径**。Phase 1 业务代码以 POD 写就，无需也无法直接编译 §后续代码块中的 `bundle_base` 派生示例。
+**★ 关键澄清（★ 治理修订 2026-11-08）**：★ 本文档其余段落（如 §「所有 Bundle 继承 bundle_base」）展示的是 **Phase 5+ 目标形态**；★ ★ **「现状」不是本文件承载的内容**（★ 属实施态 ⇒ 见 `roadmap-evolution.md`）⇒ ★ 本文件只承载**形态与升级路径**。Phase 1 业务代码以 POD 写就，无需也无法直接编译 §后续代码块中的 `bundle_base` 派生示例。
 
-**★ 早期形态（Phase 1）的 Bundle 定义示例**（★ `bundles/mem_bundles.h` · ★ **形态示例、非当前状态断言**）：
+**★ 早期形态（Phase 1）的 Bundle 定义示例**（★ `bundles/mem_bundles.h` · ★ **形态示例、非现状断言**）：
 ```cpp
 struct CacheReq {
   cf::plugin::uint_t<64> address{0};
@@ -122,7 +122,9 @@ struct CacheRespBundle : public bundle_base<CacheRespBundle> {
 ```
 
 ```cpp
-// bundles/impl_mode.h
+// ★ 历史形态（★ ADR-093 Phase-2 单模化后 `ImplMode` 已移除 —— 类型表示由编译开关决定，
+//   不再有运行期 mode）⇒ 本块仅作 legacy 知识留存，MUST NOT 当作现行 API
+// bundles/impl_mode.h（历史文件名）
 enum class ImplMode {
     TLM_ONLY = 0,   // 高速 TLM 仿真
     RTL_ONLY = 1,   // 周期精确 RTL
@@ -206,7 +208,7 @@ public:
 
 ## RTL 组件接口（CppHDL）
 
-> ★ ★ **v1.16 订正注（2026-11-08 · ADR-091 §D3a.7 / ADR-094 r.11 / r.16）**：★ ★ **本节下方示范是 Phase 1 ~ 5 时代的 `__input(Bundle)` / `__output(Bundle)` 形态 ⇒ ★ 与现行目标态冲突** ⇒ ★ ★ **目标态 = 层 2 单元的接口 MUST 是「逐字段标量端口」**（★ `__io` 宏 + `ch_in` / `ch_out`；★ **MUST NOT** 用 bundle 成员跨层：★ bundle 成员是 `type_proxy`、**不是端口** ⇒ 被上游接口白名单排除；★ 且 `ch_in<ch_stream<…>>` 会退化成**整宽 blob 的单个 `type_input`** ⇒ 语义空壳）⇒ ★ ★ **正确示范见下方「层 2 单元接口（目标形态）」**（★ 取自已落地的 `ip/cpu/core/regfile_chmem.h`）⇒ ★ **决策权威** = ADR-091 v1.16 §D3a.7 + ADR-094 r.11 / r.16；★ **层次化 Plugin 的结构事实**见 [`hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)。
+> ★ ★ **v1.16 订正注（2026-11-08 · ADR-091 §D3a.7 / ADR-094 r.11 / r.16）**：★ ★ **本节下方示范是 Phase 1 ~ 5 时代的 `__input(Bundle)` / `__output(Bundle)` 形态 ⇒ ★ 与现行目标态冲突** ⇒ ★ ★ **目标态 = 层 2 单元的接口 MUST 是「逐字段标量端口」**（★ `__io` 宏 + `ch_in` / `ch_out`；★ **MUST NOT** 用 bundle 成员跨层：★ bundle 成员是 `type_proxy`、**不是端口** ⇒ 被上游接口白名单排除；★ 且 `ch_in<ch_stream<…>>` 会退化成**整宽 blob 的单个 `type_input`** ⇒ 语义空壳）⇒ ★ ★ **正确示范见下方「层 2 单元接口（目标形态）」**（★ 取自层 2 现有实例 `ip/cpu/core/regfile_chmem.h`）⇒ ★ **决策权威** = ADR-091 v1.16 §D3a.7 + ADR-094 r.11 / r.16；★ **层次化 Plugin 的结构事实**见 [`hierarchical-plugin-architecture.md`](./hierarchical-plugin-architecture.md)。
 
 ```cpp
 // ═══════════════════════════════════════════════════════════════
@@ -253,7 +255,7 @@ public:
 
 ### ★ 层 2 单元接口（★ **目标形态** · 2026-11-08 补）
 
-> ★ ★ **目标态的层 2 单元接口 = 逐字段标量端口**（★ 权威 = ADR-091 v1.16 §D3a.7 + ADR-094 r.11 / r.16）⇒ ★ **示例取自已落地的唯一层 2 实例** `ip/cpu/core/regfile_chmem.h`（★ 7 个标量端口）⇒ ★ **对照上方旧示范**：★ 旧 = 4 个 **bundle** 端口；★ 新 = 7 个**标量**端口（★ 4 in + 2 out + 1 in 使能）⇒ ★ **代价 = 端口数变多**（★ 收益 = 端口真为端口 ⇒ 层次化 emitter 可正确建 module 边界 + 观测可按端口寻址）。
+> ★ ★ **目标态的层 2 单元接口 = 逐字段标量端口**（★ 权威 = ADR-091 v1.16 §D3a.7 + ADR-094 r.11 / r.16）⇒ ★ **示例取自层 2 的唯一现有实例** `ip/cpu/core/regfile_chmem.h`（★ 7 个标量端口）⇒ ★ **对照上方旧示范**：★ 旧 = 4 个 **bundle** 端口；★ 新 = 7 个**标量**端口（★ 4 in + 2 out + 1 in 使能）⇒ ★ **代价 = 端口数变多**（★ 收益 = 端口真为端口 ⇒ 层次化 emitter 可正确建 module 边界 + 观测可按端口寻址）。
 
 ```cpp
 // ★ 层 2 单元（`ch::Component`）—— ★ 逐字段标量端口形态
@@ -300,24 +302,20 @@ class RegFileComponent : public ch::Component {
 
 ```cpp
 // soc/RiscvVirtSoC.h
-// 推荐使用 JSON 配置驱动组装（见下方）
-// 以下手工 C++ 组装仅供理解参考
-// 实际 SoC 装配推迟到 Phase 2+ 实施；当前推荐使用 JSON + ModuleFactory
+// 以下手工 C++ 组装仅供理解结构；SoC 装配走 JSON 配置 + ModuleFactory（见下方）
 class ExampleVirtSoC {
 public:
-    explicit ExampleVirtSoC(ImplMode mode = ImplMode::TLM_ONLY);
+    ExampleVirtSoC();
 
     void build();    // 实例化并连接所有组件
     void run(uint64_t cycles);
     void load_elf(const std::string& path);
 
 private:
-    ImplMode mode_;
-
     // CPU：TLM（ISS 驱动，cpptlm::CPUTLM 业务扩展待 Phase 2 实施）
     std::unique_ptr<ComponentBase> cpu_;
 
-    // Cache：按 mode_ 决定实现（CppTLM 标准 CacheTLM；Phase 5+ 才有 L1CacheRtl）
+    // Cache：层 2 单元接口（逐字段标量端口；见 ADR-091 §D3a.7 / ADR-094 r.11）
     std::unique_ptr<ComponentBase> l1_cache_;
 
     // 其余组件（TLM 通用模板，无 L1/DRAM/外设特化）

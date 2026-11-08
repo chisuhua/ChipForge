@@ -65,8 +65,8 @@
 |---|---|---|
 | ★ **本主题文档**（★ 当前态快照 / 结构事实 / 需求 / 残留） | `docs/architecture/hierarchical-plugin-architecture.md`（★ §3 目标形态 · §5 命名规则 · §4 归属↔语义耦合） | 🚧 Draft（★ §1 = dated 实施态快照） |
 | ★ **门禁面契约**（登记簿 / 逻辑契约名清单 / error_kind / 通用总则） | `docs/architecture/parity-gate-contract.md`（★ **S-17** · **S-17.1**（机器可读 JSON）· **S-10** · **GN-1**） | ✅ **v1.8**（★ S-17 / S-17.1 **自 ADR-094 阶段 2 起生效**） |
-| ★ **框架层架构**（★ Plugin 范式 + ★ §4.2 `ch::Component` 与 Plugin 的关系） | `docs/architecture/plugin-framework.md`（★ §4「与 CppTLM / CppHDL 关系」· §4.2 Component） | ⚠️ **v1.2 · 2026-06-09 · §4.2 已过时**（★ 仍写「Plugin 仅在 TLM 模式生效 / 同一 IP 可有 TLM 版 + RTL 版」⇒ ★ 与 ADR-091 v1.16 两层范式 + ADR-083 单一 source of truth **冲突**）⇒ ★ **以 ADR-091 v1.16 / ADR-094 为准**（★ ★ 该文件**不在 `arch_paths`** ⇒ ★ architect 不改它 ⇒ ★ 残留 ⑮） |
-| ★ **框架代码映射**（★ 架构概念 ↔ CppHDL 代码位置） | `docs/architecture/code-framework-mapping.md`（★ **§3.1 组件模型表** = `Component`（★ RTL 组件基类）· `ch_module<T>`（子模块实例化）· `ch_device<T>`（顶层设备）· `ch.hpp`） | ✅（★ ★ **锚点是代码路径 ⇒ 随上游漂移** ⇒ 须按 M-6/M-7 复核；★ 该文自带「版本敏感性声明」） |
+| ★ **框架层架构**（★ Plugin 范式 + ★ §4.2 `ch::Component` 与 Plugin 的关系） | `docs/architecture/mixed/plugin-framework.md`（★ **非权威 · 仅作背景**）（★ §4「与 CppTLM / CppHDL 关系」· §4.2 Component） | ⚠️ **v1.2 · 2026-06-09 · §4.2 已过时**（★ 仍写「Plugin 仅在 TLM 模式生效 / 同一 IP 可有 TLM 版 + RTL 版」⇒ ★ 与 ADR-091 v1.16 两层范式 + ADR-083 单一 source of truth **冲突**）⇒ ★ **以 ADR-091 v1.16 / ADR-094 为准**（★ ★ 该文件**不在 `arch_paths`** ⇒ ★ architect 不改它 ⇒ ★ 残留 ⑮） |
+| ★ **框架代码映射**（★ 架构概念 ↔ CppHDL 代码位置） | `docs/architecture/mixed/code-framework-mapping.md`（★ **非权威 · 仅作背景**）（★ **§3.1 组件模型表** = `Component`（★ RTL 组件基类）· `ch_module<T>`（子模块实例化）· `ch_device<T>`（顶层设备）· `ch.hpp`） | ✅（★ ★ **锚点是代码路径 ⇒ 随上游漂移** ⇒ 须按 M-6/M-7 复核；★ 该文自带「版本敏感性声明」） |
 | ★ **总体架构 / 接口形态**（★ 描述性总览） | `docs/architecture/overview.md` · `docs/architecture/interface-design.md`（★ 两者含 v1.16 补注；★ `interface-design.md` §「层 2 单元接口」= 目标形态示范） | ✅ |
 | ★ **版本节点架构演进 SSOT**（★ **层次化的版本落点在此**） | `docs/architecture/roadmap-evolution.md`（★ §4.5 **v0.11.0 目标表**含层次化装配行 · §8 **跨版本对比表**含层次化行） | ✅（★ 2026-11-08 已补） |
 
@@ -78,13 +78,13 @@
 | ★ **层次化 RTL 写作指南**（★ 用户视角） | `CppHDL/docs/developer_guide/patterns/HIERARCHICAL-RTL-AUTHORING-GUIDE.md`（★ §1 **7 条纪律 D1~D7** · §2 粒度（ADR-061）· §3 三种写法风格） | ✅ Active |
 | ★ **组件生命周期指南**（★ `ch_device` vs `ch_module`） | `CppHDL/docs/developer_guide/patterns/COMPONENT-LIFECYCLE-GUIDE.md` | ✅ Active |
 
-> ★ **排除说明（★ 为什么有些架构文档不在表内）**：★ `docs/architecture/` 下其余文档与本主题**无直接耦合** ⇒ 不列（★ 避免稀释信号）：★ `performance-guide.md` / `testing-and-dse.md` 的「层次化」命中 = ★ **同词异义**（★ 「StatGroup 层次化统计组」/「层次化统计收集」⇒ ★ 与 Plugin 层次化无关）· ★ `tech-selection.md` · `ip-catalog.md` · `background-and-goals.md` · `error-handling.md` · `tlm-*.md`（★ 命中数 0）· ★ `m4-dse-cpufactory-real-pr-description.md`（★ 命中 0）· ★ `plugin-research/external-plugin-architectures.md`（★ **研究态**：★ 主题是 SpinalHDL 等**外部**架构 ⇒ 非本仓目标架构；★ 且 `arch-docs.json` 的 `exclude_paths` 已排除）· ★ ★ **`declarative-hybrid-framework.md`（★ 混合态 ⇒ 移出）**：★ 该文头部自声明「⚠️ **本文档混合了"已实现框架"与"Phase 1 设计提案"**」⇒ ★ ★ **提案不是「已定的目标」⇒ 混入真相区会让未决内容冒充目标态** ⇒ ★ 故只作**背景参考**，不进真相区。
+> ★ **排除说明（★ 为什么有些架构文档不在表内）**：★ `docs/architecture/` 下其余文档与本主题**无直接耦合** ⇒ 不列（★ 避免稀释信号）：★ `performance-guide.md` / `testing-and-dse.md` 的「层次化」命中 = ★ **同词异义**（★ 「StatGroup 层次化统计组」/「层次化统计收集」⇒ ★ 与 Plugin 层次化无关）· ★ `tech-selection.md` · `ip-catalog.md` · `background-and-goals.md` · `error-handling.md` · `tlm-*.md`（★ 命中数 0）· ★ `m4-dse-cpufactory-real-pr-description.md`（★ 命中 0）· ★ `plugin-research/external-plugin-architectures.md`（★ **研究态**：★ 主题是 SpinalHDL 等**外部**架构 ⇒ 非本仓目标架构；★ 且 `arch-docs.json` 的 `exclude_paths` 已排除）· ★ ★ **`declarative-hybrid-framework.md`（★ 混合态 ⇒ 移出）**：★ 该文头部自声明「⚠️ **本文档混合了"实现框架"与"Phase 1 设计提案"**」⇒ ★ ★ **提案不是「已定的目标」⇒ 混入真相区会让未决内容冒充目标态** ⇒ ★ 故只作**背景参考**，不进真相区。
 
 ### 0.4 ★ 目标态 ⇄ 实施态（★ **真相区 vs 实施区**）
 
 | | ★ **真相区（目标态）** | ★ **实施区（过程态）** |
 |---|---|---|
-| ★ 是什么 | ★ **理想架构目标**：该怎么设计 | ★ **当前实现**：现在长什么样 |
+| ★ 是什么 | ★ **理想架构目标**：该怎么设计 | ★ **现状**：现在长什么样 |
 | ★ 载体 | ★ **架构决策文档 + 架构文档**（★ §0.3 A~D） | ★ **代码 / 测试 / 判据脚本 / 证据链**（★ 下表） |
 | ★ 回答 | ★ 「**目标是什么**」 | ★ 「**离目标有多远**」 |
 | ★ 漂移方式 | ★ 决策漂移（须取代流程）/ 描述漂移（须改文档） | ★ 实施推进 ⇒ ★ **代码变多、真相不变** |
@@ -177,7 +177,7 @@
 | **N2** | ★ 装配点**可无 active parent** ⇒ 「成层判定」与「装配点」**解耦**；★ 但组件 MUST 登记进组件树（否则上游 FATAL） | 上游 ADR-061 决策⑥ · `hierarchy_analysis.cpp:211-227` | ADR-094 r.2 / r.7 |
 | **N3** | ★ Component MUST 共用**宿主的 ctx**（子 ctx ⇒ node-id aliasing ⇒ 组件 output 端口从 simulator `data_map` 消失 ⇒ 观测静默读不到） | 上游 `CppHDL/include/device.h:12-19`（上游自己踩过） | ADR-091 **G-1p** · ADR-094 r.3 |
 | **N4** | ★ 顶层端口名 MUST NOT 与内部 `ch_reg` / `ch_node` 同名（★ **v1.16 扩面**：判定对象 = **ctx 节点名** vs **顶层端口名**） | ★ `CppHDL/include/codegen_naming.h:72-88`（★ **`build_verilog_name_table` = 全局去重的真实实现**：★ 同 base 名 ⇒ 加 `_N` ⇒ 端口被改名 ⇒ 两后端端口名不一致）· `CppHDL/src/codegen_verilog.cpp:71-79`（★ 扁平端口收集） | ADR-091 **G-1o** · ADR-094 D-3.6 |
-| **N5** | ★ **节点名唯一性** MUST 有 **opt-in** 的创建期 fail-fast（解释器侧不改名 / Verilator 侧改名 ⇒ 按名解析会**静默采到错节点**） | 上游 `NodeNamePolicy::kRejectDuplicates`（`CppHDL/include/core/context.h:51-55`，已实现） | ADR-091 **G-1o** / V-25 · ADR-094 D-6 阶段 1 |
+| **N5** | ★ **节点名唯一性** MUST 有 **opt-in** 的创建期 fail-fast（解释器侧不改名 / Verilator 侧改名 ⇒ 按名解析会**静默采到错节点**） | 上游 `NodeNamePolicy::kRejectDuplicates`（`CppHDL/include/core/context.h:51-55`） | ADR-091 **G-1o** / V-25 · ADR-094 D-6 阶段 1 |
 | **N6** | ★ **公共头 ODR 安全**（★ 上游**已修**：`build_hierarchical_name` 移到 `component.h:266` 且 `inline`）⇒ ★ ChipForge 的 G-1b **换根**（ODR 根消失 ⇒ 理由 = include 面最小化 + `ch::detail` 命名二义） | `CppHDL/include/component.h:266` | ADR-091 **G-1b** · ADR-094 **V-34** |
 | **N7** | ★ 观测 MUST 按**逻辑契约名**解析（★ 不再要求「契约名 == ctx 节点名」）⇒ ⇒ 契约身份与节点名**解耦** | 上游 `ch_device` 的顶层端口**本身就带 `top_` 前缀**（`top.<port>` → `top_<port>`）⇒ ★ 「裸名」是 ChipForge 侧约定 | ADR-094 **D-3.1~D-3.9** · 契约文档 **S-17 / S-17.1** |
 | **N8** | ★ 层 2 单元接口 MUST 是**逐字段标量端口**（★ bundle / `ch_stream` 的成员是 `type_proxy`、**不是端口** ⇒ 被上游接口白名单排除；且 `ch_in<ch_stream<…>>` 退化成**整宽 blob 的单个 `type_input`** ⇒ 语义空壳） | `CppHDL/src/hierarchy_port_check.h:60-90` · 实测探针 | ADR-094 **r.11 / r.16** · D-5 |
