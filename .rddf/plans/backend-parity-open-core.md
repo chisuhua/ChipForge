@@ -1454,6 +1454,56 @@ regfile 测试相关**（★ 更多 `ch_reg` 创建 ⇒ ★ 更多对 current co
 ★ ★★ **实测**：★ A4-3 的「`flush` 源改回 payload」变异 ⇒ **1 case 失败** ✔
 ⇒ ★ ⇒ ★ **新约束已被变成可执行判据**（★ 而非仅文档条款）。
 
+### K34 — ★ ADR-094 的推导与证据落点（★ 2026-11-08 补建）
+
+> ★ **为什么需要这一节**：ADR-094 的头部写着「★ 推导与证据（逐条 file:line、探针记录、选项推演、
+> 上游 ADR 逐条对照）⇒ `.rddf/reviews/ADR-094-decision-ledger.md` §3 / §6 / §7 ·
+> **`.rddf/plans/backend-parity-open-core.md` §K34**（★ **待 builder 落**）」⇒ ★ 本节即该占位。
+> ★ **实施面清单**（★ 13 处实质位置 + 2 处补写缺口）已落 `openspec/changes/chmem-hierarchical-assembly/design.md` §2
+> ⇒ ★ 本节只承载**实施期产生的推导与证据**（★ 探针记录 / 逐文件裁决 / 变异实测）。
+
+★ **待填（★ 实施期按批落）**：
+- ①-A 的 root 持有形态与 `ConstructionFrame` 实测（★ 见 assembly design.md §3.1 的建议 + 实测结论）
+- ①-A′ `regfile_bridge_chmem.h` 改造前后的 owner 分布对比
+- ①-B 登记簿 / manifest 的字段落定过程
+- ①-D 三条同批改动的**编译期**证据（★ `top__DOT___reg_N` 改名后的链接面）
+
+### K35 — ★ 阶段 1「同名普查」报告落点（★ 2026-11-08 补建）
+
+> ★ **判据来源**：ADR-094 **V-39**（★ 「现网 52 case + CH_MEM binary 全量 case 的 ctx 中同名节点组数 = 0」）
+> ⇒ ★ **归属** = `chmem-hierarchical-assembly` 的 **①-C** task 4.2（★ 普查**不通过 ⇒ 先修存量，不切阶段 1**）。
+
+★ **本节的落盘格式（★ 实施期填）**：
+```
+## 同名普查报告（★ 阶段 1 前置）
+- 窗口锚：commit = <sha> · CH_MEM binary SHA = <sha> · 语料 = tests/cpu/parity/corpus.txt（52 case）
+- 扫描范围：现网 52 case + CH_MEM binary 全量 case 的 ctx
+- 结果：同名节点组数 = <N>
+- 若 N > 0：逐组列出（组名 · 冲突节点 id · 首个创建者 · 消费方）⇒ ★ 先修存量再切阶段 1
+- 变异对照：注入一个同名节点 ⇒ 普查 MUST 报出该组 ⇒ RED
+```
+
+★ **★ 增量规则**（★ 2026-11-08 补）：★ 普查窗口一旦钉住（commit + binary SHA）⇒
+★ **任何新增 case ⇒ MUST 增量普查**（★ 否则新 case 里的同名节点逃逸 ⇒ V-39 判据失效）。
+
+### K36 — ★ 迁移期基线结论落点（★ 2026-11-08 补建）
+
+> ★ **判据来源**：ADR-094 **V-35 / V-36**（★ 迁移期判据 ⇒ **阶段 2 验收后整体退役**）
+> ⇒ ★ **归属** = `chmem-hierarchical-assembly` 的 **①-C task 4.4/4.5（捕获）** + **①-D task 5.7/5.8（比对）**。
+
+★ **捕获时机（★ MUST = ①-C 出口 / ①-D 开工前）**：★ ADR-094:157「基线 MUST 在阶段 1 结束 /
+阶段 2 开工前捕获，★ 切换后**无法事后补**」⇒ ★ **MUST NOT** 放到 ①-D 里。
+
+★ **本节的落盘格式（★ 实施期填）**：
+```
+## 迁移期基线（★ 临时产物 · 阶段 2 验收后整体退役）
+- 捕获时机：★ ①-C 出口（★ 切换前）
+- 内容：逐 case 的逐拍全观测量 hash 链（FNV · 与既有 pchash 同构造）+ 终值逐位数组 + 环境标识（commit / cpu 配置 / 语料集）
+- V-35 比对：切换前后 hash 链逐 case 相等（硬）+ 终值逐位相等（第二判据）⇒ 结果：<结论>
+- V-36 比对：阶段 2 触发集 ⊆ 阶段 1 触发集（无新增误报）+ 阶段 2 触发集为空 ⇒ 结果：<结论>
+- ★ 机器产物位置（★ 临时）：构建目录 / CI artifact ⇒ ★ 结论落本节 ⇒ ★ **不进长期报告 schema**
+```
+
 ### K7 — ★ `ch_uint` 需全限定 `ch::core::ch_uint`
 
 CppHDL 的 `ch_uint` **不在全局命名空间** ⇒ ★ 测试与实现里一律写 `ch::core::ch_uint<N>`（★ `ch::core::ch_bool` 同理）。
