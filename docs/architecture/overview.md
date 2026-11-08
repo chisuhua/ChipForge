@@ -1,20 +1,15 @@
 # 总体架构设计
 
-> **📌 实现状态快照 (2026-10-08)**
+> **📌 本文件 = 目标架构（真相源）**
 >
-> ★ ★ **定性（★ 2026-11-08 治理修订 · 架构文档治理）**：★ **本段 = 实施态快照**（★ 「现在长什么样」），★ **不是目标态**（★ 「该长什么样」）⇒ ★ ⇒ ★ **目标态在本文档正文**（★ §架构总览 / §关键设计原则 / §工程目录结构）⇒ ★ **本段仅供读者快速定位当前进度，★ MUST NOT 被当作目标态引用**（★ 否则「现状即合理」⇒ 约束失效）⇒ ★ ★ **本段 dated 2026-10-08 ⇒ 已 1 个月未复核**（★ 具体进度以 [`roadmap-evolution.md`](./roadmap-evolution.md)（★ 架构演进 SSOT）+ [`.rddf/roadmap/`](../../.rddf/roadmap/) 为准 ⇒ ★ **本段不作为进度真源**）⇒ ★ **真相 = 目标态**的纪律见 [`hierarchical-plugin-architecture.md` §0.1](./hierarchical-plugin-architecture.md)（★ 该文件 §0.1 + M-8 是本仓**唯一**已制度化的「真相区 / 实施区」纪律样板 ⇒ ★ **本仓级纪律尚待治理决策** ⇒ 见 `.rddf/reviews/architecture-docs-governance-recommendations.md`）
+> ★ ★ **治理修订（2026-11-08 · ADR-095 §2.3「就地净化」· ★ 用户已签认）**：★ ★ **本文件只描述目标架构**（★ 「该长什么样」）⇒ ★ ★ **实施进度（★ 「现在长什么样」）已移出本文件**（★ 原 2026-10-08 的进度清单段）⇒ ★ **进度查询**：★ [`roadmap-evolution.md`](./roadmap-evolution.md)（★ 架构演进 SSOT）+ [`.rddf/roadmap/`](../../.rddf/roadmap/)（★ phase / objective / feature 台账）⇒ ★ ⇒ ★ **本文件不承载进度**（★ 真相源 = 目标架构；★ 纪律样板 = ADR-095 §2.5 门禁 ①「顶层纯净 lint」）★ ★ **★ 范围诚实标注**：★ 本轮已净化**头部**；★ ★ **正文仍有深度残留**（★ §PayloadStore 节的「当前状态（Phase 6c/6d）」等 8 处）⇒ ★ **归 AC-109c（待 change 批次）** ⇒ ★ 见 `.rddf/reviews/architecture-docs-governance-recommendations.md` **§11**。
 >
-> - ✅ **Phase 0 Plugin 脚手架已落地**：`cf::plugin` 6 个头文件（PluginBase / Payload\<T\> / PipeNode / PipeBuilder / CtrlLink / uint_t\<N\>）+ 89/89 框架测试 PASS + 432/432 ctest PASS（TLM binary）
-> - ✅ **Plugin-style 单一 source of truth 固化**（ADR-083, 2026-10-08）：业务 IP 不再分别维护 TLM 副本 + RTL 副本；同份代码经由**两个编译模式**产出不同仿真后端
-> - ✅ **CH_MEM elaboration 正道**（ADR-040 v2.0）：`cf::plugin::uint_t<N>` 在 `-DCF_PLUGIN_USE_CH_MEM` 下编译为 `ch::core::ch_uint<N>`；业务代码经由 `pb.elaborate(ctx)` 发射 lnode DAG
-> - ✅ **Verilator backend 可用**（Phase 6d.5 E8 子集）：`ch::toVerilog(ctx)` → `.v` → `verilator --cc` → 联合仿真；`[verilator]` 1/1 case PASS（5 ELF tohost=1，10 assertions）
-> - ✅ **Phase 1.3 全部子任务完成**（2026-06-13）：L1CachePlugin (lookup+refill) + Bridge + Adapter e2e + 5 缓存测试文件 (21 test cases)
-> - ✅ **Phase 1.4 完成**（2026-06-13）：L1CachePlugin 设计方法学复盘（[`docs/methodology/plugin-style-design-methodology-v1.md`](../methodology/plugin-style-design-methodology-v1.md)）
-> - ✅ **CPU M4/M5 完成**（2026-06-24）：11 Plugin 套件 CpuFactory 真实注册 + DSE 576-config sweep
-> - ✅ **MMU 实装 + VIPT 集成 + CPU Pipeline**（2026-09-14）：`mmu-tlb-ptw-impl`（TLB/PTW 算法 + MMUTLMBridge）→ `mmu-cache-integration`（L1Cache 消费 MMU_VADDR VIPT + PIPT fallback）→ `cpu-mmu-integration`（RiscvMMUPlugin 注册 CpuFactory + 3 substage）→ `ptw-walk-bridge-fix`（PTW at_stage 接线 + Bridge 真实 issue_request/read_response）。**317/317 tests PASS**
-> - 🚧 **下一里程碑**：`soc-cpu-l1-mmu-demo`（CPU+MMU+L1+Memory 完整 SoC，真 RISC-V 程序 tohost 退出）→ `cache-phase1.5-4way`（VIPT 正式安全 ADR-044 §2.5）→ `mmu-chmem-pipeline-integration`（CH_MEM 真 sv32 translation owner 闭合）。SoC 路线图见 [`.rddf/roadmap/`](../../.rddf/roadmap/)
+> ★ **以下为与目标架构直接相关的规范性前提**（★ 有 ADR 锚的架构约束，★ 非进度）：
+> - **Plugin-style 单一 source of truth**（ADR-083）：业务 IP 不再分别维护 TLM 副本 + RTL 副本；同份代码经由**两个编译模式**产出不同仿真后端
+> - **CH_MEM elaboration 正道**（ADR-040 v2.0）：`cf::plugin::uint_t<N>` 在 `-DCF_PLUGIN_USE_CH_MEM` 下编译为 `ch::core::ch_uint<N>`；业务代码经由 `pb.elaborate(ctx)` 发射 lnode DAG
+> - **两条 RTL 出口**（★ 上游已就绪）：`ch::toVerilog(ctx)` → 扁平 `.v`（★ **门禁路径**）· `ch::toVerilogHierarchical(out_path, root, options)` → 单文件多 module（★ **交付路径**，★ 层 2 单元成独立 module ⇒ 可单独综合 / 单独交付）
 >
-> **本文档描述目标架构**；具体实现进度以 [`.rddf/roadmap.md`](../../.rddf/roadmap.md) 为准。
+> **本文档描述目标架构**；具体实现进度以 [`roadmap-evolution.md`](./roadmap-evolution.md) + [`.rddf/roadmap.md`](../../.rddf/roadmap.md) 为准。
 
 ## 架构总览
 
