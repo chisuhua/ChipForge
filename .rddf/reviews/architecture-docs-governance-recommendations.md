@@ -84,7 +84,7 @@
 | ★ **扩 2 份**（★ `error-handling.md` + `background-and-goals.md` —— ★ **目标态**且仅缺 dated 注） | ★ 这 2 份的残留 ⑱ 可由 architect 直接闭合；★ 不触碰历史态文档 | ★ 可写面小幅扩大（★ 需重审边界） |
 | ★ **维持现状走 owner 注记** | 边界不变 | ★ 长期双轨（★ 4~5 份文档长期 stale ⇒ 读者读到过时目标态） |
 
-★ ★ **architect 倾向**：★ **区分对待** —— ★ `error-handling.md` / `background-and-goals.md`（★ **目标态** + 仅缺 dated 注）**值得扩**；★ `plugin-framework.md` / `code-framework-mapping.md` / `tech-selection.md`（★ **历史态 / 映射态**）**不值得扩**（★ 扩了也是让 architect 去改历史文档 ⇒ 正确处置是 dated 注 + 整体重写归 backlog）⇒ ★ **需你点头「扩 2 份」这个口径**（★ 上表已补该栏）。
+★ ★ **architect 倾向**：★ **区分对待** —— ★ `error-handling.md` / `background-and-goals.md`（★ **目标态** + 仅缺 dated 注）**值得扩**；★ `plugin-framework.md` / `code-framework-mapping.md` / `tech-selection.md`（★ **历史态 / 映射态**）**不值得扩**（★ 扩了也是让 architect 去改历史文档 ⇒ 正确处置是 dated 注 + 整体重写归 backlog）⇒ ★ **需你点头「扩 2 份」这个口径**（★ 上表已补该栏）。★ ★ **2026-11-08 收口深挖后上调为「扩 4 份」**（★ 新增 `performance-guide.md`〔大面积虚构 ⇒ 需整体标历史态〕· `ip-catalog.md`〔索引层〕⇒ ★ **完整清单见 §9.1 A2**）⇒ ★ **本表「扩 2 份」栏为第一轮口径**，★ ★ **以 §9.1 A2 的 4 份清单为准**（★ 算术：2 + 2 = 4）。
 
 ### 选项 3：`adr.md` §2.4 统计口径怎么收？
 
@@ -148,4 +148,94 @@ last_reviewed: YYYY-MM-DD          # ★ 上次核对日（对齐 M-6「时效�
 | 5 | ★ 主题文档 §7 残留 +2（⑲ 统计口径脱节 · ⑳ `arch_paths` 治理盲区） | 主题文档 §7 | ★ 登记（★ 决策见 §4） |
 
 ★ ★ **本自身的 mixed 属性（★ 诚实标注）**：★ ★ **本文件所在的 `hierarchical-plugin-architecture.md` §7 本身就是「mixed 内容」的实例**（★ 跨主题残留台账 · 含治理条目 ⇒ 与「真相 = 目标态」口径张力）⇒ ★ ★ **沿 ⑮~⑱ 的既有先例**（★ 该节已是「跨主题残留台账」形态）⇒ ★ 不构成新问题、★ 但**是本仓纪律尚未仓级化的又一处证据**。
+---
+
+## 9. ★ 治理路线图（★ 2026-11-08 收口深挖后）
+
+> ★ §1~§8 是**第一轮**诊断与建议；★ ★ **§9 是收口深挖后的完整路线图**（★ 缺口清单 A~G + 新挖 G1~G9 + 优先级 + 后果 + 依赖图）。
+
+### 9.1 ★ 完整缺口清单（★ 按「性质」分级）
+
+| # | 缺口 | ★ 性质 | 证据 | ★ 建议处置 | 归属 |
+|---|---|---|---|---|---|
+| **D** | ADR-094 未登记 V-28/V-29 机制锚（★ `ch::hier_eq`） | ★ **待办 · 零依赖** | ★ 上游 helper 2026-11-06 落地 · 本仓 **0 引用** | ✅ **本轮已做**（★ ADR-094 V-28 补机制锚注） | ★ architect |
+| **D2** | ADR-089 / 契约文档未登记「层次化产物适用面」 | ★ **待办 · 阻塞 §3.5 升 MUST** | ★ 两文 grep「层次化」**零命中** | ★ 起草为 ADR-089 修订 + 契约文档补面 ⇒ ★ **须经 oracle → critic 审**（★ 属新决策） | ★ architect（待你点头） |
+| **B1** | ★ `plugin-framework.md` **17 处过时 / 死链**（★ 10 组内容过时 + 7 处死引用） | ★★ **实际错误** | ★ `:4` Phase 1.5 进行中（已 archive）· `:207` 「get 缺失默认构造」**与 ADR-040 v3.0 Check 8 fail-fast 直接矛盾** · `:669-671` 双副本（**与 ADR-083 矛盾**）· `:673-694` 「Plugin→lnode 转换器」（ADR-037 v2.0：无转换器）· `:156,220,318,388,456,568,573` **7 处 `src/cf_plugin/tests/` 死引用**（目录已删） | ★ **顶部标「Phase 0/1 历史快照」+ §4 / §5 整节替换为指针**（ADR-037 v2.0 / ADR-083 / ADR-091 v1.16）★ **局部 dated 注不可行**（★ 冲突遍布 §4/§5 + 死链 ⇒ 给读者「其余可信」的错觉）⇒ ★ 整体重写归 backlog | ★ owner（★ **不在 `arch_paths`**） |
+| **B4** | ★ `error-handling.md`：`MemRespBundle` **死名** + COMPARE **从未存在** + `LOG_ERROR/LOG_WARN` **无此宏** | ★★ **实际错误** | ★ 真名 `cf::bundles::MemResp`（`bundles/mem_bundles.h:59`）· 开放核 `ip/cpu/core/bus_iface_chmem.h:27` 明禁该名 · COMPARE 已被 Sim↔Verilator parity 取代 | ★ dated 注 + 改死名 + §4.3 标「从未实现」 | ★ owner |
+| **B5** | ★ `background-and-goals.md`：**C++17 事实错误** | ★★ **实际错误** | ★ `:20`「C++17 / C++20」⇒ ★ 实际 **C++23** 全 target（AGENTS.md + ADR-047） | ★ 立即改 C++23 | ★ owner（★ 或先扩 `arch_paths`） |
+| **B6** | ★★ `performance-guide.md`：**大面积虚构** | ★★ **实际错误（最重）** | ★ §2.1 DMI JSON **无解析**（CppTLM 仅 `is_dmi_allowed() const { return false; }` 桩）· §2.2 `quantum_ns` 仅 GPU board shell 常量 · §2.4「CPU ISS 基本块缓存 2-5x」**零代码命中** · §3.3 速度表把 TLM_ONLY/RTL_ONLY/COMPARE **当真配置**（COMPARE/SHADOW 从未存在）· §4.1/§4.2 SHADOW/ImplMode 切换 JSON **虚构** ⇒ ★ **全文无一处真实实测性能数据** | ★ **整体标历史态**（★ ADR-088 §10 单模后其指导价值归零）⇒ ★ **NOT** 逐条修（★ 修成本 > 重写） | ★ owner |
+| **B3** | `code-framework-mapping.md`：`extern/CppTLM` 错径 + §3.1 缺层次化符号 | ★ **实际错误** | ★ `:75` 错径（★ 已在 ADR-083 / `overview.md` 同批订正）· §3.1 缺 `create_child` / `hier_eq` / `toVerilogHierarchical`，★ 且列了 `ch_module` / `ch_device`（★ ADR-091 G-1b 禁用于层 2） | ★ 改错径 + 补行（★ 按其自带「版本敏感性声明」） | ★ owner |
+| **B2** | `tech-selection.md`：数字快照腐化 + C++20 | ★ 定时炸弹 | ★ `:63,64,113,115` 快照数字 · `:124`「C++20」 | ★ 数字去敏（★ AGENTS.md「不记快照」纪律）+ dated 注 | ★ owner |
+| **G7** | ★★ `adr.md` §2 **分段语义错位**（★ 本轮核心新证） | ★ **定时炸弹** | ★ §2.3（★「Phase 1 提案决策（🚧）」段）实测 **18 行 = 🚧 12 + ✅ 6**（★ ✅ 6 = ADR-045/087/088/089/091/092）⇒ ★ 该段实为**追加残段**、非按状态分段（★ 046/047/048/049/082/083 被放进 §2.1 · ★ 045/087~092 没搬）⇒ ★ **6 次注册 5 次不搬** ⇒ ★ ★ **「按状态分三段 + 人工搬行」已被证伪** ⇒ ★ 唯一出路 = **单表 + 状态列 + 机检** | ★ **随 A3 一并裁决**（★ ★ 人工搬行方案排除） | ★ **待决策** |
+| **G1** | `adr.md` §3 节标题计数腐化 | ★ 定时炸弹 | ★ C「5 条」实 **6** · K「2 条」实 **1** · L「1 条」实 **2** · TOC G=5（节标题 7） | ✅ **本轮已修**（★ 含 TOC anchor 同步 —— ★ anchor 含条数 ⇒ 不同步即断链） | ★ architect |
+| **G8** | `adr.md` §2.4 M 类静默漏 ADR-049 | ★ 效率损失（★ §2.4 已有「不得引用为全部 ADR 的分布」声明对冲 ⇒ 实际危害偏低） | ★ M=3 只数 044/085/086 · 漏 049（✅ · 2026-09-25 · ≤086） | ★ **随 A3 一并**（★ 单点改会再动那套脱节统计） | ★ **待决策** |
+| **G3** | ADR-042 决策被现实超越 | ★ 定时炸弹 | ★ §2.1 行 ✅，★ 但 MMU 已在 Phase 6d 实装（`ip/mmu/` · `[mmu]` · `src/cf_plugin/bridge/mmu_bridge.h`） | ✅ **本轮已加 dated 注**（★ 推迟语义仅对 FPU/Exception 成立） | ★ architect |
+| **G4** | ADR-091 文件 Status 行版本滞后 | ★ 效率损失 | ★ 文件 Status 写 v1.2/v1.9，★ 正文与 §2.1 行已是 v1.16 | ★ 随下次修订 | ★ architect |
+| **G2** | ★ ADR-083（**Accepted**）内 `extern/CppTLM` 错径 ×2 | ★★ **实际错误** | ★ `extern/` 目录**实测不存在** | ✅ **本轮已修**（★ + `overview.md` 1 处 ⇒ 3/5 处） | ★ architect |
+| **G5** | `docs/lessons` / `docs/methodology` 各含 `src/cf_plugin/tests/` 死引用（×3） | ★ 定时炸弹 | ★ 目录已删 | ★ 随 C3 扩围**自动进检** | ★ builder / owner |
+| **G6** | `background-and-goals.md:55`「与 CppTLM 共享同一套 Bundle 类型系统」过度陈述 | ★ 实际错误（弱） | ★ `bundles/` 用 `cf::plugin::uint_t`，★ TLM 下是 POD | ★ dated 注 | ★ owner |
+| **G9** | `error-handling.md` **全文无 CH_MEM 错误范式** | ★ 缺口 | ★ ADR-047 `Result` / PayloadStore fail-fast 全文缺席 | ★ owner 补节 或 标历史态 | ★ owner |
+| **A3** | `adr.md` §2.4 统计口径（48 vs 60 · 两套词表 · M 类断链） | ★ 定时炸弹 | ★ 见 §7 | ★ **单表化 + 派生 + 机检相等**（★ 与 ADR-094 D-16 同一哲学） | ★ **待决策** |
+| **A2** | `arch_paths` 仅覆盖 **7 份顶层文件 / 18 份**（★ 另含 1 个目录 `adr/`）⇒ ★ **盲区 10 份**（★ 口径：18 顶层 − 7 命中 − 1 排除 = 10） | ★ 归属问题 | ★ `.rddf/config/arch-docs.json` | ★ **扩围**（★ 换 architect 直接修的权利）★ ⇒ ★ **建议扩 4 份（★ 逐一列名，★ 不含历史态 / 映射态文档）**：★ ① `error-handling.md`（★ 目标态 · 仅缺 dated 注 + 死名 `MemRespBundle`）· ② `background-and-goals.md`（★ 目标态 · C++17 事实错误）· ③ `performance-guide.md`（★ **大面积虚构** ⇒ 需整体标历史态 ⇒ ★ **须 architect 写**）· ④ `ip-catalog.md`（★ 索引层 · §相关文档 只链 2 份架构文档）★ ★ **明确排除 3 份历史态 / 映射态文档**（★ `plugin-framework.md` · `code-framework-mapping.md` · `tech-selection.md`）⇒ ★ ★ **扩围 = 2 + 2 = 4 份（★ 算术闭合）** | ★ **待决策** |
+| **A1** | 无 `docs/architecture/README.md` | ★ 效率损失 | ★ 18 份靠 AGENTS.md §5 四行表 | ★ 建（★ MUST 生成式 + frontmatter 派生 + 机检相等） | ★ **待决策** |
+| **C1** | ADR 孤儿检查未建 | ★ 效率损失 | ★ `verify_adr.sh` 不做 | ★ builder（★ **实测零误伤** ⇒ 可直接落闸） | ★ builder |
+| **C2** | 索引条目路径存在性未建 | ★ 效率损失 | ★ 残留 ⑩ | ★ builder | ★ builder |
+| **C3** | ★ `doc_link_check.sh` 检查 2 仅根级 3 文档 | ★ **定时炸弹** | ★ `doc_link_check.sh:14-15,56` · ★ 实测漏报 **≥16 处**死/错引用 | ★ **先扩 `docs/architecture/`**（18 份）★ ⇒ 跑顺后再评估全量（★ 脚本注释明说全量噪声过高） | ★ builder |
+| **E** | 层次化落点未登记进 `objective-soc-cpu-v0110-launch.md` | ★ 待办 | ★ 该文件 grep「层次化」**零命中** | ★ planner | ★ planner |
+| **F** | 层次化主题 §7 的 20 条残留（★ ⑨已闭合） | ★ 混合 | ★ 主题文档 §7 | ★ 按各条归属（★ ⑭ 已由 D 闭合） | ★ 混合 |
+| **B7** | ★ `m4-dse-cpufactory-real-pr-description.md` **不应驻留架构目录**（★ PR 描述非架构文档） | ★ 效率损失 | ★ 该文自述「OpenSpec change 已归档」 | ★ 移出（★ 归 `openspec/changes/archive/` 旁或 `docs/` 历史区） | ★ owner |
+
+### 9.2 ★ 优先级（★ 前 5）
+
+| 序 | 项 | ★ 为什么这个序 |
+|---|---|---|
+| **1** | ★ **D（机制锚注）** | ★ ★ **零依赖** + ★ **阻塞 ADR-094 治理收口** ⇒ ★ 本轮已做 |
+| **2** | ★ **B5 / B4 / B6 的「错误子集」**（C++17 · `MemRespBundle` · `performance-guide` 虚构） | ★ ★ **读者即刻会信的错** ⇒ ★ 改一句话即止血（★ B6 是整体标历史态） |
+| **3** | ★ **A2（`arch_paths` 扩围）** | ★ ★ **它决定 B1~B6 谁有权改** ⇒ ★ 它是 B 的**前置** |
+| **4** | ★ **G7① §2 单表化 + 两条机检**（★ 节标题数 = 行数 · 行状态 = 节语义） | ★ ★ **拆弹**：★ 单表化后 A3（补登）才有意义、★ C1（孤儿检查的词表）才稳定 |
+| **5** | ★ **C3（`doc_link_check` 扩围 `docs/architecture/`）** | ★ ★ 把 **≥16 处**死/错引用**收进门禁** ⇒ ★ G5 自动收敛 |
+
+### 9.3 ★ ★ 不治理的**实际后果**（★ 最严重 3 条）
+
+| # | 谁 · 什么时候 | ★ 会发生什么 |
+|---|---|---|
+| **1** | ★ **下一个 onboarding 的 IP 开发者** | ★ 读 `background-and-goals.md:20` 认定代码库 **C++17**；★ 按 `performance-guide.md` 的 §2.1/§4.1 配 `dmi_enabled` / `impl_mode_config` JSON ⇒ ★ **照做即发现配置无人解析**（★ ADR-029 明写「悬挂引用」）⇒ ★ ★ **onboarding 第一天踩两个虚构/错误事实** |
+| **2** | ★ **验证工程师** | ★ 按 `error-handling.md:39-51` 用 **`MemRespBundle.status`** 设计错误注入、按 `:74-77` 做 **COMPARE** 异常验证 ⇒ ★ **编译直接失败**（★ 开放核 `bus_iface_chmem.h:27` 明禁该名）★ 且 **COMPARE 模式从未存在**、parity 语义早已取代 |
+| **3** | ★ **架构读者** | ★ 按 `plugin-framework.md:669-671` 得出「同一 IP 可维护 **TLM 版 + RTL 版两份**」⇒ ★ ★ **这正是 ADR-083（2026-10-08 Accepted）要消灭的双副本模式** ⇒ ★ 若据此规划新 IP ⇒ ★ **新项目 Day 1 就违反已签批的 single-source-of-truth** |
+
+### 9.4 ★ 依赖图（★ 文字版）
+
+```
+A2（arch_paths 扩围）──► B1~B6（5 份盲区文档的直接修权限）
+        │                        └──► C3（扩围后 doc_link_check 才有意义）
+        ▼
+G7①（§2 单表化 + 机检）──► A3（§2.4 补登 087~094）──► C1（孤儿检查的词表稳定）
+        │
+        └──► G8（M 类补 ADR-049）· G1（§3 计数，已做）
+
+D（机制锚注）──► ADR-094 治理收口（★ 独立快车道 · 零前置 · ★ 本轮已完成 D1）
+D2（适用面登记）──► 主题文档 §3.5 由 SHOULD 升 MUST（★ 须先登记）
+
+E（objective 登记）∥ 全部（★ 可并行）
+F 残留 ⑭ ──► D（★ 已闭合）
+```
+
+### 9.5 ★ 建议的**决策顺序**（★ 若只能做三件事）
+
+| 顺 | 决策 | ★ 为什么先做它 |
+|---|---|---|
+| **1** | ★ **A2（`arch_paths` 扩围 · 建议扩 4 份 · ★ 清单见 §9.1 A2）** | ★ 它**解锁 B1~B6 的直接修权限** ⇒ ★ 否则 5 份盲区文档只能长期走 owner 注记（★ 慢且易漏） |
+| **2** | ★ **A1（建 `docs/architecture/README.md`）** | ★ 闭合「17 份零全局索引」⇒ ★ 且 MUST 生成式（★ frontmatter 派生 + 机检相等）⇒ ★ 否则 README 自己也会腐 |
+| **3** | ★ **A3（§2.4 口径 · 建议在 G7① 单表化之后）** | ★ ★ **顺序有依赖**：★ 先单表化（★ 消除「人工搬行」这个已被证伪的方案）★ 再补登 ⇒ ★ 否则会把两套口径固化得更深（★ 残留 ⑲ 已警示） |
+
+### 9.6 ★ 本轮已做（★ architect 单方可做 + 零风险）
+
+| # | 修订 | 性质 |
+|---|---|---|
+| 1 | ★ `adr.md` §3 节标题计数修正（C 5→6 · K 2→1 · L 1→2）+ ★ **TOC anchor 同步**（★ anchor 含条数 ⇒ 不同步即断链） | ★ 纯事实修正 |
+| 2 | ★ `adr.md` §2.1 ADR-001 行状态：✅ → ★ **⚠️ 部分过时**（★ 依据 §3 记录） | ★ 纯事实修正（★ 消除表内自相矛盾） |
+| 3 | ★ `adr.md` §2.1 ADR-042 行加 dated 注（★ MMU 已实装 ⇒ 推迟语义仅对 FPU/Exception 成立） | ★ 事实标注 |
+| 4 | ★ `extern/CppTLM` 错径订正 **3 处**（★ `ADR-083` ×2 + `overview.md` ×1）⇒ ★ 实际 = 仓库根 `CppTLM/`（★ `extern/` 实测不存在） | ★ 纯路径事实修正 |
+| 5 | ★ **ADR-094 V-28 补 `ch::hier_eq` 机制锚注**（★ 7 项闭合公共面 + fail-closed + 判别力边界 + 「MUST NOT 自建等价比对器」） | ★ **D1**（★ 机制锚的首次登记） |
+
 ★ ★ **未做（★ 需你决策）**：★ 补登 `adr.md` §2.4（★ 会固化第二套分类 ⇒ 见选项 3）· ★ 建 `docs/architecture/README.md`（★ 见选项 1）· ★ 扩 `arch_paths`（★ 见选项 2）· ★ 写门禁脚本（★ 归 builder）· ★ frontmatter 批量标注（★ 依赖选项 1）。
