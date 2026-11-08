@@ -126,7 +126,7 @@ python3 tools/parity/parity_gate.py --layer night --jobs 4 --report build/parity
 
 | 判据 | 实测 | 证据落点 |
 |---|---|---|
-| **fail-closed ≥5 例** | **6/6** | `openspec/changes/backend-parity-harness/tasks.md` §2b |
+| **fail-closed ≥5 例** | **6/6** | `openspec/changes/archive/2026-11-09-backend-parity-harness/tasks.md` §2b |
 | **变异自检 ≥2 例** | ≥2 | 契约 §7 **S-6**（`memsig` 数据取反 `a55f52c5`→`8fcc53ba`）· **S-9a**（实跑 `branchbench_m0` 20k）· **S-10**（负向 N1~N5 均 `rc=2`） |
 | 判定层鉴别力 | `--self-test` **16/16** | `python3 tools/parity/parity_gate.py --self-test` |
 | ★ 白名单校验 | exit 0（★ 真实例外 **0** 条 + 常驻合成例外 `synthetic-self-test`） | `load_exceptions()` 内嵌校验 |

@@ -73,9 +73,9 @@
 
 | 门禁 | 内容 | 载体 |
 |---|---|---|
-| ① **顶层纯净 lint** | 顶层 + `adr/` 不得出现实施态时点语汇（`mixed/` / `archive/` 豁免） | `tools/check_arch_truth.sh` |
+| ① **顶层纯净 lint** | ★ **顶层**（`docs/architecture/*.md`，**非递归**）不得出现实施态时点语汇（★ **`adr/` 不在范围** · `mixed/` / `archive/` 豁免）⇒ ★ 词表 + 8 类语法上下文豁免（ADR-095 v1.1 §2.5.1） | `tools/check_arch_truth.sh` |
 | ② **链接完整性** | `doc_link_check.sh` 覆盖 `docs/architecture/`（含子目录） | `tools/doc_link_check.sh` |
 | ③ **ADR 孤儿检查** | `adr/` 每份在 `adr.md` §2 有行；`adr.md` 每行本地链接存在 | `tools/verify_adr.sh` |
-| ④ **子目录引用非权威标注** | 顶层引用 `mixed/` / `archive/` 须标「非权威」 | 门禁 ① / 人工核销 |
+| ④ **子目录引用非权威标注** | 顶层引用 `mixed/` / `archive/` 下的**文件**时须标「非权威」 | 门禁 ① / 人工核销 |
 
-★ 门禁的落地与验证：`openspec/changes/architecture-truth-boundary-enforcement/`
+★ 门禁的落地与验证：`openspec/changes/archive/2026-11-09-architecture-truth-boundary-enforcement/`

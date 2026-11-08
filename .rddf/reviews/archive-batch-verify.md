@@ -52,7 +52,7 @@
 |---|---|---|
 | parity 门禁在 CI 执行 + 回读 | ✅ | CI run **42473424285**（`workflow_dispatch` · layer=pr · ref=main）⇒ **conclusion = success** · **非 success/skipped 的 step 数 = 0**（13 步全过） |
 | artifact 回读 | ✅ | `parity-report-pr` ⇒ `verdict=PASS` · `error_kind=null` · `layer=pr` · `timings.count=8` · `p95=30.851s` · `jobs=4` · `commit=c10041a` |
-| ★ CI 首次 run 的两次失败 | ✅ 已归因并修复 | ① deps 未构建（`No rule to make target libcpptlm_core.a`）② Verilator 静默未装（按发行版精确匹配分流 ⇒ 两分支都 skip）⇒ 均已修，第三次 run 全绿；★ 证据落 `openspec/changes/backend-parity-ci/ci-first-run-evidence.md` |
+| ★ CI 首次 run 的两次失败 | ✅ 已归因并修复 | ① deps 未构建（`No rule to make target libcpptlm_core.a`）② Verilator 静默未装（按发行版精确匹配分流 ⇒ 两分支都 skip）⇒ 均已修，第三次 run 全绿；★ 证据落 `openspec/changes/archive/2026-11-09-backend-parity-ci/ci-first-run-evidence.md` |
 
 ### 2.4 验收 4 —— 边界与错误路径（★ 每条都有负向对照）
 

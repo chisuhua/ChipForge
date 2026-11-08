@@ -544,6 +544,22 @@ def self_test():
     checks.append(("--timeout-s 显式覆盖生效",
                     case_timeout({"name": "b", "kind": "branchbench"}, _O) == 77, "77s"))
 
+    # ★ ★ v1.6（2026-11-08 CI 首跑实测修正）：语料存在性校验**按「本次选中集合」**判定。
+    #   ★ 原实现校验清单全量 ⇒ `--layer pr` 也因 night 专属的 branchbench ELF 缺失而 ERROR
+    #   ⇒ 而 branchbench 的构建需 `riscv32-unknown-elf-g++`（CI 不可得）⇒ PR 层被 night 前置拖红。
+    #   ★ 契约：选中项缺失 ⇒ ERROR（fail-closed 不变）；未选中项缺失 ⇒ WARNING（不改 verdict）。
+    _c = lambda n, rel, lay: {"name": n, "kind": "elf", "relpath": rel, "layer": lay}
+    _sel_pr = [_c("ok", "CMakeLists.txt", "pr")]
+    _all_pr = _sel_pr + [_c("bb", "build/__nope__.elf", "night")]
+    _miss, _warn = check_corpus_files_exist(_sel_pr, _all_pr)
+    checks.append(("语料存在性：未选中项缺失 ⇒ 仅 WARNING（不改 verdict）",
+                    _miss == [] and len(_warn) == 1 and "night" in _warn[0],
+                    f"missing={len(_miss)} warnings={len(_warn)}"))
+    _miss2, _warn2 = check_corpus_files_exist([_c("bad", "build/__nope__.elf", "pr")],
+                                               [_c("bad", "build/__nope__.elf", "pr")])
+    checks.append(("语料存在性：选中项缺失 ⇒ ERROR（fail-closed 不变）",
+                    len(_miss2) == 1 and _warn2 == [], f"missing={len(_miss2)}"))
+
     width = max(len(c[0]) for c in checks)
     failed = 0
     for name, passed, detail in checks:

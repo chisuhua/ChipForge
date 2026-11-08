@@ -1,6 +1,6 @@
 # A4 实施路径（差分门禁接线 + CI build 能力）
 
-> **change**: `backend-parity-ci`（★ **本 plan 起草时已立项** ⇒ `openspec/changes/backend-parity-ci/`）
+> **change**: `backend-parity-ci`（★ **本 plan 起草时已立项** ⇒ `openspec/changes/archive/2026-11-09-backend-parity-ci/`）
 > **本文件**: A4 的可执行路径（repo 内 SSOT）★ ★ **AC 权威 = change 的 `proposal.md` 的 `## Acceptance Criteria` 段**（★ 与 `rdd-verifier` 提取源一致：★ `rdd-verifier/SKILL.md:148`）⇒ ★ **本 plan 是执行路径，不是 AC 权威**
 > **架构授权**: **ADR-089**（双后端差分 parity 门禁，✅ Accepted v1.4）· **ADR-088 v1.4**（TLM 后端退役，✅ Accepted）· **ADR-083**（Plugin-style 单一 source of truth）
 > **门禁契约**: `docs/architecture/parity-gate-contract.md`（★ S-1~S-17 · ★ GN-1 通用总则）⇒ ★ **本 plan MUST NOT 改判定语义**
@@ -177,7 +177,7 @@
 
 ★ ① `.rddf/roadmap/features/feat-backend-parity-gate.md:36` ⇒ ★ A4 勾选 + 完成日期
 ★ ② `.rddf/roadmap/objectives/objective-backend-parity-and-single-model.md:142` ⇒ ★ G-A4 勾选
-★ ③ `openspec/changes/backend-parity-ci/tasks.md` ⇒ ★ 全部勾选
+★ ③ `openspec/changes/archive/2026-11-09-backend-parity-ci/tasks.md` ⇒ ★ 全部勾选
 ★ ④ ★ **★ 判据 4/6/7 的引用更新**：★ `ADR-088` 的状态行**不由 builder 改**（★ 属 architect）⇒ ★ 只在**审稿报告 / roadmap** 记录「判据 4/7 的完成形式已满足」
 
 ---

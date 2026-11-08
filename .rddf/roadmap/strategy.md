@@ -129,13 +129,10 @@ graph TD
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
 | `2026-10-08-cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-08-verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 52 0 |
-| `backend-parity-corpus` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (23/25) | 2 23 |
-| `backend-parity-harness` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (25/26) | 1 25 |
-| `backend-parity-observability` | wave5-isa-coverage-and-bp | P1 | DONE | 0 29 |
+| `backend-parity-corpus` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (24/25) | 1 24 |
 | `backend-parity-open-core` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (40/61) | 21 40 |
 | `mmu-chmem-phase-b-c-launch` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (10/33) | 23 10 |
 | `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (29/173) | 144 29 |
-| `parity-gate-spec` | wave5-isa-coverage-and-bp | P1 | DONE | 0 32 |
 | `parity-observation-ambiguity-fail-closed` | wave5-isa-coverage-and-bp | P1 | TODO | 0 0 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
@@ -166,6 +163,9 @@ graph TD
 | `2026-10-22-chmem-mmu-keys-modality` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 46 |
 | `2026-10-22-ctrl-link-chmem-reg-handle` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 4 31 |
 | `2026-10-24-rv64-isa-declaration-correction` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 0 14 |
+| `2026-11-09-backend-parity-harness` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 26 |
+| `2026-11-09-backend-parity-observability` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 29 |
+| `2026-11-09-parity-gate-spec` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 32 |
 | `chmem-bp-btb-gshare` | wave6-linux-and-productization | P1 | TODO | 7 0 |
 | `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
 | `2026-10-24-chmem-branch-microbench` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 4 |
@@ -174,8 +174,11 @@ graph TD
 | `2026-10-24-chmem-verilator-perf-harness` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 6 |
 | `2026-10-26-chmem-bp-btb-gshare-poc` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 5 |
 | `2026-10-26-chmem-branch-microbench-fix` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 5 |
-| `architecture-truth-boundary-enforcement` | wave7-architecture-governance | P1 | TODO | 0 0 |
-| `architecture-truth-boundary` | wave7-architecture-governance | P1 | TODO | 0 0 |
+| `chmem-hierarchical-assembly` | wave7-architecture-governance | P1 | IN_PROGRESS (6/56) | 50 6 |
+| `chmem-hierarchical-unit-landing` | wave7-architecture-governance | P1 | IN_PROGRESS (5/30) | 25 5 |
+| `2026-11-09-architecture-truth-boundary-enforcement` | wave7-architecture-governance | P1 | ✅ DONE (archived) | 0 41 |
+| `2026-11-09-architecture-truth-boundary` | wave7-architecture-governance | P1 | ✅ DONE (archived) | 0 11 |
+| `2026-11-09-backend-parity-ci` | wave7-architecture-governance | P1 | ✅ DONE (archived) | 0 36 |
 
 > **Status 解读**:
 > - `TODO`: tasks.md 全部 open 或不存在

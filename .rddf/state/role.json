@@ -1,52 +1,10 @@
 {
   "schema_version": "role-v1",
-  "current_role": "planner",
-  "updated_at": "2026-11-08T11:07:08Z",
+  "current_role": "builder",
+  "updated_at": "2026-11-08T16:01:39Z",
   "updated_by": "user",
   "session_id": "ses_e898bf3fdffe3w9rIJOc3vco62",
   "history": [
-    {
-      "role": "architect",
-      "at": "2026-10-28T02:54:26Z",
-      "by": "user",
-      "trigger": "A1 实施期发现 CpuBusReq 缺「访问字节宽度」字段 ⇒ 写语义无法表达 sub-word RMW ⇒ 契约变更属架构裁决 ⇒ 切 architect 落 ADR-091 v1.7"
-    },
-    {
-      "role": "builder",
-      "at": "2026-10-28T02:56:55Z",
-      "by": "user",
-      "trigger": "A0 深化完成（ADR-091 v1.6 + v1.7 + plan §K13~K16）⇒ 切 builder 实施 A1（dmem 端口化）"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-29T01:13:29Z",
-      "by": "user",
-      "trigger": "A2 完成后裁决 memsig 的观测来源（开放核不持有内存 ⇒ 核侧算不出 ⇒ 需定 S5 契约）"
-    },
-    {
-      "role": "builder",
-      "at": "2026-10-29T06:56:46Z",
-      "by": "user",
-      "trigger": "ADR-091 v1.11 裁决落地后切回 builder，实施 A2.5（端口名解耦 G-1o + 断言精确化 V-15 + branch 测试补 toVerilog）"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-29T08:20:13Z",
-      "by": "user",
-      "trigger": "A2.6 完成后切 architect —— 裁决观测契约 4 项（plan §K23.3）+ A4 微架构调研（register re-naming / 乱序 / 层次化 plugin / regfile 做成 ch::component+ch_stream）"
-    },
-    {
-      "role": "architect",
-      "at": "2026-10-29T17:29:56Z",
-      "by": "user",
-      "trigger": "双审查（oracle+metis）产出 A-1~A-5 待裁决项 ⇒ 落 ADR 修订"
-    },
-    {
-      "role": "builder",
-      "at": "2026-10-29T17:33:45Z",
-      "by": "user",
-      "trigger": "ADR-091 v1.13 五项裁决落地后切回 builder，实施 A4-3（rd_we × flush 掩码）"
-    },
     {
       "role": "architect",
       "at": "2026-10-30T03:03:41Z",
@@ -124,6 +82,48 @@
       "at": "2026-11-08T11:07:08Z",
       "by": "user",
       "trigger": "用户「按建议顺序实施」序列第③步：修订 L1-B proposal 的词表/范围/8 类豁免（与 ADR-095 v1.1 对齐）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-11-08T11:33:12Z",
+      "by": "user",
+      "trigger": "用户口令：切 architect 梳理目标 / 为什么 / 怎么做 / 当前任务（A4+L1 收口后的全局复盘）"
+    },
+    {
+      "role": "planner",
+      "at": "2026-11-08T11:38:54Z",
+      "by": "user",
+      "trigger": "用户口令：切 planner 梳理后续任务内容与实施路径（承接 architect 的目标/取舍梳理）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-11-08T15:09:50Z",
+      "by": "user",
+      "trigger": "用户「继续推进」⇒ 第 0 批第 2 步：ADR-094 订正（r.14/V-40 归属 · V-32/V-34 补归属 · AC 权威口径 · D-22 标注）+ G-A3 签认"
+    },
+    {
+      "role": "builder",
+      "at": "2026-11-08T15:11:32Z",
+      "by": "user",
+      "trigger": "用户「继续推进」⇒ 第 0 批第 3 步：G-A3 证据重跑（当前 HEAD · night 层 52 case）+ AC-103 补证 + S-12 机检 + 归档 + strategy 重派生"
+    },
+    {
+      "role": "verifier",
+      "at": "2026-11-08T15:30:02Z",
+      "by": "user",
+      "trigger": "用户「继续推进」⇒ 归档前验收（★ builder 的固定审查者；★ verifier 分流条件②不满足 ⇒ 走本地验收 1-5 步）"
+    },
+    {
+      "role": "architect",
+      "at": "2026-11-08T16:00:53Z",
+      "by": "user",
+      "trigger": "night 层 52/52 PASS（当前 HEAD 8c94f5a）⇒ 切 architect 签认 G-A3（★ 阶段 C 前置①的唯一来源）"
+    },
+    {
+      "role": "builder",
+      "at": "2026-11-08T16:01:39Z",
+      "by": "user",
+      "trigger": "G-A3 已由 architect 签认 ⇒ 回 builder：勾 feat G-A3 + 归档 5 个 change + 重派生 strategy §7 + 开 draft PR 验证两条 workflow"
     }
   ]
 }
