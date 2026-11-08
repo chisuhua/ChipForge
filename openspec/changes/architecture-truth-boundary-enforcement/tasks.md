@@ -147,6 +147,12 @@ depends_on:
   - `tools/test_doc_checker.py` 在本机不可运行（同名 `tools` 包被另一 checkout 抢先解析）——
     **pre-existing 环境问题**，非本 change 引入
   - `arch-docs.json` 的 `build` 条目在未构建环境中不存在 —— 环境项，非死条目
+  - ★ `mmu-chmem-pipeline-integration` 的 `openspec validate` **失败（pre-existing）**：
+    其 `specs/cpu-l1-mmu-demo-regression/spec.md` 的 `MODIFIED` 块漏继承既有 scenario
+    （「Fix SHALL NOT modify ADR-049 PADDR consumption contract」的 `ADR-049 contract preserved`）。
+    ★ 该 specs/ 目录最近一次改动来自 `308cc08` / `fafadf7`（本 change 之前）⇒ **非本 change 引入**，
+    且修它需要判断那条 spec 的语义 ⇒ **不在本 change 范围**。后果：`openspec validate --changes`
+    为 **15 通过 / 1 失败**（本 change + 姊妹 change + L4 两个 change 全部 ✓）。
 
 ## 12. ★ 阶段边界
 
