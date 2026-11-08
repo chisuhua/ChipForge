@@ -1,0 +1,16 @@
+# ★ 本 change **不修改任何 spec**（★ 纯 CI/门禁接线：★ 只改 `tools/parity/parity_gate.py` + `tools/run_chipforge_tests.sh` + 新建 CI workflow）
+# ★ ⇒ 归档时 `openspec archive <change> --skip-specs` 合规
+# ★ ★ 依据：★ ADR-089（✅ Accepted v1.4）+ ADR-088 v1.4 §5.2 判据 4/7
+# ★   的判据是 **Verification 条目**（★ G-A4 / 判据 4 / 判据 7）★ 而非 spec capability 的 Requirement
+# ★ ⇒ ★ 因此**无** spec delta 可写
+# ★ ★ 另：★ 本文件**不改** spec-level 行为（★ 门禁的判定语义 S-1~S-17 一字未改）
+# ★   ⇒ ★ 只加「CI 具备 build 能力」+「门禁在 CI 中被执行且结果被回读」两个执行面
+
+schema: spec-driven
+created: 2026-11-08
+goal: 把已能跑的差分门禁接进本机入口与 CI，并让 CI 具备 build 能力（ADR-088 §5.2 判据 4 + 判据 7）
+affected_areas:
+  - tools/parity
+  - tools/run_chipforge_tests.sh
+  - .github/workflows
+skip_specs: true
