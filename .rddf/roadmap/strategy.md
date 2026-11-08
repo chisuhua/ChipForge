@@ -38,6 +38,7 @@
 | `wave4-csr-cache-dse` | Wave 4 CSR/异常 + Cache DSE | P2#6 phase-1.5-wave-4 + P2#7 cache 64×4 LRU | **v0.9.0** | exploring (占位) |
 | **`wave5-isa-coverage-and-bp`**（**新增 2026-09-27**）| Wave 5 ISA 覆盖 + 分支预测 + S/U mode | P3#8 mfc-cpu-pipeline-multi-cycle-fsm ✅ archived (2026-10-16, 53/60 done, 7 defer v0.11.0) + P3#9 cpu-pipeline-rv32c-decode + P3#10 cache-icache-fence-i + P3#11 cpu-pipeline-smode-umode + P3#12 cpu-pipeline-amo-lrsc + P3#13 cpu-pipeline-bp-btb-gshare (→ v1.0.0 窗口, 决策 2026-10-19) + P3#14 soc-freertos-demo + ADR-070~082 ✅ Accepted + ADR-084（14 条新规划，含 084=write-back FSM（重编号，原 083 冲突）净新增）| **v0.10.0 ✅ mfc 收官 → v0.11.0 → v1.0.0** | IN_PROGRESS（mfc ✅ archived, mmu-chmem **29/168 (Phase 2 done 2026-10-17, follow-up `mmu-chmem-phase-b-c-launch` 已开占位 Sprint 2-5)**, BP-BTB 归 v1.0.0 窗口 2026-10-19 决策）；详见 [`docs/architecture/roadmap-evolution.md` §4-§4.5](../../docs/architecture/roadmap-evolution.md) |
 | **`wave6-linux-and-productization`**（**2026-10-09 标记, v1.0.0+ 远期**）| Wave 6 Linux + chip-selector 商业化 | P4#15 vexii-riscv-parity-poc (远期 placeholder, v1.0.0+ 启动期启用) | **v1.0.0 → v1.3.0** | deferred (wave6 启动期启用); 详见 [`docs/architecture/roadmap-evolution.md` §5-§7](../../docs/architecture/roadmap-evolution.md) |
+| **`wave7-architecture-governance`**（**新增 2026-11-08 · architect 治理线**）| Wave 7 架构治理 —— 真相源边界 + 目录治理 + 门禁收口 | `architecture-truth-boundary`（位置 + 引用改写）· `architecture-truth-boundary-enforcement`（门禁 + 顶层净化）· 层次化装配 2 change（ADR-094）· A4 门禁接线 + CI | ★ **不绑版本**（治理线独立于功能版本节奏）| active（★ 新建） |
 
 ## 4. 依赖图
 
@@ -128,8 +129,14 @@ graph TD
 | `phase-1.5-wave-4` | wave4-csr-cache-dse | P2 | TODO | 41 0 |
 | `2026-10-08-cache-phase1.5-4way` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 32 0 |
 | `2026-10-08-verilator-l1cache-e2e-coverage` | wave4-csr-cache-dse | P2 | ✅ DONE (archived) | 52 0 |
+| `backend-parity-corpus` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (23/25) | 2 23 |
+| `backend-parity-harness` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (25/26) | 1 25 |
+| `backend-parity-observability` | wave5-isa-coverage-and-bp | P1 | DONE | 0 29 |
+| `backend-parity-open-core` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (40/61) | 21 40 |
 | `mmu-chmem-phase-b-c-launch` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (10/33) | 23 10 |
 | `mmu-chmem-pipeline-integration` | wave5-isa-coverage-and-bp | P1 | IN_PROGRESS (29/173) | 144 29 |
+| `parity-gate-spec` | wave5-isa-coverage-and-bp | P1 | DONE | 0 32 |
+| `parity-observation-ambiguity-fail-closed` | wave5-isa-coverage-and-bp | P1 | TODO | 0 0 |
 | `2026-09-28-cpu-factory-satp-mapping` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 24 4 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-deep-rca` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 19 0 |
 | `2026-09-28-debug-cpu-l1-mmu-demo-paddr-regression` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 3 20 |
@@ -159,11 +166,16 @@ graph TD
 | `2026-10-22-chmem-mmu-keys-modality` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 0 46 |
 | `2026-10-22-ctrl-link-chmem-reg-handle` | wave5-isa-coverage-and-bp | P1 | ✅ DONE (archived) | 4 31 |
 | `2026-10-24-rv64-isa-declaration-correction` | wave5-isa-coverage-and-bp | P0 | ✅ DONE (archived) | 0 14 |
+| `chmem-bp-btb-gshare` | wave6-linux-and-productization | P1 | TODO | 7 0 |
 | `vexii-riscv-parity-poc` | wave6-linux-and-productization | P1 | TODO | 74 0 |
 | `2026-10-24-chmem-branch-microbench` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 4 |
 | `2026-10-24-chmem-tlm-backend-freeze` | wave6-linux-and-productization | P0 | ✅ DONE (archived) | 0 9 |
 | `2026-10-24-chmem-tlm-coverage-parity-ledger` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 8 |
 | `2026-10-24-chmem-verilator-perf-harness` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 6 |
+| `2026-10-26-chmem-bp-btb-gshare-poc` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 5 |
+| `2026-10-26-chmem-branch-microbench-fix` | wave6-linux-and-productization | P1 | ✅ DONE (archived) | 0 5 |
+| `architecture-truth-boundary-enforcement` | wave7-architecture-governance | P1 | TODO | 0 0 |
+| `architecture-truth-boundary` | wave7-architecture-governance | P1 | TODO | 0 0 |
 
 > **Status 解读**:
 > - `TODO`: tasks.md 全部 open 或不存在
