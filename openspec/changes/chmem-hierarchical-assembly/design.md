@@ -154,6 +154,7 @@ PipeBuilder
 | **G3** | ★ **生产代码里零 `declare_out` 调用**（只有测试 20+ 处）⇒ r.6 的「顶层端口 MUST 经 `declare_in/out`」在生产路径**无现存调用点** | ①-D owner 切换后**测试批量变红**（端口名 `open_pc` → `cpu.open_pc`）⇒ ★ ADR 未覆盖测试基线处置 | architect + builder |
 | **G4** | 上游 `Component::build()` 也在 `create_ports` **之前**置 `built_`（`CppHDL/src/component.cpp:268`）⇒ 上游侧同样不可重试 | r.10 的**上游对应风险** | architect（是否需上游回执） |
 | **G5** | r.14 的「**创建时机维度**」未覆盖（★ oracle 终审点名的**长期残留风险**）⇒ `at_stage` 闭包内新建的节点被归 root ⇒ 合法化为不可见 | 本次不解决 ⇒ 已登记为长期项 | architect（触发条件 = 幽灵节点被实际观测到） |
+| **G7** | ★ ★ **与 `parity-observation-ambiguity-fail-closed` 的重叠**（★ 2026-11-08 实施前发现）：★ 该 change 做的正是「`resolve_node_id` 三态化」，★ 且改**同一个文件** `tools/parity_runner/parity_sim_runner.cpp` ⇒ ★ 若两者都做 ⇒ 改同一文件 + 同一判据 ⇒ 必然冲突 | ★ **已划界**（★ 见上表）：★ **三态化的实现**归该 change（1 文件 · 可独立验收 · 依赖已解除）★ 本 change 的 **①-C 只做「同名普查 + 消费」** ⇒ ★ L4 的 AC-13 / tasks 4.1 已改写 + `depends_on` 已加 | ★ **已闭合**（planner 2026-11-08） |
 
 ---
 

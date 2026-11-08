@@ -64,7 +64,11 @@
 
 ## 4. ①-C 阶段 1（★ 出口 V-39 + V-35/V-36 基线捕获）
 
-- [ ] **4.1** ★ `resolve_node_id` **三态化**：`kOk` / `kMissing` / `kAmbiguous`（C-1）⇒ ★ **变异**：歧义仍返回首个节点 ⇒ RED（V: V-39）⇒ 阶段 1 期间 `kAmbiguous` ⇒ 门禁报 `observation_ambiguous:<key>`（`ERROR(2)`）
+- [ ] **4.1** ★ **消费** `resolve_node_id` 的三态化（`kOk` / `kMissing` / `kAmbiguous`）⇒ 阶段 1 期间 `kAmbiguous` ⇒ 门禁报 `observation_ambiguous:<key>`（`ERROR(2)`）
+      ★ ★ **2026-11-08 边界划定**：★ **实现**归姊妹 change `parity-observation-ambiguity-fail-closed`（★ = ADR-091 **V-25** 的落地
+      ⇒ ★ 它改**同一个文件** `tools/parity_runner/parity_sim_runner.cpp` ⇒ ★ 本任务 **MUST NOT** 重复实现）
+      ⇒ ★ **前置** = 姊妹 change 已实施并归档（★ 依赖已解除：其 `depends_on: backend-parity-observability` 已归档）
+      ⇒ ★ 消费侧判据：★ 歧义 case ⇒ 门禁 `ERROR(2)` + `error_kind=observation_ambiguous:<key>`（V: V-39）
 - [ ] **4.2** ★ **前置同名普查**（★ **一次性 · 只读**）：范围 = 现网 52 case + CH_MEM binary 全量 case 的 ctx；同名节点组数 MUST = 0（或已逐组定位并修复）⇒ 报告落 `plan §K35` ⇒ ★ **变异**：注入一个同名节点 ⇒ 普查 MUST 报出该组 ⇒ RED ⇒ ★ **不通过 ⇒ 先修存量，不切阶段 1**
 - [ ] **4.3** ★ **普查窗口钉住**：记录 commit + CH_MEM binary SHA；★ **新增 case ⇒ 增量普查**（V: V-39）
 - [ ] **4.4** ★ **V-35 基线捕获**（★ **时机 MUST = 本批出口 / ①-D 开工前** —— ADR-094:157「切换后**无法事后补**」）：逐 case 的逐拍全观测量 hash 链（FNV，与既有 `pchash` **同构造** ⇒ 零新范式）+ 终值逐位数组 + 环境标识（commit / cpu 配置 / 语料集）⇒ 机器产物为**临时**（构建目录 / CI artifact）★ 结论落 `plan §K36` ⇒ ★ **变异**：捕获后人为注入一处观测差异 ⇒ hash 链 MUST 不同 ⇒ RED（V: V-35）

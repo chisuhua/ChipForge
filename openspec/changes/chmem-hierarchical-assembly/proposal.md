@@ -9,6 +9,10 @@ adr:
   - ADR-089
 depends_on:
   - backend-parity-ci
+  # ★ ★ 2026-11-08 新增：★ `resolve_node_id` 三态化的**实现**由姊妹 change 交付
+  #   （★ `parity-observation-ambiguity-fail-closed` = ADR-091 V-25 的落地 ⇒ 改**同一个文件**
+  #   `tools/parity_runner/parity_sim_runner.cpp`）⇒ ★ 本 change 的 ①-C 只做「同名普查 + 消费三态化」
+  - parity-observation-ambiguity-fail-closed
 ---
 
 # chmem-hierarchical-assembly —— 层次化装配框架地基（阶段 ①-A ~ ①-D）
@@ -140,7 +144,12 @@ depends_on:
 
 ### ①-C 阶段 1（★ 出口 V-39 + V-35 / V-36 基线捕获）
 
-- [ ] **AC-13** `resolve_node_id` **三态化**（`kOk` / `kMissing` / `kAmbiguous`）；★ **变异**：歧义仍返回首个节点 ⇒ RED（覆盖 V: V-39 · 侧面: **框架侧**）
+- [ ] **AC-13** ★ **`resolve_node_id` 三态化的「消费」**（覆盖 V: V-39 · 侧面: **框架侧**）
+      ★ **实现**由 `parity-observation-ambiguity-fail-closed` 交付 —— ★ **2026-11-08 边界划定**：
+      ★ 该 change（= ADR-091 **V-25** 的落地）改**同一个文件** `tools/parity_runner/parity_sim_runner.cpp`
+      ⇒ ★ 本 change **MUST NOT** 重复实现
+      ⇒ 判据：★ 阶段 1 期间 `kAmbiguous` ⇒ 门禁报 `observation_ambiguous:<key>`（`ERROR(2)`）；
+      ★ **变异**：歧义仍返回首个节点 ⇒ RED（★ 该变异由**姊妹 change** 的 AC-1 承重）⇒ ★ 本条只验「消费侧接住了」
 - [ ] **AC-14** 前置**同名普查**：现网 52 case + CH_MEM binary 全量 case 的 ctx 中同名节点组数 = 0（或已逐组定位并修复）；★ **普查窗口 MUST 钉住**（commit + CH_MEM binary SHA）+ ★ **新增 case ⇒ 增量普查**（覆盖 V: V-39 · 侧面: **框架侧**）
 - [ ] **AC-15** ★ **V-35 / V-36 基线捕获**（★ **时机 MUST = ①-C 出口 / ①-D 开工前** —— ADR-094:157）：逐 case 逐拍全观测量 hash 链（FNV，与既有 `pchash` 同构造）+ 终值逐位数组 + 环境标识；★ **变异**：捕获后人为注入一处观测差异 ⇒ hash 链 MUST 不同 ⇒ RED（覆盖 V: V-35, V-36 · 侧面: **框架侧**）
 
