@@ -1,0 +1,160 @@
+name: Parity Gate (双后端差分 · 阶段 A4)
+
+# ★ 本 workflow 落地 ADR-088 v1.4 §5.2 的 **判据 4 + 判据 7**（阶段 C 删 TLM 的硬前置①②）：
+#   判据 4 = 「CI 有可回归的自动测试」⇒ ★ 完成形式 = 差分门禁在 CI 中被执行且结果被回读
+#   判据 7 = 「CI 具备 build 能力」  ⇒ ★ 现状 CI 不构建项目 ⇒ 门禁 step 恒 SKIP ⇒ 判据 4/6 退化为「本机成立」
+# ★ change: backend-parity-ci · plan: .rddf/plans/backend-parity-ci.md（P3 + P4）
+# ★ 契约: docs/architecture/parity-gate-contract.md（S-13 语料单一来源 · S-15 运行时预算与分层 · GN-1 通用总则）
+#
+# ★ ★ **硬约束（GN-1）**：★ 判定机制自身失效 MUST 响亮失败，MUST NOT 表现为「无问题」
+#   ⇒ ★ 本 workflow **不得**用 `if [ ! -f ... ]; then echo SKIP; exit 0; fi` 短路
+#   （★ 那正是 architecture-gates.yml:163-166 / :179-182 让判据 4/6 退化为「本机成立」的病根）
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**/*.{h,cpp,cu,cuh,cc,cxx,hpp}'
+      - 'CMakeLists.txt'
+      - 'ip/**'
+      - 'src/cf_plugin/**'
+      - 'tests/cpu/**'
+      - 'bundles/**'
+      - 'tools/parity/**'
+      - 'tools/parity_runner/**'
+      - 'tools/verilator_runner/**'
+      - 'tools/run_chipforge_tests.sh'
+      - 'docs/architecture/parity-gate-contract.md'
+      - '.github/workflows/parity-gate.yml'
+  # ★ 夜间层：全量 52 case（48 ELF + 4 branchbench）≈ 45~60 min（S-15 实测 jobs=4）
+  #   ⇒ ★ 必须与 PR 层分离（★ PR 层 8 case ≈ 6.5 min）
+  schedule:
+    - cron: '0 18 * * *'   # 每日 18:00 UTC（★ 避开 PR 高峰）
+  workflow_dispatch:
+    inputs:
+      layer:
+        description: 'corpus 层（pr = 8 case 快子集 / night = 52 case 全量）'
+        required: false
+        default: 'pr'
+        type: choice
+        options: [pr, night]
+
+jobs:
+  parity-gate:
+    runs-on: ubuntu-latest
+    name: Parity Gate (${{ github.event_name == 'schedule' && 'night' || (inputs.layer || 'pr') }})
+    # ★ AC-2③：★ 必须设上限（★ 防止挂死占额度）—— 夜间层 ≈ 45~60 min ⇒ 留 2× 余量
+    timeout-minutes: 150
+
+    env:
+      CHIPFORGE_ROOT: ${{ github.workspace }}
+      CPPTLM_REPO: ${{ vars.CPPTLM_REPO || 'chisuhua/CppTLM' }}
+      CPPHDL_REPO: ${{ vars.CPPHDL_REPO || 'chisuhua/CppHDL' }}
+      # ★ 层选择：定时任务 ⇒ night；手动 ⇒ inputs.layer；PR ⇒ pr（S-15 分层语义）
+      PARITY_LAYER: ${{ github.event_name == 'schedule' && 'night' || (inputs.layer || 'pr') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ★ AC-2①：★ 检出 deps 到 ExternalProject 期望的路径（★ 复用 architecture-gates.yml 的约定）
+      - name: Checkout CppTLM
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CPPTLM_REPO }}
+          path: ${{ github.workspace }}/CppTLM
+
+      - name: Checkout CppHDL
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CPPHDL_REPO }}
+          path: ${{ github.workspace }}/CppHDL
+
+      # ★ AC-2④：★ Verilator 可用（★ 复用 architecture-gates.yml:50-63 的安装路径）
+      - name: Detect distribution
+        id: distro
+        run: |
+          DISTRO_VERSION=$(lsb_release -rs 2>/dev/null || grep -oP 'VERSION_ID="\K[^"]+' /etc/os-release)
+          echo "VERSION_ID=$DISTRO_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Install Verilator (Ubuntu 24.04 noble)
+        if: steps.distro.outputs.VERSION_ID == '24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator
+          verilator --version | head -1
+
+      - name: Build Verilator from source (Ubuntu 22.04 jammy)
+        if: steps.distro.outputs.VERSION_ID == '22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake make flex bison g++
+          git clone --depth 1 --branch v5.020 https://github.com/verilator/verilator.git /tmp/verilator
+          cd /tmp/verilator && cmake -B build && cmake --build build -j$(nproc) && sudo make install
+          verilator --version | head -1
+
+      # ★ ★ 单元级快车道（S-15）：★ **零构建依赖** ⇒ ★ 排在 build 之前
+      #   ⇒ ★ build 挂掉也能先拿到「比对器自身判别力」的信号
+      - name: Unit-level fast lane (parity_gate --self-test, 零构建依赖)
+        run: |
+          echo "=== A4 单元级快车道（契约 S-15）==="
+          python3 tools/parity/parity_gate.py --self-test
+
+      # ★ AC-2①：★ cmake configure（★ 默认 ExternalProject 隔离构建 deps）
+      - name: Configure (cmake)
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      # ★ AC-2②：★ 只 build 两个 runner target（★ 不 build 686 个 TLM case ⇒ 省时长）
+      #   ★ 夜间层额外需要 branchbench 的 4 个 ELF（CMake 构建产物，见 corpus.txt 头注）
+      - name: Build parity runners (判据 7)
+        run: |
+          TARGETS="parity_sim_runner cpu_verilator_sim"
+          if [ "$PARITY_LAYER" = "night" ] || [ "$PARITY_LAYER" = "all" ]; then
+            TARGETS="$TARGETS branchbench_elfs"
+          fi
+          echo "=== building targets: $TARGETS ==="
+          cmake --build build --target $TARGETS -j$(nproc)
+
+      # ★ AC-2② 验证：★ 两个 runner 都必须存在（★ 缺失 ⇒ 响亮失败，不 SKIP）
+      - name: Verify runners exist (GN-1 — 不得 SKIP)
+        run: |
+          rc=0
+          for r in build/bin/parity_sim_runner build/bin/cpu_verilator_sim; do
+            if [ -x "$r" ]; then
+              echo "OK   : $r"
+            else
+              echo "ERROR: $r 不存在 ⇒ ★ 判据 7 未满足（GN-1：不得静默 SKIP）"
+              rc=1
+            fi
+          done
+          exit $rc
+
+      # ★ AC-3①②：★ 门禁**被实际执行** + 结果**被回读**
+      - name: Run parity gate (判据 4)
+        id: parity
+        run: |
+          set -o pipefail
+          echo "=== 差分门禁 layer=$PARITY_LAYER ==="
+          python3 tools/parity/parity_gate.py --layer "$PARITY_LAYER" 2>&1 | tee build/parity/stdout.log
+          echo "gate_exit=$?" >> $GITHUB_OUTPUT
+
+      # ★ AC-3②：★ verdict + error_kind 机器可读（★ 供 ADR-088 判据 4/6 引用）
+      #   ★ 回读逻辑在 tools/parity/read_back_verdict.py（★ 独立脚本 ⇒ 可本地测 + 可单测；
+      #     ★ 不把 Python 内联进 YAML —— block scalar 缩进会让 heredoc 缩进错乱）
+      - name: Read back verdict (判据 4 的完成形式)
+        if: always()
+        run: |
+          python3 tools/parity/read_back_verdict.py --report build/parity/report.json
+
+      # ★ AC-3④：★ artifact 上传（★ 结果被回读的载体）
+      - name: Upload parity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-report-${{ env.PARITY_LAYER }}
+          path: |
+            build/parity/report.json
+            build/parity/stdout.log
+          if-no-files-found: error   # ★ 又是 GN-1：没有产物 = 没有结论 = 失败
+          retention-days: 30
