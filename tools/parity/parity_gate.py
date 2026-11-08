@@ -617,6 +617,46 @@ def self_test():
 
 # ────────────────────────────────────────────────────────────── main
 
+def write_error_report(opts, error_kind, message):
+    """★ 失败路径**也写报告**（★ C1-⑧ · 2026-11-08）。
+
+    ★ ★ 为什么必须写：★ 门禁失败时若**不写** report.json ⇒ ★ 消费方
+    （`read_back_verdict.py` / CI 的 `Read back verdict` step ★ 带 `if: always()`）
+    ⇒ ★ 会读到**上次运行残留**的报告（★ `verdict=PASS`）⇒ ★ ★ **假绿**。
+    ★ ⇒ **失败也必须留下本次的结论**，让消费者的输入永远完整。
+    ★ 实证：★ CI 首次 run（42472260469）的 artifact 步骤就报过
+    ★ `No files were found with the provided path: build/parity/report.json`（★ 失败 ⇒ 无报告）。
+    ★ ★ 同一根因的另一个实例已在 `run_simulator` / `run_verilator`（★ 跑之前删旧报告）修掉。
+    """
+    report = {
+        "schema_version": "parity-report-v1",
+        "verdict": "ERROR",
+        "error_kind": error_kind,
+        "message": message,
+        "layer": getattr(opts, "layer", None),
+        "commit": _git_head(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "observations": {},
+        "per_case": [],
+        "exceptions_applied": [],
+        "warnings": [],
+        "partial_cases": [],
+        "jobs": getattr(opts, "jobs", None),
+        "timings": {},
+    }
+    try:
+        path = os.path.abspath(opts.report)
+        d = os.path.dirname(path)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=2)
+            fh.write("\n")
+    except OSError as exc:
+        print(f"WARNING: 无法写 error report（{exc}）", file=sys.stderr)
+    return report
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="双后端差分 parity 门禁 —— 比对器（A2b）")
     ap.add_argument("--corpus", default=os.path.join("tests", "cpu", "parity", "corpus.txt"))
@@ -679,6 +719,7 @@ def main(argv=None):
         selected = [c for c in selected if c["name"] in wanted]
     if not selected:
         print("ERROR: empty corpus selection", file=sys.stderr)
+        write_error_report(opts, "empty_selection", "empty corpus selection")
         return 2
 
     # pre-flight：语料文件存在性（选中项 fail-closed · 未选中项仅 WARNING）
@@ -687,6 +728,7 @@ def main(argv=None):
         for m in missing_files:
             print(f"ERROR: corpus file not found: {m}", file=sys.stderr)
         print("verdict=ERROR error_kind=corpus_missing_files", file=sys.stderr)
+        write_error_report(opts, "corpus_missing_files", "; ".join(missing_files))
         return 2
     for w in missing_warnings:
         print(f"WARNING: corpus file not found: {w}", file=sys.stderr)
@@ -699,6 +741,7 @@ def main(argv=None):
             for p in problems:
                 print(f"ERROR: {p}", file=sys.stderr)
             print("verdict=ERROR error_kind=corpus_mismatch", file=sys.stderr)
+            write_error_report(opts, "corpus_mismatch", "; ".join(problems))
             return 2
 
     per_case = []

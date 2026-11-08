@@ -375,6 +375,29 @@ auto req_addr = must(pb.declare_out<U64>("x"));      // ✅
 | ★ **C1-②** | ★ **两个测试 binary 的源文件集合**不对称**（TLM = GLOB / CH_MEM = 显式列表） | ★ CH_MEM-only 测试（用 `declare_in/out` / `elaborate()` / `create_simulator()`）被 TLM 的 `GLOB_RECURSE` 收集 ⇒ ★ **TLM 111 个编译错误** | ★ 新增 `CHMEM_ONLY_TEST_SOURCES` + **CMake 断言**（★ 排除集合 ⊆ CH_MEM 源集合）⇒ ★ 防「只排一边」 |
 | ★ **C1-③** | ★ **ctest 本身不构建项目** | ★ 源码编译失败 ⇒ ★ ctest **照跑旧产物** ⇒ ★ 报告「通过」 | ★ 新增 **build fixture**（★ `cf_build_all`）⇒ ★ 编译失败 ⇒ 依赖测试 **Not Run** ⇒ ctest 整体 FAIL ⇒ **fail-closed** |
 
+#### ★ K18.1c ★★ **第 5 个通道（★ 2026-11-08 实测补录）：失败不写报告 ⇒ 消费者读到残留 PASS**
+
+| # | 通道 | 机制 | 封堵 | 证据 |
+|---|---|---|---|---|
+| ★ **C1-⑤** | ★ **门禁失败时不写报告** | ★ `parity_gate.py` 的 4 个 `return 2`（`input_invalid` / `empty_selection` / `corpus_missing_files` / `corpus_mismatch`）**全在写 report 之前** ⇒ ★ 失败 ⇒ `report.json` 不更新 ⇒ ★ 消费方（★ `read_back_verdict.py` + CI 的 `Read back verdict` step ★ 带 **`if: always()`**）读到**上次残留**的 `verdict=PASS` ⇒ ★ **假绿** | ★ 新增 `write_error_report()` ⇒ ★ **失败路径也写报告**（`verdict=ERROR` + `error_kind`）⇒ ★ 消费者输入永远完整 | ★ 实证：★ 放置假残留（`verdict=PASS` / `commit=STALE`）⇒ 制造失败 ⇒ 报告被覆盖成 `verdict=ERROR` / `commit=<本次 HEAD>` ⇒ 消费者 **EXIT=2**（非 PASS） |
+
+★ ★ **与 C1-④ 的关系**：★ **同根因、两个面** —— ★ C1-④ 防「读**旧 case 报告**」（`{case}.sim.json`）
+★ · ★ C1-⑤ 防「读**旧汇总报告**」（`report.json`）⇒ ★ 两个面**都要封**才算完整。
+
+★ ★ **历史证据**：★ CI 首次 run（`42472260469`）的 artifact 步骤报过
+★ `No files were found with the provided path: build/parity/report.json` ⇒ ★ 失败 ⇒ 无报告 ⇒ artifact 空
+★ ⇒ ★ 这条**早就被 CI 日志记录过**，只是当时被读成「artifact 上传失败」而非「失败不写报告」。
+
+#### ★ K18.1b ★★ **第 4 个通道（★ 2026-11-08 实测补录 · V-25 实施期抓到）**
+
+| # | 通道 | 机制 | 封堵 | 证据 |
+|---|---|---|---|---|
+| ★ **C1-④** | ★ **门禁读「上次运行」的报告**（★ 与 C1-③ 同机制、★ 不同载体） | ★ runner exit 2（★ 歧义 / TIMEOUT / 崩溃）时**不写** JSON ⇒ ★ work-dir 里留着**上次成功运行**的报告 ⇒ ★ gate 读到**陈旧数据** ⇒ ★ **观测侧是错的、门禁却绿** | ★ `run_simulator` / `run_verilator` 跑之前**删除**目标 JSON（★ 「没有新报告」⇒ 不会读陈旧数据） | ★ `openspec/changes/archive/2026-11-09-parity-observation-ambiguity-fail-closed/evidence/v25-ambiguity-evidence.txt` §4 |
+
+★ ★ **实测经过（★ 值得记，因为它证明「旧产物顶替」不是理论风险）**：★ V-25 的**歧义变异对照**第一次跑 gate 时
+★ **判 PASS**（★ 假绿！）⇒ ★ 根因 = 上述 C1-④ ⇒ ★ 修完后同一变异即被正确判为
+★ `error_kind=observation_ambiguous:reg_1`（★ verdict ERROR · exit 2）⇒ ★ **假绿通道当场被封**。
+
 #### K18.2 ★★ **「回归通过」信号此前根本不存在**（★ 恒红）
 
 ★ `ctest` 的 `chipforge_tests` entry 跑**全量** binary ⇒ ★ 其中含 baseline-known

@@ -180,6 +180,18 @@ depends_on:
 - [x] C1.4 ★ **baseline-aware 运行器**：`tools/run_catch2_with_baseline.sh` + `tools/baseline_known_failures.txt`（★ 按 binary 分节 + 每条附根因/owner/收敛期限）⇒ ★ **「全量回归通过」信号恢复**（★ 原先 ctest entry **恒红** ⇒ 信号从来不存在）
 - [x] C1.5 ★ **ctest build fixture**：`cf_build_all` ⇒ ★ 编译失败 ⇒ 依赖测试 **Not Run** ⇒ ctest 整体 FAIL ⇒ ★ **fail-closed**（★ 实测：注入编译错误 ⇒ `0% tests passed, 2 tests failed`）
 - [x] C1.6 ★ **实测知识沉淀**：plan §K18（★ 含「Catch2 XML reporter 会破坏依赖 `std::cerr` 捕获的测试」等 4 条可迁结论）
+- [x] ★ **C1.8** ★ ★ **第 5 个「旧产物顶替」通道：门禁失败时**不写报告** ⇒ 消费者读到残留的 PASS（★ 2026-11-08 实测抓到）
+      ★ `parity_gate.py` 的 4 个 `return 2`（★ `input_invalid` / `empty_selection` / `corpus_missing_files` / `corpus_mismatch`）
+      **全部在写 report 之前** ⇒ ★ 失败 ⇒ `report.json` **不更新**
+      ⇒ ★ 消费方 `read_back_verdict.py` + CI 的 `Read back verdict` step（★ 带 **`if: always()`** ⇒ 门禁失败时照样跑）
+      ⇒ ★ 读到**上次运行残留**的 `verdict=PASS` ⇒ ★ ★ **假绿**
+      ★ ★ **实证**：★ ① 先放置一份假的残留报告（`verdict=PASS` / `commit=STALE`）② 制造门禁失败
+      （`--only __nonexistent__` ⇒ `empty_selection`）③ ⇒ 报告被**覆盖成** `verdict=ERROR` / `error_kind=empty_selection`
+      / `commit=<本次 HEAD>` ⇒ ④ 消费者 `read_back_verdict.py` ⇒ **EXIT=2**（★ 不是 PASS）⇒ ★ **假绿通道封死**
+      ★ ★ **历史证据**：★ CI 首次 run（`42472260469`）的 artifact 步骤就报过
+      ★ `No files were found with the provided path: build/parity/report.json`（★ 失败 ⇒ 无报告 ⇒ artifact 空）
+      ⇒ ★ 修法：`parity_gate.py` 新增 `write_error_report()` ⇒ ★ **失败路径也写报告**（★ verdict=ERROR + error_kind）
+      ⇒ ★ 与 C1-④（跑之前删旧报告）**同根因、两个面**：★ C1-④ 防「读旧**case** 报告」· ★ C1-⑧ 防「读旧**汇总**报告」
 - [x] ★ **C1.7** ★ ★ **第 4 个「旧产物顶替」通道（★ 2026-11-08 变异对照实测抓到 · V-25 实施期）**：★ `parity` 门禁侧
       ★ runner exit 2（★ 歧义 / TIMEOUT / 崩溃）时**不写** JSON ⇒ ★ work-dir 里留着**上次成功运行**的报告
       ⇒ ★ gate 读到**陈旧数据** ⇒ ★ **观测侧是错的、门禁却绿**（★ 与 C1-③ 同机制、★ 不同载体：ctest 的 binary vs 门禁的 JSON 报告）
