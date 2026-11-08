@@ -194,6 +194,17 @@ jobs:
           bash tools/doc_link_check.sh --quiet
         continue-on-error: false
 
+      # ★ 门禁①④（ADR-095 §2.5①④ · change architecture-truth-boundary-enforcement）
+      #   ① 顶层 docs/architecture/*.md 不得出现实施态时点语汇（「现在长什么样」不进真相源）
+      #   ④ 顶层引用 mixed/ / archive/ 下的文档时必须标「非权威 · 仅作背景」
+      #   ★ 阻塞级：顶层纯净是 ADR-095 的核心治理约束，破一条顶层就会二次变脏
+      - name: Check architecture truth purity (check_arch_truth.sh)
+        id: verify_arch_truth
+        run: |
+          echo "=== Running check_arch_truth.sh (gate 1 + gate 4) ==="
+          bash tools/check_arch_truth.sh
+        continue-on-error: false
+
       - name: Summary (always)
         if: always()
         run: |
