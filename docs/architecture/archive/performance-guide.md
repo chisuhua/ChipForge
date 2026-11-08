@@ -429,6 +429,6 @@ void on_simulation_end() {
 ```
 
 ## 8. 相关文档
-- [项目架构总览](overview.md)
-- [测试与 DSE 框架](testing-and-dse.md)
-- [错误处理机制](error-handling.md)
+- [项目架构总览](../overview.md)
+- [测试与 DSE 框架](../mixed/testing-and-dse.md)
+- [错误处理机制](../error-handling.md)

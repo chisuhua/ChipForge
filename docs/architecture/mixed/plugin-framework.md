@@ -120,9 +120,9 @@ Phase 0 锁定 5 个最小可行组件（`PluginBase` / `Payload<T>` / `PipeNode
 - **包含**：`setup` + `build` 生命周期、类型安全 Key、节点状态机、阶段注册、声明式控制、位宽语义。
 - **不包含**：依赖分析、JSON 配置、ScoreBoard、CompareDriver、RTL AST 生成、BundleMapper（全部推迟到 Phase 6）。
 
-**完整 API 参考**：详见 [docs/api/cf_plugin.md](../api/cf_plugin.md)
+**完整 API 参考**：详见 [docs/api/cf_plugin.md](../../api/cf_plugin.md)
 
-> 上一节（§1）回答了"为什么需要 Plugin 风格"。本节回答"Plugin 风格的 5 个 P0 组件分别是什么、长什么样"。每个组件给出：设计意图、公共 API 列表（高层视图）、头文件位置、测试文件位置、关键约束。完整方法签名请翻阅 [cf_plugin.md](../api/cf_plugin.md)。
+> 上一节（§1）回答了"为什么需要 Plugin 风格"。本节回答"Plugin 风格的 5 个 P0 组件分别是什么、长什么样"。每个组件给出：设计意图、公共 API 列表（高层视图）、头文件位置、测试文件位置、关键约束。完整方法签名请翻阅 [cf_plugin.md](../../api/cf_plugin.md)。
 
 ### 2.1 PluginBase
 
@@ -135,7 +135,7 @@ Phase 0 锁定 5 个最小可行组件（`PluginBase` / `Payload<T>` / `PipeNode
 2. **派生类自由**：派生类只 override 必需的方法，没有"必须填的回调"。
 3. **禁止 `tick()` 业务重写**（D4 决策）：`tick()` 设为 `private = delete`，派生类无法意外定义同名函数。这把"Plugin-style vs tick()-style"从编码约定升级为编译期约束。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
 
 | 成员 | 类别 | 用途 |
 |------|------|------|
@@ -178,7 +178,7 @@ struct MyPlugin : cf::plugin::PluginBase {
 - 取值时如果类型不对，`std::any_cast` 抛 `bad_any_cast` 异常，错误信息不友好。
 - `Payload<T>` 用模板强制把 Key 写成有类型的全局对象，三个问题全部解决。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
 
 #### `PayloadKeyBase`（类型擦除基类）
 
@@ -273,7 +273,7 @@ state                       │
 - `CANCELING` + `complete_cancel()` → `IDLE`
 - `reset()` → 直接回到 `IDLE`
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
 
 #### 构造与查询
 
@@ -349,7 +349,7 @@ enum class Phase {
 2. **未来扩展**（Phase 6）：如果引入"先跑完所有 EARLY 再跑 NORMAL 再跑 LATE"的分桶调度，字段已就位。
 3. **可读性**：用户在 `at_stage` 时显式选 Phase，强迫思考"这个回调属于早/中/晚哪一段"。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
 
 #### Plugin 管理
 
@@ -429,7 +429,7 @@ ctrl.halt_when([&] { return node.is_blocked(); })
 
 空 `Condition`（`!cond`）被静默忽略，不会崩。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
 
 | 成员 | 用途 |
 |------|------|
@@ -469,7 +469,7 @@ ctrl.halt_when([&] { return node.is_blocked(); })
 
 为什么不在 Phase 0 直接用 `ch_uint<N>`：Phase 0 是 TLM 模式验证阶段，引入 RTL 抽象会增加复杂度但没有可见收益。`uint_t<N>` 是"位宽语义"的占位 typedef，行为与标准类型一致；Phase 6 再决定是否替换为 `ch_uint<N>`（届时会有 BundleMapper 等基础设施配合）。
 
-**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../api/cf_plugin.md)）：
+**公共 API 列表**（仅高层视图，完整签名见 [cf_plugin.md](../../api/cf_plugin.md)）：
 
 | 成员 | 用途 |
 |------|------|
@@ -505,7 +505,7 @@ static_assert(std::is_same<bool_t, bool>::value,   "bool_t must be bool (Phase 0
 
 ---
 
-**完整 API 参考**：详见 [docs/api/cf_plugin.md](../api/cf_plugin.md)
+**完整 API 参考**：详见 [docs/api/cf_plugin.md](../../api/cf_plugin.md)
 
 ---
 
@@ -760,7 +760,7 @@ D6 决策**保留 CppHDL chlib 现有 28 个测试零破坏**，新 Plugin 业�
 
 > **详细阶段定义**：
 > - Phase 0：`.rddf/roadmap/archive/phase-0-plugin-scaffolding.md`（实施记录 + 退出标准；2026-10-09 路线迁移时整合进 AGENTS.md + ADR-037/040/046/083, 文件已删除, 不链接）
-> - Phase 1：[`.rddf/roadmap/archive/phase-1-tlm-foundation.md`](../../.rddf/roadmap/archive/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
+> - Phase 1：[`.rddf/roadmap/archive/phase-1-tlm-foundation.md`](../../../.rddf/roadmap/archive/phase-1-tlm-foundation.md)（L1CachePlugin 业务实现）
 > - Phase 6：`.rddf/roadmap/archive/phase-6-declarative.md`（同上, 整合进 AGENTS.md + roadmap-evolution.md, 文件已删除, 不链接）
 
 ### 5.2 Phase 0 接口稳定性承诺

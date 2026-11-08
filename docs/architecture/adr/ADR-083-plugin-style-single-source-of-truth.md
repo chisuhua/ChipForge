@@ -281,7 +281,7 @@ CppTLM legacy 角色的**终态**分 4 阶段推进（路线图载体 `.rddf/roa
 - [ADR-040](ADR-040-tlm-hdl-portability-constraints.md)：TLM→HDL 移植性约束 v2.0（CH_MEM 是新正道）
 - [ADR-046](ADR-046-multi-cycle-fsm-exemption.md)：多周期 FSM 豁免
 - [docs/methodology/plugin-style-design-methodology-v1.md](../../methodology/plugin-style-design-methodology-v1.md) v2：Plugin 声明式电路设计方法学（TLM + CH_MEM 双模）
-- [docs/architecture/plugin-framework.md](../plugin-framework.md)：Plugin 框架架构
+- [docs/architecture/plugin-framework.md](../mixed/plugin-framework.md)：Plugin 框架架构
 - [docs/lessons/phase-6c-elaboration-substrate.md](../../lessons/phase-6c-elaboration-substrate.md)：Phase 6c 行级教训
 
 ---

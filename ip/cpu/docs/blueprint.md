@@ -506,6 +506,6 @@ VexRiscv 是 SpinalHDL 生态最成功的开源 RISC-V CPU:
 - **各阶段实施规划**: [`implementation-plan/M1..M5`](implementation-plan/)
 - **任务状态看板**: [`status.md`](status.md)
 - **权威设计**: [`multi_isa_architecture.md`](multi_isa_architecture.md) v2.0
-- **框架层**: [`docs/architecture/plugin-framework.md`](../../../docs/architecture/plugin-framework.md)
+- **框架层**: [`docs/architecture/plugin-framework.md`](../../../docs/architecture/mixed/plugin-framework.md)
 - **方法学**: [`docs/methodology/plugin-style-design-methodology-v1.md`](../../../docs/methodology/plugin-style-design-methodology-v1.md)
 - **L1Cache 经验**: [`docs/lessons/phase-1.2-l1cacheplugin.md`](../../../docs/lessons/phase-1.2-l1cacheplugin.md)

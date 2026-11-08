@@ -93,9 +93,9 @@ public:
 
 ### 当前实际状态 (2026-06-17 实证)
 
-> ★ ★ **定性（★ 2026-11-08 治理修订）**：★ **本节 = 实施态快照**（★ dated **2026-06-17** ⇒ ★ **近 5 个月未复核**）⇒ ★ **不是目标态**（★ 「该长什么样」见本节之上的设计描述）⇒ ★ ⇒ ★ **MUST NOT 被当作目标态引用**；★ **当前进度以 [`roadmap-evolution.md`](./roadmap-evolution.md) + [`.rddf/roadmap/`](../../.rddf/roadmap/) 为准** ⇒ ★ **本节不作为进度真源**（★ 纪律样板见 [`hierarchical-plugin-architecture.md` §0.1](./hierarchical-plugin-architecture.md)）。
+> ★ ★ **定性（★ 2026-11-08 治理修订）**：★ **本节 = 实施态快照**（★ dated **2026-06-17** ⇒ ★ **近 5 个月未复核**）⇒ ★ **不是目标态**（★ 「该长什么样」见本节之上的设计描述）⇒ ★ ⇒ ★ **MUST NOT 被当作目标态引用**；★ **当前进度以 [`roadmap-evolution.md`](../roadmap-evolution.md) + [`.rddf/roadmap/`](../../../.rddf/roadmap/) 为准** ⇒ ★ **本节不作为进度真源**（★ 纪律样板见 [`hierarchical-plugin-architecture.md` §0.1](../hierarchical-plugin-architecture.md)）。
 
-> **本节由审计添加, 区分"文档承诺"vs"实际可用"**。详细 DSE 设计见 [`../../ip/cpu/docs/dse_architecture.md`](../../ip/cpu/docs/dse_architecture.md)。
+> **本节由审计添加, 区分"文档承诺"vs"实际可用"**。详细 DSE 设计见 [`../../ip/cpu/docs/dse_architecture.md`](../../../ip/cpu/docs/dse_architecture.md)。
 
 | 工具/脚本 | 本文档描述 | 2026-06-17 实际状态 |
 |-----------|-----------|-------------------|
@@ -109,7 +109,7 @@ public:
 
 > **注**: 上述行号引用上一版本 (2026-06-17 前),现以语义 anchor 替代,避免再次编辑时漂移。
 
-**关键变更**: 本节原描述的 `SweepDriver` 类已被 [`../../ip/cpu/docs/dse_architecture.md`](../../ip/cpu/docs/dse_architecture.md) §8.3 重构为独立可执行脚本 (`tools/dse/sweep_driver.py`),以子进程方式调用 `cpu_sim` 二进制,避免 Python 直接绑定 C++ 类。
+**关键变更**: 本节原描述的 `SweepDriver` 类已被 [`../../ip/cpu/docs/dse_architecture.md`](../../../ip/cpu/docs/dse_architecture.md) §8.3 重构为独立可执行脚本 (`tools/dse/sweep_driver.py`),以子进程方式调用 `cpu_sim` 二进制,避免 Python 直接绑定 C++ 类。
 
 ### JSON 配置驱动的参数化体系
 
@@ -204,7 +204,7 @@ public:
 
 参考 gem5 的 Stats 系统，每个 TLM 组件内置层次化统计收集：
 
-本项目采用 `tlm_stats` 命名空间实现统计收集框架，详见 [Performance Guide - §7 CPPLTLM Stats Framework](performance-guide.md#7-cpptlm-统计收集框架)。
+本项目采用 `tlm_stats` 命名空间实现统计收集框架，详见 [Performance Guide - §7 CPPLTLM Stats Framework](../archive/performance-guide.md#7-cpptlm-统计收集框架)。
 
 #### 组件统计注
 

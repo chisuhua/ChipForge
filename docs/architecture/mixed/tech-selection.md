@@ -149,8 +149,8 @@ auto addr = node(addr_key);  // 编译期类型检查
 | Phase 7+ | + 真实 RTL 实体 (ip/<area>/rtl/) + 工艺映射 | Yosys / Design Compiler | 预留 |
 
 ## 9. 相关文档
-- [项目架构总览](overview.md)
-- [背景与目标](background-and-goals.md)
-- [ADR-083 Plugin-style 单一 source of truth](adr/ADR-083-plugin-style-single-source-of-truth.md)
-- [ADR-040 TLM→HDL 移植性约束 v2.0](adr/ADR-040-tlm-hdl-portability-constraints.md)
-- [ADR-037 Plugin 作为设计范式](adr/ADR-037-plugin-as-design-paradigm.md)
+- [项目架构总览](../overview.md)
+- [背景与目标](../background-and-goals.md)
+- [ADR-083 Plugin-style 单一 source of truth](../adr/ADR-083-plugin-style-single-source-of-truth.md)
+- [ADR-040 TLM→HDL 移植性约束 v2.0](../adr/ADR-040-tlm-hdl-portability-constraints.md)
+- [ADR-037 Plugin 作为设计范式](../adr/ADR-037-plugin-as-design-paradigm.md)

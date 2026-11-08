@@ -10,7 +10,7 @@
 
 > **v2.0.3 变更**: §12.0.3 责任归属表新增 "Phase 归属" 列;所有 Owner 标记为 "TBD" 待用户指派。
 >
-> **v2.1.0 变更**: §4（声明式 Plugin 模型 §4.1–§4.7）与 §7（PipeNode / PipeLink / PipeBuilder 通用骨架）已抽离至独立文档 [`plugin-framework.md`](./plugin-framework.md),本文件仅保留 §4.8（Plugin 与 ChStreamModuleBase 跨抽象层关系）。版本号升至 v2.1.0,日期更新至 2026-06-09。
+> **v2.1.0 变更**: §4（声明式 Plugin 模型 §4.1–§4.7）与 §7（PipeNode / PipeLink / PipeBuilder 通用骨架）已抽离至独立文档 [`plugin-framework.md`](plugin-framework.md),本文件仅保留 §4.8（Plugin 与 ChStreamModuleBase 跨抽象层关系）。版本号升至 v2.1.0,日期更新至 2026-06-09。
 
 > ⚠️ **重要：本文档混合了"已实现框架"与"Phase 1 设计提案"**
 >
@@ -21,7 +21,7 @@
 >
 > **请在阅读每一节时，查看该节开头的状态标记**。所有"Phase 1 提案"章节在文档目录中以 🚧 标记。
 >
-> **如需查阅"框架层已实现 API 与代码路径"的权威映射**，请参考 [`code-framework-mapping.md`](./code-framework-mapping.md)。
+> **如需查阅"框架层已实现 API 与代码路径"的权威映射**，请参考 [`code-framework-mapping.md`](code-framework-mapping.md)。
 
 ---
 
@@ -155,7 +155,7 @@ int main() {
 
 ### 2.3 ChStreamModuleBase：实际 API
 
-`ChStreamModuleBase` 的实际 API（[`core/chstream_module.hh`](../../CppTLM/include/core/chstream_module.hh)）：
+`ChStreamModuleBase` 的实际 API（[`core/chstream_module.hh`](../../../CppTLM/include/core/chstream_module.hh)）：
 
 ```cpp
 // include/core/chstream_module.hh
@@ -1046,16 +1046,16 @@ private:
 
 #### 项目内文档
 
-- [docs/architecture/overview.md](./overview.md) — 顶层架构概览
-- [docs/architecture/interface-design.md](./interface-design.md) — 接口设计
-- [docs/architecture/tech-selection.md](./tech-selection.md) — 技术选型
-- [docs/architecture/testing-and-dse.md](./testing-and-dse.md) — 验证与 DSE
-- [docs/architecture/code-framework-mapping.md](./code-framework-mapping.md) — **代码与框架映射（已实现 API 权威清单）**
-- [docs/architecture/error-handling.md](./error-handling.md) — 错误处理
-- [docs/architecture/performance-guide.md](./performance-guide.md) — 性能指南
-- [docs/architecture/background-and-goals.md](./background-and-goals.md) — 项目背景与目标
-- [docs/GLOSSARY.md](../GLOSSARY.md) — 术语表
-- [ip/cpu/docs/multi_isa_architecture.md](../../ip/cpu/docs/multi_isa_architecture.md) — CPU 多 ISA Plugin 设计提案（**Phase 1 草案**）
+- [docs/architecture/overview.md](../overview.md) — 顶层架构概览
+- [docs/architecture/interface-design.md](../interface-design.md) — 接口设计
+- [docs/architecture/tech-selection.md](tech-selection.md) — 技术选型
+- [docs/architecture/testing-and-dse.md](testing-and-dse.md) — 验证与 DSE
+- [docs/architecture/code-framework-mapping.md](code-framework-mapping.md) — **代码与框架映射（已实现 API 权威清单）**
+- [docs/architecture/error-handling.md](../error-handling.md) — 错误处理
+- [docs/architecture/performance-guide.md](../archive/performance-guide.md) — 性能指南
+- [docs/architecture/background-and-goals.md](../background-and-goals.md) — 项目背景与目标
+- [docs/GLOSSARY.md](../../GLOSSARY.md) — 术语表
+- [ip/cpu/docs/multi_isa_architecture.md](../../../ip/cpu/docs/multi_isa_architecture.md) — CPU 多 ISA Plugin 设计提案（**Phase 1 草案**）
 
 #### 外部参考
 

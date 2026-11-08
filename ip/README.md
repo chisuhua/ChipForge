@@ -74,4 +74,4 @@ ip/{name}/
 ## 相关文档
 - [项目架构总览](../docs/architecture/overview.md)
 - [接口设计详解](../docs/architecture/interface-design.md)
-- [测试与 DSE 框架](../docs/architecture/testing-and-dse.md)
+- [测试与 DSE 框架](../docs/architecture/mixed/testing-and-dse.md)

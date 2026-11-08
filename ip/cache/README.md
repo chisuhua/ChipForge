@@ -104,7 +104,7 @@ Cache IP 位于 CPU 与主存之间，提供低延迟的数据/指令缓存服�
 ## 8. 相关文档
 - [项目架构总览](../../docs/architecture/overview.md)
 - [接口设计详解](../../docs/architecture/interface-design.md)
-- [测试与 DSE 框架](../../docs/architecture/testing-and-dse.md)
+- [测试与 DSE 框架](../../docs/architecture/mixed/testing-and-dse.md)
 - `.omo/drafts/decision-phase-1.3-bridge-2026-06-10.md`（Phase 1.3 v2 决策草案，gitignored 草稿，不链接）
 - [Phase 1.2 Lessons 文档](../../docs/lessons/phase-1.2-l1cacheplugin.md)
 - [ADR-044 L1 Cache VIPT 设计锁定](docs/adr/ADR-044-l1-cache-vipt-coherence.md)

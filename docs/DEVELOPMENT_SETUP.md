@@ -261,4 +261,4 @@ verilator --lint-only /tmp/hello.v
 
 ## 6. 相关文档
 - [项目架构总览](architecture/overview.md)
-- [核心技术选型](architecture/tech-selection.md)
+- [核心技术选型](architecture/mixed/tech-selection.md)

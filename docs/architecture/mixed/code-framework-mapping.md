@@ -415,9 +415,9 @@
 
 ## 6. 相关文档
 
-- [项目架构总览](overview.md)
-- [接口设计详解](interface-design.md)
-- [术语表](../GLOSSARY.md)
+- [项目架构总览](../overview.md)
+- [接口设计详解](../interface-design.md)
+- [术语表](../../GLOSSARY.md)
 - [技术选型](tech-selection.md)
 
 ## 7. 实现状态与设计目标对比
@@ -465,7 +465,7 @@
 ### 7.5 建议的修正优先级
 
 1. ✅ **完成 2026-06-17**：明确 `interface-design.md` 与 `overview.md` 的文档性质（设计提案 vs 已完成体系结构）—— §1.0.1 增加"已实现 POD vs 设计目标 bundle_base"对照表
-2. ✅ **完成 2026-06-17**：删除 8 个幽灵类名（详见 [`tools/verify_no_ghost_refs.sh` 头部注释](../../tools/verify_no_ghost_refs.sh)）在 7 文档中的所有引用
+2. ✅ **完成 2026-06-17**：删除 8 个幽灵类名（详见 [`tools/verify_no_ghost_refs.sh` 头部注释](../../../tools/verify_no_ghost_refs.sh)）在 7 文档中的所有引用
 3. ✅ **完成 2026-06-17**：删除 `soc/riscv_virt.json`（7 个悬挂类引用 + `impl_mode` 字段无消费者）；新增 CI 脚本 `tools/verify_no_ghost_refs.sh` 防止回归
 4. ✅ **完成 2026-06-17**：删除 `ip/cpu/cpu_factory.cpp`（12 行 stub）；`RiscvVirtSoC.h/cpp` 推迟到 Phase 2+ 实施
 5. ✅ **已执行 (2026-06-09)**：将 PipeNode / 声明式 Plugin 的设计从 `multi_isa_architecture.md` 拆分到独立 RFC 文档 [`plugin-framework.md`](plugin-framework.md)
@@ -474,7 +474,7 @@
 
 ### 7.6 已修复 (2026-06-17)
 
-通过 [doc-code-realignment change](../../CHANGELOG.md#v002-2026-06-17---doc-code-realignment) 实施的 8 项修复：
+通过 [doc-code-realignment change](../../../CHANGELOG.md#v002-2026-06-17---doc-code-realignment) 实施的 8 项修复：
 
 | # | 漂移项 | 修复方式 | 关联任务 |
 |---|--------|----------|----------|
@@ -484,7 +484,7 @@
 | 4 | `docs/architecture/overview.md` §"ch_stream 接口即 ISA 无关层" 在 1 个 CPU IP 情况下"验证"无意义 | 改为 "Phase 1.4+ Future Work" 占位段 + `> ⚠️ 推迟到 Phase 1.4+` 标记 | Task 2.2 |
 | 5 | 8 个幽灵类名在 7 个文档中散布（详见 `tools/verify_no_ghost_refs.sh`） | 全部替换为 Plugin 风格命名 / 已注册 CppTLM 类名 / "Phase X+ 实施"占位 | Task 3.2 |
 | 6 | `soc/README.md` 顶部描述"已实现 RISC-V virt" | 改为"目前 2 个 L1Cache 验证配置；RISC-V virt 推迟到 Phase 2+" | Task 4.2 |
-| 7 | Bridge 适配层 `tick()` 合法性无 ADR 记录 | 新增 [ADR-041-bridge-tick-pattern.md](./adr/ADR-041-bridge-tick-pattern.md) 明确业务 Plugin vs Bridge 适配边界 | Task 5.1 |
+| 7 | Bridge 适配层 `tick()` 合法性无 ADR 记录 | 新增 [ADR-041-bridge-tick-pattern.md](../adr/ADR-041-bridge-tick-pattern.md) 明确业务 Plugin vs Bridge 适配边界 | Task 5.1 |
 | 8 | 无 CI 防护防止幽灵类名回归 | 新增 `tools/verify_no_ghost_refs.sh`（可执行 + bash 严格模式 + 8 个类名 grep） | Task 6.1 |
 
 **文档/代码一致性基线**：从约 50% 提升到 80%+（以 `tools/verify_no_ghost_refs.sh` exit 0 为准）

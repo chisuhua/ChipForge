@@ -1152,8 +1152,8 @@ TEST(Compare, RV32I_AllPayloadsMatch) {
 - [ip/cpu/configs/cpu_params_schema.json](../configs/cpu_params_schema.json) — JSON Schema
 - [docs/architecture/overview.md](../../../docs/architecture/overview.md) — 顶层架构
 - [docs/architecture/interface-design.md](../../../docs/architecture/interface-design.md) — 接口设计
-- [docs/architecture/tech-selection.md](../../../docs/architecture/tech-selection.md) — 技术选型
-- [docs/architecture/testing-and-dse.md](../../../docs/architecture/testing-and-dse.md) — 验证与 DSE
+- [docs/architecture/tech-selection.md](../../../docs/architecture/mixed/tech-selection.md) — 技术选型
+- [docs/architecture/testing-and-dse.md](../../../docs/architecture/mixed/testing-and-dse.md) — 验证与 DSE
 - [docs/GLOSSARY.md](../../../docs/GLOSSARY.md) — 术语表
 
 ### 10.2 外部参考

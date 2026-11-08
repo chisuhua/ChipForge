@@ -321,5 +321,5 @@ DebugTracker.record_error() 记录错误
 
 ## 8. 相关文档
 - [接口设计详解](interface-design.md)
-- [测试与 DSE 框架](testing-and-dse.md)
+- [测试与 DSE 框架](mixed/testing-and-dse.md)
 - [项目架构总览](overview.md)

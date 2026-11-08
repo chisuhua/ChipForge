@@ -5,7 +5,7 @@
 > ⚠️ **DEPRECATED 术语 (2026-06-08)**:
 > - `PipelineCore` → 废弃，改用 `PipeBuilder`（见 [multi_isa_architecture.md v2.0 §2.4](../docs/multi_isa_architecture.md)）
 > - `Stageable` → 废弃，改用 `Payload<T>`（见 [multi_isa_architecture.md v2.0 §2.3](../docs/multi_isa_architecture.md)）
-> - 权威设计：[`docs/architecture/declarative-hybrid-framework.md` v2.0.2](../../../docs/architecture/declarative-hybrid-framework.md)
+> - 权威设计：[`docs/architecture/declarative-hybrid-framework.md` v2.0.2](../../../docs/architecture/mixed/declarative-hybrid-framework.md)
 > - 决策依据：`.omo/drafts/decision-plugin-framework-2026-06-08.md`（gitignored 草稿，不链接）
 
 ## 概述

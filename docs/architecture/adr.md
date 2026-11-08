@@ -5,7 +5,7 @@
 | 版本号 | 1.16 |
 | 创建日期 | 2026-06-07 |
 | 状态 | Active |
-| 源文档 | [`code-framework-mapping.md`](./code-framework-mapping.md) + [`declarative-hybrid-framework.md`](./declarative-hybrid-framework.md) |
+| 源文档 | [`code-framework-mapping.md`](mixed/code-framework-mapping.md) + [`declarative-hybrid-framework.md`](mixed/declarative-hybrid-framework.md) |
 | 配套脚本 | [`tools/verify_adr.sh`](../../tools/verify_adr.sh) |
 
 > **本文档定位**
@@ -826,7 +826,7 @@ Bundle 字段类型**分三阶段**演进,完整说明见 [`docs/architecture/in
 | 理由 | 调度由框架确定性决定，Plugin 不持有时序状态 |
 | 后果 | ✅ 已实现；`include/cf/plugin/plugin_base.h:48` 定义 `PluginBase`，仅提供 `name() / setup() / build()`，无 `tick()`。`PluginLoader`（ADR-017）是无关的 dlopen 加载器 |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.1
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.1
 
 **与 ADR-041 的关系**：D4（Plugin 基类无 tick）仅强制 `cf::plugin::PluginBase` 派生类。Bridge 适配层不继承 `PluginBase`，故不受 D4 强制，**可**实现 `tick()`。详见 [ADR-041](./adr/ADR-041-bridge-tick-pattern.md)。
 
@@ -852,7 +852,7 @@ grep -nE "^class PluginBase\b" /workspace/project/ChipForge/include/cf/plugin/pl
 | 理由 | Plugin 实现与物理流水线深度解耦，配置变更无需修改 Plugin 代码 |
 | 后果 | ✅ 已实现；`PipeBuilder::at_stage(stage_name, phase, cb)` 在 `include/cf/plugin/pipe_builder.h:68`，并自动创建 `PipeNode`（line 72-74） |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.2
 
 **验证命令**（必须通过）：
 ```bash
@@ -874,7 +874,7 @@ grep -nE "void\s+at_stage\s*\(" /workspace/project/ChipForge/include/cf/plugin/p
 | 理由 | 依赖检测（EARLY）→ 主体逻辑（NORMAL）→ 写回准备（LATE），三档足够典型需求 |
 | 后果 | ✅ 已实现；`enum class Phase` 在 `include/cf/plugin/pipe_builder.h:38` 定义，配合 `phase_name()`（line 44）输出可读名称 |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.2
 
 **验证命令**（必须通过）：
 ```bash
@@ -896,7 +896,7 @@ grep -nE "enum\s+class\s+Phase\s*\{[^}]*EARLY" /workspace/project/ChipForge/incl
 | 理由 | 允许 Plugin 在 `setup()` 阶段动态扩展物理流水线深度 |
 | 后果 | ✅ 最小实现已落地（`include/cf/plugin/pipe_builder.h:77`，`depth` 参数占位），父子关系记录在 `substage_parent_`；完整拓扑/调度集成推迟到 Phase 6 |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.3
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.3
 
 **验证命令**（必须通过 — 最小签名）：
 ```bash
@@ -1004,7 +1004,7 @@ grep -nE "void\s+declare_substage\s*\(" /workspace/project/ChipForge/include/cf/
 | 理由 | 三态握手（valid/ready/cancel）支持流水线正常、阻塞、取消三种场景 |
 | 后果 | ✅ 已实现；`class PipeNode` 在 `include/cf/plugin/pipe_node.h:29`，状态查询 API 完整，桥接到底层 `ch_stream` 握手语义 |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.4
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.4
 
 **验证命令**（必须通过）：
 ```bash
@@ -1051,7 +1051,7 @@ grep -nE "^class\s+CtrlLink\b" /workspace/project/ChipForge/include/cf/plugin/ct
 | 理由 | 单一入口，简化用户心智 |
 | 后果 | ✅ 脚手架已实现；`class PipeBuilder` 在 `include/cf/plugin/pipe_builder.h:53`，聚合 `register_plugin / at_stage / declare_substage / node_of_logic_stage`；`build()`/`tick()` 调度闭环待 Phase 6 完善 |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.2
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.2
 
 **与 ADR-041 的关系**：`PipeBuilder` 是业务 Plugin 的统一编译器入口（`pb.run()`），其内部**不**直接实现 `tick()`，而是委托给 `PluginBase` 派生类的 `at_stage()` 回调。Bridge 适配层（如 `L1CacheTLMBridge`）绕过 PipeBuilder，由 CppTLM EventQueue 直接调用其 `tick()`，并在 `tick()` body 末尾调用 `plugin_->pb.run()` 完成业务执行。详见 [ADR-041](./adr/ADR-041-bridge-tick-pattern.md)。
 
@@ -1075,7 +1075,7 @@ grep -nE "^class PipeBuilder\b" /workspace/project/ChipForge/include/cf/plugin/p
 | 理由 | 多 Plugin 独立声明同一条件，框架做 OR 合并 |
 | 后果 | ✅ CtrlLink 四种控制 API 已实现（见 `include/cf/plugin/ctrl_link.h:34/40/46/52`）；D6 共存方案保留 CppHDL chlib 现有 `stream_halt_when` / `stream_throw_when` 自由函数（位于 `chlib/stream.h:58,92`），新 Plugin 业务代码统一使用 `CtrlLink::*` 对象方法 |
 
-**完整设计见** [`plugin-framework.md`](plugin-framework.md) §2.5
+**完整设计见** [`plugin-framework.md`](mixed/plugin-framework.md) §2.5
 
 **决策依据** (D6 共存方案):
 

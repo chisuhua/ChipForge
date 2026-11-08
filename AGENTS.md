@@ -208,7 +208,7 @@ bash tools/run_chipforge_tests.sh --help     # 全部选项与用法
 | [`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md) | 开发环境搭建（symlink + 3 种 CMake 模式） |
 | [`README.md`](README.md) / [`CONTRIBUTING.md`](CONTRIBUTING.md) | 项目概述 / 贡献流程、commit 规范、PR SLA |
 | [`docs/architecture/overview.md`](docs/architecture/overview.md) | 架构总览 |
-| [`docs/architecture/plugin-framework.md`](docs/architecture/plugin-framework.md) | Plugin 框架详细设计 |
+| [`docs/architecture/mixed/plugin-framework.md`](docs/architecture/mixed/plugin-framework.md) | Plugin 框架详细设计 |
 | [`docs/methodology/plugin-style-design-methodology-v1.md`](docs/methodology/plugin-style-design-methodology-v1.md) | D4 方法学 v2（TLM + CH_MEM 双模，含 Phase 6c elaboration chapter §8） |
 | [`docs/lessons/phase-6c-elaboration-substrate.md`](docs/lessons/phase-6c-elaboration-substrate.md) | Phase 6c 行级教训（15 类陷阱 + 7 个模式 + 8 项检查） |
 | [`docs/research/phase6c-elaboration-pattern-study.md`](docs/research/phase6c-elaboration-pattern-study.md) | Phase 6c 立项前研究（SpinalHDL / VexRiscv / CppHDL 借鉴） |
