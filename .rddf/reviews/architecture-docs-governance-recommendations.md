@@ -239,3 +239,24 @@ F 残留 ⑭ ──► D（★ 已闭合）
 | 5 | ★ **ADR-094 V-28 补 `ch::hier_eq` 机制锚注**（★ 7 项闭合公共面 + fail-closed + 判别力边界 + 「MUST NOT 自建等价比对器」） | ★ **D1**（★ 机制锚的首次登记） |
 
 ★ ★ **未做（★ 需你决策）**：★ 补登 `adr.md` §2.4（★ 会固化第二套分类 ⇒ 见选项 3）· ★ 建 `docs/architecture/README.md`（★ 见选项 1）· ★ 扩 `arch_paths`（★ 见选项 2）· ★ 写门禁脚本（★ 归 builder）· ★ frontmatter 批量标注（★ 依赖选项 1）。
+
+---
+
+### 10. ★ ADR-095 的迁移执行计划（★ 实施步骤 ⇒ 不进 ADR 正文）
+
+| 步 | 动作 | ★ 风险控制 |
+|---|---|---|
+| **M1** | ★ 建 `README.md`（★ 目录级导航）+ 建 `mixed/` `archive/` 目录 | ★ 无 |
+| **M2** | ★ **批量移动**（★ 用 `git mv` 保留历史）⇒ ★ **按引用数升序**（★ `m4-dse`(0) → `performance-guide`(1) → `background-and-goals`(2) → `tech-selection`(4) → `tlm-plan`(4) → `testing-and-dse`(9) → `declarative-hybrid`(10) → `code-framework-mapping`(11) → `plugin-framework`(14) → `ip-catalog`(16) → `tlm-ledger`(22)）⇒ ★ **低风险批次先跑** | ★ `git mv` 保历史 ⇒ ★ 可单批回滚 |
+| **M2.5** | ★ ★ **导出「引用基线清单」**（★ 脚本导出**全部真断链**（★ markdown 链接形态）的「原路径 → 新路径」对照表，★ **随 change 存档**）⇒ ★ ★ **这是 V-107 的判据来源**（★ 无基线 ⇒ 「漏改一处」无处对照 ⇒ fail-closed 语义失效） | ★ 落 change 存档目录 |
+| **M3** | ★ **同步改引用**（★ 脚本批量替换路径）⇒ ★ 每批后跑 `doc_link_check.sh` | ★ 机检可验 |
+| **M3.1** | ★ ★ **`adr.md` 的三处源文档指针**（★ 头部「源文档」字段 + 维护规则 5「以源文档……为准」+ 漂移处理流程「更新对应源文档」）⇒ ★ 改指 `./mixed/...` + 标「★ 非权威 · 历史派生源」+ 维护规则与漂移流程措辞**软化**（「历史派生源（现居 `mixed/`）」）⇒ ★ 长期：★ 仍被依赖的决策段**收编进 `adr/`** ⇒ 源文档指针退役 | ★ 与移动同批 |
+| **M3.2** | ★ **根级文档同步**（★ `AGENTS.md` 的「关键文档源」表 · ★ `.cursorrules`）⇒ ★ 二者以**全路径**链顶层文档（★ `overview.md` · `plugin-framework.md` · `roadmap-evolution.md`）⇒ ★ `plugin-framework.md` 下沉后根级断链 ⇒ ★ 且根级**不在门禁 ① 覆盖范围** ⇒ ★ 须手工核 | ★ 与移动同批 |
+| **M3.3** | ★ **`ip-catalog.md` 与 `ip/README.md` 互链**（★ 两份**功能上都是 IP 索引** ⇒ ★ 防「两处登记」）⇒ ★ 声明「★ **stub 归 `ip/README.md` · 全目录归 `ip/ip-catalog.md` · 单一维护点 = `ip/ip-catalog.md`**」 | ★ 与移动同批 |
+| **M4** | ★ 更新 `arch-docs.json`（★ `arch_paths` = ★ **顶层 9 份 + `adr/` + `mixed/` + `ip/mmu/docs/adr` + `ip/cache/docs/adr`**（★ IP 级 ADR 目录**保留** ⇒ ★ 见 ADR-095 §2.4）；★ `exclude_paths` += `archive/`（★ ★ `plugin-research/` **已在** `exclude_paths` ⇒ 该项为 no-op）★ 且 **删除旧条目** `tlm-coverage-parity-ledger.md`（★ 移动后成死项））⇒ ★ **与 M2 同批**（★ 否则中途 `arch_paths` 失效） | ★ 同批 ⇒ 无空窗 |
+| **M5** | ★ **净化顶层 4 份**：★ `overview.md`（拆 stale 快照）· `interface-design.md`（拆 Phase 1 当前态段）· `error-handling.md` + `background-and-goals.md`（修 C++17 / 死名）⇒ ★ **它们进顶层前 MUST 过晋升检验** | ★ 净化内容属**内容决策** ⇒ ★ 各需相应审查 |
+| **M6** | ★ 落地门禁 ①②③④ | ★ 见 §2.5 |
+
+★ ★ **回滚路径**：★ 每批 = 一个 commit ⇒ ★ 验收失败 ⇒ **单批 `git revert`**（★ `git mv` 的历史可追溯）⇒ ★ **无不可逆操作**。
+
+★ ★ **说明**：★ 本节是**实施步骤**（★ 归 builder）⇒ ★ 按 ADR 契约（★ 推导与证据、实施步骤 MUST NOT 进 ADR 正文）⇒ ★ **不在 ADR-095 正文** ⇒ ★ 落此处（★ 治理材料）★ ⇒ ★ 未来立项时归 change 的 `tasks.md`。
