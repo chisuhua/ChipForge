@@ -66,8 +66,9 @@
 ```
 "timings": {
   "per_case": {"<name>": <seconds>, ...},
+  "count": <n>,
   "p50": <seconds>, "p95": <seconds>,
-  "total": <seconds>, "jobs": <n>
+  "total": <seconds>
 }
 ```
 ★ ★ **MUST NOT**：★ 改动任何判定逻辑（★ 退出码映射 · verdict 计算 · 差异比较）⇒ ★ **S-1~S-17 契约不变**。
