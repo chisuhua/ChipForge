@@ -5,12 +5,12 @@
 | 版本号 | 1.16 |
 | 创建日期 | 2026-06-07 |
 | 状态 | Active |
-| 源文档 | [`code-framework-mapping.md`](mixed/code-framework-mapping.md) + [`declarative-hybrid-framework.md`](mixed/declarative-hybrid-framework.md) |
+| 源文档（★ **非权威 · 历史派生源**） | [`mixed/code-framework-mapping.md`](mixed/code-framework-mapping.md) + [`mixed/declarative-hybrid-framework.md`](mixed/declarative-hybrid-framework.md) ★ ⇒ ★ **本注册表的权威 = `adr/` 自身**（详见 §1.2 规则 5） |
 | 配套脚本 | [`tools/verify_adr.sh`](../../tools/verify_adr.sh) |
 
 > **本文档定位**
 >
-> 本文档**提炼**两份架构文档中的所有设计决策点，每条决策附带**可机械执行的验证命令**。通过运行 `tools/verify_adr.sh`，可立即判断**当前代码实现是否仍与架构设计对齐**——任何"漂移"都会被报告为验证失败。
+> 本文档**历史派生**自两份架构文档（★ 现位于 `mixed/` ⇒ **非权威**）中的所有设计决策点，每条决策附带**可机械执行的验证命令**。★ ★ **本注册表的权威 = `adr/` 目录下的 ADR 本体**（2026-11-08 订正：原「本文档提炼、以源文档为准」的权威方向已倒置）。通过运行 `tools/verify_adr.sh`，可立即判断**当前代码实现是否仍与架构设计对齐**——任何"漂移"都会被报告为验证失败。
 >
 > **使用方式**：
 > 1. 修改 CppTLM/CppHDL/ChipForge 代码后，运行 `tools/verify_adr.sh`
@@ -66,7 +66,7 @@
 2. **所有 ✅ 决策的验证必须通过**；任何失败即为"代码漂移"
 3. **🚧 决策的实现状态变化**时，需同时更新本文档与对应源文档
 4. **新增架构决策**时，分配新 ID 并填入对应分类
-5. **本文档与源文档的优先级**：以源文档（`code-framework-mapping.md` / `declarative-hybrid-framework.md`）为准；本文档为衍生跟踪表
+5. ★ **本文档与 `adr/` 的优先级**（2026-11-08 订正）：★ **以 `adr/` 下的 ADR 本体为准**；★ 本文档 = **注册表 / 导航入口**（它是索引，不承载决策内容）。★ 历史派生源（`mixed/code-framework-mapping.md` / `mixed/declarative-hybrid-framework.md`）**降为非权威背景** ⇒ ★ **不得**据此裁决决策冲突。
 6. **每月审计**：完整运行一次验证脚本，确认所有 ✅ 状态决策仍可验证
 
 ---
