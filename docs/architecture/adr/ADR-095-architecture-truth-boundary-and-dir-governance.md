@@ -1,13 +1,14 @@
 # ADR-095 — `docs/architecture/` 真相源边界与目录治理
 
-- **Status**: 🚧 **Proposed v0.1**（2026-11-08 · architect）
+- **Status**: ✅ **Accepted v1.0**（2026-11-08 · architect；★ ★ **用户签认「批准」** ⇒ 决策已定）
+- **签认记录**: ★ **2026-11-08 · 用户签认「批准」** ⇒ ★ ① 本 ADR 的决策（★ 顶层结构 · 三机制 · `arch_paths` 目录化 · 4 项门禁）**已定**；★ ② ★ **角色边界变更（★ architect 新增可写 6 份）已签认生效**（★ 见 §2.4）
 - **Date**: 2026-11-08
 - **Author**: architect
 - **Parent（上游）**: 无（★ 本 ADR 是**本仓内部**的文档治理决策，★ 不涉及上游 CppHDL）
-- **关联 change**: ★ **尚未立项**（★ 目录重构属**实施面** ⇒ 归 builder）⇒ ★ 登记 backlog：★ `.rddf/reviews/architecture-docs-governance-recommendations.md` §9.1 **A1 / A2 / G7**（★ 本 ADR 是那三项的**决策层**）
-- **AC 映射**: ★ **尚未立项** ⇒ ★ AC 权威（change 的 `tasks.md`）暂缺 ⇒ ★ 立项后回填（★ 本 ADR 的 Verification 段即草案）
+- **关联 change**: ★ **尚未立项**（★ 目录重构属**实施面** ⇒ 归 **planner 立项 / builder 执行**）⇒ ★ 登记 backlog：★ `.rddf/reviews/architecture-docs-governance-recommendations.md` §9.1 **A1 / A2 / G7**（★ 本 ADR 是那三项的**决策层**）★ ⇒ ★ **立项后回填**（★ 立项时须把 §5 的 V-101~V-110 拆成该 change 的 AC）
+- **AC 映射**: ★ **尚未立项** ⇒ ★ AC 权威（change 的 `tasks.md`）暂缺 ⇒ ★ 立项后回填（★ 本 ADR 的 §5 Verification 段即草案 ⇒ ★ **§5 即立项时 AC 的来源**）
 - **决策台账**: `.rddf/reviews/architecture-docs-governance-recommendations.md`（★ §1~§8 诊断 · **§9 治理路线图**）
-- **审稿记录**: `.rddf/reviews/ADR-094-hierarchical-assembly-contract-review.md`（★ §7l~§7n 治理轮）
+- **审稿记录**: `.rddf/reviews/ADR-095-architecture-truth-boundary-and-dir-governance-review.md`（★ 本 ADR 的 oracle + critic 审稿记录与逐条处置）
 
 ---
 
@@ -104,7 +105,7 @@ docs/architecture/
 | ★ **仓外 · IP 级 ADR** | ★ `ip/mmu/docs/adr`（**35 份**）· `ip/cache/docs/adr`（**1 份**）⇒ ★ **保留 architect 可写** | ★ **architect**（★ 现状即如此） | ★ ★ **保留的理由**：★ IP 级 ADR **也是决策本体 / 真相源** ⇒ ★ 「真相源必须有单一守护者」原则**延伸到它们** ⇒ ★ ★ 且它们**不在 `docs/architecture/` 目录内** ⇒ ★ **不影响「顶层干净」目标** ⇒ ★ ★ **本决策不改变其归属**（★ ⇒ ★ **不构成角色边界变更** ⇒ ★ **无须额外签认**） |
 | ★ **仓外 · 其余** | ★ `ip/`（含 `ip-catalog.md`） | ★ IP owner | — |
 
-⇒ ★ ★ **★ 角色边界变更（★ 待用户签认）**：★ 本形态使 architect **新增可写 6 份**（★ `error-handling.md` · `background-and-goals.md` · `plugin-framework.md` · `declarative-hybrid-framework.md` · `code-framework-mapping.md` · `tech-selection.md` —— ★ 前两份进顶层、后四份进 `mixed/`）⇒ ★ ★ **这是 architect 可写域的实质扩展** ⇒ ★ **属角色边界变更 ⇒ MUST 由用户签认**（★ 不随本 ADR 自动生效）
+⇒ ★ ★ **★ 角色边界变更（★ ✅ 2026-11-08 用户签认「批准」⇒ 已生效）**：★ 本形态使 architect **新增可写 6 份**（★ `error-handling.md` · `background-and-goals.md` · `plugin-framework.md` · `declarative-hybrid-framework.md` · `code-framework-mapping.md` · `tech-selection.md` —— ★ 前两份进顶层、后四份进 `mixed/`）⇒ ★ ★ **这是 architect 可写域的实质扩展** ⇒ ★ ⇒ ★ **属角色边界变更 ⇒ MUST 由用户签认**（★ ★ **已于 2026-11-08 签认「批准」⇒ 生效**）
 ⇒ ★ ★ **这取代了「逐份扩围」**（★ 治理建议 §9.1 A2 的「扩 4 份」）⇒ ★ 一次重构 ⇒ ★ **长期生效** ⇒ ★ **治理成本不再随文档数线性增长**。
 
 ### 2.5 ★ 门禁（★ 新增 / 扩展，★ 归 builder）
