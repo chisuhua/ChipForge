@@ -108,9 +108,20 @@ riscv64-unknown-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -o /tmp/add.elf tests
 |---|---|---|
 | 1 | ★ `Architecture Compliance Gates` 的 PR 路径 | ✅ **已验证全绿**（16 步，含 2 个新 step） |
 | 2 | ★ `Parity Gate` 的 PR 路径 | ✅ **已验证 SUCCESS**（★ 13 步全 success · artifact `verdict=PASS` · p95 46.708s） |
-| 3 | ★ `toolchain-sanity` 的 3 处缺陷 | ✅ **已修**（§3）⇒ ★ 需第 2 次 run 确认 |
+| 3 | ★ `toolchain-sanity` 的 3 处缺陷 | ✅ **已修并实测确认**（★ 第 2 次 run **42498495788** ⇒ 两个 job **全 success** · `Sanity — RISC-V cross-compile` 由 failure ⇒ **success**） |
 | 4 | ★ `Documentation Health Check` | ★ **pre-existing** ⇒ 归 backlog |
 | 5 | ★ 夜间层（night）在 CI 不可跑 | ★ **开放项 O-A4-1**（`branchbench_elfs` 需 `riscv32-unknown-elf-g++`，★ CI 只提供 riscv64）⇒ 三选一：CI 装 riscv32 / branchbench ELF 改 vendored / 夜间层改本地 runner |
 
-★ **本报告的元价值**：★ 在此之前，「CI 能在 PR 上跑」这件事**只有推断，没有证据**；
-★ 取证一次，**同时**拿到了 ① 两条主路径的实测 ② 3 个从未暴露的缺陷 ③ 两个新门禁在 PR 上的可用性证明。
+---
+
+## 6. ★ 取证结论（第 2 次 run 确认后）
+
+| workflow | PR 路径实测 | 结论 |
+|---|---|---|
+| `Architecture Gates` | ★ 第 1 次 run **42498002622**：`Architecture Compliance Gates` job **16 步全绿**（含首次验证的 **S-12 provenance** 与 **architecture truth purity** 两个新 step）；`toolchain-sanity` job **failure** ⇒ ★ 第 2 次 run **42498495788**：**两个 job 全 success** | ✅ **已验证**（★ 且顺带修掉 3 处从未暴露的缺陷） |
+| `Parity Gate` | ★ 第 1 次 run **42498002503**：**13 步全 success** · artifact `verdict=PASS` · `p50 34.386` / `p95 46.708` | ✅ **已验证** |
+| `Documentation Health Check` | failure | ★ **pre-existing**（`ip/cpu/configs/*.json` 的 JSON Schema 违规）⇒ 归 backlog |
+
+★ ★ **本报告的元价值**：★ 在此之前，「CI 能在 PR 上跑」这件事**只有推断，没有证据**；
+★ 取证一次，**同时**拿到了：① 两条主路径的实测 ② **3 个从未暴露的缺陷**（★ 其中 2 个会让 PR 无故变红）
+③ 两个新门禁在 PR 上的可用性证明 ④ 「warn-only 声明 vs 实现矛盾」这类**声明-实现漂移**的一次暴露。
