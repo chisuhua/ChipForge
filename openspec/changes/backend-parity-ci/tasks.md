@@ -39,24 +39,24 @@ depends_on:
 
 ## 3. ★ P3 — CI build job（★ ADR-088 判据 7）
 
-- [ ] **3.1** ★ **RED**：★ `.github/workflows/` 下**无**任何 `cmake --build`（★ 改动前基线）
-- [ ] **3.2** ★ **GREEN**：★ 新建 `.github/workflows/parity-gate.yml`（★ **独立 workflow** · ★ 理由见 plan §3.3）
-- [ ] **3.3** ★ checkout CppTLM / CppHDL 到 `${workspace}/CppTLM` / `${workspace}/CppHDL`（★ 复用 `architecture-gates.yml:101-111` 的路径与 `vars.*` 约定）★ **AC-2**
-- [ ] **3.4** ★ 装 Verilator（★ 复用 `architecture-gates.yml:50-63` 的安装逻辑）★ **AC-2**
-- [ ] **3.5** ★ `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug` + ★ `cmake --build build --target parity_sim_runner cpu_verilator_sim`（★ ★ **只 build 两个 runner** ⇒ ★ 不 build 686 个 TLM case）★ **AC-2**
-- [ ] **3.6** ★ `timeout-minutes` 上限（★ 防止挂死占额度）★ **AC-2**
-- [ ] **3.7** ★ 验证：★ workflow 含 `cmake --build` + 只含两个 runner target + 有 `timeout-minutes` ★ **AC-2**
+- [x] **3.1** ★ **RED**：★ `.github/workflows/` 下**无**任何 `cmake --build`（★ 改动前基线）
+- [x] **3.2** ★ **GREEN**：★ 新建 `.github/workflows/parity-gate.yml`（★ **独立 workflow** · ★ 理由见 plan §3.3）
+- [x] **3.3** ★ checkout CppTLM / CppHDL 到 `${workspace}/CppTLM` / `${workspace}/CppHDL`（★ 复用 `architecture-gates.yml:101-111` 的路径与 `vars.*` 约定）★ **AC-2**
+- [x] **3.4** ★ 装 Verilator（★ 复用 `architecture-gates.yml:50-63` 的安装逻辑）★ **AC-2**
+- [x] **3.5** ★ `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug` + ★ `cmake --build build --target parity_sim_runner cpu_verilator_sim`（★ ★ **只 build 两个 runner** ⇒ ★ 不 build 686 个 TLM case）★ **AC-2**
+- [x] **3.6** ★ `timeout-minutes` 上限（★ 防止挂死占额度）★ **AC-2**
+- [x] **3.7** ★ 验证：★ workflow 含 `cmake --build` + 只含两个 runner target + 有 `timeout-minutes` ★ **AC-2**
 - [ ] **3.8** ★ ★ **CI 真实耗时待实测**（★ **本 change 的唯一外部依赖风险** · ★ 需真实 PR run 验证）★ **AC-2**
 
 ## 4. ★ P4 — CI 门禁执行 + 结果回读（★ ADR-088 判据 4）
 
-- [ ] **4.1** ★ **RED**：★ CI 中门禁 step 恒 SKIP（★ 病根 = `architecture-gates.yml:163-166` 的「产物不存在 ⇒ SKIP」）★ **AC-3**
-- [ ] **4.2** ★ **GREEN**：★ CI 跑 `python3 tools/parity/parity_gate.py --layer pr`（★ PR 层 = 8 case ≈ **6.5 min** 实测）★ **AC-3**
-- [ ] **4.3** ★ ★ **MUST NOT** 让「产物不存在 ⇒ SKIP」短路 ⇒ ★ **产物缺失 ⇒ FAIL loudly**（★ ★ **判据 4 的核心**）★ **AC-3**
-- [ ] **4.4** ★ **回读**：★ 从 `build/parity/report.json` 读 `verdict` + `error_kind`（★ **机器可读**）⇒ ★ `actions/upload-artifact@v4` 上传 ★ **AC-3**
-- [ ] **4.5** ★ **PR 级 / 夜间级分离**：★ PR 跑 `pr` 层；★ 夜间跑 `night` 层（★ **定时触发** · ★ 52 case ≈ **45~60 min**）⇒ ★ 同一 workflow 不同 trigger + layer 参数 ★ **AC-3**
-- [ ] **4.6** ★ **失败即阻塞**：★ 门禁 FAIL ⇒ step 失败 ⇒ 阻止 PR merge（★ ★ **判据 6 的前置**）★ **AC-3**
-- [ ] **4.7** ★ 验证：★ CI 上门禁**非 SKIP** + artifact 含 `verdict` + 故意制造分歧 ⇒ CI **红** ★ **AC-3**
+- [x] **4.1** ★ **RED**：★ CI 中门禁 step 恒 SKIP（★ 病根 = `architecture-gates.yml:163-166` 的「产物不存在 ⇒ SKIP」）★ **AC-3**
+- [x] **4.2** ★ **GREEN**：★ CI 跑 `python3 tools/parity/parity_gate.py --layer pr`（★ PR 层 = 8 case ≈ **6.5 min** 实测）★ **AC-3**
+- [x] **4.3** ★ ★ **MUST NOT** 让「产物不存在 ⇒ SKIP」短路 ⇒ ★ **产物缺失 ⇒ FAIL loudly**（★ ★ **判据 4 的核心**）★ **AC-3**
+- [x] **4.4** ★ **回读**：★ 从 `build/parity/report.json` 读 `verdict` + `error_kind`（★ **机器可读**）⇒ ★ `actions/upload-artifact@v4` 上传 ★ **AC-3**
+- [x] **4.5** ★ **PR 级 / 夜间级分离**：★ PR 跑 `pr` 层；★ 夜间跑 `night` 层（★ **定时触发** · ★ 52 case ≈ **45~60 min**）⇒ ★ 同一 workflow 不同 trigger + layer 参数 ★ **AC-3**
+- [x] **4.6** ★ **失败即阻塞**：★ 门禁 FAIL ⇒ step 失败 ⇒ 阻止 PR merge（★ ★ **判据 6 的前置**）★ **AC-3**
+- [x] **4.7** ★ 验证：★ CI 上门禁**非 SKIP** + artifact 含 `verdict` + 故意制造分歧 ⇒ CI **红** ★ **AC-3**
 
 ## 5. ★ P5 — 收口（G-A4 逐条核 + 记账）
 
