@@ -104,25 +104,51 @@ depends_on:
 ## Acceptance Criteria
 
 > AC 权威 = 本段。每条对应 ADR-094 §Verification 的 V 编号。
+>
+> ★ ★ **2026-11-08 修订（planner · D-22 裁决 + metis/critic 审查）**：★ 原 AC 为**平铺 18 条、无批次归属**
+> ⇒ 实施者无法判断「哪条在 ①-A 就该验、哪条必须等 ①-D」⇒ ★ 现按 ADR-094 §D-6 的两阶段 +
+> `.rddf/reviews/ADR-094-decision-ledger.md` §9.2 的批次**分组**，并订正 5 处：
+> ① **V-40 归 ①-D**（★ §9.2 原列进 ①-A ⇒ 阶段 1 期间 `owner == nullptr` ⇒ 该判据**必然全量 RED**）
+> ② **V-35 / V-36 基线捕获归 ①-C 出口**（★ ADR-094:157「基线 MUST 在阶段 1 结束 / 阶段 2 开工前捕获，切换后**无法事后补**」）
+> ③ **V-41 拆两半**（★ ①-A 只验「provider 槽位单例 + 重复安装立即失败」；manifest / identity 的安装期自检归 ①-B）
+> ④ **V-34 / V-32 补归属**（★ 二者原先在批次表里**无归属** ⇒ 违反 ADR-094:13「无遗漏」）
+> ⑤ **★ 新增 ①-A′ 前置适配**（★ `regfile_bridge_chmem.h:124` 的裸 `make_unique` ⇒ ①-D 的 r.14 **必然 RED** ⇒ 改造 MUST 前置）
+>
+> ★ **V 侧面标记**：同一个 V 可能被两个 change 各覆盖一次（**框架侧** / **落地侧**）⇒ ★ 每条 AC MUST 标侧面，
+> ★ 机检「无重复」按「**同一 V 的同一侧面**」判定（★ 细则 = 本 change 的 `design.md`）。
 
-- [ ] **AC-1** 单元 MUST 经 `root.create_child<T>(name)` 创建；**变异**：改回裸 `make_unique` ⇒ 组件树缺该单元 ⇒ 层次化发射 FATAL（覆盖 V: V-31）
-- [ ] **AC-2** 负向三变体：① 漏 `add_child` ⇒ FATAL ② ctor 传 `nullptr` + 事后 `add_child` ⇒ RED ③ 登记但不 `build` ⇒ FATAL（覆盖 V: V-31）
-- [ ] **AC-3** 每实例端口名**逐字不同**，且单元每个 `ch_in` 均有 driver（按 r.5 的外部驱动输入集）（覆盖 V: V-32）
-- [ ] **AC-4** 归属守卫（r.14）生效：构建收尾时 ctx 中除 clock/reset 外每个节点 owner ∈ `{root}` ∪ `{已登记单元}`；**变异**：把某节点挂到 root 之外 ⇒ 立即 `CHREQUIRE` 失败（覆盖 V: V-40）
-- [ ] **AC-5** provider 安装期自检：装 `manifest` provider 时校验每个键的 node 存在且 raw 名一致；装 `identity` provider 时校验对应关系；不符 ⇒ 立即失败（覆盖 V: V-41）
-- [ ] **AC-6** `build()` 幂等（r.10）：同一状态重复调用 ⇒ **成功早退**、不重跑 `negotiate/setup/build`、不产生重复登记；状态已变 ⇒ 显式失败（覆盖 V: V-43）
-- [ ] **AC-7** 层 2 基类的**编译期**校验：`io_type` 成员为标量 `ch_in`/`ch_out`；**变异**：把某成员改成 bundle / `ch_stream` ⇒ **编译不过**（覆盖 V: V-42）
-- [ ] **AC-8** 层次化发射成功且 `warnings` ⊆ 归属空洞类别，**0 条 undriven-bubble**；若宣称「交付接口干净」⇒ **0 个 `Synthesized`**（覆盖 V: V-27）
-- [ ] **AC-9** `port_provenance` 精确匹配：顶层 input=`Bubbled` · 顶层 output=`InlineFolded` · clock/reset=`ClockReset` · 单元自身=`Self`（覆盖 V: V-27b）
-- [ ] **AC-10** 层次化 vs 扁平**逐拍等价**（机制锚 = 上游 `ch::hier_eq`，ChipForge 侧须真实接入，不得只写文档）（覆盖 V: V-28）
-- [ ] **AC-11** `GranularityScope(ForceInline)` 下产物与扁平**逐字节一致**（同一 ctx、同一 elaborate，不重新 build）（覆盖 V: V-29）
-- [ ] **AC-12** `resolve_node_id` **三态化**（`kOk` / `kMissing` / `kAmbiguous`）；**变异**：歧义仍返回首个节点 ⇒ RED（覆盖 V: V-39）
-- [ ] **AC-13** 阶段 1 前置**同名普查**：现网 52 case + CH_MEM binary 全量 case 的 ctx 中同名节点组数 = 0（或已逐组定位并修复）（覆盖 V: V-39）
-- [ ] **AC-14** 登记闸①在 manifest 缺失时 ⇒ `ERROR(2)` + `manifest_missing`（防「闸②退化为『有 manifest 才查』」）（覆盖 V: V-37）
-- [ ] **AC-15** 绑定提供者一致：同一 case 中两侧解析出的**逻辑契约名集合**一致（开放核 `manifest` / 预载核 `identity`）（覆盖 V: V-38）
-- [ ] **AC-16** 迁移期判据 V-35（归属切换语义回归）/ V-36（方向守卫触发面回归）在**阶段 1 结**时捕获基线、阶段 2 验收后**退役**（不得留成僵尸判据）（覆盖 V: V-35, V-36）
-- [ ] **AC-17** `verilator --lint-only --top-module top <file>` **exit 0**，stderr 无 `%Error`（覆盖 V: V-33）
-- [ ] **AC-18** 2 TU 链接探针通过（`G-1b` 保留、仅换理由）（覆盖 V: V-34）
+### ①-A 框架地基（★ 出口 V-42 / V-43 / V-41a / V-34）
+
+- [ ] **AC-1** ★ `PipeBuilder` 持有**恰一个** root `Component` + 只读访问器 `root_component()`；root 与 `pb.ctx()` 同 ctx；root 构造 MUST 包在 `Component::ConstructionFrame` 内；root 名 MUST == 契约常量 `cpu`；★ **该 root 与层次化 emitter 的 `root` 参数 MUST 是同一对象**（指针相等）★ **变异**：两者指向不同对象 ⇒ 归属判据失真 ⇒ RED（覆盖 V: V-31, V-34 · **框架侧**）
+- [ ] **AC-2** 单元 MUST 经 `root.create_child<T>(name)` 创建，MUST NOT 裸 `make_unique`；返回值 MUST 检查非空；★ **变异**：改回裸 `make_unique` ⇒ 组件树缺该单元 ⇒ 层次化发射 FATAL（覆盖 V: V-31 · **框架侧**）
+- [ ] **AC-3** 负向三变体：① 漏 `add_child` ⇒ FATAL ② ctor 传 `nullptr` + 事后 `add_child` ⇒ RED ③ 登记但不 `build` ⇒ FATAL（覆盖 V: V-31 · **框架侧**）
+- [ ] **AC-4** 层 2 基类的**编译期**校验：`io_type` 成员 MUST 为标量 `ch_in`/`ch_out`；★ **变异**：把某成员改成 bundle / `ch_stream` ⇒ **编译不过**；★ **正向**：绕过基类直接继承 `ch::Component` ⇒ 门禁 grep MUST 报出（覆盖 V: V-42 · **框架侧**）
+- [ ] **AC-5** `build()` 幂等（r.10）：同一状态重复调用 ⇒ **成功早退**、不重跑 `negotiate/setup/build`、不产生重复登记；状态已变（插件集指纹不同）⇒ MUST 显式失败（`PluginError::BuildStateConflict`）；★ `built_` MUST 只在**成功收尾**时置；★ **插件集指纹的字段与顺序 MUST 显式定义**（覆盖 V: V-43 · **框架侧**）
+- [ ] **AC-6** provider 槽位单例（r.15 前半）：同一 ctx 第二次安装 provider ⇒ MUST **立即失败**；★ **变异**：装两个 provider ⇒ MUST RED（覆盖 V: V-41 · **框架侧**）
+- [ ] **AC-7** ★ **r.6 的负向前置断言**：①-A 阶段 root-scope **MUST NOT 全局化**（顶层端口 owner 仍 `nullptr`）⇒ 顶层端口的声明位置判据（`scope_depth() == 0`）**延到 ①-D 生效**；★ **变异**：在 ①-A 就全局化 ⇒ 阶段 1 全量 `kMissing` ⇒ 门禁恒红 ⇒ MUST 被本条拦住（覆盖 V: V-31 · **框架侧**）
+- [ ] **AC-8** 2 TU 链接探针通过（框架头与新核头零 `<ch.hpp>` include）（覆盖 V: V-34 · **框架侧**）
+
+### ①-A′ RegFile 前置适配（★ 无独立 V · 是 ①-D 的**硬前置**）
+
+- [ ] **AC-9** ★ `ip/cpu/core/regfile_bridge_chmem.h` 的 `std::make_unique<RegFileComponent>(nullptr, "regfile")` MUST 改为 `root.create_child<RegFileComponent>(...)` + 以 `pb.ctx()` 调 `build()`；★ **理由**：该行是 ADR-094:23 点名的现存缺陷、且是 **V-40 的变异靶** ⇒ 不改则 ①-D 的归属守卫**必然 RED**（覆盖 V: V-40 · **框架侧**）
+
+### ①-B 观测登记（★ 出口 V-37 / V-38 / V-41b）
+
+- [ ] **AC-10** 登记簿 + manifest + 两道机械闸（闸① 框架内 · 期望键集**由调用方注入**；闸② gate 侧）⇒ manifest 缺失时 MUST `ERROR(2)` + `manifest_missing`（防「闸②退化为『有 manifest 才查』」）；★ **变异**：摘掉闸① ⇒ 静默通过 ⇒ RED（覆盖 V: V-37 · **框架侧**）
+- [ ] **AC-11** provider 安装期自检（r.15 后半）：装 `manifest` provider 时校验每个键的 node 存在且 raw 名一致；装 `identity` provider 时校验精确匹配到**唯一**节点；不符 ⇒ 立即失败（`provider_conflict`，★ 消息点名**逻辑名 + 两个候选节点名**）（覆盖 V: V-41 · **框架侧**）
+- [ ] **AC-12** 绑定提供者一致：同一 case 中两侧解析出的**逻辑契约名集合**一致；★ 报告 MUST 标注每个观测的 provider（`manifest` / `identity`）（覆盖 V: V-38 · **框架侧**）
+
+### ①-C 阶段 1（★ 出口 V-39 + V-35 / V-36 基线捕获）
+
+- [ ] **AC-13** `resolve_node_id` **三态化**（`kOk` / `kMissing` / `kAmbiguous`）；★ **变异**：歧义仍返回首个节点 ⇒ RED（覆盖 V: V-39 · **框架侧**）
+- [ ] **AC-14** 前置**同名普查**：现网 52 case + CH_MEM binary 全量 case 的 ctx 中同名节点组数 = 0（或已逐组定位并修复）；★ **普查窗口 MUST 钉住**（commit + CH_MEM binary SHA）+ ★ **新增 case ⇒ 增量普查**（覆盖 V: V-39 · **框架侧**）
+- [ ] **AC-15** ★ **V-35 / V-36 基线捕获**（★ **时机 MUST = ①-C 出口 / ①-D 开工前** —— ADR-094:157）：逐 case 逐拍全观测量 hash 链（FNV，与既有 `pchash` 同构造）+ 终值逐位数组 + 环境标识；★ **变异**：捕获后人为注入一处观测差异 ⇒ hash 链 MUST 不同 ⇒ RED（覆盖 V: V-35, V-36 · **框架侧**）
+
+### ①-D 阶段 2（★ **不可拆** · 出口 V-40 + V-35 / V-36 比对与退役）
+
+- [ ] **AC-16** ★ **同批不可拆**：owner 切换（root-scope 覆盖**整个构建期**）+ 登记上线 + manifest 上线 + **r.14 归属守卫生效**；★ 验收失败 MUST **整批回退**（git 级 revert 该批 ⇒ MUST NOT 只回退其中一项 ⇒ 会留下 owner / 解析路径的混合态）（覆盖 V: V-40 · **框架侧**）
+- [ ] **AC-17** ★ **三条同批改动**（★ 理由写明「不改则编不过 / 判据恒 RED」）：① `tools/parity_runner/parity_sim_runner.cpp` 的 `resolve_node_id` 精确名解析 ⇒ 改 manifest 驱动（★ 顶层端口名从 `reg_1` 变 `cpu_reg_1` ⇒ 精确名**全量失效**）② `tools/verilator_runner/sim_main.cpp` 的 `top__DOT___reg_N` **编译期硬编码**引用 ⇒ 改名或改 manifest 驱动 ③ `ip/cpu/core/regfile_bridge_chmem.h` 的裸 `make_unique` ⇒ 改 `root.create_child`（★ 见 AC-9）（覆盖 V: V-40 · **框架侧**）
+- [ ] **AC-18** ★ **V-35 / V-36 比对与退役**：切换前后 hash 链**逐 case 相等**（硬）+ 终值逐位相等（第二判据）+ 方向守卫触发集 ⊆ 阶段 1 触发集且阶段 2 触发集为空；★ 阶段 2 验收后 **MUST 整体退役**（★ 不得留成僵尸判据）（覆盖 V: V-35, V-36 · **框架侧**）
 
 ## ★ 拆批说明（为什么是 2 个 change）
 
