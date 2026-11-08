@@ -131,6 +131,41 @@ class TestSubdirRefs(unittest.TestCase):
         self.assertIsNone(gate.resolve_ref("#anchor", str(_ROOT)))
 
 
+class TestTopLevelLayout(unittest.TestCase):
+    """★ critic 2026-11-08 指出的规避手法：`mkdir docs/architecture/<new>/` 即绕过门禁①。"""
+
+    def _mk(self, names):
+        import tempfile
+        root = tempfile.mkdtemp(prefix="layout-")
+        base = os.path.join(root, "docs", "architecture")
+        os.makedirs(base)
+        for n in names:
+            full = os.path.join(base, n)
+            # 带扩展名的当文件，否则当目录
+            if "." in n.rsplit("/", 1)[-1]:
+                open(full, "w").close()
+            else:
+                os.makedirs(full)
+        return root
+
+    def test_allowed_layout_clean(self):
+        root = self._mk(["README.md", "adr.md", "adr", "mixed", "archive", "plugin-research"])
+        self.assertEqual(gate.check_top_level_layout(root), [])
+
+    def test_unexpected_dir_flagged(self):
+        root = self._mk(["README.md", "notes"])
+        problems = gate.check_top_level_layout(root)
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0][0], "unexpected-dir")
+        self.assertEqual(problems[0][1], "notes")
+
+    def test_non_markdown_file_flagged(self):
+        root = self._mk(["README.md", "scratch.txt"])
+        problems = gate.check_top_level_layout(root)
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0][0], "unexpected-file")
+
+
 class TestAcVCoverage(unittest.TestCase):
     @staticmethod
     def _mk(ac_id, v_ids, self_exempt=False):

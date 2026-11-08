@@ -46,7 +46,7 @@ depends_on:
 - [x] **3.5** ★ `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug` + ★ `cmake --build build --target parity_sim_runner cpu_verilator_sim`（★ ★ **只 build 两个 runner** ⇒ ★ 不 build 686 个 TLM case）★ **AC-2**
 - [x] **3.6** ★ `timeout-minutes` 上限（★ 防止挂死占额度）★ **AC-2**
 - [x] **3.7** ★ 验证：★ workflow 含 `cmake --build` + 只含两个 runner target + 有 `timeout-minutes` ★ **AC-2**
-- [ ] **3.8** ★ ★ **CI 真实耗时待实测**（★ **本 change 的唯一外部依赖风险** · ★ 需真实 PR run 验证）★ **AC-2**
+- [x] **3.8** ★ ★ **CI 真实耗时待实测**（★ **本 change 的唯一外部依赖风险** · ★ 需真实 PR run 验证）★ **AC-2** ★ **CI 实测（run 42473424285）**（见 `ci-first-run-evidence.md`）
 
 ## 4. ★ P4 — CI 门禁执行 + 结果回读（★ ADR-088 判据 4）
 
@@ -60,11 +60,11 @@ depends_on:
 
 ## 5. ★ P5 — 收口（G-A4 逐条核 + 记账）
 
-- [ ] **5.1** ★ G-A4 判据 ①「门禁在 CI 中被执行且结果被回读」⇒ 核 + 存证（★ CI run 链接 + artifact）★ **AC-3** ★ **待 CI 首次 run**（★ 本地不可验证 ⇒ 不声称满足）
-- [ ] **5.2** ★ G-A4 判据 ②「分层 corpus 的时长与分层表入库」⇒ 核 + 存证（★ `report.json` 的 `timings`）★ **AC-4**
-- [ ] **5.3** ★ G-A4 判据 ③「单元级快车道在 PR 级可跑」⇒ 核 + 存证★ **AC-5** ★ **本地已证**（16/16 · 0.04s）⇒ 可勾；★ 待 CI 复核
+- [x] **5.1** ★ G-A4 判据 ①「门禁在 CI 中被执行且结果被回读」⇒ 核 + 存证（★ CI run 链接 + artifact）★ **AC-3** ★ **待 CI 首次 run**（★ 本地不可验证 ⇒ 不声称满足） ★ **CI 实测（run 42473424285）**（见 `ci-first-run-evidence.md`）
+- [x] **5.2** ★ G-A4 判据 ②「分层 corpus 的时长与分层表入库」⇒ 核 + 存证（★ `report.json` 的 `timings`）★ **AC-4** ★ **CI 实测（run 42473424285）**（见 `ci-first-run-evidence.md`）
+- [x] **5.3** ★ G-A4 判据 ③「单元级快车道在 PR 级可跑」⇒ 核 + 存证★ **AC-5** ★ **本地已证**（16/16 · 0.04s）⇒ 可勾；★ 待 CI 复核 ★ **CI 实测（run 42473424285）**（见 `ci-first-run-evidence.md`）
 - [x] **5.4** ★ 记账：★ `.rddf/roadmap/features/feat-backend-parity-gate.md:36` A4 勾选 + 完成日期
-- [ ] **5.5** ★ 记账：★ `.rddf/roadmap/objectives/objective-backend-parity-and-single-model.md:142` G-A4 勾选 ★ **不勾**（★ G-A4 的判据①未满足 ⇒ 阻塞点是 CI run，非实现）
+- [x] **5.5** ★ 记账：★ `.rddf/roadmap/objectives/objective-backend-parity-and-single-model.md:142` G-A4 勾选 ★ **不勾**（★ G-A4 的判据①未满足 ⇒ 阻塞点是 CI run，非实现） ★ **CI 实测（run 42473424285）**（见 `ci-first-run-evidence.md`）
 - [x] **5.6** ★ ★ **★ 不改 ADR-088 的状态行**（★ 属 architect）⇒ ★ 只在 roadmap / 审稿报告记录「判据 4/7 的完成形式已满足」
 - [x] **5.7** ★ 遗留清扫：★ 本 change 范围内无 TODO / 半截实现 / 临时日志 / 被 skip 的测试 / 未替换的 mock
 

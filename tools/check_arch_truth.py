@@ -61,6 +61,12 @@ DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 NON_AUTHORITATIVE_MARK = "非权威"
 SUB_DIRS = ("mixed", "archive")
 ARCH_BASE = os.path.join("docs", "architecture")
+
+# ★ ★ 顶层布局白名单（critic 2026-11-08 指出的可复现规避手法）：
+#   `mkdir docs/architecture/notes && echo "当前状态：已完成" > .../foo.md` 即可绕过门禁①
+#   （门禁只扫顶层 `*.md` 非递归，且门禁②只查链接）
+#   ⇒ 顶层目录集合 MUST 冻结；新增子目录属**治理变更**，须先改 ADR-095 §2.1 再改本白名单。
+ALLOWED_TOP_DIRS = ("adr", "archive", "mixed", "plugin-research")
 MD_LINK_RE = re.compile(r"\]\(([^)\s]+)\)")
 TICK_RE = re.compile(r"`([^`\n]+)`")
 HEADING_RE = re.compile(r"^(#{1,6})\s")
@@ -245,6 +251,29 @@ def resolve_ref(raw, root):
     return os.path.normpath(os.path.join(root, ARCH_BASE, p))
 
 
+def check_top_level_layout(root):
+    """门禁① 的布局守卫：`docs/architecture/` 顶层只许既有 4 个子目录 + `.md` 文件。
+
+    ★ 为什么是**判据**而不是提示：只扫 `*.md`（非递归）时，新增一个子目录就是**零成本规避**。
+      目录位置本身就是 ADR-095 §2.1 的治理对象 ⇒ 出现白名单外的条目 MUST 报红。
+    """
+    base = os.path.join(root, ARCH_BASE)
+    problems = []
+    if not os.path.isdir(base):
+        return problems
+    for name in sorted(os.listdir(base)):
+        full = os.path.join(base, name)
+        if os.path.isdir(full):
+            if name not in ALLOWED_TOP_DIRS:
+                problems.append(("unexpected-dir", name,
+                                 "顶层子目录不在白名单 " + str(list(ALLOWED_TOP_DIRS))
+                                 + "（新增子目录须先改 ADR-095 §2.1 与本白名单）"))
+        elif not name.endswith(".md"):
+            problems.append(("unexpected-file", name,
+                             "顶层只放 markdown 真相源（其它类型文件不属真相源）"))
+    return problems
+
+
 def scan_subdir_refs(path, root):
     """门禁④：顶层文档引用 `mixed/` `archive/` 下的**文件**时，同行 MUST 出现「非权威」。
 
@@ -380,6 +409,11 @@ def main(argv=None):
         for rel, e in all_ex:
             print(f"EXEMPT  {rel}:{e.line}  ({e.rule})  [{e.word}]")
 
+    # ---- 门禁① 布局守卫：顶层目录/文件白名单（防「新建子目录绕过」）----
+    layout = check_top_level_layout(root)
+    for kind, name, why in layout:
+        print(f"RED-LAYOUT  {os.path.join(ARCH_BASE, name)}  [{kind}]  {why}")
+
     # ---- 门禁④：顶层引用 mixed/ archive/ 须标「非权威 · 仅作背景」----
     subdir_total = 0
     if not opts.quiet:
@@ -390,11 +424,14 @@ def main(argv=None):
             print(f"RED-SUBDIR  {rel}:{lineno}  {refs}  {text[:100]}")
 
     print()
-    if total or subdir_total:
+    if total or subdir_total or layout:
         if total:
             print(f"门禁① 结果: {total} 处实施态时点语汇（顶层须为 0）")
             print("  ⇒ 顶层只放真相源（ADR-095 §2.3①）：把「现在长什么样」移出顶层，"
                   "或改为形态定性（「该长什么样」）")
+        if layout:
+            print(f"门禁①（布局）结果: {len(layout)} 处顶层条目不在白名单（须为 0）")
+            print("  ⇒ 顶层位置本身是治理对象（ADR-095 §2.1）：新增子目录 = 零成本规避门禁①")
         if subdir_total:
             print(f"门禁④ 结果: {subdir_total} 处引用 mixed//archive/ 未标「非权威」（须为 0）")
             print("  ⇒ 顶层引用子目录文档时 MUST 标明「★ 非权威 · 仅作背景」（ADR-095 §2.5④）")
