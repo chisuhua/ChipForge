@@ -98,12 +98,18 @@ std::optional<std::uint32_t> resolve_node_id(ch::core::context& ctx,
 ## Acceptance Criteria
 
 
-- [ ] ★ **A-1** ★ ★ **变异对照（V-25 承重判据）**：★ 把某个内部 `ch_reg` 改名撞上契约名（★ 如 `open_reg_1` → `reg_1`）⇒ ★ runner MUST **exit 2**（★ **非** 0 / 非 1）⇒ ★ 且错误信息 MUST 含**歧义契约名**
-- [ ] ★ **A-2** ★ **前置体检**：★ 先跑既有 corpus ⇒ ★ MUST 确认**当前零歧义**（★ ⇒ 若已存在歧义 ⇒ 说明**已有假绿通道在跑** ⇒ 优先修）
-- [ ] ★ **A-3** ★ **既有门禁零退化**：★ `python3 tools/parity/parity_gate.py --self-test` ⇒ PASS
-- [ ] ★ **A-4** ★ **既有 corpus 零退化**：★ 两侧 5 项观测量 + 确定性判据逐位相等（★ 与 `backend-parity-observability` 的既有基线一致）
-- [ ] ★ **A-5** ★ ★ **协议一致性**：★ runner 的 exit 2 ⇒ `parity_gate.py` MUST 判为 **ERROR**（★ `error_kind=observation_ambiguous:<name>`）⇒ ★ **MUST NOT** 降级为 FAIL 或跳过
-- [ ] ★ **A-6** ★ **正反两面都有**：★ 观测名**缺失** ⇒ 仍 MUST 是既有的「missing observation」⇒ exit 2（★ **MUST NOT** 被新路径吞掉）
+- [x] **A-1** ★ ★ **变异对照（V-25 承重判据）**：★ 把某个内部 `ch_reg` 改名撞上契约名（★ 如 `open_reg_1` → `reg_1`）⇒ ★ runner MUST **exit 2**（★ **非** 0 / 非 1）⇒ ★ 且错误信息 MUST 含**歧义契约名**
+      ★ ✅ **2026-11-08 变异对照实测**：★ 在 `ip/cpu/plugins/reg_file_chmem.h` 的 regs 构造循环后额外创建一个同名 `reg_1` ⇒ ★ runner 输出 `AMBIGUOUS_OBSERVATION: reg_1` + `ambiguous observation 'regs': contract name 'reg_1' matched 2 nodes (ids:787,880)` ⇒ **EXIT = 2**（★ 非 0/非 1）★ gate 归 `error_kind=observation_ambiguous:reg_1` ⇒ 证据 = `evidence/v25-ambiguity-evidence.txt` §3
+- [x] **A-2** ★ **前置体检**：★ 先跑既有 corpus ⇒ ★ MUST 确认**当前零歧义**（★ ⇒ 若已存在歧义 ⇒ 说明**已有假绿通道在跑** ⇒ 优先修）
+      ★ ✅ **2026-11-08 前置体检**：★ `--layer pr --jobs 4` ⇒ `verdict=PASS` · 8 case · p95 50.444s ⇒ ★ **当前零歧义** ⇒ ★ 可进入「加检测」阶段 ⇒ 证据 = `evidence/v25-ambiguity-evidence.txt` §1
+- [x] **A-3** ★ **既有门禁零退化**：★ `python3 tools/parity/parity_gate.py --self-test` ⇒ PASS
+      ★ ✅ **2026-11-08**：`python3 tools/parity/parity_gate.py --self-test` ⇒ **20/20**（★ 16 → 18 → 20：语料分层作用域 2 例 + 歧义解析 2 例）
+- [x] **A-4** ★ **既有 corpus 零退化**：★ 两侧 5 项观测量 + 确定性判据逐位相等（★ 与 `backend-parity-observability` 的既有基线一致）
+      ★ ✅ **2026-11-08**：★ 变异还原后 `--layer pr --jobs 4` ⇒ **8/8 PASS**；★ runner 单跑 observations 与 A3 首跑**逐位相同**（`regs 72c91fd2b209cdff` · `cycles 478` · `pchash 830b6af580cdf64e`）⇒ 证据 = `evidence/v25-ambiguity-evidence.txt` §3③
+- [x] **A-5** ★ ★ **协议一致性**：★ runner 的 exit 2 ⇒ `parity_gate.py` MUST 判为 **ERROR**（★ `error_kind=observation_ambiguous:<name>`）⇒ ★ **MUST NOT** 降级为 FAIL 或跳过
+      ★ ✅ **2026-11-08**：★ runner exit 2 ⇒ gate 判 **ERROR**（★ 非 FAIL / 非跳过）· `error_kind = observation_ambiguous:reg_1`（★ 契约 S-10 表 `:281` **已登记**该取值 ⇒ ★ 未另立字面量）⇒ 证据 = `evidence/v25-ambiguity-evidence.txt` §3②
+- [x] **A-6** ★ **正反两面都有**：★ 观测名**缺失** ⇒ 仍 MUST 是既有的「missing observation」⇒ exit 2（★ **MUST NOT** 被新路径吞掉）
+      ★ ✅ **2026-11-08**：★ 缺失路径**逐字保持**（仍报 `missing observation '...'`）⇒ ★ self-test 新增「stderr 无歧义前缀 ⇒ 解析为空（★ 缺失 MUST NOT 被误分类为歧义）」一例锁死
 
 
 ★ ★★ **判据口径**：★ 本 change 是**门禁自身的加固**⇒ ★ 它的判据**本身就是**「门禁在坏输入上必须红」⇒ ★ A-1 是**唯一承重判据**（★ A-2~A-6 均为回归/协议断言）。

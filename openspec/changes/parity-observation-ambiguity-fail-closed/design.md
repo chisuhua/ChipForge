@@ -13,11 +13,20 @@
 |---|---|
 | ★ **唯一改动文件** | `tools/parity_runner/parity_sim_runner.cpp`（★ **1 个文件**） |
 | 改动性质 | 解释器侧**观测名解析**从「静默取首个」⇒ 「三态 + 歧义即 ERROR(2)」 |
-| 协议变更 | ★ **零**（★ 观测契约名一字不改 · 退出码语义不变 · `parity_gate.py` **零改动**） |
+| 协议变更 | ★ **零**（★ 观测契约名一字不改 · 退出码语义不变 · ★ **JSON 报告格式零变更** ⇒ 歧义走既有 stderr 诊断通道） |
+| ★ **实际改动文件** | ★ **2 个**（★ **2026-11-08 实测修正** —— ★ 原写「唯一改动文件 = runner」是**错的**）：★ runner（★ 三态化 + 歧义诊断）· ★ `parity_gate.py`（★ **仅** `runner_error` 的分类细化 + 删旧报告 ⇒ ★ **不新增任何报告字段**） |
 | 依赖 | ★ `backend-parity-observability`（**已归档** ⇒ 依赖已解除） |
 
 ★ **零协议变更是本 change 的关键性质**：★ `parity_gate.py` 现有约定已把 runner 的 exit 2 归为
-**ERROR** ⇒ ★ 本 change **不碰** gate ⇒ ⇒ **不可能**把「歧义」降级成分歧（FAIL）或静默跳过。
+**ERROR** ⇒ ★ 本 change **不碰** gate 的判定语义 ⇒ ⇒ **不可能**把「歧义」降级成分歧（FAIL）或静默跳过。
+
+★ ★ **2026-11-08 实测修正（★ 原设计有两处错）**：
+① ★ 「gate 零改动」**不成立** —— ★ 契约 S-10 要求 `error_kind=observation_ambiguous:<name>`，
+   而 gate 现有逻辑把「runner exit 2 且无 JSON」一律归 `runner_error` ⇒ ★ **必须**加分类细化
+   ⇒ ★ 但**只改分类**，★ **不新增 JSON 报告字段** ⇒ ★ 「零协议变更」仍然成立
+② ★ gate 侧另有一个**假绿通道**（★ 变异对照实测抓到）：★ runner exit 2 时**不写** JSON
+   ⇒ ★ work-dir 里**上次成功运行**的报告会被读到 ⇒ ★ 观测侧错、门禁却绿
+   ⇒ ★ 修法 = 跑之前删旧报告（★ 见 `evidence/v25-ambiguity-evidence.txt` §4）
 
 ---
 

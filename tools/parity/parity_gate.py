@@ -364,6 +364,24 @@ def judge(case_name, sim, vl, exceptions):
 
 # ────────────────────────────────────────────────────────────── 执行两个后端
 
+# ★ ★ ADR-091 V-25（★ 契约 S-10 的 `observation_ambiguous:<key>`）：
+# ★ runner 在「观测契约名歧义」时**先于**缺失报出，并打印**固定前缀**的一行：
+#   `AMBIGUOUS_OBSERVATION: <契约名>`
+# ★ ⇒ gate 据此把 `runner_error` **细化**为 `observation_ambiguous:<name>`。
+# ★ ★ **JSON 报告协议零变更** ⇒ 走既有 stderr 诊断通道（★ 不新增报告字段）。
+AMBIGUOUS_MARKER = "AMBIGUOUS_OBSERVATION: "
+
+
+def _ambiguous_name(stderr):
+    """从 runner 的 stderr 里提取歧义契约名；无 ⇒ 空串。"""
+    if not stderr:
+        return ""
+    for line in stderr.splitlines():
+        if line.startswith(AMBIGUOUS_MARKER):
+            return line[len(AMBIGUOUS_MARKER):].strip()
+    return ""
+
+
 def _run(cmd, timeout_s):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s,
@@ -403,10 +421,20 @@ def run_simulator(case, opts):
     #   ★ 只在显式给出时传：不给 ⇒ 走各 runner 的默认（与 P2 之前逐位一致）。
     if getattr(opts, "cpu_config", ""):
         cmd += ["--config", opts.cpu_config]
+    # ★ ★ 跑之前**删掉旧报告**（★ 假绿通道，2026-11-08 变异对照实测抓到）：
+    #   runner 在 exit 2（如 ADR-091 V-25 的**歧义**）时**不写** JSON
+    #   ⇒ 若 work-dir 里留着**上次成功运行**的报告 ⇒ gate 会读到**陈旧数据**并判 PASS
+    #   ⇒ ★ 观测侧错了、门禁却绿 ⇒ 正是本契约要杜绝的「假绿」。
+    if os.path.isfile(out):
+        os.remove(out)
     proc, err = _run(cmd, case_timeout(case, opts))
     if err:
         return None, err
     if not os.path.isfile(out):
+        # ★ ADR-091 V-25：runner exit 2 且无 JSON ⇒ **歧义** ⇒ 归类为 observation_ambiguous:<name>
+        amb = _ambiguous_name(proc.stderr if proc else "")
+        if amb:
+            return None, f"observation_ambiguous:{amb}"
         return None, "simulator produced no report"
     with open(out, "r", encoding="utf-8") as fh:
         return json.load(fh), None
@@ -427,10 +455,17 @@ def run_verilator(case, opts):
     # P2: 同 simulator 侧 —— 同一份 config 必须喂给两侧, 否则比的是两种配置。
     if getattr(opts, "cpu_config", ""):
         cmd += ["--config", getattr(opts, "cpu_config")]
+    # ★ ★ 同 simulator 侧：跑之前删掉旧报告（★ 陈旧报告 ⇒ 假绿）
+    if os.path.isfile(out):
+        os.remove(out)
     proc, err = _run(cmd, case_timeout(case, opts))
     if err:
         return None, err
     if not os.path.isfile(out):
+        # ★ ADR-091 V-25：同 simulator 侧（★ Verilator 侧当前不报歧义，★ 但同一归类路径留着）
+        amb = _ambiguous_name(proc.stderr if proc else "")
+        if amb:
+            return None, f"observation_ambiguous:{amb}"
         return None, "verilator produced no report"
     with open(out, "r", encoding="utf-8") as fh:
         return json.load(fh), None
@@ -560,6 +595,15 @@ def self_test():
     checks.append(("语料存在性：选中项缺失 ⇒ ERROR（fail-closed 不变）",
                     len(_miss2) == 1 and _warn2 == [], f"missing={len(_miss2)}"))
 
+    # ★ ★ ADR-091 V-25：歧义 ⇒ `observation_ambiguous:<name>`（★ 契约 S-10 已登记该取值）
+    checks.append(("runner stderr 的歧义前缀 ⇒ 可解析出契约名",
+                    _ambiguous_name("AMBIGUOUS_OBSERVATION: reg_1\n"
+                                    "ambiguous observation 'regs': ...") == "reg_1",
+                    _ambiguous_name("AMBIGUOUS_OBSERVATION: reg_1\n")))
+    checks.append(("★ stderr 无歧义前缀 ⇒ 解析为空（★ 缺失态 MUST NOT 被误分类为歧义）",
+                    _ambiguous_name("missing observation 'pchash': node pc not found") == "",
+                    repr(_ambiguous_name("missing observation 'pchash': node pc not found"))))
+
     width = max(len(c[0]) for c in checks)
     failed = 0
     for name, passed, detail in checks:
@@ -669,13 +713,18 @@ def main(argv=None):
         vl, vl_err = run_verilator(case, opts)
         _elapsed = round(time.monotonic() - _t0, 3)
         if sim_err or vl_err:
+            err_text = sim_err or vl_err
+            # ★ ADR-091 V-25：歧义 ⇒ `observation_ambiguous:<name>`（★ 契约 S-10 已登记该取值）
+            # ★ 其余 runner 故障 ⇒ 既有 `runner_error`（★ 不变）
+            ek = ("observation_ambiguous:" + err_text.split(":", 1)[1]
+                  if err_text.startswith("observation_ambiguous:") else "runner_error")
             return {
                 "name": case["name"],
                 "observations": {},
                 "first_divergence": None,
                 "verdict": "ERROR",
-                "error_kind": "runner_error",
-                "runner_error": sim_err or vl_err,
+                "error_kind": ek,
+                "runner_error": err_text,
                 "elapsed_s": _elapsed,
             }
         j = judge(case["name"], sim, vl, exceptions)

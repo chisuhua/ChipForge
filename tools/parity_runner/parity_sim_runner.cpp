@@ -244,14 +244,52 @@ bool parse_args(int argc, char** argv, Options* o) {
   return true;
 }
 
+// ★ ★ ADR-091 V-25：观测契约名在 ctx 内 MUST 唯一。
+// ★ 三态：成功 / 缺失 / 歧义 —— ★ 「没这个观测」与「这个观测有多个候选」是**不同故障**
+//   ⇒ MUST 可区分：★ 否则「静默取首个」⇒ 观测可能读到**内部 ch_reg** 而非端口 ⇒ **假绿**。
+enum class NodeLookup { kOk, kMissing, kAmbiguous };
+
+struct NodeLookupResult {
+  NodeLookup status = NodeLookup::kMissing;
+  std::uint32_t node_id = 0;
+  std::vector<std::uint32_t> candidates;  // ★ 歧义时的**全部**候选（★ 可定位）
+};
+
 // Resolve a node id by NAME once (contract S-2 §2.1: one sweep, then direct
-// data_map() reads). Returns std::nullopt when the node does not exist.
-std::optional<std::uint32_t> resolve_node_id(ch::core::context& ctx,
-                                             const std::string& name) {
+// data_map() reads).
+// ★ v1.7：★ 一次扫描收集**全部**命中 ⇒ 三态化**不增加**扫描次数（★ 「one sweep」约束保持）。
+NodeLookupResult resolve_node_id(ch::core::context& ctx, const std::string& name) {
+  NodeLookupResult r;
   for (const auto& node : ctx.get_nodes()) {
-    if (node && node->name() == name) return node->id();
+    if (node && node->name() == name) r.candidates.push_back(node->id());
   }
-  return std::nullopt;
+  if (r.candidates.empty()) {
+    r.status = NodeLookup::kMissing;
+    return r;
+  }
+  if (r.candidates.size() > 1) {
+    r.status = NodeLookup::kAmbiguous;
+    return r;
+  }
+  r.status = NodeLookup::kOk;
+  r.node_id = r.candidates.front();
+  return r;
+}
+
+// ★ 歧义诊断（★ 契约 S-10 的 `observation_ambiguous:<key>`）：
+// ★ 第一行用**固定前缀** `AMBIGUOUS_OBSERVATION: <契约名>` ⇒ gate 侧据此归类。
+// ★ ★ **JSON 报告协议零变更** ⇒ 走既有 stderr 诊断通道（★ 不新增报告字段）。
+constexpr const char* kAmbiguousMarker = "AMBIGUOUS_OBSERVATION: ";
+
+void report_ambiguous(const std::string& observation, const std::string& contract_name,
+                      const std::vector<std::uint32_t>& ids) {
+  std::fprintf(stderr, "%s%s\n", kAmbiguousMarker, contract_name.c_str());
+  std::fprintf(stderr, "ambiguous observation '%s': contract name '%s' matched %zu nodes (ids:",
+               observation.c_str(), contract_name.c_str(), ids.size());
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    std::fprintf(stderr, "%s%u", i ? "," : "", ids[i]);
+  }
+  std::fprintf(stderr, ")\n");
 }
 
 std::optional<std::uint64_t> read_slot(const ch::data_map_t& dm,
@@ -381,19 +419,66 @@ int main(int argc, char** argv) {
   std::unique_ptr<ch::Simulator> sim = std::move(sim_res.value());
 
   // ── resolve node ids once ──────────────────────────────────────────────
-  auto tohost_id = resolve_node_id(ctx, "tohost_probe_data_proxy");
-  auto pc_id = resolve_node_id(ctx, "pc");
+  // ★ ADR-091 V-25：三态化 ⇒ 「歧义」与「缺失」**分开**处理。
+  auto tohost_res = resolve_node_id(ctx, "tohost_probe_data_proxy");
+  auto pc_res = resolve_node_id(ctx, "pc");
   // ③ memsig (contract S-6): DUT-side probe registers, named identically on
   // both backends so the two sides can be compared directly.
-  auto mem_sig_id = resolve_node_id(ctx, "mem_sig");
-  auto mem_sig_upd_id = resolve_node_id(ctx, "mem_sig_updates");
+  auto mem_sig_res = resolve_node_id(ctx, "mem_sig");
+  auto mem_sig_upd_res = resolve_node_id(ctx, "mem_sig_updates");
 
   constexpr int kNumX = 32;
-  std::vector<std::optional<std::uint32_t>> reg_ids(kNumX);
+  std::vector<NodeLookupResult> reg_res(kNumX);
   int regs_missing = 0;
   for (int i = 1; i < kNumX; ++i) {
-    reg_ids[i] = resolve_node_id(ctx, "reg_" + std::to_string(i));
-    if (!reg_ids[i]) ++regs_missing;
+    reg_res[i] = resolve_node_id(ctx, "reg_" + std::to_string(i));
+    if (reg_res[i].status == NodeLookup::kMissing) ++regs_missing;
+  }
+
+  // ── ★ 歧义 MUST **先于**缺失处理（★ 歧义是更严重的假绿风险：★ 缺失会被报出来，
+  //   ★ 歧义原本会被「静默取首个」**掩盖** ⇒ 观测读到错节点 ⇒ 门禁绿但数据错）
+  // ★ 5 类观测**逐类独立**报出（★ 消息含歧义契约名 + 全部候选 node id ⇒ 可定位）
+  if (tohost_res.status == NodeLookup::kAmbiguous) {
+    report_ambiguous("tohost", "tohost_probe_data_proxy", tohost_res.candidates);
+    return 2;
+  }
+  if (pc_res.status == NodeLookup::kAmbiguous) {
+    report_ambiguous("pchash", "pc", pc_res.candidates);
+    return 2;
+  }
+  for (int i = 1; i < kNumX; ++i) {
+    if (reg_res[i].status == NodeLookup::kAmbiguous) {
+      report_ambiguous("regs", "reg_" + std::to_string(i), reg_res[i].candidates);
+      return 2;
+    }
+  }
+  if (mem_sig_res.status == NodeLookup::kAmbiguous) {
+    report_ambiguous("memsig", "mem_sig", mem_sig_res.candidates);
+    return 2;
+  }
+  if (mem_sig_upd_res.status == NodeLookup::kAmbiguous) {
+    report_ambiguous("memsig_updates", "mem_sig_updates", mem_sig_upd_res.candidates);
+    return 2;
+  }
+
+  // ── 以下是既有的「缺失」路径（★ 逐字保持：★ 缺失仍报 missing observation ⇒ A-6）
+  auto tohost_id = tohost_res.status == NodeLookup::kOk
+                       ? std::optional<std::uint32_t>(tohost_res.node_id)
+                       : std::nullopt;
+  auto pc_id = pc_res.status == NodeLookup::kOk
+                   ? std::optional<std::uint32_t>(pc_res.node_id)
+                   : std::nullopt;
+  auto mem_sig_id = mem_sig_res.status == NodeLookup::kOk
+                        ? std::optional<std::uint32_t>(mem_sig_res.node_id)
+                        : std::nullopt;
+  auto mem_sig_upd_id = mem_sig_upd_res.status == NodeLookup::kOk
+                            ? std::optional<std::uint32_t>(mem_sig_upd_res.node_id)
+                            : std::nullopt;
+  std::vector<std::optional<std::uint32_t>> reg_ids(kNumX);
+  for (int i = 1; i < kNumX; ++i) {
+    reg_ids[i] = reg_res[i].status == NodeLookup::kOk
+                     ? std::optional<std::uint32_t>(reg_res[i].node_id)
+                     : std::nullopt;
   }
 
   if (!tohost_id) {

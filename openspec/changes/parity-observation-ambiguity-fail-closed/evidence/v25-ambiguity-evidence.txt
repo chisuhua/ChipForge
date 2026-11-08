@@ -1,0 +1,87 @@
+================================================================================
+ADR-091 V-25 落地证据 —— 观测契约名的歧义 fail-closed
+================================================================================
+
+★ change: `parity-observation-ambiguity-fail-closed`（★ = ADR-091 **V-25** 的落地）
+★ 判定依据: `docs/architecture/adr/ADR-091-chmem-open-core-port-architecture.md`（V-25）
+★ 契约依据: `docs/architecture/parity-gate-contract.md` **S-10**（`observation_ambiguous:<key>` 已登记）
+★ 边界: ★ 与 L4 `chmem-hierarchical-assembly` ①-C 的职责已划界（★ 本 change 交付**实现**，
+  ★ L4 只做「同名普查 + 消费」⇒ ★ 两者 MUST NOT 重复实现）
+
+--------------------------------------------------------------------------------
+§1  A-2 前置体检（★ 先查后改：★ 若已有歧义 ⇒ 说明「已有假绿通道在跑」⇒ 优先修歧义）
+--------------------------------------------------------------------------------
+  命令: python3 tools/parity/parity_gate.py --layer pr --jobs 4 --report build/parity/report-poa-baseline.json
+  结果: verdict=PASS · error_kind=None · cases=8 · p95=50.444s
+  ⇒ ★ **当前零歧义**（★ 8 个 PR 层 case 全部无 `observation_ambiguous`）⇒ ★ 可以进入「加检测」阶段
+
+--------------------------------------------------------------------------------
+§2  实现（★ 2 个文件）
+--------------------------------------------------------------------------------
+  ① `tools/parity_runner/parity_sim_runner.cpp`
+     · 新增 `enum class NodeLookup { kOk, kMissing, kAmbiguous }` + `NodeLookupResult`
+     · `resolve_node_id` 改为**一次扫描收集全部命中** ⇒ 三态化**不增加**扫描次数
+       （★ 契约 S-2 §2.1 的「one sweep」约束保持）
+     · 新增 `report_ambiguous()`：第一行打印**固定前缀** `AMBIGUOUS_OBSERVATION: <契约名>`，
+       第二行给完整信息（观测名 + 契约名 + **全部候选 node id**）
+     · 5 类观测**逐类独立**分派：★ `tohost_probe_data_proxy` · `pc` · `reg_1..reg_31` ·
+       `mem_sig` · `mem_sig_updates`
+     · ★ **歧义先于缺失**处理（★ 歧义是更严重的假绿风险：★ 缺失会被报出来，
+       ★ 歧义原本会被「静默取首个」**掩盖** ⇒ 观测读到错节点 ⇒ 门禁绿但数据错）
+     · ★ **缺失路径逐字保持**（★ 仍报 `missing observation '...'` ⇒ A-6）
+
+  ② `tools/parity/parity_gate.py`
+     · 新增 `AMBIGUOUS_MARKER` + `_ambiguous_name(stderr)`
+     · `run_simulator` / `run_verilator`：runner exit 2 且无 JSON ⇒ 若 stderr 含歧义前缀
+       ⇒ 返回 `observation_ambiguous:<name>`
+     · 分类处：`runner_error` ⇒ **细化为** `observation_ambiguous:<name>`（★ 契约 S-10 已登记该取值；
+       ★ 其余 runner 故障仍是 `runner_error` ⇒ 不变）
+     · ★ ★ **跑之前删掉旧报告**（★ 见 §4 的假绿通道）
+
+--------------------------------------------------------------------------------
+§3  A-1 变异对照（★ V-25 的承重判据）
+--------------------------------------------------------------------------------
+  ★ 手法：在 `ip/cpu/plugins/reg_file_chmem.h` 的 regs 构造循环后**额外创建一个同名 `reg_1`**
+    （★ 该循环本来就是 `("reg_" + std::to_string(i))` 显式命名 ⇒ 最贴近「内部节点撞契约名」的真实形态）
+  ★ 纪律：★ 临时改动 MUST 用 `cp` 覆盖还原 ⇒ ★ **MUST NOT** `git checkout`（★ 会丢未提交的工作）
+
+  ① runner 直接跑：
+      AMBIGUOUS_OBSERVATION: reg_1
+      ambiguous observation 'regs': contract name 'reg_1' matched 2 nodes (ids:787,880)
+      ⇒ **EXIT = 2**（★ 非 0（无观测）/ 非 1（后端分歧））★ 消息含**歧义契约名** + 全部候选 id
+
+  ② gate 归类：
+      [ERROR] rv32ui-p-add  runner_error=observation_ambiguous:reg_1
+      verdict=ERROR  error_kind=observation_ambiguous:reg_1  ⇒ **EXIT = 2**
+
+  ③ 还原（`cp /tmp/opencode/poa-gold.h`）⇒ `git diff` 为空 ⇒ ★ **完全还原**
+     ⇒ runner 单跑 EXIT=0（`regs 72c91fd2b209cdff` · `cycles 478` · `pchash 830b6af580cdf64e`）
+     ⇒ gate PR 层全量 **8/8 PASS**（★ 与 A3 首跑**逐位相同**）
+
+--------------------------------------------------------------------------------
+§4  ★★ 变异对照**顺带抓出的真缺陷**：陈旧报告 ⇒ 假绿
+--------------------------------------------------------------------------------
+  ★ 现象：★ 第一次跑 gate 变异时，**判 PASS**（★ 假绿！）⇒ ★ 根因：
+    ★ runner 在 exit 2（歧义）时**不写** JSON ⇒ 但 work-dir 里留着**上次成功运行**的报告
+    ⇒ ★ gate 读到**陈旧数据** ⇒ 观测侧是错的、门禁却绿
+  ★ ⇒ 修法：★ `run_simulator` / `run_verilator` 在**跑之前**删除目标 JSON
+    ⇒ ★ 「没有新报告」⇒ 不会读陈旧数据
+  ★ ⇒ **本缺陷与 ADR-091 V-25 同源**（★ 观测侧的失败没被门禁看见 ⇒ 假绿）
+    ⇒ ★ 修完后同一变异即被正确判为 `observation_ambiguous:reg_1`
+  ★ ★ **本条是「假绿通道」的又一例** ⇒ ★ 与 S-1「declared observation that is not collected
+    is an ERROR, not a skip」同精神 ⇒ ★ 已在本 change 内一并修掉
+
+--------------------------------------------------------------------------------
+§5  回归与验收
+--------------------------------------------------------------------------------
+  | 判据 | 结果 |
+  |---|---|
+  | A-1 变异对照 | ✅ runner EXIT=2 + 消息含歧义契约名 + 候选 id；gate `error_kind=observation_ambiguous:reg_1` |
+  | A-2 前置体检 | ✅ 8 case PASS · p95 50.444s · **零歧义** |
+  | A-3 既有门禁零退化 | ✅ `parity_gate.py --self-test` **20/20**（★ 16 → 18 → 20） |
+  | A-4 既有 corpus 零退化 | ✅ PR 层 **8/8 PASS** · observations 与 A3 首跑**逐位相同** |
+  | A-5 协议一致性 | ✅ runner exit 2 ⇒ gate 判 **ERROR**（★ 非 FAIL / 非跳过）· `error_kind` 用 S-10 已登记的取值 |
+  | A-6 正反两面 | ✅ 缺失态**仍**报 `missing observation`（★ self-test「stderr 无歧义前缀 ⇒ 解析为空」锁死 ⇒ 缺失 MUST NOT 被误分类为歧义） |
+
+  ★ 其它门禁零退化：`check_arch_truth` 0 命中 · doc_link 0 broken · verify_adr 0 FAILED/0 ORPHANS
+  · AC↔V 28/28 · 单测 64 passed
