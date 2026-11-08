@@ -34,6 +34,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -631,8 +632,11 @@ def main(argv=None):
 
     def _one(case):
         """跑一个 case 的两侧 ⇒ 返回该 case 的报告条目（顺序无关，事后按清单排序）。"""
+        # ★ A4（S-15）：★ 采集 per-case 墙钟时长 ⇒ ★ **只采集，不参与判定**（★ 判定逻辑一字未改）。
+        _t0 = time.monotonic()
         sim, sim_err = run_simulator(case, opts)
         vl, vl_err = run_verilator(case, opts)
+        _elapsed = round(time.monotonic() - _t0, 3)
         if sim_err or vl_err:
             return {
                 "name": case["name"],
@@ -641,6 +645,7 @@ def main(argv=None):
                 "verdict": "ERROR",
                 "error_kind": "runner_error",
                 "runner_error": sim_err or vl_err,
+                "elapsed_s": _elapsed,
             }
         j = judge(case["name"], sim, vl, exceptions)
         return {
@@ -656,6 +661,7 @@ def main(argv=None):
             "exceptions_applied": j["applied"],
             "cap": case_cap(case, opts),
             "timeout_s": case_timeout(case, opts),
+            "elapsed_s": _elapsed,
         }
 
     # ★ 并行：两侧 runner 是**独立子进程**（各自独立 context / 独立 work-dir）
@@ -710,7 +716,10 @@ def main(argv=None):
         "warnings": exc_warnings,
         "partial_cases": [c["name"] for c in per_case if c.get("vacuous_observations")],
         "jobs": opts.jobs,
-        "timings": {},
+        # ★ A4（S-15）：★ 时长采集 —— ★ **只观测，不参与判定**。
+        #   ★ 契约要求「A4 MUST 先把实测 p95 写进报告 timings，再据此定阈值」
+        #   ⇒ ★ 这里**只采集**（★ 不设任何硬阈值 —— S-15 明写「本期不设未实测的硬阈值」）。
+        "timings": _summarize_timings(per_case),
     }
     with open(opts.report, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2)
@@ -720,6 +729,47 @@ def main(argv=None):
         for w in exc_warnings:
             print(f"WARNING: {w}", file=sys.stderr)
     return {"PASS": 0, "FAIL": 1, "ERROR": 2}[verdict]
+
+
+def _percentile(values, pct):
+    """★ 分位数（线性插值）—— ★ 不引入 numpy（★ 本文件是纯 stdlib，★ 见文件头契约）。
+
+    ★ ★ 口径说明（★ 供 A4 判据 S-15 复核）：
+    - 输入为空 ⇒ 返回 None（★ 不编造 0）
+    - ★ **nearest-rank** 与 **线性插值** 两种口径在 n=8 时 p95 差异 ≤ 1 个样本的间距
+      ⇒ ★ 阈值定档前若对 p95 敏感，MUST 在本函数处显式声明口径（★ 当前 = 线性插值）。
+    """
+    if not values:
+        return None
+    xs = sorted(values)
+    if len(xs) == 1:
+        return round(xs[0], 3)
+    k = (len(xs) - 1) * (pct / 100.0)
+    lo = int(k)
+    hi = min(lo + 1, len(xs) - 1)
+    frac = k - lo
+    return round(xs[lo] + (xs[hi] - xs[lo]) * frac, 3)
+
+
+def _summarize_timings(per_case):
+    """★ A4（S-15）：★ 汇总 per-case 时长 ⇒ ★ per_case / p50 / p95 / total / jobs。
+
+    ★ ★ **只采集，不参与判定**（★ 判定逻辑在 judge() 里，★ 与本函数无耦合）。
+    ★ ★ **MUST NOT** 在此处设硬阈值（★ S-15：★ 「本期不设未实测的硬阈值」）。
+    """
+    per = {}
+    for c in per_case:
+        e = c.get("elapsed_s")
+        if isinstance(e, (int, float)):
+            per[c["name"]] = round(float(e), 3)
+    vals = list(per.values())
+    return {
+        "per_case": per,
+        "count": len(vals),
+        "p50": _percentile(vals, 50),
+        "p95": _percentile(vals, 95),
+        "total": round(sum(vals), 3) if vals else None,
+    }
 
 
 def _git_head():
